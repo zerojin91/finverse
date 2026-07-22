@@ -1,0 +1,10 @@
+[project]
+name = "finverse-workspace"
+version = "0.1.0"
+description = "Isolated development runner for the FINVERSE web service"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.uv]
+package = false
+cache-dir = ".uv-cache"
