@@ -14,13 +14,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FINVERSE | AI 금융 디지털 트윈",
+  title: "FINVERSE | 시장 인사이트와 마이 금융 트윈",
   description:
-    "시장 충격 속 선택을 내 자산과 생활 목표에 연결해 연습하는 AI 금융 디지털 트윈 서비스",
+    "시장 환경을 이해하고 조건을 시뮬레이션한 뒤 나의 금융 목표에 연결하는 AI 금융 판단 서비스",
   openGraph: {
-    title: "FINVERSE | 오늘 시장을 내 미래로",
+    title: "FINVERSE | 시장을 이해하고, 나에게 적용하다",
     description:
-      "시장 충격 속 선택을 내 자산과 생활 목표에 연결해 연습하는 AI 금융 디지털 트윈",
+      "KOSPI 시장 인사이트부터 나의 금융 트윈까지 이어지는 AI 조건부 시뮬레이션",
     type: "website",
     locale: "ko_KR",
     images: [
@@ -28,14 +28,14 @@ export const metadata: Metadata = {
         url: "/og.png",
         width: 1200,
         height: 630,
-        alt: "FINVERSE AI 금융 디지털 트윈",
+        alt: "FINVERSE 시장 인사이트와 마이 금융 트윈",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "FINVERSE | 오늘 시장을 내 미래로",
-    description: "시장 충격 속 선택을 연습하는 AI 금융 디지털 트윈",
+    title: "FINVERSE | 시장을 이해하고, 나에게 적용하다",
+    description: "시장 인사이트를 나의 금융 목표에 연결하는 AI 조건부 시뮬레이션",
     images: ["/og.png"],
   },
   icons: {

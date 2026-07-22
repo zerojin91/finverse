@@ -29,10 +29,17 @@ test("server-renders the FINVERSE B2C experience", async () => {
 
   const html = await response.text();
   assert.match(html, /<html lang="ko">/i);
-  assert.match(html, /<title>FINVERSE \| AI 금융 디지털 트윈<\/title>/i);
-  assert.match(html, /오늘 시장을 내 미래로 연결합니다/);
-  assert.match(html, /AI 반도체 랠리 이후 KOSPI 변곡점/);
-  assert.match(html, /내 상황으로 시뮬레이션/);
-  assert.match(html, /수익률보다 판단 습관을 기록합니다/);
+  assert.match(html, /<title>FINVERSE \| 시장 인사이트와 마이 금융 트윈<\/title>/i);
+  assert.match(html, /AI 반도체 랠리 이후/);
+  assert.match(html, /시장 고가 저가 종가/);
+  assert.match(html, /예측 포인트와 구간/);
+  assert.match(html, /예측값을 만든 이유 TOP 3/);
+  assert.match(html, /관련 뉴스/);
+  assert.match(html, /시나리오에 참여할 에이전트/);
+  assert.match(html, /3개 에이전트로/);
+  assert.match(html, /마이 금융 트윈/);
+  assert.doesNotMatch(html, /관련 뉴스 2건/);
+  assert.doesNotMatch(html, /예측 근거와 연결된 뉴스/);
+  assert.doesNotMatch(html, /에이전트의 가정과 조건을 직접 조정하세요/);
   assert.doesNotMatch(html, /codex-preview|Building your site|react-loading-skeleton/i);
 });
