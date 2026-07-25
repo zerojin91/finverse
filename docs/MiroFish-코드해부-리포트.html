@@ -1,0 +1,2197 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MiroFish 코드 해부 리포트</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --abyss:#06222E; --deep:#0E3A4A; --shelf:#2C6E85; --shoal:#7FA9B8;
+  --wash:#C9DBE1; --chart:#E4EDF0; --paper:#F5FAFB;
+  --mark:#AE2D68; --sand:#B07C1F;
+  --ink:#082B37; --ink2:#3C6373; --ink3:#6B8E9B;
+  --rule:#BFD4DB; --rule2:#D6E4E8;
+  --disp:'Archivo','IBM Plex Sans KR',system-ui,sans-serif;
+  --body:'IBM Plex Sans KR','Archivo',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --rail:230px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0; background:var(--chart); color:var(--ink);
+  font-family:var(--body); font-size:16px; line-height:1.78; font-weight:400;
+  -webkit-font-smoothing:antialiased;
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+}
+
+/* ---------- rail ---------- */
+.rail{
+  position:fixed; left:0; top:0; bottom:0; width:var(--rail); z-index:60;
+  background:var(--abyss); color:var(--wash);
+  padding:26px 0 20px; display:flex; flex-direction:column;
+  border-right:1px solid #0A2E3C;
+}
+.rail-id{padding:0 20px 18px; border-bottom:1px solid #143C4B}
+.rail-id b{
+  display:block; font-family:var(--disp); font-weight:800; font-size:19px;
+  font-stretch:112%; letter-spacing:-.02em; color:#EAF3F6;
+}
+.rail-id span{
+  display:block; font-family:var(--mono); font-size:9.5px; letter-spacing:.2em;
+  text-transform:uppercase; color:var(--shoal); margin-top:4px;
+}
+.rail-scroll{flex:1; overflow-y:auto; padding:14px 0 10px; scrollbar-width:thin}
+.rail-scroll::-webkit-scrollbar{width:3px}
+.rail-scroll::-webkit-scrollbar-thumb{background:#1D4C5E}
+.rail-grp{
+  font-family:var(--mono); font-size:9px; letter-spacing:.22em; text-transform:uppercase;
+  color:#4E7C8D; padding:16px 20px 7px;
+}
+.rail a{
+  display:flex; gap:9px; align-items:baseline; padding:5px 20px;
+  color:#9DBFCB; text-decoration:none; font-size:12.5px; line-height:1.45;
+  border-left:2px solid transparent; transition:color .16s,border-color .16s,background .16s;
+}
+.rail a em{font-family:var(--mono); font-style:normal; font-size:10px; color:#4E7C8D; min-width:16px}
+.rail a:hover{color:#EAF3F6; background:#0B2C39}
+.rail a.on{color:#fff; border-left-color:var(--mark); background:#0B2C39}
+.rail a.on em{color:var(--mark)}
+.rail a:focus-visible{outline:2px solid var(--mark); outline-offset:-2px}
+.rail-foot{
+  padding:12px 20px 0; border-top:1px solid #143C4B;
+  font-family:var(--mono); font-size:9.5px; letter-spacing:.06em; color:#4E7C8D; line-height:1.7;
+}
+.rail-prog{height:2px; background:#143C4B; margin:0 20px 12px}
+.rail-prog i{display:block; height:100%; width:0; background:var(--mark); transition:width .1s linear}
+
+.wrap{margin-left:var(--rail)}
+.inner{max-width:1080px; margin:0 auto; padding:0 44px}
+
+/* ---------- hero ---------- */
+.hero{
+  position:relative; background:var(--abyss); color:#DCEAEF; overflow:hidden;
+  padding:86px 0 0; isolation:isolate;
+}
+.hero-bg{position:absolute; inset:0; z-index:0; opacity:.5}
+.hero-swarm{position:absolute; inset:0; z-index:1; opacity:.85}
+.hero .inner{position:relative; z-index:2}
+.eyebrow{
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.26em; text-transform:uppercase;
+  color:var(--shoal); display:flex; gap:12px; align-items:center; margin:0 0 26px;
+}
+.eyebrow::after{content:''; flex:1; height:1px; background:#1D4C5E; max-width:180px}
+.hero h1{
+  font-family:var(--disp); font-weight:900; font-stretch:118%;
+  font-size:clamp(3.4rem,10vw,8rem); line-height:.86; letter-spacing:-.045em;
+  margin:0; color:#F2F8FA;
+}
+.hero h1 span{display:block; color:var(--shelf)}
+.hero-sub{
+  font-size:clamp(1rem,2vw,1.3rem); line-height:1.6; max-width:640px; color:#B4D0D9;
+  margin:30px 0 0; font-weight:300;
+}
+.hero-sub b{color:#F2F8FA; font-weight:600}
+.hero-meta{
+  display:flex; flex-wrap:wrap; gap:0; margin:52px 0 0;
+  border-top:1px solid #1D4C5E; border-bottom:1px solid #1D4C5E;
+}
+.hero-meta div{
+  flex:1 1 130px; padding:20px 20px 20px 0; border-right:1px solid #143C4B;
+}
+.hero-meta div:last-child{border-right:0}
+.hero-meta b{
+  display:block; font-family:var(--disp); font-weight:800; font-stretch:100%;
+  font-size:clamp(1.5rem,3vw,2.1rem); letter-spacing:-.03em; color:#F2F8FA; line-height:1;
+}
+.hero-meta span{
+  display:block; font-family:var(--mono); font-size:9.5px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--shoal); margin-top:8px;
+}
+.hero-note{
+  display:flex; gap:14px; align-items:flex-start; padding:22px 0 44px;
+  font-size:13px; color:#8FB2BE; line-height:1.7;
+}
+.hero-note b{color:var(--mark); font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; white-space:nowrap; padding-top:2px}
+
+/* ---------- sections ---------- */
+section{padding:78px 0 10px; scroll-margin-top:0}
+.sec-head{display:flex; gap:20px; align-items:flex-start; margin:0 0 34px; padding-bottom:20px; border-bottom:2px solid var(--deep)}
+.sec-no{
+  font-family:var(--mono); font-size:11px; font-weight:600; letter-spacing:.1em;
+  color:var(--mark); padding-top:9px; min-width:34px;
+}
+.sec-head h2{
+  font-family:var(--disp); font-weight:800; font-stretch:105%;
+  font-size:clamp(1.6rem,3.6vw,2.5rem); line-height:1.08; letter-spacing:-.03em;
+  margin:0; color:var(--abyss); flex:1;
+}
+.sec-head p{margin:9px 0 0; font-size:14px; color:var(--ink2); line-height:1.65; font-weight:300}
+h3{
+  font-family:var(--disp); font-weight:700; font-stretch:104%; font-size:1.16rem;
+  letter-spacing:-.015em; margin:46px 0 14px; color:var(--abyss);
+  display:flex; gap:10px; align-items:baseline;
+}
+h3::before{content:''; width:14px; height:2px; background:var(--mark); flex:none; transform:translateY(-4px)}
+h4{
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.18em; text-transform:uppercase;
+  color:var(--ink3); margin:30px 0 12px; font-weight:600;
+}
+p{margin:0 0 15px}
+a{color:var(--shelf)}
+strong{font-weight:600; color:var(--abyss)}
+code{
+  font-family:var(--mono); font-size:.855em; background:#D8E6EA; color:var(--deep);
+  padding:1.5px 5px; border-radius:2px; word-break:break-word;
+}
+.lead{font-size:17px; line-height:1.8; color:var(--ink); font-weight:300; max-width:760px}
+.lead strong{font-weight:600}
+
+/* ---------- primitives ---------- */
+.fig{margin:26px 0 30px; min-width:0}
+.fig-cap{
+  font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--ink3); margin:11px 0 0; display:flex; flex-wrap:wrap; gap:4px 9px;
+  align-items:baseline; min-width:0; overflow-wrap:anywhere;
+}
+.fig-cap b{color:var(--mark); font-weight:600}
+.card{background:var(--paper); border:1px solid var(--rule); padding:22px 24px}
+.card.dark{background:var(--abyss); border-color:var(--deep); color:#C7DDE4}
+.card.dark strong{color:#F2F8FA}
+.card.dark code{background:#0F3746; color:#9FC6D2}
+.grid{display:grid; gap:14px; min-width:0}
+.grid>*{min-width:0}
+.g2{grid-template-columns:repeat(2,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g4{grid-template-columns:repeat(4,1fr)}
+
+.stat{background:var(--paper); border:1px solid var(--rule); border-top:3px solid var(--shelf); padding:16px 18px}
+.stat b{display:block; font-family:var(--disp); font-weight:800; font-size:1.7rem; letter-spacing:-.03em; color:var(--abyss); line-height:1.05}
+.stat span{display:block; font-family:var(--mono); font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink3); margin-top:7px}
+.stat p{margin:9px 0 0; font-size:12.5px; line-height:1.55; color:var(--ink2)}
+.stat.mk{border-top-color:var(--mark)}
+.stat.sd{border-top-color:var(--sand)}
+
+table{width:100%; border-collapse:collapse; font-size:13.5px; margin:6px 0 0}
+th{
+  text-align:left; font-family:var(--mono); font-size:9.5px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--ink3); font-weight:600;
+  padding:0 12px 9px 0; border-bottom:1.5px solid var(--deep); white-space:nowrap;
+}
+td{padding:10px 12px 10px 0; border-bottom:1px solid var(--rule2); vertical-align:top; line-height:1.6}
+td code{font-size:12px}
+tbody tr:hover{background:#EDF4F6}
+.tw{overflow-x:auto; margin:20px 0 26px}
+
+pre{
+  background:var(--abyss); color:#BCD8E1; font-family:var(--mono); font-size:12.5px;
+  line-height:1.72; padding:18px 20px; overflow-x:auto; margin:16px 0 22px;
+  border-left:3px solid var(--mark);
+}
+pre b{color:#F2F8FA; font-weight:500}
+pre i{color:#5D8A9B; font-style:normal}
+pre u{color:var(--mark); text-decoration:none}
+pre s{color:#D9A340; text-decoration:none}
+
+.tag{
+  display:inline-block; font-family:var(--mono); font-size:9.5px; letter-spacing:.12em;
+  text-transform:uppercase; padding:3px 8px; border:1px solid var(--rule);
+  background:#fff; color:var(--ink2); margin:0 4px 4px 0;
+}
+.tag.a{border-color:var(--shelf); color:var(--shelf)}
+.tag.b{border-color:var(--mark); color:var(--mark)}
+.tag.c{border-color:var(--sand); color:var(--sand)}
+
+.note{
+  border-left:3px solid var(--sand); background:#FAF5E9; padding:15px 18px;
+  margin:20px 0; font-size:13.5px; line-height:1.7;
+}
+.note b{
+  display:block; font-family:var(--mono); font-size:9.5px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--sand); margin-bottom:6px;
+}
+.note.m{border-left-color:var(--mark); background:#FBEFF4}
+.note.m b{color:var(--mark)}
+
+ul.lst{list-style:none; padding:0; margin:14px 0 20px}
+ul.lst li{padding:9px 0 9px 22px; border-bottom:1px solid var(--rule2); position:relative; font-size:14px; line-height:1.65}
+ul.lst li::before{content:''; position:absolute; left:0; top:17px; width:9px; height:1.5px; background:var(--mark)}
+ul.lst li:last-child{border-bottom:0}
+
+svg{display:block; width:100%; height:auto}
+.svgbox{background:var(--paper); border:1px solid var(--rule); padding:18px}
+.svgbox.dark{background:var(--abyss); border-color:var(--deep)}
+
+@media (max-width:1000px){
+  :root{--rail:0px}
+  .rail{position:static; width:100%; height:auto; flex-direction:column; padding:18px 0}
+  .rail-scroll{max-height:none; display:flex; flex-wrap:wrap; padding:10px 12px}
+  .rail-grp{width:100%; padding:8px 8px 4px}
+  .rail a{border-left:0; border-bottom:2px solid transparent; padding:5px 10px}
+  .rail a.on{border-left:0; border-bottom-color:var(--mark)}
+  .rail-prog{margin:8px 12px}
+  .inner{padding:0 22px}
+  .g3,.g4{grid-template-columns:repeat(2,1fr)}
+}
+@media (max-width:620px){
+  .g2,.g3,.g4{grid-template-columns:1fr}
+  .hero-meta div{flex:1 1 50%; border-bottom:1px solid #143C4B}
+  section{padding:52px 0 6px}
+}
+</style>
+</head>
+<body>
+
+<nav class="rail" aria-label="목차">
+  <div class="rail-id">
+    <b>MiroFish</b>
+    <span>Codebase teardown</span>
+  </div>
+  <div class="rail-prog"><i id="prog"></i></div>
+  <div class="rail-scroll">
+    <div class="rail-grp">전체 조망</div>
+    <a href="#s01"><em>01</em>서비스 개요</a>
+    <a href="#s02"><em>02</em>전체 파이프라인</a>
+    <a href="#s03"><em>03</em>아키텍처와 코드 규모</a>
+    <div class="rail-grp">파이프라인 심층</div>
+    <a href="#s04"><em>04</em>온톨로지 생성</a>
+    <a href="#s05"><em>05</em>지식그래프 구축</a>
+    <a href="#s06"><em>06</em>페르소나 생성</a>
+    <a href="#s07"><em>07</em>시뮬레이션 설정</a>
+    <a href="#s08"><em>08</em>시뮬레이션 실행</a>
+    <a href="#s09"><em>09</em>IPC 프로토콜</a>
+    <a href="#s10"><em>10</em>그래프 역주입</a>
+    <a href="#s11"><em>11</em>리포트 에이전트</a>
+    <div class="rail-grp">주변부</div>
+    <a href="#s12"><em>12</em>API 표면</a>
+    <a href="#s13"><em>13</em>유틸리티 계층</a>
+    <a href="#s14"><em>14</em>프론트엔드</a>
+    <a href="#s15"><em>15</em>배포와 설정</a>
+    <a href="#s16"><em>16</em>총평</a>
+  </div>
+  <div class="rail-foot">
+    main @ 60757b3<br>2026-07-23<br>AGPL-3.0
+  </div>
+</nav>
+
+<div class="wrap">
+
+<header class="hero">
+  <svg class="hero-bg" viewBox="0 0 1200 700" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <g fill="none" stroke="#1B4757" stroke-width="1">
+      <path d="M-50 120C180 96 330 168 520 150 700 133 830 66 1000 84 1110 96 1180 130 1250 120"/>
+      <path d="M-50 180C170 152 340 224 530 204 720 184 840 118 1010 138 1120 150 1180 186 1250 176"/>
+      <path d="M-50 246C160 214 350 286 540 264 730 242 850 176 1020 198 1130 212 1180 248 1250 238"/>
+      <path d="M-50 318C150 282 360 354 550 330 740 306 860 240 1030 264 1140 280 1180 316 1250 306"/>
+      <path d="M-50 396C140 356 370 428 560 402 750 376 870 310 1040 336 1150 353 1180 390 1250 380"/>
+      <path d="M-50 480C130 436 380 508 570 480 760 452 880 386 1050 414 1160 432 1180 470 1250 460"/>
+      <path d="M-50 570C120 522 390 594 580 564 770 534 890 468 1060 498 1170 517 1180 556 1250 546"/>
+      <path d="M-50 666C110 614 400 686 590 654 780 622 900 556 1070 588 1180 607 1180 648 1250 638"/>
+    </g>
+    <g fill="none" stroke="#245B6E" stroke-width="1.4">
+      <path d="M-50 246C160 214 350 286 540 264 730 242 850 176 1020 198 1130 212 1180 248 1250 238"/>
+      <path d="M-50 480C130 436 380 508 570 480 760 452 880 386 1050 414 1160 432 1180 470 1250 460"/>
+    </g>
+  </svg>
+  <svg class="hero-swarm" id="swarm" viewBox="0 0 1200 700" preserveAspectRatio="xMidYMid slice" aria-hidden="true"></svg>
+
+  <div class="inner">
+    <p class="eyebrow">github.com/666ghj/MiroFish · 코드 해부 리포트</p>
+    <h1>MiroFish<span>코드 해부</span></h1>
+    <p class="hero-sub">
+      뉴스·정책 초안·소설 같은 <b>씨앗 자료 한 뭉치</b>를 넣으면, 지식그래프를 세우고 그 안의 인물들을
+      소셜미디어 계정으로 환생시켜 수십 시간의 여론을 굴린 뒤 리포트를 뽑는 엔진.
+      이 문서는 그 27,787줄이 실제로 <b>무엇을 어떤 순서로 하는지</b> 따라간 기록입니다.
+    </p>
+    <div class="hero-meta">
+      <div><b>67.1k</b><span>Stars</span></div>
+      <div><b>27,787</b><span>Backend LOC</span></div>
+      <div><b>59</b><span>API 엔드포인트</span></div>
+      <div><b>8</b><span>파이프라인 단계</span></div>
+      <div><b>4</b><span>외부 의존</span></div>
+    </div>
+    <p class="hero-note">
+      <b>기준</b>
+      <span>main 브랜치 커밋 <code>60757b3</code>(2026-07-23) 기준 전수 조사. 라인 수·함수명·상수값은 모두 해당 시점 소스에서 직접 확인한 값이며, README가 아니라 코드를 근거로 씁니다.</span>
+    </p>
+  </div>
+</header>
+<div class="inner">
+
+<!-- ============ 01 ============ -->
+<section id="s01">
+  <div class="sec-head">
+    <div class="sec-no">01</div>
+    <div>
+      <h2>이 서비스는 무엇을 하는가</h2>
+      <p>코드를 읽기 전에, 이 시스템이 사용자에게 약속하는 것과 실제로 계산하는 것을 분리해 둡니다.</p>
+    </div>
+  </div>
+
+  <p class="lead">
+    MiroFish는 <strong>"만약 이렇게 되면 어떻게 될까"를 시뮬레이션으로 답하는 엔진</strong>입니다.
+    사용자가 하는 일은 두 가지뿐입니다 — 자료를 올리고, 알고 싶은 것을 자연어로 적는 것.
+    그 뒤로는 파라미터 설정 화면이 없습니다. 에이전트를 몇 명 만들지, 며칠치를 굴릴지, 누가 언제 활동할지를
+    전부 LLM이 결정합니다. 이 <strong>"설정 없음"이 제품의 핵심 주장</strong>이고, 동시에 코드 복잡도의 대부분이 여기서 나옵니다.
+  </p>
+
+  <div class="fig">
+    <div class="svgbox">
+      <svg viewBox="0 0 1000 250" role="img" aria-label="입력에서 출력까지의 흐름">
+        <text x="0" y="12" font-family="IBM Plex Mono" font-size="10" letter-spacing="2" fill="#6B8E9B">사용자가 주는 것</text>
+        <text x="380" y="12" font-family="IBM Plex Mono" font-size="10" letter-spacing="2" fill="#6B8E9B">엔진이 만드는 것</text>
+        <text x="720" y="12" font-family="IBM Plex Mono" font-size="10" letter-spacing="2" fill="#6B8E9B">사용자가 받는 것</text>
+
+        <rect x="0" y="30" width="300" height="72" fill="#F5FAFB" stroke="#BFD4DB"/>
+        <text x="18" y="58" font-family="IBM Plex Sans KR" font-size="14" font-weight="600" fill="#082B37">씨앗 자료</text>
+        <text x="18" y="80" font-family="IBM Plex Mono" font-size="11" fill="#3C6373">PDF · MD · TXT / 최대 50MB</text>
+
+        <rect x="0" y="118" width="300" height="72" fill="#F5FAFB" stroke="#BFD4DB"/>
+        <text x="18" y="146" font-family="IBM Plex Sans KR" font-size="14" font-weight="600" fill="#082B37">예측 요구사항</text>
+        <text x="18" y="168" font-family="IBM Plex Sans KR" font-size="12" fill="#3C6373">자연어 한 문단. 파라미터 없음</text>
+
+        <path d="M310 66H358M310 154H358" stroke="#7FA9B8" stroke-width="1.2" fill="none" marker-end="url(#ar1)"/>
+        <defs><marker id="ar1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M2 1L8 5L2 9" fill="none" stroke="#7FA9B8" stroke-width="1.5"/></marker>
+        <marker id="ar2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M2 1L8 5L2 9" fill="none" stroke="#AE2D68" stroke-width="1.5"/></marker></defs>
+
+        <rect x="370" y="30" width="270" height="160" fill="#06222E"/>
+        <text x="390" y="60" font-family="Archivo" font-size="16" font-weight="800" fill="#F2F8FA">평행 디지털 세계</text>
+        <text x="390" y="86" font-family="IBM Plex Sans KR" font-size="12" fill="#8FB2BE">지식그래프 1개</text>
+        <text x="390" y="107" font-family="IBM Plex Sans KR" font-size="12" fill="#8FB2BE">페르소나 N명</text>
+        <text x="390" y="128" font-family="IBM Plex Sans KR" font-size="12" fill="#8FB2BE">Twitter · Reddit 두 세계</text>
+        <text x="390" y="149" font-family="IBM Plex Sans KR" font-size="12" fill="#8FB2BE">72시간 × 60분 라운드</text>
+        <rect x="390" y="162" width="230" height="1" fill="#1D4C5E"/>
+        <text x="390" y="180" font-family="IBM Plex Mono" font-size="10" letter-spacing="1" fill="#AE2D68">EMERGENT BEHAVIOR</text>
+
+        <path d="M650 110H698" stroke="#AE2D68" stroke-width="1.2" fill="none" marker-end="url(#ar2)"/>
+
+        <rect x="710" y="30" width="290" height="72" fill="#F5FAFB" stroke="#BFD4DB" stroke-width="1"/>
+        <rect x="710" y="30" width="3" height="72" fill="#AE2D68"/>
+        <text x="728" y="58" font-family="IBM Plex Sans KR" font-size="14" font-weight="600" fill="#082B37">예측 리포트</text>
+        <text x="728" y="80" font-family="IBM Plex Sans KR" font-size="12" fill="#3C6373">목차 계획 후 섹션별 생성</text>
+
+        <rect x="710" y="118" width="290" height="72" fill="#F5FAFB" stroke="#BFD4DB"/>
+        <rect x="710" y="118" width="3" height="72" fill="#AE2D68"/>
+        <text x="728" y="146" font-family="IBM Plex Sans KR" font-size="14" font-weight="600" fill="#082B37">살아있는 세계</text>
+        <text x="728" y="168" font-family="IBM Plex Sans KR" font-size="12" fill="#3C6373">아무 에이전트나 붙잡고 대화</text>
+
+        <text x="0" y="228" font-family="IBM Plex Sans KR" font-size="12" fill="#6B8E9B">
+          리포트가 끝나도 시뮬 프로세스는 살아 있습니다 — 명시적으로 <tspan font-family="IBM Plex Mono" fill="#3C6373">close_env</tspan> 를 부를 때까지.
+        </text>
+      </svg>
+    </div>
+    <p class="fig-cap"><b>Fig 01</b> 사용자 관점의 입출력. 중앙 블록은 디스크 위에 실제로 만들어지는 파일들입니다.</p>
+  </div>
+
+  <h3>세 가지 핵심 주장</h3>
+  <div class="grid g3">
+    <div class="stat">
+      <span>주장 1</span>
+      <b>창발</b>
+      <p>개별 에이전트에게 결말을 지시하지 않습니다. 각자 페르소나대로 행동하게 두고, 집단에서 나타나는 패턴을 결과로 봅니다.</p>
+    </div>
+    <div class="stat mk">
+      <span>주장 2</span>
+      <b>시간 축</b>
+      <p>Zep 그래프가 "지금 유효한 사실"과 "과거엔 사실이었던 것"을 구분합니다. 여론이 뒤집히는 순간을 추적할 수 있습니다.</p>
+    </div>
+    <div class="stat sd">
+      <span>주장 3</span>
+      <b>개입 가능</b>
+      <p>시뮬이 도는 중에 특정 에이전트에게 질문을 던지거나 사건을 주입할 수 있습니다. 사후 분석이 아니라 실시간 관측입니다.</p>
+    </div>
+  </div>
+
+  <h3>이 시스템이 하지 않는 일</h3>
+  <ul class="lst">
+    <li><strong>데이터를 수집하지 않습니다.</strong> 크롤러도 API 커넥터도 없습니다. 이미 정리된 문서를 받는 것에서 시작합니다. README의 우한대 데모도 <em>BettaFish</em>라는 별개 프로젝트가 만든 리포트를 씨앗으로 넣은 것입니다.</li>
+    <li><strong>확률을 계산하지 않습니다.</strong> 출력에 신뢰구간이나 확률값이 없습니다. 시나리오 서술이 나옵니다.</li>
+    <li><strong>같은 입력에 같은 출력을 주지 않습니다.</strong> 에이전트 선정이 <code>random.sample</code> 기반이고 시드 고정 코드가 없습니다 — 8장에서 자세히 다룹니다.</li>
+    <li><strong>백테스트를 제공하지 않습니다.</strong> 과거 사건으로 정확도를 검증하는 코드나 데이터셋이 레포에 없습니다.</li>
+  </ul>
+</section>
+
+<!-- ============ 02 ============ -->
+<section id="s02">
+  <div class="sec-head">
+    <div class="sec-no">02</div>
+    <div>
+      <h2>전체 파이프라인</h2>
+      <p>README는 5단계라고 말하지만, 코드는 8개의 뚜렷한 국면으로 나뉩니다. 이후 4~11장이 이 8개를 하나씩 따라갑니다.</p>
+    </div>
+  </div>
+
+  <div class="fig">
+    <div class="svgbox">
+      <svg viewBox="0 0 1000 748" role="img" aria-label="8단계 파이프라인과 담당 모듈">
+        <g font-family="IBM Plex Mono" font-size="10" letter-spacing="1.4">
+          <circle cx="8" cy="10" r="4" fill="#2C6E85"/><text x="20" y="14" fill="#6B8E9B">LLM</text>
+          <circle cx="78" cy="10" r="4" fill="#AE2D68"/><text x="90" y="14" fill="#6B8E9B">ZEP</text>
+          <circle cx="146" cy="10" r="4" fill="#B07C1F"/><text x="158" y="14" fill="#6B8E9B">OASIS</text>
+          <text x="700" y="14" fill="#6B8E9B">담당 모듈</text>
+        </g>
+        <line x1="44" y1="46" x2="44" y2="716" stroke="#BFD4DB" stroke-width="1.5"/>
+
+        <g id="stages">
+          <!-- row template repeated -->
+          <g>
+            <circle cx="44" cy="81" r="13" fill="#06222E"/><text x="44" y="85" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" font-weight="600" fill="#F2F8FA">1</text>
+            <rect x="76" y="46" width="908" height="70" fill="#F5FAFB" stroke="#BFD4DB"/>
+            <text x="96" y="74" font-family="IBM Plex Sans KR" font-size="14.5" font-weight="600" fill="#082B37">온톨로지 설계</text>
+            <text x="96" y="97" font-family="IBM Plex Sans KR" font-size="12.5" fill="#3C6373">문서를 읽고 "누가 등장인물이 될 수 있는가"의 타입 체계를 만든다 — 정확히 10종</text>
+            <text x="964" y="74" text-anchor="end" font-family="IBM Plex Mono" font-size="10.5" fill="#2C6E85">ontology_generator.py</text>
+            <text x="964" y="96" text-anchor="end" font-family="IBM Plex Mono" font-size="10" fill="#6B8E9B">732 lines</text>
+            <circle cx="88" cy="81" r="4" fill="#2C6E85"/>
+          </g>
+          <g>
+            <circle cx="44" cy="165" r="13" fill="#06222E"/><text x="44" y="169" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" font-weight="600" fill="#F2F8FA">2</text>
+            <rect x="76" y="130" width="908" height="70" fill="#F5FAFB" stroke="#BFD4DB"/>
+            <text x="96" y="158" font-family="IBM Plex Sans KR" font-size="14.5" font-weight="600" fill="#082B37">지식그래프 구축</text>
+            <text x="96" y="181" font-family="IBM Plex Sans KR" font-size="12.5" fill="#3C6373">타입 정의를 파이썬 클래스로 찍어내고, 문서를 350개씩 배치로 Zep에 밀어넣는다</text>
+            <text x="964" y="158" text-anchor="end" font-family="IBM Plex Mono" font-size="10.5" fill="#2C6E85">graph_builder.py</text>
+            <text x="964" y="180" text-anchor="end" font-family="IBM Plex Mono" font-size="10" fill="#6B8E9B">879 lines</text>
+            <circle cx="88" cy="165" r="4" fill="#AE2D68"/>
+          </g>
+          <g>
+            <circle cx="44" cy="249" r="13" fill="#06222E"/><text x="44" y="253" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" font-weight="600" fill="#F2F8FA">3</text>
+            <rect x="76" y="214" width="908" height="70" fill="#F5FAFB" stroke="#BFD4DB"/>
+            <text x="96" y="242" font-family="IBM Plex Sans KR" font-size="14.5" font-weight="600" fill="#082B37">페르소나 생성</text>
+            <text x="96" y="265" font-family="IBM Plex Sans KR" font-size="12.5" fill="#3C6373">그래프의 각 노드를 소셜미디어 계정으로 환생시킨다. 개인이면 사람, 조직이면 대변인</text>
+            <text x="964" y="242" text-anchor="end" font-family="IBM Plex Mono" font-size="10.5" fill="#2C6E85">oasis_profile_generator.py</text>
+            <text x="964" y="264" text-anchor="end" font-family="IBM Plex Mono" font-size="10" fill="#6B8E9B">1,248 lines</text>
+            <circle cx="88" cy="243" r="4" fill="#2C6E85"/><circle cx="88" cy="255" r="4" fill="#AE2D68"/>
+          </g>
+          <g>
+            <circle cx="44" cy="333" r="13" fill="#06222E"/><text x="44" y="337" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" font-weight="600" fill="#F2F8FA">4</text>
+            <rect x="76" y="298" width="908" height="70" fill="#F5FAFB" stroke="#BFD4DB"/>
+            <text x="96" y="326" font-family="IBM Plex Sans KR" font-size="14.5" font-weight="600" fill="#082B37">시뮬레이션 설정 생성</text>
+            <text x="96" y="349" font-family="IBM Plex Sans KR" font-size="12.5" fill="#3C6373">며칠치를 굴릴지, 누가 언제 활동할지, 어떤 사건으로 시작할지를 LLM이 4단계로 나눠 결정</text>
+            <text x="964" y="326" text-anchor="end" font-family="IBM Plex Mono" font-size="10.5" fill="#2C6E85">simulation_config_generator.py</text>
+            <text x="964" y="348" text-anchor="end" font-family="IBM Plex Mono" font-size="10" fill="#6B8E9B">993 lines</text>
+            <circle cx="88" cy="333" r="4" fill="#2C6E85"/>
+          </g>
+          <g>
+            <circle cx="44" cy="417" r="13" fill="#AE2D68"/><text x="44" y="421" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" font-weight="600" fill="#fff">5</text>
+            <rect x="76" y="382" width="908" height="70" fill="#F5FAFB" stroke="#AE2D68"/>
+            <text x="96" y="410" font-family="IBM Plex Sans KR" font-size="14.5" font-weight="600" fill="#082B37">시뮬레이션 실행</text>
+            <text x="96" y="433" font-family="IBM Plex Sans KR" font-size="12.5" fill="#3C6373">별도 프로세스에서 OASIS 환경을 띄우고 라운드를 돌린다. 여기가 토큰을 태우는 곳</text>
+            <text x="964" y="410" text-anchor="end" font-family="IBM Plex Mono" font-size="10.5" fill="#2C6E85">simulation_runner.py + scripts/</text>
+            <text x="964" y="432" text-anchor="end" font-family="IBM Plex Mono" font-size="10" fill="#6B8E9B">2,033 + 3,248 lines</text>
+            <circle cx="88" cy="411" r="4" fill="#B07C1F"/><circle cx="88" cy="423" r="4" fill="#2C6E85"/>
+          </g>
+          <g>
+            <circle cx="44" cy="501" r="13" fill="#06222E"/><text x="44" y="505" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" font-weight="600" fill="#F2F8FA">6</text>
+            <rect x="76" y="466" width="908" height="70" fill="#F5FAFB" stroke="#BFD4DB"/>
+            <text x="96" y="494" font-family="IBM Plex Sans KR" font-size="14.5" font-weight="600" fill="#082B37">프로세스 간 통신</text>
+            <text x="96" y="517" font-family="IBM Plex Sans KR" font-size="12.5" fill="#3C6373">돌아가는 세계 안으로 질문을 밀어넣는다. 소켓이 아니라 디렉터리 두 개로</text>
+            <text x="964" y="494" text-anchor="end" font-family="IBM Plex Mono" font-size="10.5" fill="#2C6E85">simulation_ipc.py</text>
+            <text x="964" y="516" text-anchor="end" font-family="IBM Plex Mono" font-size="10" fill="#6B8E9B">394 lines</text>
+            <circle cx="88" cy="501" r="4" fill="#B07C1F"/>
+          </g>
+          <g>
+            <circle cx="44" cy="585" r="13" fill="#06222E"/><text x="44" y="589" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" font-weight="600" fill="#F2F8FA">7</text>
+            <rect x="76" y="550" width="908" height="70" fill="#F5FAFB" stroke="#BFD4DB"/>
+            <text x="96" y="578" font-family="IBM Plex Sans KR" font-size="14.5" font-weight="600" fill="#082B37">그래프 역주입</text>
+            <text x="96" y="601" font-family="IBM Plex Sans KR" font-size="12.5" fill="#3C6373">시뮬 중 일어난 일을 자연어 문장으로 바꿔 그래프에 다시 쓴다. 그래프가 자란다</text>
+            <text x="964" y="578" text-anchor="end" font-family="IBM Plex Mono" font-size="10.5" fill="#2C6E85">zep_graph_memory_updater.py</text>
+            <text x="964" y="600" text-anchor="end" font-family="IBM Plex Mono" font-size="10" fill="#6B8E9B">791 lines</text>
+            <circle cx="88" cy="585" r="4" fill="#AE2D68"/>
+          </g>
+          <g>
+            <circle cx="44" cy="669" r="13" fill="#06222E"/><text x="44" y="673" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" font-weight="600" fill="#F2F8FA">8</text>
+            <rect x="76" y="634" width="908" height="70" fill="#F5FAFB" stroke="#BFD4DB"/>
+            <text x="96" y="662" font-family="IBM Plex Sans KR" font-size="14.5" font-weight="600" fill="#082B37">리포트 작성</text>
+            <text x="96" y="685" font-family="IBM Plex Sans KR" font-size="12.5" fill="#3C6373">ReACT 에이전트가 목차를 짜고, 섹션마다 최소 3번 검색한 뒤 쓴다</text>
+            <text x="964" y="662" text-anchor="end" font-family="IBM Plex Mono" font-size="10.5" fill="#2C6E85">report_agent.py + zep_tools.py</text>
+            <text x="964" y="684" text-anchor="end" font-family="IBM Plex Mono" font-size="10" fill="#6B8E9B">4,353 lines</text>
+            <circle cx="88" cy="657" r="4" fill="#2C6E85"/><circle cx="88" cy="669" r="4" fill="#AE2D68"/><circle cx="88" cy="681" r="4" fill="#B07C1F"/>
+          </g>
+        </g>
+        <path d="M44 716 L38 704 L50 704 Z" fill="#BFD4DB"/>
+      </svg>
+    </div>
+    <p class="fig-cap"><b>Fig 02</b> 왼쪽 점은 각 단계가 어떤 외부 서비스를 건드리는지 표시합니다. 8단계만 셋 다 씁니다.</p>
+  </div>
+
+  <div class="note m">
+    <b>여기서 눈여겨볼 것</b>
+    5단계와 7단계가 <strong>동시에</strong> 돌아갑니다. 시뮬레이션이 라운드를 굴리는 동안 별도 워커 스레드가 그 결과를 계속 그래프에 밀어넣습니다.
+    그래서 8단계의 리포트 에이전트가 검색을 시작할 때, 그래프는 이미 "원본 자료 + 시뮬레이션 중 벌어진 사건"을 모두 담고 있습니다.
+    이 되먹임 구조가 이 프로젝트에서 가장 특징적인 설계입니다.
+  </div>
+</section>
+
+<!-- ============ 03 ============ -->
+<section id="s03">
+  <div class="sec-head">
+    <div class="sec-no">03</div>
+    <div>
+      <h2>아키텍처와 코드 규모</h2>
+      <p>어디에 무엇이 있고, 어디에 무게가 실려 있는지.</p>
+    </div>
+  </div>
+
+  <div class="fig">
+    <div class="svgbox">
+      <svg viewBox="0 0 1000 500" role="img" aria-label="시스템 아키텍처">
+        <text x="0" y="12" font-family="IBM Plex Mono" font-size="10" letter-spacing="2" fill="#6B8E9B">브라우저</text>
+        <rect x="0" y="24" width="1000" height="76" fill="#F5FAFB" stroke="#BFD4DB"/>
+        <text x="20" y="52" font-family="IBM Plex Sans KR" font-size="14" font-weight="600" fill="#082B37">Vue 3 · Vite 7 · vue-router · vue-i18n · D3</text>
+        <text x="20" y="76" font-family="IBM Plex Mono" font-size="11" fill="#3C6373">:3000 — Step1GraphBuild … Step5Interaction (20,414 lines)</text>
+        <text x="980" y="52" text-anchor="end" font-family="IBM Plex Mono" font-size="10.5" fill="#AE2D68">WebSocket 없음</text>
+        <text x="980" y="74" text-anchor="end" font-family="IBM Plex Mono" font-size="10.5" fill="#6B8E9B">전부 폴링</text>
+
+        <path d="M500 100V128" stroke="#7FA9B8" stroke-width="1.2" marker-end="url(#ar1)"/>
+        <text x="512" y="120" font-family="IBM Plex Mono" font-size="10" fill="#6B8E9B">axios / HTTP</text>
+
+        <text x="0" y="152" font-family="IBM Plex Mono" font-size="10" letter-spacing="2" fill="#6B8E9B">Flask 프로세스 — 단일 프로세스 전제</text>
+        <rect x="0" y="164" width="1000" height="142" fill="#06222E"/>
+        <rect x="20" y="184" width="300" height="46" fill="#0E3A4A"/>
+        <text x="34" y="206" font-family="IBM Plex Mono" font-size="11" fill="#EAF3F6">api/graph.py</text>
+        <text x="306" y="206" text-anchor="end" font-family="IBM Plex Mono" font-size="10" fill="#7FA9B8">10 routes</text>
+        <text x="34" y="222" font-family="IBM Plex Mono" font-size="10" fill="#5D8A9B">963 lines</text>
+        <rect x="336" y="184" width="300" height="46" fill="#0E3A4A"/>
+        <text x="350" y="206" font-family="IBM Plex Mono" font-size="11" fill="#EAF3F6">api/simulation.py</text>
+        <text x="622" y="206" text-anchor="end" font-family="IBM Plex Mono" font-size="10" fill="#AE2D68">31 routes</text>
+        <text x="350" y="222" font-family="IBM Plex Mono" font-size="10" fill="#5D8A9B">2,878 lines</text>
+        <rect x="652" y="184" width="328" height="46" fill="#0E3A4A"/>
+        <text x="666" y="206" font-family="IBM Plex Mono" font-size="11" fill="#EAF3F6">api/report.py</text>
+        <text x="966" y="206" text-anchor="end" font-family="IBM Plex Mono" font-size="10" fill="#7FA9B8">18 routes</text>
+        <text x="666" y="222" font-family="IBM Plex Mono" font-size="10" fill="#5D8A9B">1,139 lines</text>
+
+        <rect x="20" y="246" width="960" height="42" fill="#14414F"/>
+        <text x="34" y="272" font-family="IBM Plex Sans KR" font-size="13" font-weight="600" fill="#EAF3F6">services/ — 13개 모듈, 12,000여 줄</text>
+        <text x="966" y="272" text-anchor="end" font-family="IBM Plex Mono" font-size="10" fill="#7FA9B8">상태는 클래스 변수에 보관</text>
+
+        <path d="M170 306V342" stroke="#AE2D68" stroke-width="1.2" marker-end="url(#ar2)"/>
+        <path d="M500 306V342" stroke="#7FA9B8" stroke-width="1.2" marker-end="url(#ar1)"/>
+        <path d="M830 306V342" stroke="#7FA9B8" stroke-width="1.2" marker-end="url(#ar1)"/>
+
+        <text x="0" y="332" font-family="IBM Plex Mono" font-size="10" letter-spacing="2" fill="#6B8E9B">외부 경계</text>
+
+        <rect x="0" y="342" width="330" height="112" fill="#F5FAFB" stroke="#AE2D68" stroke-dasharray="4 3"/>
+        <text x="20" y="368" font-family="IBM Plex Sans KR" font-size="13.5" font-weight="600" fill="#082B37">OASIS 서브프로세스</text>
+        <text x="20" y="390" font-family="IBM Plex Mono" font-size="10.5" fill="#3C6373">python run_*_simulation.py</text>
+        <text x="20" y="409" font-family="IBM Plex Mono" font-size="10.5" fill="#3C6373">asyncio 루프 · semaphore=30</text>
+        <text x="20" y="428" font-family="IBM Plex Mono" font-size="10.5" fill="#AE2D68">↕ 파일시스템 IPC</text>
+        <text x="20" y="446" font-family="IBM Plex Mono" font-size="10.5" fill="#3C6373">→ *_simulation.db (SQLite)</text>
+
+        <rect x="346" y="342" width="308" height="112" fill="#F5FAFB" stroke="#BFD4DB"/>
+        <text x="366" y="368" font-family="IBM Plex Sans KR" font-size="13.5" font-weight="600" fill="#082B37">Zep Cloud</text>
+        <text x="366" y="390" font-family="IBM Plex Mono" font-size="10.5" fill="#3C6373">zep-cloud 3.25.0</text>
+        <text x="366" y="409" font-family="IBM Plex Sans KR" font-size="11.5" fill="#3C6373">지식그래프 + 에이전트 장기기억</text>
+        <text x="366" y="428" font-family="IBM Plex Sans KR" font-size="11.5" fill="#AE2D68">셀프호스팅 불가 — 기동 시 차단</text>
+
+        <rect x="670" y="342" width="330" height="112" fill="#F5FAFB" stroke="#BFD4DB"/>
+        <text x="690" y="368" font-family="IBM Plex Sans KR" font-size="13.5" font-weight="600" fill="#082B37">LLM 엔드포인트</text>
+        <text x="690" y="390" font-family="IBM Plex Mono" font-size="10.5" fill="#3C6373">OpenAI SDK 호환 아무거나</text>
+        <text x="690" y="409" font-family="IBM Plex Sans KR" font-size="11.5" fill="#3C6373">기본 권장: 알리바바 바이롄 qwen-plus</text>
+        <text x="690" y="428" font-family="IBM Plex Sans KR" font-size="11.5" fill="#3C6373">선택: LLM_BOOST_* 별도 가속 모델</text>
+
+        <text x="0" y="482" font-family="IBM Plex Sans KR" font-size="12" fill="#6B8E9B">영속화는 Zep(그래프) · SQLite(시뮬 결과) · JSON 파일(프로젝트·태스크·런상태) 세 곳에 나뉘어 있고, 관계형 DB는 없습니다.</text>
+      </svg>
+    </div>
+    <p class="fig-cap"><b>Fig 03</b> 점선 박스가 프로세스 경계입니다. 이 경계 때문에 9장의 파일 IPC가 필요해집니다.</p>
+  </div>
+
+  <h3>무게가 실린 곳</h3>
+  <p>백엔드 27,787줄 중 상위 8개 파일이 절반을 넘게 차지합니다. 특히 <code>api/simulation.py</code>는 라우트 파일인데도 단일 파일 최대입니다.</p>
+
+  <div class="fig">
+    <div class="svgbox">
+      <svg viewBox="0 0 1000 446" role="img" aria-label="파일별 코드 라인 수">
+        <g font-family="IBM Plex Mono" font-size="10.5" fill="#6B8E9B">
+          <text x="0" y="10">파일별 라인 수 · 상위 14</text>
+          <text x="770" y="10" fill="#2C6E85">■ services</text>
+          <text x="860" y="10" fill="#AE2D68">■ api</text>
+          <text x="920" y="10" fill="#B07C1F">■ scripts</text>
+        </g>
+        <g font-family="IBM Plex Mono" font-size="11">
+          <text x="0" y="38" fill="#082B37">api/simulation.py</text><rect x="250" y="27" width="620" height="14" fill="#AE2D68"/><text x="880" y="38" fill="#3C6373">2,878</text>
+          <text x="0" y="63" fill="#082B37">services/report_agent.py</text><rect x="250" y="52" width="564" height="14" fill="#2C6E85"/><text x="824" y="63" fill="#3C6373">2,619</text>
+          <text x="0" y="88" fill="#082B37">services/simulation_runner.py</text><rect x="250" y="77" width="438" height="14" fill="#2C6E85"/><text x="698" y="88" fill="#3C6373">2,033</text>
+          <text x="0" y="113" fill="#082B37">services/zep_tools.py</text><rect x="250" y="102" width="373" height="14" fill="#2C6E85"/><text x="633" y="113" fill="#3C6373">1,734</text>
+          <text x="0" y="138" fill="#082B37">scripts/run_parallel_simulation.py</text><rect x="250" y="127" width="366" height="14" fill="#B07C1F"/><text x="626" y="138" fill="#3C6373">1,699</text>
+          <text x="0" y="163" fill="#082B37">services/oasis_profile_generator.py</text><rect x="250" y="152" width="269" height="14" fill="#2C6E85"/><text x="529" y="163" fill="#3C6373">1,248</text>
+          <text x="0" y="188" fill="#082B37">api/report.py</text><rect x="250" y="177" width="245" height="14" fill="#AE2D68"/><text x="505" y="188" fill="#3C6373">1,139</text>
+          <text x="0" y="213" fill="#082B37">services/simulation_config_generator.py</text><rect x="250" y="202" width="214" height="14" fill="#2C6E85"/><text x="474" y="213" fill="#3C6373">993</text>
+          <text x="0" y="238" fill="#082B37">api/graph.py</text><rect x="250" y="227" width="207" height="14" fill="#AE2D68"/><text x="467" y="238" fill="#3C6373">963</text>
+          <text x="0" y="263" fill="#082B37">scripts/validate_zep_cloud_integration.py</text><rect x="250" y="252" width="195" height="14" fill="#B07C1F"/><text x="455" y="263" fill="#3C6373">904</text>
+          <text x="0" y="288" fill="#082B37">services/graph_builder.py</text><rect x="250" y="277" width="189" height="14" fill="#2C6E85"/><text x="449" y="288" fill="#3C6373">879</text>
+          <text x="0" y="313" fill="#082B37">services/zep_graph_memory_updater.py</text><rect x="250" y="302" width="170" height="14" fill="#2C6E85"/><text x="430" y="313" fill="#3C6373">791</text>
+          <text x="0" y="338" fill="#082B37">scripts/run_twitter_simulation.py</text><rect x="250" y="327" width="168" height="14" fill="#B07C1F"/><text x="428" y="338" fill="#3C6373">780</text>
+          <text x="0" y="363" fill="#082B37">services/ontology_generator.py</text><rect x="250" y="352" width="158" height="14" fill="#2C6E85"/><text x="418" y="363" fill="#3C6373">732</text>
+        </g>
+        <line x1="250" y1="380" x2="1000" y2="380" stroke="#BFD4DB"/>
+        <g font-family="IBM Plex Sans KR" font-size="12" fill="#3C6373">
+          <text x="0" y="406">Python 백엔드 <tspan font-family="IBM Plex Mono" fill="#082B37">27,787</tspan> · Vue 프론트 <tspan font-family="IBM Plex Mono" fill="#082B37">20,414</tspan> · 로케일 사전 <tspan font-family="IBM Plex Mono" fill="#082B37">75KB</tspan></text>
+          <text x="0" y="430">테스트 18개 중 <tspan font-family="IBM Plex Mono" fill="#AE2D68">9개</tspan>가 Zep 연동 검증. 시뮬 루프와 리포트 생성 로직은 사실상 미커버.</text>
+        </g>
+      </svg>
+    </div>
+    <p class="fig-cap"><b>Fig 04</b> 라우트 파일(자홍)이 상위권에 세 개나 있다는 게 이 코드베이스의 구조적 부채를 요약합니다.</p>
+  </div>
+
+  <h3>디렉터리 배치</h3>
+<pre><b>backend/</b>
+├── run.py                   <i># 진입점 50줄. Config.validate() 실패 시 즉시 종료</i>
+├── app/
+│   ├── __init__.py          <i># 앱 팩토리 + 블루프린트 + 프로세스 정리 훅 등록</i>
+│   ├── config.py            <i># .env, OASIS 액션 목록, ReportAgent 상수</i>
+│   ├── api/                 <u>4,980줄</u> <i>— 라우트... 이자 로직</i>
+│   ├── services/            <u>12,000+줄</u> <i>— 13개 모듈, 진짜 코드</i>
+│   ├── models/              <i># Project · Task — JSON 파일 영속화</i>
+│   └── utils/               <i># LLM·Zep 래퍼, 재시도, 로케일, 파일 파서</i>
+├── scripts/                 <u>4,623줄</u> <i>— subprocess로 실행되는 OASIS 러너</i>
+└── tests/                   <i># pytest 18개</i>
+
+<b>frontend/src/</b>
+├── api/                     <i># axios 모듈 4개 (index·graph·simulation·report)</i>
+├── views/                   <i># 라우트 7개</i>
+└── components/              <i># Step1GraphBuild … Step5Interaction</i>
+
+<b>locales/</b>  <i>en.json · zh.json — 한국어 없음</i></pre>
+
+  <div class="note">
+    <b>읽는 순서 제안</b>
+    <code>app/__init__.py</code> → <code>config.py</code> → <code>services/</code>의 8개 파이프라인 모듈 순서대로.
+    <code>api/simulation.py</code>는 마지막에 보세요. 2,878줄이 시간순이 아니라 엔드포인트 순으로 배열돼 있어서
+    파이프라인을 모르는 상태로 읽으면 길을 잃습니다.
+  </div>
+</section>
+<!-- ============ 04 ============ -->
+<section id="s04">
+  <div class="sec-head">
+    <div class="sec-no">04</div>
+    <div>
+      <h2>온톨로지 생성</h2>
+      <p><code>services/ontology_generator.py</code> · 732줄 · 그중 절반이 프롬프트 하나</p>
+    </div>
+  </div>
+
+  <p class="lead">
+    첫 단계에서 시스템이 던지는 질문은 "이 문서에 무엇이 있는가"가 아니라
+    <strong>"이 문서에서 누가 트위터 계정을 가질 수 있는가"</strong>입니다.
+    이 질문 하나가 이후 모든 단계의 성격을 결정합니다.
+  </p>
+
+  <h3>정확히 10개, 마지막 둘은 고정</h3>
+  <p>
+    프롬프트는 엔티티 타입 개수를 협상 불가능하게 못박습니다. 그리고 그중 마지막 두 개는 항상 <code>Person</code>과 <code>Organization</code>입니다.
+  </p>
+
+  <div class="fig">
+    <div class="svgbox">
+      <svg viewBox="0 0 1000 268" role="img" aria-label="온톨로지 10슬롯 구조">
+        <text x="0" y="12" font-family="IBM Plex Mono" font-size="10" letter-spacing="2" fill="#6B8E9B">슬롯 1–8 · 문서를 읽고 설계</text>
+        <text x="700" y="12" font-family="IBM Plex Mono" font-size="10" letter-spacing="2" fill="#AE2D68">슬롯 9–10 · 고정</text>
+
+        <g font-family="IBM Plex Mono" font-size="11">
+          <rect x="0" y="24" width="164" height="52" fill="#F5FAFB" stroke="#BFD4DB"/><text x="14" y="46" fill="#082B37">Student</text><text x="14" y="65" font-size="9.5" fill="#6B8E9B">학생</text>
+          <rect x="174" y="24" width="164" height="52" fill="#F5FAFB" stroke="#BFD4DB"/><text x="188" y="46" fill="#082B37">Professor</text><text x="188" y="65" font-size="9.5" fill="#6B8E9B">교수 · 연구자</text>
+          <rect x="348" y="24" width="164" height="52" fill="#F5FAFB" stroke="#BFD4DB"/><text x="362" y="46" fill="#082B37">Journalist</text><text x="362" y="65" font-size="9.5" fill="#6B8E9B">기자</text>
+          <rect x="522" y="24" width="164" height="52" fill="#F5FAFB" stroke="#BFD4DB"/><text x="536" y="46" fill="#082B37">University</text><text x="536" y="65" font-size="9.5" fill="#6B8E9B">대학</text>
+
+          <rect x="0" y="86" width="164" height="52" fill="#F5FAFB" stroke="#BFD4DB"/><text x="14" y="108" fill="#082B37">MediaOutlet</text><text x="14" y="127" font-size="9.5" fill="#6B8E9B">언론사</text>
+          <rect x="174" y="86" width="164" height="52" fill="#F5FAFB" stroke="#BFD4DB"/><text x="188" y="108" fill="#082B37">GovernmentAgency</text><text x="188" y="127" font-size="9.5" fill="#6B8E9B">정부기관</text>
+          <rect x="348" y="86" width="164" height="52" fill="#F5FAFB" stroke="#BFD4DB"/><text x="362" y="108" fill="#082B37">Company</text><text x="362" y="127" font-size="9.5" fill="#6B8E9B">기업</text>
+          <rect x="522" y="86" width="164" height="52" fill="#F5FAFB" stroke="#BFD4DB"/><text x="536" y="108" fill="#082B37">Official</text><text x="536" y="127" font-size="9.5" fill="#6B8E9B">공무원</text>
+
+          <rect x="700" y="24" width="300" height="52" fill="#FBEFF4" stroke="#AE2D68"/><text x="714" y="46" fill="#082B37" font-weight="600">Person</text><text x="714" y="65" font-size="9.5" fill="#AE2D68">어디에도 안 맞는 모든 자연인</text>
+          <rect x="700" y="86" width="300" height="52" fill="#FBEFF4" stroke="#AE2D68"/><text x="714" y="108" fill="#082B37" font-weight="600">Organization</text><text x="714" y="127" font-size="9.5" fill="#AE2D68">어디에도 안 맞는 모든 조직</text>
+        </g>
+
+        <line x1="0" y1="162" x2="1000" y2="162" stroke="#BFD4DB"/>
+        <text x="0" y="188" font-family="IBM Plex Sans KR" font-size="13" font-weight="600" fill="#082B37">폴백 타입이 왜 필요한가 — 프롬프트에 적힌 이유</text>
+        <text x="0" y="212" font-family="IBM Plex Sans KR" font-size="12.5" fill="#3C6373">텍스트에는 "중고등학교 교사", "지나가던 행인", "어떤 네티즌"이 반드시 등장합니다.</text>
+        <text x="0" y="234" font-family="IBM Plex Sans KR" font-size="12.5" fill="#3C6373">구체 타입에 매칭되지 않으면 갈 곳이 없어 그래프에서 통째로 누락됩니다.</text>
+        <text x="0" y="256" font-family="IBM Plex Sans KR" font-size="12.5" fill="#AE2D68">여론 시뮬레이션에서 "이름 없는 다수"가 빠지면 시뮬레이션 자체가 성립하지 않습니다.</text>
+      </svg>
+    </div>
+    <p class="fig-cap"><b>Fig 05</b> 슬롯 1–8의 이름은 문서마다 달라지지만 9–10은 항상 같습니다. 관계 타입은 6–10개, <code>UPPER_SNAKE_CASE</code> 강제.</p>
+  </div>
+
+  <h3>엔티티가 될 수 있는 것과 없는 것</h3>
+  <p>
+    프롬프트에서 가장 많은 분량을 쓰는 규칙입니다. 지식그래프 일반론에서는 "학술 정직성" 같은 개념도 훌륭한 노드지만,
+    여기서는 <strong>발언할 수 없는 것은 노드가 될 수 없습니다</strong>. 모든 노드가 나중에 계정으로 변환되기 때문입니다.
+  </p>
+
+  <div class="grid g2">
+    <div class="card">
+      <h4 style="margin-top:0; color:var(--shelf)">허용 — 발언할 수 있는 주체</h4>
+      <p style="font-size:13.5px; margin:0">
+        구체적 개인(공인·당사자·오피니언 리더·전문가·일반인), 기업과 공식 계정, 조직(대학·협회·NGO·노조),
+        정부·규제 기관, 미디어(신문·방송·1인 미디어), 소셜 플랫폼 자체, 특정 집단의 대표(동문회·팬덤·권익 단체).
+      </p>
+    </div>
+    <div class="card" style="border-left:3px solid var(--mark)">
+      <h4 style="margin-top:0; color:var(--mark)">금지 — 추상 개념</h4>
+      <p style="font-size:13.5px; margin:0">
+        "여론", "정서", "트렌드" 같은 <strong>추상 개념</strong>. "학술 정직성", "교육 개혁" 같은 <strong>주제·화제</strong>.
+        "찬성측", "반대측" 같은 <strong>입장·태도</strong>. 이것들은 시뮬레이션 <em>결과</em>로 나와야 할 것이지 입력이 아닙니다.
+      </p>
+    </div>
+  </div>
+
+  <h3>긴 문서를 다루는 법</h3>
+  <p>
+    LLM에 넘기는 텍스트 상한은 <code>MAX_TEXT_LENGTH_FOR_LLM = 50000</code>자입니다.
+    흔한 구현은 앞에서 5만 자를 자르고 마는데, 여기서는 그렇게 하지 않습니다.
+  </p>
+
+  <div class="fig">
+    <div class="svgbox">
+      <svg viewBox="0 0 1000 300" role="img" aria-label="긴 문서 샘플링 전략 비교">
+        <text x="0" y="12" font-family="IBM Plex Mono" font-size="10" letter-spacing="1.6" fill="#6B8E9B">원본 — 예: 홍루몽 80회, 수십만 자</text>
+        <rect x="0" y="24" width="1000" height="26" fill="#D6E4E8"/>
+        <g font-family="IBM Plex Sans KR" font-size="10" fill="#3C6373">
+          <text x="10" y="41">1회</text><text x="480" y="41">40회</text><text x="945" y="41">80회</text>
+        </g>
+
+        <text x="0" y="84" font-family="IBM Plex Mono" font-size="10" letter-spacing="1.6" fill="#AE2D68">흔한 구현 — 앞에서 자르기</text>
+        <rect x="0" y="96" width="1000" height="26" fill="#EDF4F6"/>
+        <rect x="0" y="96" width="180" height="26" fill="#AE2D68"/>
+        <text x="196" y="114" font-family="IBM Plex Sans KR" font-size="12" fill="#3C6373">뒤쪽 인물이 통째로 사라짐 — 후반부에만 등장하는 배역은 온톨로지에 반영되지 않음</text>
+
+        <text x="0" y="156" font-family="IBM Plex Mono" font-size="10" letter-spacing="1.6" fill="#2C6E85">MiroFish — 전역 청크 샘플링</text>
+        <rect x="0" y="168" width="1000" height="26" fill="#EDF4F6"/>
+        <g fill="#2C6E85">
+          <rect x="0" y="168" width="58" height="26"/><rect x="94" y="168" width="58" height="26"/>
+          <rect x="188" y="168" width="58" height="26"/><rect x="282" y="168" width="58" height="26"/>
+          <rect x="376" y="168" width="58" height="26"/><rect x="470" y="168" width="58" height="26"/>
+          <rect x="564" y="168" width="58" height="26"/><rect x="658" y="168" width="58" height="26"/>
+          <rect x="752" y="168" width="58" height="26"/><rect x="846" y="168" width="58" height="26"/>
+          <rect x="940" y="168" width="58" height="26"/>
+        </g>
+
+        <line x1="0" y1="220" x2="1000" y2="220" stroke="#BFD4DB"/>
+        <g font-family="IBM Plex Mono" font-size="11">
+          <text x="0" y="244" fill="#6B8E9B">1</text><text x="24" y="244" fill="#082B37">8,000자 청크로 전부 분할 <tspan fill="#6B8E9B">(overlap 200, 최대 60개)</tspan></text>
+          <text x="0" y="266" fill="#6B8E9B">2</text><text x="24" y="266" fill="#082B37">_select_representative_chunks() 로 전역 대표 표본 추출</text>
+          <text x="0" y="288" fill="#6B8E9B">3</text><text x="24" y="288" fill="#082B37">예산 초과면 발췌 길이를 <tspan fill="#AE2D68">×0.85씩 축소 재시도</tspan> — 하한 400자</text>
+        </g>
+      </svg>
+    </div>
+    <p class="fig-cap"><b>Fig 06</b> 홍루몽 전체 결말을 추론하는 데모가 성립하려면 이 로직이 반드시 필요합니다.</p>
+  </div>
+
+  <h3>세부 방어 장치 두 가지</h3>
+
+  <h4>1 · 예약어 회피</h4>
+  <p>
+    Zep에는 시스템이 선점한 필드명이 있습니다. LLM이 무심코 <code>name</code>이나 <code>summary</code>를 속성으로 만들면 인제스천이 깨집니다.
+    <code>utils/ontology.py</code>가 이 목록을 들고 있고, <code>safe_attr_name()</code>이 충돌하면 <code>entity_</code> 프리픽스를 붙여 우회합니다.
+  </p>
+  <p>
+    <span class="tag b">uuid</span><span class="tag b">name</span><span class="tag b">group_id</span><span class="tag b">graph_id</span><span class="tag b">name_embedding</span><span class="tag b">summary</span><span class="tag b">created_at</span>
+  </p>
+
+  <h4>2 · max_tokens를 일부러 비움</h4>
+  <p>
+    LLM 호출부에 <code>max_tokens=None</code>이 명시돼 있고, 바로 위에 이유가 주석으로 붙어 있습니다 —
+    일부 OpenAI 호환 프로바이더가 <strong>숨겨진 추론 토큰을 같은 예산에 계산</strong>하기 때문에,
+    4096 같은 값을 박아두면 정작 JSON이 잘려 나옵니다. 그래서 프로바이더 기본값에 맡깁니다.
+  </p>
+
+<pre>result = self.llm_client.chat_json(
+    messages=messages,
+    temperature=<u>0.3</u>,
+    <i># Structured ontology responses can exceed 4096 completion tokens,</i>
+    <i># especially when a compatible provider counts hidden reasoning in</i>
+    <i># the same budget. Let the provider use its model-specific limit.</i>
+    max_tokens=<u>None</u>,
+    max_attempts=2,
+)</pre>
+
+  <div class="note">
+    <b>언어 정책</b>
+    타입 이름은 무조건 영어(<code>PascalCase</code> / <code>UPPER_SNAKE_CASE</code> / <code>snake_case</code>)로 강제하고,
+    <code>description</code>과 <code>analysis_summary</code>만 로케일 언어로 씁니다. 스키마는 안정적으로, 설명은 읽기 좋게 — 합리적인 분리입니다.
+  </div>
+</section>
+
+<!-- ============ 05 ============ -->
+<section id="s05">
+  <div class="sec-head">
+    <div class="sec-no">05</div>
+    <div>
+      <h2>지식그래프 구축</h2>
+      <p><code>services/graph_builder.py</code> · 879줄 · 이 코드베이스에서 가장 영리한 함수가 여기 있습니다</p>
+    </div>
+  </div>
+
+  <h3>LLM이 뱉은 JSON을 파이썬 클래스로 찍어내기</h3>
+  <p>
+    Zep SDK는 온톨로지를 <strong>Pydantic 모델</strong>로 요구합니다. 그런데 스키마는 문서마다 LLM이 매번 다르게 만듭니다.
+    정적으로 클래스를 선언해 둘 방법이 없습니다. <code>set_ontology()</code>는 <code>type()</code>으로 런타임에 클래스를 생성해 이 문제를 넘습니다.
+  </p>
+
+  <div class="fig">
+    <div class="svgbox">
+      <svg viewBox="0 0 1000 232" role="img" aria-label="동적 클래스 생성 흐름">
+        <rect x="0" y="20" width="228" height="92" fill="#F5FAFB" stroke="#BFD4DB"/>
+        <text x="16" y="44" font-family="IBM Plex Mono" font-size="10" letter-spacing="1.4" fill="#6B8E9B">LLM 출력</text>
+        <text x="16" y="68" font-family="IBM Plex Mono" font-size="11" fill="#082B37">{"name": "Student",</text>
+        <text x="16" y="86" font-family="IBM Plex Mono" font-size="11" fill="#082B37"> "attributes": [...]}</text>
+        <text x="16" y="104" font-family="IBM Plex Sans KR" font-size="11" fill="#6B8E9B">그냥 dict입니다</text>
+
+        <path d="M238 66H282" stroke="#7FA9B8" stroke-width="1.2" marker-end="url(#ar1)"/>
+
+        <rect x="292" y="20" width="300" height="92" fill="#06222E"/>
+        <text x="308" y="44" font-family="IBM Plex Mono" font-size="10" letter-spacing="1.4" fill="#7FA9B8">런타임 클래스 생성</text>
+        <text x="308" y="68" font-family="IBM Plex Mono" font-size="11" fill="#AE2D68">type(name, (EntityModel,), attrs)</text>
+        <text x="308" y="88" font-family="IBM Plex Mono" font-size="10.5" fill="#BCD8E1">attrs["__annotations__"] = ...</text>
+        <text x="308" y="105" font-family="IBM Plex Sans KR" font-size="10.5" fill="#5D8A9B">Pydantic v2는 어노테이션을 직접 넣어야 인식</text>
+
+        <path d="M602 66H646" stroke="#7FA9B8" stroke-width="1.2" marker-end="url(#ar1)"/>
+
+        <rect x="656" y="20" width="344" height="92" fill="#F5FAFB" stroke="#AE2D68"/>
+        <text x="672" y="44" font-family="IBM Plex Mono" font-size="10" letter-spacing="1.4" fill="#AE2D68">Zep 등록</text>
+        <text x="672" y="68" font-family="IBM Plex Mono" font-size="11" fill="#082B37">client.graph.set_ontology(</text>
+        <text x="672" y="86" font-family="IBM Plex Mono" font-size="11" fill="#082B37">  graph_ids, entities, edges)</text>
+        <text x="672" y="104" font-family="IBM Plex Sans KR" font-size="11" fill="#6B8E9B">이제 인제스천이 이 타입으로 추출</text>
+
+        <line x1="0" y1="140" x2="1000" y2="140" stroke="#BFD4DB"/>
+        <g font-family="IBM Plex Sans KR" font-size="12.5">
+          <text x="0" y="166" font-weight="600" fill="#082B37">타입 주석이 엔티티와 엣지에서 서로 다릅니다</text>
+          <text x="0" y="192" fill="#3C6373">엔티티 속성 → <tspan font-family="IBM Plex Mono" fill="#2C6E85">Optional[EntityText]</tspan>   ·   엣지 속성 → <tspan font-family="IBM Plex Mono" fill="#2C6E85">Optional[str]</tspan></text>
+          <text x="0" y="216" fill="#6B8E9B">엣지 전용 온톨로지를 넘길 땐 entities에 None이 아니라 빈 dict를 줘야 합니다 — Zep이 .items()를 돌기 때문. 주석에 명시돼 있습니다.</text>
+        </g>
+      </svg>
+    </div>
+    <p class="fig-cap"><b>Fig 07</b> "LLM이 스키마를 만들고 그 스키마로 다시 LLM이 추출한다"는 구조를 성립시키는 12줄.</p>
+  </div>
+
+  <h3>청킹부터 인제스천까지</h3>
+
+  <div class="fig">
+    <div class="svgbox">
+      <svg viewBox="0 0 1000 208" role="img" aria-label="청킹과 배치 전송">
+        <g font-family="IBM Plex Mono" font-size="10.5">
+          <text x="0" y="12" letter-spacing="1.4" fill="#6B8E9B">원문</text>
+          <rect x="0" y="22" width="150" height="34" fill="#D6E4E8"/>
+          <text x="14" y="44" fill="#082B37">텍스트 전체</text>
+
+          <path d="M160 39H196" stroke="#7FA9B8" stroke-width="1.2" marker-end="url(#ar1)"/>
+
+          <text x="206" y="12" letter-spacing="1.4" fill="#6B8E9B">청킹</text>
+          <rect x="206" y="22" width="230" height="34" fill="#F5FAFB" stroke="#BFD4DB"/>
+          <text x="220" y="38" fill="#082B37">chunk_size 500</text>
+          <text x="220" y="52" fill="#6B8E9B">overlap 50</text>
+
+          <path d="M446 39H482" stroke="#7FA9B8" stroke-width="1.2" marker-end="url(#ar1)"/>
+
+          <text x="492" y="12" letter-spacing="1.4" fill="#6B8E9B">배치 묶기</text>
+          <rect x="492" y="22" width="230" height="34" fill="#F5FAFB" stroke="#BFD4DB"/>
+          <text x="506" y="38" fill="#082B37">BatchAddItem × 350</text>
+          <text x="506" y="52" fill="#6B8E9B">validate_batch_chunks()</text>
+
+          <path d="M732 39H768" stroke="#AE2D68" stroke-width="1.2" marker-end="url(#ar2)"/>
+
+          <text x="778" y="12" letter-spacing="1.4" fill="#AE2D68">Zep</text>
+          <rect x="778" y="22" width="222" height="34" fill="#FBEFF4" stroke="#AE2D68"/>
+          <text x="792" y="38" fill="#082B37">비동기 인제스천</text>
+          <text x="792" y="52" fill="#AE2D68">_wait_for_batch() 폴링</text>
+        </g>
+
+        <line x1="0" y1="82" x2="1000" y2="82" stroke="#BFD4DB"/>
+
+        <text x="0" y="108" font-family="IBM Plex Sans KR" font-size="13" font-weight="600" fill="#082B37">멱등성 — 재시도해도 그래프가 두 번 생기지 않게</text>
+        <g font-family="IBM Plex Mono" font-size="11">
+          <rect x="0" y="122" width="300" height="30" fill="#F5FAFB" stroke="#BFD4DB"/>
+          <text x="14" y="141" fill="#082B37">build_operation_id(graph_id, chunks)</text>
+          <path d="M310 137H346" stroke="#7FA9B8" stroke-width="1.2" marker-end="url(#ar1)"/>
+          <rect x="356" y="122" width="240" height="30" fill="#F5FAFB" stroke="#BFD4DB"/>
+          <text x="370" y="141" fill="#082B37">청크 내용 해시</text>
+          <path d="M606 137H642" stroke="#7FA9B8" stroke-width="1.2" marker-end="url(#ar1)"/>
+          <rect x="652" y="122" width="348" height="30" fill="#F5FAFB" stroke="#AE2D68"/>
+          <text x="666" y="141" fill="#082B37">_find_batch_by_operation_id() → 있으면 재사용</text>
+        </g>
+        <text x="0" y="180" font-family="IBM Plex Sans KR" font-size="12" fill="#6B8E9B">네트워크가 끊겨 사용자가 새로고침하고 다시 눌러도 같은 그래프에 이어붙습니다. 유료 API를 쓰는 서비스에선 필수인데 자주 빠지는 처리입니다.</text>
+      </svg>
+    </div>
+    <p class="fig-cap"><b>Fig 08</b> 인제스천은 비동기라 <code>_wait_for_batch()</code>와 <code>_wait_for_episodes()</code>가 완료를 폴링합니다.</p>
+  </div>
+
+  <h3>백그라운드 스레드와 로케일 함정</h3>
+  <p>
+    그래프 구축은 오래 걸리므로 <code>build_graph_async()</code>가 태스크 ID만 반환하고 데몬 스레드로 넘깁니다.
+    그런데 이 코드베이스의 로케일은 <strong>스레드로컬</strong>이라, 그냥 스레드를 띄우면 워커 안에서 언어 설정이 사라집니다.
+    그래서 스폰 직전에 값을 캡처해 인자로 넘깁니다.
+  </p>
+
+<pre><i># Capture locale before spawning background thread</i>
+current_locale = <u>get_locale()</u>
+
+thread = threading.Thread(
+    target=self._build_graph_worker,
+    args=(task_id, text, ontology, graph_name,
+          chunk_size, chunk_overlap, batch_size, <u>current_locale</u>)
+)
+thread.daemon = True
+thread.start()</pre>
+
+  <div class="note">
+    <b>같은 패턴이 세 번 반복됩니다</b>
+    <code>graph_builder</code>의 스레드, <code>oasis_profile_generator</code>의 ThreadPoolExecutor 워커,
+    <code>simulation_runner</code>의 모니터 스레드 — 모두 <code>get_locale()</code> → 전달 → <code>set_locale()</code> 3단 패턴을 씁니다.
+    실제로 한 번 겪고 나서 전체에 적용한 흔적으로 읽힙니다.
+  </div>
+</section>
+<!-- ============ 06 ============ -->
+<section id="s06">
+  <div class="sec-head">
+    <div class="sec-no">06</div>
+    <div>
+      <h2>페르소나 생성</h2>
+      <p><code>services/oasis_profile_generator.py</code> · 1,248줄 · 그래프 노드를 계정으로 환생시키는 단계</p>
+    </div>
+  </div>
+
+  <p class="lead">
+    그래프에는 "우한대학교"라는 노드가 있습니다. 대학은 트윗을 쓰지 않습니다.
+    이 단계는 그 간극을 메우는 일 — <strong>노드마다 나이·성별·MBTI·직업·관심사·말투를 가진 계정 하나</strong>를 만들어냅니다.
+  </p>
+
+  <h3>프로필 스키마와 플랫폼 분기</h3>
+  <p>
+    <code>OasisAgentProfile</code> 데이터클래스 하나가 두 플랫폼을 모두 표현하고, 출력 시점에 포맷이 갈립니다.
+  </p>
+
+  <div class="fig">
+    <div class="svgbox">
+      <svg viewBox="0 0 1000 320" role="img" aria-label="프로필 스키마와 플랫폼별 출력">
+        <rect x="0" y="24" width="360" height="272" fill="#06222E"/>
+        <text x="20" y="16" font-family="IBM Plex Mono" font-size="10" letter-spacing="1.6" fill="#6B8E9B">OasisAgentProfile</text>
+        <g font-family="IBM Plex Mono" font-size="11" fill="#BCD8E1">
+          <text x="20" y="50" fill="#F2F8FA">공통</text>
+          <text x="20" y="70">user_id · user_name · name</text>
+          <text x="20" y="88">bio · persona</text>
+
+          <text x="20" y="122" fill="#F2F8FA">인격</text>
+          <text x="20" y="142">age · gender · mbti</text>
+          <text x="20" y="160">country · profession</text>
+          <text x="20" y="178">interested_topics[]</text>
+
+          <text x="20" y="212" fill="#F2F8FA">플랫폼 지표</text>
+          <text x="20" y="232" fill="#B07C1F">karma</text>
+          <text x="20" y="250" fill="#2C6E85">friend_count · follower_count</text>
+          <text x="20" y="268" fill="#2C6E85">statuses_count</text>
+
+          <text x="20" y="288" fill="#AE2D68">source_entity_uuid · _type</text>
+        </g>
+
+        <path d="M370 110H414" stroke="#B07C1F" stroke-width="1.2" fill="none" marker-end="url(#ar3)"/>
+        <path d="M370 220H414" stroke="#2C6E85" stroke-width="1.2" fill="none" marker-end="url(#ar4)"/>
+        <defs>
+          <marker id="ar3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M2 1L8 5L2 9" fill="none" stroke="#B07C1F" stroke-width="1.5"/></marker>
+          <marker id="ar4" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M2 1L8 5L2 9" fill="none" stroke="#2C6E85" stroke-width="1.5"/></marker>
+        </defs>
+
+        <rect x="424" y="60" width="576" height="100" fill="#F5FAFB" stroke="#B07C1F"/>
+        <text x="444" y="86" font-family="IBM Plex Sans KR" font-size="13.5" font-weight="600" fill="#082B37">to_reddit_format() → JSON</text>
+        <text x="444" y="110" font-family="IBM Plex Mono" font-size="11" fill="#3C6373">karma 기본 1000 · 댓글 트리 중심</text>
+        <text x="444" y="134" font-family="IBM Plex Sans KR" font-size="11.5" fill="#6B8E9B">가용 액션 13종 — 대화형 상호작용을 관측하기 좋음</text>
+
+        <rect x="424" y="180" width="576" height="100" fill="#F5FAFB" stroke="#2C6E85"/>
+        <text x="444" y="206" font-family="IBM Plex Sans KR" font-size="13.5" font-weight="600" fill="#082B37">to_twitter_format() → CSV</text>
+        <text x="444" y="230" font-family="IBM Plex Mono" font-size="11" fill="#3C6373">friend 100 / follower 150 / statuses 500</text>
+        <text x="444" y="254" font-family="IBM Plex Sans KR" font-size="11.5" fill="#6B8E9B">가용 액션 6종 — 확산 속도를 관측하기 좋음</text>
+      </svg>
+    </div>
+    <p class="fig-cap"><b>Fig 09</b> <code>source_entity_uuid</code>가 남아 있어서 리포트 단계에서 "이 발언은 그래프의 어느 노드에서 나왔나"를 역추적할 수 있습니다.</p>
+  </div>
+
+  <h3>개인이냐 조직이냐</h3>
+  <p>
+    엔티티 타입을 두 개의 하드코딩 리스트로 분류해서 <strong>완전히 다른 프롬프트</strong>를 태웁니다.
+    조직은 사람이 아니므로 "그 조직을 대표해 발언하는 인격"을 만듭니다.
+  </p>
+
+  <div class="grid g2">
+    <div class="card">
+      <h4 style="margin-top:0">INDIVIDUAL_ENTITY_TYPES → 개인 인생사</h4>
+      <p style="margin:0 0 8px">
+        <span class="tag a">student</span><span class="tag a">alumni</span><span class="tag a">professor</span><span class="tag a">person</span><span class="tag a">publicfigure</span><span class="tag a">expert</span><span class="tag a">faculty</span><span class="tag a">official</span><span class="tag a">journalist</span><span class="tag a">activist</span>
+      </p>
+      <p style="font-size:13px; color:var(--ink2); margin:0"><code>_build_individual_persona_prompt()</code> — 경력, 성격, 소셜미디어 습관까지 상세 생성</p>
+    </div>
+    <div class="card">
+      <h4 style="margin-top:0">GROUP_ENTITY_TYPES → 대변인 인격</h4>
+      <p style="margin:0 0 8px">
+        <span class="tag c">university</span><span class="tag c">governmentagency</span><span class="tag c">organization</span><span class="tag c">ngo</span><span class="tag c">mediaoutlet</span><span class="tag c">company</span><span class="tag c">institution</span><span class="tag c">group</span><span class="tag c">community</span>
+      </p>
+      <p style="font-size:13px; color:var(--ink2); margin:0"><code>_build_group_persona_prompt()</code> — 조직의 공식 입장과 톤을 대변하는 계정으로 생성</p>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>이 분류의 한계</b>
+    문자열 소문자 매칭입니다. 4장에서 LLM이 <code>Lawyer</code>나 <code>Doctor</code> 같은 타입을 만들면 두 리스트 어디에도 없어서
+    분기가 기본값으로 떨어집니다. 온톨로지는 문서마다 자유롭게 생성되는데 여기 리스트는 고정이라, 구조적으로 어긋날 여지가 있습니다.
+  </div>
+
+  <h3>Zep 재검색으로 인물 부풀리기</h3>
+  <p>
+    노드의 <code>summary</code> 필드만 보고 페르소나를 만들면 밋밋해집니다.
+    <code>_search_zep_for_entity()</code>가 인물 이름으로 <strong>엣지 검색과 노드 검색을 병렬로</strong> 한 번 더 돌려서,
+    그래프 곳곳에 흩어진 그 인물 관련 사실을 긁어모은 뒤 프롬프트에 넣습니다. 사실상 페르소나 생성용 미니 RAG입니다.
+  </p>
+
+  <h3>병렬 생성 — 순서 보존과 실시간 중계</h3>
+
+  <div class="fig">
+    <div class="svgbox">
+      <svg viewBox="0 0 1000 260" role="img" aria-label="병렬 프로필 생성 구조">
+        <text x="0" y="12" font-family="IBM Plex Mono" font-size="10" letter-spacing="1.6" fill="#6B8E9B">ThreadPoolExecutor · parallel_count=5</text>
+        <g font-family="IBM Plex Mono" font-size="10.5">
+          <text x="0" y="42" fill="#6B8E9B">W1</text><rect x="34" y="30" width="118" height="16" fill="#2C6E85"/><rect x="158" y="30" width="96" height="16" fill="#2C6E85"/><rect x="260" y="30" width="132" height="16" fill="#2C6E85"/>
+          <text x="0" y="66" fill="#6B8E9B">W2</text><rect x="34" y="54" width="146" height="16" fill="#2C6E85"/><rect x="186" y="54" width="110" height="16" fill="#2C6E85"/>
+          <text x="0" y="90" fill="#6B8E9B">W3</text><rect x="34" y="78" width="92" height="16" fill="#2C6E85"/><rect x="132" y="78" width="160" height="16" fill="#2C6E85"/><rect x="298" y="78" width="88" height="16" fill="#2C6E85"/>
+          <text x="0" y="114" fill="#6B8E9B">W4</text><rect x="34" y="102" width="128" height="16" fill="#2C6E85"/><rect x="168" y="102" width="124" height="16" fill="#AE2D68"/><rect x="298" y="102" width="104" height="16" fill="#2C6E85"/>
+          <text x="0" y="138" fill="#6B8E9B">W5</text><rect x="34" y="126" width="106" height="16" fill="#2C6E85"/><rect x="146" y="126" width="138" height="16" fill="#2C6E85"/>
+        </g>
+        <text x="410" y="42" font-family="IBM Plex Sans KR" font-size="11.5" fill="#6B8E9B">완료 순서는 뒤죽박죽</text>
+        <text x="410" y="112" font-family="IBM Plex Sans KR" font-size="11.5" fill="#AE2D68">실패해도 폴백 프로필로 채우고 계속 진행</text>
+
+        <line x1="0" y1="164" x2="1000" y2="164" stroke="#BFD4DB"/>
+        <g font-family="IBM Plex Mono" font-size="11">
+          <text x="0" y="190" fill="#082B37">profiles = [None] * total</text>
+          <text x="300" y="190" font-family="IBM Plex Sans KR" fill="#3C6373">미리 자리를 잡고 인덱스로 채워 <tspan font-weight="600" fill="#082B37">순서 보존</tspan></text>
+          <text x="0" y="216" fill="#082B37">save_profiles_realtime()</text>
+          <text x="300" y="216" font-family="IBM Plex Sans KR" fill="#3C6373">하나 완료될 때마다 <tspan fill="#AE2D68">파일 전체를 다시 씀</tspan></text>
+          <text x="0" y="242" fill="#082B37">GET /profiles/realtime</text>
+          <text x="300" y="242" font-family="IBM Plex Sans KR" fill="#3C6373">프론트가 폴링 → 페르소나가 태어나는 걸 라이브로 표시</text>
+        </g>
+      </svg>
+    </div>
+    <p class="fig-cap"><b>Fig 10</b> 매번 전체 파일을 다시 쓰는 건 비효율이지만, 덕분에 대기 화면이 볼거리가 됩니다. UX를 위해 성능을 내준 명시적 선택입니다.</p>
+  </div>
+
+  <h3>LLM을 못 믿는 코드</h3>
+  <p>이 파일에 특히 방어 코드가 몰려 있습니다. 세 겹입니다.</p>
+  <ul class="lst">
+    <li><code>_fix_truncated_json()</code> — 응답이 중간에 끊긴 JSON을 닫아서 살려냅니다.</li>
+    <li><code>_try_fix_json()</code> — 문자열 값 안에 이스케이프 안 된 raw 개행이 들어간 경우를 정규식으로 교정합니다. <code>fix_string_newlines()</code> 헬퍼가 내부에 있습니다.</li>
+    <li>그래도 실패하면 <strong>예외를 던지지 않고</strong> 엔티티 <code>summary</code>로 최소 프로필을 만들어 진행합니다. 500명 중 3명이 실패해도 시뮬레이션은 돕니다.</li>
+    <li><code>__post_init__</code>의 <code>_coerce_to_str()</code> / <code>_coerce_to_str_list()</code> — LLM이 문자열 자리에 dict나 배열을 넣는 경우를 경계에서 한 번에 정규화합니다.</li>
+  </ul>
+</section>
+
+<!-- ============ 07 ============ -->
+<section id="s07">
+  <div class="sec-head">
+    <div class="sec-no">07</div>
+    <div>
+      <h2>시뮬레이션 설정 생성</h2>
+      <p><code>services/simulation_config_generator.py</code> · 993줄 · "설정 화면 없음"을 성립시키는 곳</p>
+    </div>
+  </div>
+
+  <p class="lead">
+    사용자가 파라미터를 만지지 않는다는 건, 누군가는 그 파라미터를 정해야 한다는 뜻입니다.
+    이 모듈이 그 일을 합니다 — <strong>며칠치를 굴릴지, 어떤 사건으로 시작할지, 각 에이전트가 언제 얼마나 떠들지</strong>를 LLM에게 4번 나눠 묻습니다.
+  </p>
+
+  <h4>한 번에 안 묻고 네 번 나눠 묻는 이유</h4>
+  <p>
+    파일 docstring에 적혀 있습니다 — 한 번에 생성하면 출력이 너무 길어져 실패한다는 것.
+    에이전트가 수백 명이면 설정 JSON도 수백 개 블록이 되므로, <code>_generate_agent_configs_batch()</code>가 배치로 나눠 받습니다.
+  </p>
+
+  <div class="fig">
+    <div class="svgbox">
+      <svg viewBox="0 0 1000 118" role="img" aria-label="설정 4단계 분할 생성">
+        <g font-family="IBM Plex Mono" font-size="10.5">
+          <rect x="0" y="24" width="232" height="56" fill="#F5FAFB" stroke="#BFD4DB"/>
+          <text x="16" y="46" fill="#082B37" font-size="11.5">_generate_time_config</text>
+          <text x="16" y="66" fill="#6B8E9B">총 시간 · 라운드 길이 · 시간대</text>
+          <path d="M242 52H274" stroke="#7FA9B8" stroke-width="1.2" marker-end="url(#ar1)"/>
+
+          <rect x="284" y="24" width="232" height="56" fill="#F5FAFB" stroke="#BFD4DB"/>
+          <text x="300" y="46" fill="#082B37" font-size="11.5">_generate_event_config</text>
+          <text x="300" y="66" fill="#6B8E9B">초기 게시물 · 예약 사건</text>
+          <path d="M526 52H558" stroke="#7FA9B8" stroke-width="1.2" marker-end="url(#ar1)"/>
+
+          <rect x="568" y="24" width="232" height="56" fill="#FBEFF4" stroke="#AE2D68"/>
+          <text x="584" y="46" fill="#082B37" font-size="11.5">_generate_agent_configs_batch</text>
+          <text x="584" y="66" fill="#AE2D68">배치 반복 · 여기가 가장 김</text>
+          <path d="M810 52H842" stroke="#7FA9B8" stroke-width="1.2" marker-end="url(#ar1)"/>
+
+          <rect x="852" y="24" width="148" height="56" fill="#F5FAFB" stroke="#BFD4DB"/>
+          <text x="868" y="46" fill="#082B37" font-size="11.5">platform config</text>
+          <text x="868" y="66" fill="#6B8E9B">액션 목록 등</text>
+        </g>
+        <text x="0" y="106" font-family="IBM Plex Sans KR" font-size="11.5" fill="#6B8E9B">LLM이 실패하면 <tspan font-family="IBM Plex Mono" fill="#3C6373">_generate_agent_config_by_rule()</tspan> 룰 기반 폴백으로 떨어집니다.</text>
+      </svg>
+    </div>
+    <p class="fig-cap"><b>Fig 11</b> 순차 의존이라 앞 단계가 뒤 단계 프롬프트의 컨텍스트로 들어갑니다.</p>
+  </div>
+
+  <h3>시간 모델 — 의도와 실제가 다른 곳</h3>
+  <p>
+    <code>TimeSimulationConfig</code>에는 하루를 네 구간으로 나눈 활동 배수가 정의돼 있습니다.
+    주석에 <em>"중국인 작息 습관 기준"</em>이라고 명시돼 있고, 값도 그에 맞습니다 — 새벽엔 사실상 정지(×0.05), 저녁 7~10시가 정점(×1.5).
+  </p>
+  <p>
+    그런데 <strong>실제 러너 스크립트는 네 구간 중 둘만 읽습니다.</strong>
+    <code>run_reddit_simulation.py</code>·<code>run_twitter_simulation.py</code>·<code>run_parallel_simulation.py</code> 세 곳 모두
+    <code>peak</code>과 <code>off_peak</code>만 분기하고 나머지는 <code>else: multiplier = 1.0</code>으로 처리합니다.
+    설정 JSON에는 <code>morning_activity_multiplier</code>와 <code>work_activity_multiplier</code>가 정상적으로 기록되지만, 읽는 사람이 없습니다.
+  </p>
+
+  <div class="fig">
+    <div class="svgbox">
+      <svg viewBox="0 0 1000 352" role="img" aria-label="시간대별 에이전트 활동 배수 — 의도한 곡선과 실제 적용 곡선">
+        <g font-family="IBM Plex Mono" font-size="10.5" fill="#6B8E9B">
+          <text x="0" y="12" letter-spacing="1.4">시간대별 활동 배수</text>
+          <text x="600" y="12" fill="#2C6E85">■ 실제 적용값</text>
+          <text x="740" y="12" fill="#AE2D68">■ 피크 구간</text>
+          <text x="860" y="12">┈ 설정에 적힌 의도</text>
+        </g>
+
+        <g stroke="#D6E4E8" stroke-width="1">
+          <line x1="60" y1="74" x2="980" y2="74"/>
+          <line x1="60" y1="142" x2="980" y2="142"/>
+          <line x1="60" y1="211" x2="980" y2="211"/>
+        </g>
+        <line x1="60" y1="280" x2="980" y2="280" stroke="#7FA9B8" stroke-width="1.2"/>
+        <g font-family="IBM Plex Mono" font-size="10" fill="#6B8E9B" text-anchor="end">
+          <text x="50" y="78">1.5</text><text x="50" y="146">1.0</text><text x="50" y="215">0.5</text><text x="50" y="284">0</text>
+        </g>
+
+        <g fill="#C9DBE1">
+          <rect x="63" y="273" width="32" height="7"/><rect x="101" y="273" width="32" height="7"/>
+          <rect x="139" y="273" width="32" height="7"/><rect x="177" y="273" width="32" height="7"/>
+          <rect x="215" y="273" width="32" height="7"/><rect x="253" y="273" width="32" height="7"/>
+        </g>
+        <g fill="#2C6E85">
+          <rect x="291" y="142" width="32" height="138"/><rect x="329" y="142" width="32" height="138"/>
+          <rect x="367" y="142" width="32" height="138"/><rect x="405" y="142" width="32" height="138"/>
+          <rect x="443" y="142" width="32" height="138"/><rect x="481" y="142" width="32" height="138"/>
+          <rect x="519" y="142" width="32" height="138"/><rect x="557" y="142" width="32" height="138"/>
+          <rect x="595" y="142" width="32" height="138"/><rect x="633" y="142" width="32" height="138"/>
+          <rect x="671" y="142" width="32" height="138"/><rect x="709" y="142" width="32" height="138"/>
+          <rect x="747" y="142" width="32" height="138"/>
+        </g>
+        <g fill="#AE2D68">
+          <rect x="785" y="74" width="32" height="206"/><rect x="823" y="74" width="32" height="206"/>
+          <rect x="861" y="74" width="32" height="206"/><rect x="899" y="74" width="32" height="206"/>
+        </g>
+        <rect x="937" y="142" width="32" height="138" fill="#2C6E85"/>
+
+        <polyline fill="none" stroke="#AE2D68" stroke-width="1.6" stroke-dasharray="5 4"
+          points="79,273 117,273 155,273 193,273 231,273 269,273 307,225 345,225 383,225 421,184 459,184 497,184 535,184 573,184 611,184 649,184 687,184 725,184 763,184 801,74 839,74 877,74 915,74 953,142"/>
+
+        <g font-family="IBM Plex Mono" font-size="9.5" fill="#6B8E9B" text-anchor="middle">
+          <text x="79" y="296">0</text><text x="117" y="296">1</text><text x="155" y="296">2</text><text x="193" y="296">3</text>
+          <text x="231" y="296">4</text><text x="269" y="296">5</text><text x="307" y="296">6</text><text x="345" y="296">7</text>
+          <text x="383" y="296">8</text><text x="421" y="296">9</text><text x="459" y="296">10</text><text x="497" y="296">11</text>
+          <text x="535" y="296">12</text><text x="573" y="296">13</text><text x="611" y="296">14</text><text x="649" y="296">15</text>
+          <text x="687" y="296">16</text><text x="725" y="296">17</text><text x="763" y="296">18</text><text x="801" y="296">19</text>
+          <text x="839" y="296">20</text><text x="877" y="296">21</text><text x="915" y="296">22</text><text x="953" y="296">23</text>
+        </g>
+
+        <g font-family="IBM Plex Sans KR" font-size="11.5" fill="#6B8E9B">
+          <text x="60" y="322">새벽 ×0.05 — 일치</text>
+          <text x="291" y="322" fill="#AE2D68">의도 ×0.4 / ×0.7 → 실제 ×1.0 · 배수 미적용</text>
+          <text x="785" y="322" fill="#082B37">피크 ×1.5 — 일치</text>
+        </g>
+        <text x="60" y="344" font-family="IBM Plex Sans KR" font-size="11.5" fill="#6B8E9B">결과적으로 오전 6시부터 저녁 6시까지가 의도보다 활발하게 시뮬레이션됩니다.</text>
+      </svg>
+    </div>
+    <p class="fig-cap"><b>Fig 12</b> 점선이 <code>TimeSimulationConfig</code>가 기술한 곡선, 막대가 러너가 실제로 계산하는 값입니다.</p>
+  </div>
+
+  <div class="note m">
+    <b>확인된 불일치 두 가지</b>
+    ① <code>morning_activity_multiplier</code>(0.4)와 <code>work_activity_multiplier</code>(0.7)는 설정 생성기에서만 등장하고
+    <code>backend/</code> 어디에서도 소비되지 않습니다. 프롬프트로 LLM에게 값을 물어보고, dataclass에 담고, JSON으로 저장까지 하지만 읽지 않습니다.<br>
+    ② <code>off_peak_activity_multiplier</code>의 기본값이 설정 생성기는 <strong>0.05</strong>, 러너 <code>.get()</code> 폴백은 <strong>0.3</strong>으로 다릅니다.
+    설정 JSON이 항상 값을 채우므로 실사용에서 드러나진 않지만, 설정 없이 스크립트를 직접 돌리면 새벽 활동이 6배가 됩니다.
+  </div>
+
+  <h3>에이전트 한 명의 성격 파라미터</h3>
+  <p>
+    <code>AgentActivityConfig</code>가 에이전트별로 붙습니다. 여론 시뮬레이션의 실질적 조작 변수는 아래 셋입니다.
+  </p>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:200px">필드</th><th style="width:150px">범위 / 기본</th><th>의미</th></tr></thead>
+    <tbody>
+      <tr><td><code>activity_level</code></td><td>0.0 – 1.0 · 0.5</td><td>매 라운드 후보에 들어갈 확률. 실행 단계에서 <code>random.random()</code>과 직접 비교됩니다.</td></tr>
+      <tr><td><code>posts_per_hour</code></td><td>1.0</td><td>시간당 기대 게시 횟수</td></tr>
+      <tr><td><code>comments_per_hour</code></td><td>2.0</td><td>시간당 기대 댓글 횟수</td></tr>
+      <tr><td><code>active_hours</code></td><td>8 – 22시</td><td>이 시간대 밖이면 아예 후보에서 제외됩니다</td></tr>
+      <tr><td><code>response_delay_min/max</code></td><td>5 – 60 시뮬분</td><td>사건 발생 후 반응까지의 지연</td></tr>
+      <tr><td><code>sentiment_bias</code></td><td>−1.0 – +1.0 · 0.0</td><td><strong>감정 편향.</strong> 부정 ↔ 긍정</td></tr>
+      <tr><td><code>stance</code></td><td>4개 중 하나 · neutral</td><td><strong>입장.</strong> <code>supportive</code> / <code>opposing</code> / <code>neutral</code> / <code>observer</code></td></tr>
+      <tr><td><code>influence_weight</code></td><td>1.0</td><td><strong>영향력.</strong> 발언이 다른 에이전트에게 노출될 확률에 관여</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p style="font-size:14px; color:var(--ink2)">
+    LLM이 문서를 읽고 "이 인물은 이 사안에 반대 입장이고 영향력이 크다"를 판단해 이 값들을 채웁니다.
+    시뮬레이션의 초기 조건이 곧 LLM의 독해 결과라는 뜻이고, 예측 품질의 상당 부분이 이 한 번의 판단에 걸려 있습니다.
+  </p>
+</section>
+<!-- ============ 08 ============ -->
+<section id="s08">
+  <div class="sec-head">
+    <div class="sec-no">08</div>
+    <div>
+      <h2>시뮬레이션 실행</h2>
+      <p><code>services/simulation_runner.py</code> 2,033줄 + <code>scripts/run_*_simulation.py</code> 3,248줄</p>
+    </div>
+  </div>
+
+  <p class="lead">
+    여기가 토큰을 태우는 곳입니다. Flask는 <strong>직접 시뮬레이션을 돌리지 않고</strong>
+    별도 파이썬 프로세스를 띄운 뒤 로그 파일을 훔쳐보며 상태를 갱신합니다.
+    OASIS가 asyncio 기반이라 Flask의 동기 요청 처리 모델과 섞을 수 없기 때문입니다.
+  </p>
+
+  <h3>라운드는 어떻게 세는가</h3>
+<pre>total_rounds = int(total_hours * 60 / minutes_per_round)
+<i># 기본값 기준: 72시간 × 60분 ÷ 60분 = 72 라운드</i>
+
+if max_rounds is not None and max_rounds &gt; 0:
+    total_rounds = min(total_rounds, max_rounds)   <u># README가 40 미만 권장하는 그 값</u></pre>
+
+  <h3>매 라운드 누가 말할지 정하는 알고리즘</h3>
+  <p>
+    <code>_get_active_agents_for_round()</code>는 이 시스템 전체에서 가장 중요한 40줄입니다.
+    <strong>확률이 세 겹으로 겹칩니다.</strong>
+  </p>
+
+  <div class="fig">
+    <div class="svgbox">
+      <svg viewBox="0 0 1000 372" role="img" aria-label="라운드별 활성 에이전트 선정 알고리즘">
+        <text x="0" y="12" font-family="IBM Plex Mono" font-size="10" letter-spacing="1.6" fill="#6B8E9B">경로 A — 후보 걸러내기</text>
+
+        <rect x="0" y="26" width="620" height="42" fill="#F5FAFB" stroke="#BFD4DB"/>
+        <text x="18" y="52" font-family="IBM Plex Sans KR" font-size="13" fill="#082B37">전체 에이전트 <tspan font-family="IBM Plex Mono" font-weight="600">N</tspan>명</text>
+        <text x="602" y="52" text-anchor="end" font-family="IBM Plex Mono" font-size="10.5" fill="#6B8E9B">agent_configs</text>
+
+        <path d="M310 68V88" stroke="#7FA9B8" stroke-width="1.2" marker-end="url(#ar1)"/>
+        <text x="322" y="84" font-family="IBM Plex Mono" font-size="10" fill="#6B8E9B">필터 1 · 시간대</text>
+
+        <rect x="70" y="96" width="480" height="42" fill="#F5FAFB" stroke="#BFD4DB"/>
+        <text x="88" y="122" font-family="IBM Plex Sans KR" font-size="13" fill="#082B37">지금 시각이 <tspan font-family="IBM Plex Mono">active_hours</tspan> 안인 에이전트</text>
+        <text x="532" y="122" text-anchor="end" font-family="IBM Plex Mono" font-size="10.5" fill="#6B8E9B">결정론적</text>
+
+        <path d="M310 138V158" stroke="#7FA9B8" stroke-width="1.2" marker-end="url(#ar1)"/>
+        <text x="322" y="154" font-family="IBM Plex Mono" font-size="10" fill="#AE2D68">필터 2 · 확률</text>
+
+        <rect x="140" y="166" width="340" height="42" fill="#FBEFF4" stroke="#AE2D68"/>
+        <text x="158" y="192" font-family="IBM Plex Mono" font-size="12" fill="#082B37">random() &lt; activity_level</text>
+        <text x="462" y="192" text-anchor="end" font-family="IBM Plex Mono" font-size="10.5" fill="#AE2D68">난수</text>
+
+        <path d="M310 208V228" stroke="#AE2D68" stroke-width="1.2" marker-end="url(#ar2)"/>
+        <text x="322" y="224" font-family="IBM Plex Mono" font-size="10" fill="#AE2D68">필터 3 · 랜덤 추출</text>
+
+        <rect x="210" y="236" width="200" height="42" fill="#06222E"/>
+        <text x="228" y="262" font-family="IBM Plex Sans KR" font-size="13" font-weight="600" fill="#F2F8FA">이번 라운드 발언자</text>
+
+        <text x="700" y="12" font-family="IBM Plex Mono" font-size="10" letter-spacing="1.6" fill="#6B8E9B">경로 B — 목표 인원 정하기</text>
+        <rect x="700" y="26" width="300" height="42" fill="#F5FAFB" stroke="#BFD4DB"/>
+        <text x="716" y="52" font-family="IBM Plex Mono" font-size="11" fill="#082B37">uniform(min, max)</text>
+        <text x="984" y="52" text-anchor="end" font-family="IBM Plex Mono" font-size="10.5" fill="#AE2D68">난수</text>
+
+        <rect x="700" y="96" width="300" height="42" fill="#F5FAFB" stroke="#BFD4DB"/>
+        <text x="716" y="122" font-family="IBM Plex Mono" font-size="11" fill="#082B37">× 시간대 배수</text>
+        <text x="984" y="122" text-anchor="end" font-family="IBM Plex Mono" font-size="10.5" fill="#6B8E9B">1.5 / 1.0 / 0.05</text>
+        <path d="M850 68V88" stroke="#7FA9B8" stroke-width="1.2" marker-end="url(#ar1)"/>
+
+        <rect x="700" y="166" width="300" height="42" fill="#F5FAFB" stroke="#BFD4DB"/>
+        <text x="716" y="192" font-family="IBM Plex Mono" font-size="11" fill="#082B37">target_count</text>
+        <path d="M850 138V158" stroke="#7FA9B8" stroke-width="1.2" marker-end="url(#ar1)"/>
+        <path d="M770 208 L770 257 L424 257" fill="none" stroke="#AE2D68" stroke-width="1.2" marker-end="url(#ar2)" stroke-dasharray="4 3"/>
+        <text x="790" y="250" font-family="IBM Plex Sans KR" font-size="11" fill="#AE2D68">이 인원만큼 뽑는다</text>
+
+        <line x1="0" y1="302" x2="1000" y2="302" stroke="#BFD4DB"/>
+        <text x="0" y="328" font-family="IBM Plex Sans KR" font-size="13" font-weight="600" fill="#AE2D68">난수 호출이 라운드마다 최소 세 번. 시드를 고정하는 코드는 backend 전체에 없습니다.</text>
+        <text x="0" y="352" font-family="IBM Plex Sans KR" font-size="12.5" fill="#3C6373">같은 프로젝트·같은 설정으로 두 번 돌리면 다른 결말이 나옵니다. 결과 하나를 예측으로 읽으면 안 되고, 여러 번 돌려 분포를 봐야 합니다.</text>
+      </svg>
+    </div>
+    <p class="fig-cap"><b>Fig 13</b> 경로 B가 만든 <code>target_count</code>로 경로 A의 후보 풀에서 <code>random.sample()</code>을 합니다.</p>
+  </div>
+
+  <h3>두 세계의 문법이 다르다</h3>
+  <p>
+    <code>config.py</code>가 플랫폼별 가용 액션을 정의합니다. Reddit이 Twitter의 두 배가 넘습니다 —
+    같은 사건을 두 플랫폼에 동시에 던지면 서로 다른 종류의 여론이 관측되는 이유입니다.
+  </p>
+
+  <div class="grid g2">
+    <div class="card">
+      <h4 style="margin-top:0">Twitter · 6종 — 확산의 문법</h4>
+      <p style="margin:0">
+        <span class="tag a">CREATE_POST</span><span class="tag a">LIKE_POST</span><span class="tag a">REPOST</span><span class="tag a">QUOTE_POST</span><span class="tag a">FOLLOW</span><span class="tag">DO_NOTHING</span>
+      </p>
+      <p style="font-size:12.5px; color:var(--ink2); margin:10px 0 0">반대 표현 수단이 없습니다. 증폭만 가능합니다.</p>
+    </div>
+    <div class="card">
+      <h4 style="margin-top:0">Reddit · 13종 — 토론의 문법</h4>
+      <p style="margin:0">
+        <span class="tag c">CREATE_POST</span><span class="tag c">CREATE_COMMENT</span><span class="tag c">LIKE_POST</span><span class="tag b">DISLIKE_POST</span><span class="tag c">LIKE_COMMENT</span><span class="tag b">DISLIKE_COMMENT</span><span class="tag c">SEARCH_POSTS</span><span class="tag c">SEARCH_USER</span><span class="tag c">TREND</span><span class="tag c">REFRESH</span><span class="tag c">FOLLOW</span><span class="tag b">MUTE</span><span class="tag">DO_NOTHING</span>
+      </p>
+      <p style="font-size:12.5px; color:var(--ink2); margin:10px 0 0">비추천·뮤트가 있어 반발과 차단이 관측됩니다.</p>
+    </div>
+  </div>
+
+  <h4>OASIS 호출부</h4>
+<pre>self.env = oasis.make(
+    agent_graph=self.agent_graph,
+    platform=oasis.DefaultPlatformType.REDDIT,
+    database_path=db_path,
+    semaphore=<u>30</u>,   <i># 동시 LLM 요청 상한 — API 폭주 방지</i>
+)
+await self.env.reset()
+
+<i># 초기 사건 주입</i>
+initial_actions[agent] = <s>ManualAction</s>(
+    action_type=ActionType.CREATE_POST,
+    action_args={"content": content})
+await self.env.step(initial_actions)
+
+<i># 메인 루프</i>
+for round_num in range(total_rounds):
+    active_agents = self._get_active_agents_for_round(...)
+    actions = {agent: <s>LLMAction</s>() for _, agent in active_agents}
+    await self.env.step(actions)</pre>
+
+  <p style="font-size:14px; color:var(--ink2)">
+    <code>INTERVIEW</code>는 자동 액션 목록에서 의도적으로 빠져 있습니다. 에이전트가 스스로 인터뷰를 시작할 수는 없고,
+    오직 외부에서 <code>ManualAction</code>으로만 트리거됩니다 — 9장의 IPC가 필요한 이유입니다.
+  </p>
+
+  <h3>동시 실행 방지</h3>
+  <p>
+    같은 시뮬레이션이 두 번 시작되면 프로세스가 겹치고 SQLite가 깨집니다.
+    락 안에서 무거운 일을 하면 요청이 밀리고, 락 밖에서 하면 경쟁이 생깁니다. 이 코드는 <strong>상태를 먼저 커밋하고 락을 푸는</strong> 방식으로 해결합니다.
+  </p>
+
+<pre><i># Atomically claim this simulation ID. The expensive updater/process</i>
+<i># startup happens after releasing the lock, while the persisted</i>
+<i># STARTING state makes every concurrent start fail closed.</i>
+with cls._finalization_lock(simulation_id):
+    existing = cls.get_run_state(simulation_id)
+    if existing and existing.runner_status in <u>{STARTING, RUNNING, PAUSED, STOPPING}</u>:
+        raise ValueError("모의가 이미 실행 중")
+    cls._save_run_state(state)     <u># STARTING 을 먼저 디스크에 기록</u>
+
+<i># ↓ 락 해제됨. 여기서부터 수 초가 걸려도 동시 요청은 위에서 막힘</i>
+ZepGraphMemoryManager.create_updater(...)
+subprocess.Popen(...)</pre>
+
+  <h4>프로세스 정리</h4>
+  <p>
+    <code>register_cleanup()</code>이 <code>atexit</code>과 시그널 핸들러 양쪽에 종료 훅을 겁니다.
+    이게 앱 팩토리(<code>app/__init__.py</code>)에서 호출되므로, Flask를 <kbd>Ctrl+C</kbd>로 죽여도 시뮬 프로세스가 좀비로 남지 않습니다.
+    <code>_terminate_process()</code>는 SIGTERM 후 10초 대기, 그래도 안 죽으면 강제 종료합니다.
+  </p>
+</section>
+
+<!-- ============ 09 ============ -->
+<section id="s09">
+  <div class="sec-head">
+    <div class="sec-no">09</div>
+    <div>
+      <h2>프로세스 간 통신</h2>
+      <p><code>services/simulation_ipc.py</code> · 394줄 · 소켓도 큐도 없이 디렉터리 두 개로</p>
+    </div>
+  </div>
+
+  <p class="lead">
+    돌아가는 세계 안에 손을 넣어야 합니다 — "지금 저 학생 에이전트한테 물어봐 줘".
+    그런데 그 세계는 다른 프로세스의 asyncio 루프 안에 있습니다.
+    MiroFish의 답은 <strong>파일시스템</strong>입니다.
+  </p>
+
+  <div class="fig">
+    <div class="svgbox">
+      <svg viewBox="0 0 1000 330" role="img" aria-label="파일시스템 기반 IPC 시퀀스">
+        <text x="60" y="14" font-family="IBM Plex Sans KR" font-size="13" font-weight="600" fill="#082B37">Flask</text>
+        <text x="420" y="14" font-family="IBM Plex Sans KR" font-size="13" font-weight="600" fill="#AE2D68">파일시스템</text>
+        <text x="790" y="14" font-family="IBM Plex Sans KR" font-size="13" font-weight="600" fill="#082B37">시뮬 프로세스</text>
+        <line x1="80" y1="26" x2="80" y2="292" stroke="#BFD4DB" stroke-width="1.5"/>
+        <line x1="470" y1="26" x2="470" y2="292" stroke="#AE2D68" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <line x1="840" y1="26" x2="840" y2="292" stroke="#BFD4DB" stroke-width="1.5"/>
+
+        <g font-family="IBM Plex Mono" font-size="10.5">
+          <path d="M84 54H466" stroke="#2C6E85" stroke-width="1.2" marker-end="url(#ar1)"/>
+          <text x="96" y="48" fill="#082B37">write commands/{uuid}.json</text>
+          <text x="96" y="70" fill="#6B8E9B">IPCCommand(command_id, command_type, args)</text>
+
+          <path d="M836 106H474" stroke="#B07C1F" stroke-width="1.2" marker-end="url(#ar3)"/>
+          <text x="560" y="100" fill="#082B37">poll_command() — mtime 정렬</text>
+          <text x="560" y="122" fill="#6B8E9B">매 라운드 사이에 호출</text>
+
+          <rect x="700" y="140" width="280" height="46" fill="#F5FAFB" stroke="#BFD4DB"/>
+          <text x="716" y="160" fill="#082B37">env.step({agent: ManualAction(</text>
+          <text x="716" y="176" fill="#082B37">  ActionType.INTERVIEW, ...)})</text>
+
+          <path d="M836 214H474" stroke="#B07C1F" stroke-width="1.2" marker-end="url(#ar3)"/>
+          <text x="560" y="208" fill="#082B37">write responses/{cmd_id}.json</text>
+
+          <path d="M84 260H466" stroke="#2C6E85" stroke-width="1.2" marker-end="url(#ar1)"/>
+          <text x="96" y="254" fill="#082B37">poll responses/</text>
+          <text x="96" y="276" fill="#6B8E9B">status: pending → processing → completed | failed</text>
+        </g>
+
+        <line x1="0" y1="306" x2="1000" y2="306" stroke="#BFD4DB"/>
+        <text x="0" y="326" font-family="IBM Plex Sans KR" font-size="12" fill="#6B8E9B">지원 명령은 세 개뿐입니다 — <tspan font-family="IBM Plex Mono" fill="#3C6373">interview</tspan> · <tspan font-family="IBM Plex Mono" fill="#3C6373">batch_interview</tspan> · <tspan font-family="IBM Plex Mono" fill="#3C6373">close_env</tspan></text>
+      </svg>
+    </div>
+    <p class="fig-cap"><b>Fig 14</b> 시뮬 프로세스 쪽 <code>IPCHandler</code>는 스크립트 안에 별도로 구현돼 있습니다 — 두 프로세스가 코드를 공유하지 않습니다.</p>
+  </div>
+
+  <h3>시뮬레이션 하나가 디스크에 남기는 것</h3>
+<pre>uploads/simulations/<b>sim_xxx/</b>
+├── simulation_config.json      <i># 7장에서 LLM이 만든 설정</i>
+├── run_state.json              <i># SimulationRunState 스냅샷 — API가 읽음</i>
+├── env_status.json             <i># 프로세스 생존 신호</i>
+├── <u>commands/</u>                   <i># Flask → 시뮬</i>
+├── <u>responses/</u>                  <i># 시뮬 → Flask</i>
+├── twitter/
+│   ├── actions.jsonl           <i># 액션 로그 (모니터 스레드가 tail)</i>
+│   └── twitter_simulation.db   <i># OASIS SQLite</i>
+├── reddit/
+│   ├── actions.jsonl
+│   └── reddit_simulation.db
+└── simulation.log</pre>
+
+  <p style="font-size:14px; color:var(--ink2)">
+    <code>_monitor_simulation()</code>이 백그라운드 스레드에서 <code>actions.jsonl</code>을 따라 읽으며 진행률을 갱신하고,
+    API의 <code>/run-status</code>는 그 결과인 <code>run_state.json</code>을 반환합니다.
+    게시물·댓글 조회 엔드포인트는 <code>sqlite3.connect()</code>로 OASIS DB를 직접 엽니다.
+  </p>
+
+  <div class="note">
+    <b>이 선택의 값</b>
+    장점은 의존성 제로에 디버깅이 쉽다는 것 — 문제가 생기면 디렉터리를 열어보면 됩니다.
+    단점은 폴링 지연(명령이 다음 라운드 경계까지 대기), 파일 경쟁 여지, 그리고 <strong>같은 파일시스템을 공유하는 단일 호스트에 묶인다</strong>는 점입니다.
+    시뮬레이션을 워커 노드로 분산하려면 이 계층을 통째로 갈아야 합니다.
+  </div>
+</section>
+
+<!-- ============ 10 ============ -->
+<section id="s10">
+  <div class="sec-head">
+    <div class="sec-no">10</div>
+    <div>
+      <h2>그래프 역주입</h2>
+      <p><code>services/zep_graph_memory_updater.py</code> · 791줄 · 이 프로젝트에서 가장 특징적인 되먹임</p>
+    </div>
+  </div>
+
+  <p class="lead">
+    보통 이런 시스템에서 지식그래프는 <strong>읽기 전용 입력</strong>입니다.
+    MiroFish는 시뮬레이션 중 벌어진 일을 그래프에 다시 씁니다. 리포트 작성 시점의 그래프는 처음 만든 그래프와 다릅니다.
+  </p>
+
+  <h3>액션을 문장으로 번역하는 이유</h3>
+  <p>
+    Zep은 <strong>텍스트에서 엔티티와 관계를 추출</strong>하는 시스템입니다. 구조체를 그대로 넣으면 그래프가 자라지 않습니다.
+    그래서 <code>AgentActivity.to_episode_text()</code>가 액션 타입별로 <code>_describe_*</code> 메서드 10여 개를 두고 자연어 문장을 만듭니다.
+  </p>
+
+  <div class="fig">
+    <div class="svgbox">
+      <svg viewBox="0 0 1000 232" role="img" aria-label="액션에서 그래프 관계까지">
+        <text x="0" y="12" font-family="IBM Plex Mono" font-size="10" letter-spacing="1.6" fill="#6B8E9B">OASIS 액션</text>
+        <rect x="0" y="24" width="248" height="72" fill="#F5FAFB" stroke="#BFD4DB"/>
+        <text x="16" y="48" font-family="IBM Plex Mono" font-size="11" fill="#082B37">REPOST</text>
+        <text x="16" y="68" font-family="IBM Plex Mono" font-size="10.5" fill="#6B8E9B">agent_id: 7</text>
+        <text x="16" y="86" font-family="IBM Plex Mono" font-size="10.5" fill="#6B8E9B">post_id: 42</text>
+
+        <path d="M258 60H302" stroke="#7FA9B8" stroke-width="1.2" marker-end="url(#ar1)"/>
+        <text x="264" y="52" font-family="IBM Plex Mono" font-size="9.5" fill="#6B8E9B">_describe_repost()</text>
+
+        <rect x="312" y="24" width="360" height="72" fill="#06222E"/>
+        <text x="328" y="48" font-family="IBM Plex Mono" font-size="10" letter-spacing="1.4" fill="#7FA9B8">에피소드 텍스트</text>
+        <text x="328" y="72" font-family="IBM Plex Sans KR" font-size="12.5" fill="#F2F8FA">"김민수 기자가 우한대 공식 계정의</text>
+        <text x="328" y="90" font-family="IBM Plex Sans KR" font-size="12.5" fill="#F2F8FA">게시물을 리트윗했다"</text>
+
+        <path d="M682 60H726" stroke="#AE2D68" stroke-width="1.2" marker-end="url(#ar2)"/>
+        <text x="688" y="52" font-family="IBM Plex Mono" font-size="9.5" fill="#AE2D68">Zep 추출</text>
+
+        <rect x="736" y="24" width="264" height="72" fill="#FBEFF4" stroke="#AE2D68"/>
+        <text x="752" y="48" font-family="IBM Plex Mono" font-size="11" fill="#082B37">Journalist ─REPOSTS→ University</text>
+        <text x="752" y="70" font-family="IBM Plex Sans KR" font-size="11.5" fill="#AE2D68">그래프에 새 엣지</text>
+        <text x="752" y="88" font-family="IBM Plex Sans KR" font-size="11.5" fill="#6B8E9B">타임스탬프와 함께</text>
+
+        <line x1="0" y1="122" x2="1000" y2="122" stroke="#BFD4DB"/>
+        <text x="0" y="148" font-family="IBM Plex Sans KR" font-size="13" font-weight="600" fill="#082B37">전송 파이프라인</text>
+        <g font-family="IBM Plex Mono" font-size="10.5">
+          <rect x="0" y="162" width="190" height="38" fill="#F5FAFB" stroke="#BFD4DB"/>
+          <text x="14" y="186" fill="#082B37">Queue.put(activity)</text>
+          <path d="M200 181H232" stroke="#7FA9B8" stroke-width="1.2" marker-end="url(#ar1)"/>
+          <rect x="242" y="162" width="230" height="38" fill="#F5FAFB" stroke="#BFD4DB"/>
+          <text x="256" y="181" fill="#082B37">플랫폼별 버퍼</text>
+          <text x="256" y="195" fill="#6B8E9B">BATCH_SIZE = 5</text>
+          <path d="M482 181H514" stroke="#7FA9B8" stroke-width="1.2" marker-end="url(#ar1)"/>
+          <rect x="524" y="162" width="230" height="38" fill="#F5FAFB" stroke="#BFD4DB"/>
+          <text x="538" y="181" fill="#082B37">워커 스레드</text>
+          <text x="538" y="195" fill="#6B8E9B">SEND_INTERVAL = 0.5s</text>
+          <path d="M764 181H796" stroke="#AE2D68" stroke-width="1.2" marker-end="url(#ar2)"/>
+          <rect x="806" y="162" width="194" height="38" fill="#FBEFF4" stroke="#AE2D68"/>
+          <text x="820" y="186" fill="#082B37">graph.add(episode)</text>
+        </g>
+        <text x="0" y="224" font-family="IBM Plex Sans KR" font-size="11.5" fill="#6B8E9B">종료 시 <tspan font-family="IBM Plex Mono" fill="#AE2D68">_DrainDeadlineExceeded</tspan> 로 큐 비우기에 데드라인을 겁니다 — 무한 대기 방지.</text>
+      </svg>
+    </div>
+    <p class="fig-cap"><b>Fig 15</b> 액션 유형별 서술 메서드가 <code>CREATE_POST</code>·<code>LIKE_POST</code>·<code>DISLIKE_POST</code>·<code>REPOST</code>·<code>QUOTE_POST</code>·<code>FOLLOW</code>·<code>CREATE_COMMENT</code>·<code>LIKE_COMMENT</code>·<code>DISLIKE_COMMENT</code>·<code>SEARCH</code>·<code>MUTE</code> 등 개별로 존재합니다.</p>
+  </div>
+
+  <h3>그래프의 생애</h3>
+  <div class="fig">
+    <div class="svgbox">
+      <svg viewBox="0 0 1000 176" role="img" aria-label="Zep 그래프의 네 국면">
+        <line x1="0" y1="94" x2="1000" y2="94" stroke="#BFD4DB" stroke-width="1.5"/>
+        <g font-family="IBM Plex Sans KR" font-size="12.5">
+          <circle cx="90" cy="94" r="9" fill="#2C6E85"/>
+          <text x="90" y="52" text-anchor="middle" font-weight="600" fill="#082B37">구축</text>
+          <text x="90" y="72" text-anchor="middle" font-size="11.5" fill="#6B8E9B">원본 문서 주입</text>
+          <text x="90" y="124" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#6B8E9B">5장</text>
+
+          <circle cx="360" cy="94" r="9" fill="#2C6E85"/>
+          <text x="360" y="52" text-anchor="middle" font-weight="600" fill="#082B37">읽기</text>
+          <text x="360" y="72" text-anchor="middle" font-size="11.5" fill="#6B8E9B">페르소나·설정 생성 재료</text>
+          <text x="360" y="124" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#6B8E9B">6·7장</text>
+
+          <circle cx="640" cy="94" r="9" fill="#AE2D68"/>
+          <text x="640" y="52" text-anchor="middle" font-weight="600" fill="#AE2D68">성장</text>
+          <text x="640" y="72" text-anchor="middle" font-size="11.5" fill="#AE2D68">시뮬 사건이 계속 추가됨</text>
+          <text x="640" y="124" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#AE2D68">10장 · 5장과 동시</text>
+
+          <circle cx="910" cy="94" r="9" fill="#2C6E85"/>
+          <text x="910" y="52" text-anchor="middle" font-weight="600" fill="#082B37">검색</text>
+          <text x="910" y="72" text-anchor="middle" font-size="11.5" fill="#6B8E9B">리포트 에이전트의 자료원</text>
+          <text x="910" y="124" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#6B8E9B">11장</text>
+        </g>
+        <path d="M560 94 Q640 130 720 94" fill="none" stroke="#AE2D68" stroke-width="1.4" stroke-dasharray="4 3"/>
+        <text x="640" y="166" text-anchor="middle" font-family="IBM Plex Sans KR" font-size="11.5" fill="#6B8E9B">시뮬레이션이 도는 내내 반복되는 되먹임 구간</text>
+      </svg>
+    </div>
+    <p class="fig-cap"><b>Fig 16</b> 이 구조 덕분에 11장의 <code>PanoramaSearch</code>가 "여론이 언제 뒤집혔는가"를 질문할 수 있게 됩니다.</p>
+  </div>
+</section>
+<!-- ============ 11 ============ -->
+<section id="s11">
+  <div class="sec-head">
+    <div class="sec-no">11</div>
+    <div>
+      <h2>리포트 에이전트</h2>
+      <p><code>services/report_agent.py</code> 2,619줄 + <code>services/zep_tools.py</code> 1,734줄 · 단일 기능 최대 규모</p>
+    </div>
+  </div>
+
+  <p class="lead">
+    시뮬레이션이 끝나면 SQLite에 수천 개의 게시물과 댓글이, Zep에 수만 개의 엣지가 쌓여 있습니다.
+    이걸 사람이 읽을 문서로 바꾸는 게 마지막 단계입니다. 핵심 설계는 하나 —
+    <strong>LLM이 검색 없이 지어내는 것을 구조적으로 막는 것</strong>입니다.
+  </p>
+
+  <h3>목차를 먼저, 섹션은 따로</h3>
+
+  <div class="fig">
+    <div class="svgbox">
+      <svg viewBox="0 0 1000 392" role="img" aria-label="리포트 생성 ReACT 루프">
+        <rect x="0" y="24" width="280" height="52" fill="#06222E"/>
+        <text x="18" y="46" font-family="IBM Plex Sans KR" font-size="13.5" font-weight="600" fill="#F2F8FA">목차 계획</text>
+        <text x="18" y="66" font-family="IBM Plex Mono" font-size="10.5" fill="#7FA9B8">PLAN_SYSTEM_PROMPT → ReportOutline</text>
+
+        <path d="M290 50H334" stroke="#7FA9B8" stroke-width="1.2" marker-end="url(#ar1)"/>
+        <text x="344" y="46" font-family="IBM Plex Sans KR" font-size="12.5" fill="#3C6373">섹션 목록 확정 후, 섹션마다 아래 루프를 독립 실행</text>
+
+        <rect x="0" y="98" width="700" height="212" fill="none" stroke="#AE2D68" stroke-dasharray="5 4"/>
+        <text x="16" y="120" font-family="IBM Plex Mono" font-size="10" letter-spacing="1.6" fill="#AE2D68">섹션 1개당 ReACT 루프 · 최대 5회 반복</text>
+
+        <rect x="24" y="136" width="196" height="56" fill="#F5FAFB" stroke="#BFD4DB"/>
+        <text x="40" y="160" font-family="IBM Plex Sans KR" font-size="13" font-weight="600" fill="#082B37">Thought</text>
+        <text x="40" y="180" font-family="IBM Plex Sans KR" font-size="11.5" fill="#6B8E9B">무슨 정보가 더 필요한가</text>
+
+        <path d="M230 164H262" stroke="#7FA9B8" stroke-width="1.2" marker-end="url(#ar1)"/>
+
+        <rect x="272" y="136" width="196" height="56" fill="#F5FAFB" stroke="#BFD4DB"/>
+        <text x="288" y="160" font-family="IBM Plex Sans KR" font-size="13" font-weight="600" fill="#082B37">Action</text>
+        <text x="288" y="180" font-family="IBM Plex Sans KR" font-size="11.5" fill="#6B8E9B">4개 툴 중 하나 호출</text>
+
+        <path d="M478 164H510" stroke="#7FA9B8" stroke-width="1.2" marker-end="url(#ar1)"/>
+
+        <rect x="520" y="136" width="156" height="56" fill="#F5FAFB" stroke="#BFD4DB"/>
+        <text x="536" y="160" font-family="IBM Plex Sans KR" font-size="13" font-weight="600" fill="#082B37">Observation</text>
+        <text x="536" y="180" font-family="IBM Plex Sans KR" font-size="11.5" fill="#6B8E9B">결과 해석</text>
+
+        <path d="M598 192 L598 222 L122 222 L122 196" fill="none" stroke="#AE2D68" stroke-width="1.4" marker-end="url(#ar2)"/>
+        <text x="360" y="240" text-anchor="middle" font-family="IBM Plex Sans KR" font-size="11.5" fill="#AE2D68">최소 3회는 반드시 돈다</text>
+
+        <rect x="24" y="254" width="652" height="40" fill="#F5FAFB" stroke="#BFD4DB"/>
+        <text x="40" y="279" font-family="IBM Plex Sans KR" font-size="12.5" fill="#3C6373">아직 안 써본 툴이 남아 있으면 <tspan font-family="IBM Plex Mono" fill="#082B37">unused_tools</tspan> 를 근거로 프롬프트가 사용을 유도</text>
+
+        <path d="M710 200H754" stroke="#2C6E85" stroke-width="1.2" marker-end="url(#ar1)"/>
+        <rect x="764" y="136" width="236" height="128" fill="#06222E"/>
+        <text x="784" y="160" font-family="IBM Plex Mono" font-size="10" letter-spacing="1.6" fill="#7FA9B8">제약</text>
+        <g font-family="IBM Plex Mono" font-size="11" fill="#BCD8E1">
+          <text x="784" y="184">max_iterations = 5</text>
+          <text x="784" y="204" fill="#AE2D68">min_tool_calls = 3</text>
+          <text x="784" y="224">MAX_TOOL_CALLS / SECTION = 5</text>
+          <text x="784" y="244">MAX_TOOL_CALLS / CHAT = 2</text>
+        </g>
+
+        <line x1="0" y1="332" x2="1000" y2="332" stroke="#BFD4DB"/>
+        <g font-family="IBM Plex Sans KR" font-size="12.5" fill="#3C6373">
+          <text x="0" y="356">연속성 유지 — 이전 섹션들을 <tspan font-family="IBM Plex Mono" fill="#082B37">각 4,000자</tspan> 로 잘라 다음 섹션 프롬프트에 넣습니다.</text>
+          <text x="0" y="380">충돌 처리 — LLM이 툴 호출과 Final Answer를 동시에 뱉으면 <tspan font-family="IBM Plex Mono" fill="#AE2D68">conflict_retries</tspan> 를 올리고 재시도합니다.</text>
+        </g>
+      </svg>
+    </div>
+    <p class="fig-cap"><b>Fig 17</b> <code>min_tool_calls = 3</code>이 이 설계의 핵심입니다 — 검색 없이 그럴듯하게 쓰는 걸 산술적으로 봉쇄합니다.</p>
+  </div>
+
+  <h3>네 개의 툴</h3>
+  <p>
+    툴 설명문은 <code>TOOL_DESC_*</code> 상수로 코드에 하드코딩돼 있고, 각각 <strong>언제 쓰는지</strong>와 <strong>무엇이 돌아오는지</strong>까지 프롬프트에 명시합니다.
+  </p>
+
+  <div class="grid g2">
+    <div class="card" style="border-top:3px solid var(--mark)">
+      <h4 style="margin-top:0; color:var(--mark)">InsightForge · 깊이</h4>
+      <p style="font-size:13.5px; margin:0 0 10px">
+        질문 하나를 서브쿼리 최대 5개로 분해한 뒤 다차원 검색. 사실상 자체 구현한 RAG 파이프라인입니다.
+      </p>
+      <p style="font-size:12.5px; color:var(--ink2); margin:0"><strong>반환</strong> 인용 가능한 원문 사실 · 핵심 엔티티 인사이트 · 관계 체인 분석</p>
+    </div>
+    <div class="card" style="border-top:3px solid var(--shelf)">
+      <h4 style="margin-top:0; color:var(--shelf)">PanoramaSearch · 시간</h4>
+      <p style="font-size:13.5px; margin:0 0 10px">
+        만료된 엣지까지 끌어와 "지금 유효한 사실"과 "과거엔 사실이었던 것"을 나눠 돌려줍니다.
+      </p>
+      <p style="font-size:12.5px; color:var(--ink2); margin:0"><strong>반환</strong> 현재 유효 사실 · 이력/만료 사실 · 관련 엔티티 전체</p>
+    </div>
+    <div class="card" style="border-top:3px solid var(--shoal)">
+      <h4 style="margin-top:0">QuickSearch · 확인</h4>
+      <p style="font-size:13.5px; margin:0 0 10px">
+        단일 사실을 빠르게 검증할 때. 가장 가벼운 경로입니다.
+      </p>
+      <p style="font-size:12.5px; color:var(--ink2); margin:0"><strong>반환</strong> 질의와 가장 관련된 사실 목록</p>
+    </div>
+    <div class="card" style="border-top:3px solid var(--sand)">
+      <h4 style="margin-top:0; color:var(--sand)">InterviewAgents · 목소리</h4>
+      <p style="font-size:13.5px; margin:0 0 10px">
+        인물 파일을 읽어 주제와 맞는 에이전트를 고르고, 질문을 자동 생성해 <strong>Twitter·Reddit 양쪽에서 동시 인터뷰</strong>합니다.
+        프롬프트에 "이건 LLM 모방이 아니라 진짜 OASIS 환경 응답"이라고 못박혀 있습니다.
+      </p>
+      <p style="font-size:12.5px; color:var(--mark); margin:0"><strong>전제</strong> 시뮬 환경이 살아 있어야 작동 — 9장의 IPC 경로를 탑니다</p>
+    </div>
+  </div>
+
+  <h3>InsightForge 내부</h3>
+
+  <div class="fig">
+    <div class="svgbox">
+      <svg viewBox="0 0 1000 268" role="img" aria-label="InsightForge 검색 확산 구조">
+        <rect x="0" y="30" width="200" height="46" fill="#06222E"/>
+        <text x="16" y="58" font-family="IBM Plex Sans KR" font-size="13" font-weight="600" fill="#F2F8FA">에이전트의 질문</text>
+
+        <path d="M210 53H252" stroke="#7FA9B8" stroke-width="1.2" marker-end="url(#ar1)"/>
+        <text x="216" y="45" font-family="IBM Plex Mono" font-size="9.5" fill="#6B8E9B">LLM 분해</text>
+
+        <g font-family="IBM Plex Mono" font-size="10.5">
+          <rect x="262" y="8" width="230" height="26" fill="#F5FAFB" stroke="#BFD4DB"/><text x="276" y="26" fill="#082B37">서브쿼리 1 → limit 15 · edges</text>
+          <rect x="262" y="40" width="230" height="26" fill="#F5FAFB" stroke="#BFD4DB"/><text x="276" y="58" fill="#082B37">서브쿼리 2 → limit 15 · edges</text>
+          <rect x="262" y="72" width="230" height="26" fill="#F5FAFB" stroke="#BFD4DB"/><text x="276" y="90" fill="#082B37">… 최대 5개</text>
+          <rect x="262" y="104" width="230" height="26" fill="#FBEFF4" stroke="#AE2D68"/><text x="276" y="122" fill="#082B37">원본 질문 → limit 20 · edges</text>
+        </g>
+
+        <path d="M502 70H544" stroke="#7FA9B8" stroke-width="1.2" marker-end="url(#ar1)"/>
+
+        <rect x="554" y="8" width="200" height="122" fill="#F5FAFB" stroke="#BFD4DB"/>
+        <text x="570" y="34" font-family="IBM Plex Sans KR" font-size="12.5" font-weight="600" fill="#082B37">중복 제거</text>
+        <text x="570" y="56" font-family="IBM Plex Mono" font-size="10.5" fill="#6B8E9B">seen_facts: set</text>
+        <text x="570" y="82" font-family="IBM Plex Sans KR" font-size="12.5" font-weight="600" fill="#082B37">엔티티 추출</text>
+        <text x="570" y="104" font-family="IBM Plex Sans KR" font-size="12.5" font-weight="600" fill="#082B37">관계 체인 추적</text>
+
+        <path d="M764 70H806" stroke="#AE2D68" stroke-width="1.2" marker-end="url(#ar2)"/>
+
+        <rect x="816" y="8" width="184" height="122" fill="#FBEFF4" stroke="#AE2D68"/>
+        <text x="832" y="34" font-family="IBM Plex Mono" font-size="10.5" fill="#AE2D68">InsightForgeResult</text>
+        <text x="832" y="60" font-family="IBM Plex Mono" font-size="10.5" fill="#3C6373">sub_queries[]</text>
+        <text x="832" y="80" font-family="IBM Plex Mono" font-size="10.5" fill="#3C6373">semantic_facts[]</text>
+        <text x="832" y="100" font-family="IBM Plex Mono" font-size="10.5" fill="#3C6373">total_facts</text>
+
+        <line x1="0" y1="162" x2="1000" y2="162" stroke="#BFD4DB"/>
+        <text x="0" y="188" font-family="IBM Plex Sans KR" font-size="13" font-weight="600" fill="#082B37">PanoramaSearch — Zep 시간축을 쓰는 유일한 툴</text>
+
+        <g font-family="IBM Plex Sans KR" font-size="11.5">
+          <text x="0" y="214" fill="#6B8E9B">t →</text>
+          <line x1="34" y1="210" x2="1000" y2="210" stroke="#D6E4E8"/>
+          <rect x="34" y="204" width="300" height="12" fill="#C9DBE1"/>
+          <text x="40" y="236" fill="#6B8E9B">"대학이 사건을 부인한다" — 만료됨</text>
+          <rect x="360" y="204" width="640" height="12" fill="#AE2D68"/>
+          <text x="366" y="236" fill="#AE2D68">"대학이 조사에 착수한다" — 현재 유효</text>
+        </g>
+        <text x="0" y="262" font-family="IBM Plex Sans KR" font-size="11.5" fill="#6B8E9B">두 사실을 함께 돌려주므로 "언제 입장이 바뀌었는가"를 리포트에 쓸 수 있습니다.</text>
+      </svg>
+    </div>
+    <p class="fig-cap"><b>Fig 18</b> 다른 세 툴이 "무엇이 사실인가"를 묻는다면, PanoramaSearch만 "무엇이 사실이었는가"를 묻습니다.</p>
+  </div>
+
+  <h3>툴 호출을 파싱하는 방식</h3>
+  <p>
+    OpenAI의 네이티브 function calling을 쓰지 않습니다.
+    <code>_parse_tool_calls()</code>가 <strong>응답 텍스트에서 JSON 블록을 직접 추출</strong>하고 <code>_is_valid_tool_call()</code>로 검증합니다.
+  </p>
+  <div class="grid g2">
+    <div class="card">
+      <h4 style="margin-top:0">치르는 비용</h4>
+      <p style="font-size:13.5px; margin:0">파싱 실패 가능성, 프롬프트에 툴 스키마를 직접 써야 하는 부담, 모델이 형식을 어길 때의 재시도 로직(<code>conflict_retries</code>).</p>
+    </div>
+    <div class="card">
+      <h4 style="margin-top:0">얻는 것</h4>
+      <p style="font-size:13.5px; margin:0">function calling을 지원하지 않는 모델도 그대로 붙습니다. <code>.env</code>에 URL만 바꾸면 로컬 모델로 전환 가능하다는 이 프로젝트의 약속이 여기서 지켜집니다.</p>
+    </div>
+  </div>
+
+  <h3>두 개의 로거</h3>
+  <p>
+    에이전트가 생각하는 과정을 사용자에게 실시간으로 보여주는 게 이 화면의 핵심 UX라, 로거를 목적별로 둘 만들었습니다.
+  </p>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:230px">로거</th><th style="width:170px">형식</th><th>기록 내용 / 스트리밍 경로</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>ReportLogger</code></td>
+        <td>구조화 JSONL</td>
+        <td><code>log_planning_start</code> · <code>log_react_thought</code> · <code>log_tool_call</code> · <code>log_tool_result</code> · <code>log_section_content</code> · <code>log_report_complete</code> 등 국면별 전용 메서드 → <code>GET /report/&lt;id&gt;/agent-log/stream</code></td>
+      </tr>
+      <tr>
+        <td><code>ReportConsoleLogger</code></td>
+        <td>원시 콘솔 텍스트</td>
+        <td>파이썬 로깅 핸들러를 파일에 붙여 그대로 수집 → <code>GET /report/&lt;id&gt;/console-log/stream</code></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note">
+    <b>리포트를 읽을 때의 전제</b>
+    최소 3회 검색을 강제하고 인용 가능한 원문을 반환하도록 설계했지만, 최종 문장을 쓰는 것은 여전히 LLM입니다.
+    검색 결과와 서술 사이에 자동 검증은 없습니다. 이 파이프라인이 보장하는 것은 <strong>"근거를 찾아본 뒤에 썼다"</strong>이지
+    <strong>"쓴 내용이 근거와 일치한다"</strong>가 아닙니다.
+  </div>
+</section>
+<!-- ============ 12 ============ -->
+<section id="s12">
+  <div class="sec-head">
+    <div class="sec-no">12</div>
+    <div>
+      <h2>API 표면</h2>
+      <p>블루프린트 3개 · 엔드포인트 59개 · 인증 없음</p>
+    </div>
+  </div>
+
+  <div class="fig">
+    <div class="svgbox">
+      <svg viewBox="0 0 1000 196" role="img" aria-label="블루프린트별 엔드포인트 분포">
+        <text x="0" y="12" font-family="IBM Plex Mono" font-size="10" letter-spacing="1.6" fill="#6B8E9B">엔드포인트 59개의 분포</text>
+        <rect x="0" y="26" width="169" height="34" fill="#2C6E85"/>
+        <rect x="169" y="26" width="525" height="34" fill="#AE2D68"/>
+        <rect x="694" y="26" width="306" height="34" fill="#B07C1F"/>
+        <g font-family="IBM Plex Mono" font-size="11" fill="#fff">
+          <text x="14" y="48">10</text><text x="183" y="48">31</text><text x="708" y="48">18</text>
+        </g>
+        <g font-family="IBM Plex Mono" font-size="10.5" fill="#3C6373">
+          <text x="0" y="80">/api/graph</text><text x="169" y="80">/api/simulation</text><text x="694" y="80">/api/report</text>
+        </g>
+        <g font-family="IBM Plex Sans KR" font-size="11.5" fill="#6B8E9B">
+          <text x="0" y="102">프로젝트 · 온톨로지 · 그래프</text><text x="169" y="102">엔티티 · 준비 · 실행 · 인터뷰 · 조회</text><text x="694" y="102">생성 · 조회 · 로그 · 대화</text>
+        </g>
+
+        <line x1="0" y1="126" x2="1000" y2="126" stroke="#BFD4DB"/>
+        <g font-family="IBM Plex Sans KR" font-size="12.5" fill="#3C6373">
+          <text x="0" y="150">인증·세션·사용자 개념이 없습니다. <tspan font-family="IBM Plex Mono" fill="#082B37">CORS(origins="*")</tspan> 로 열려 있고 <tspan font-family="IBM Plex Mono" fill="#082B37">/health</tspan> 만 별도입니다.</text>
+          <text x="0" y="174" fill="#AE2D68">프로젝트 ID를 아는 사람은 누구나 조회·삭제·중지할 수 있습니다 — 로컬 도구를 전제한 설계입니다.</text>
+        </g>
+      </svg>
+    </div>
+    <p class="fig-cap"><b>Fig 19</b> <code>/api/simulation</code>이 절반을 넘습니다. 준비·실행·관측·인터뷰가 한 파일에 모여 있기 때문입니다.</p>
+  </div>
+
+  <h3>수명주기 순으로 본 주요 엔드포인트</h3>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:80px">단계</th><th style="width:300px">엔드포인트</th><th>하는 일</th></tr></thead>
+    <tbody>
+      <tr><td>준비</td><td><code>POST /api/graph/ontology/generate</code></td><td>파일 업로드 + 요구사항 → 온톨로지 (4장)</td></tr>
+      <tr><td>준비</td><td><code>POST /api/graph/build</code></td><td>비동기 그래프 구축 시작, <code>task_id</code> 반환</td></tr>
+      <tr><td>준비</td><td><code>GET /api/graph/task/&lt;id&gt;</code></td><td>구축 진행률 폴링</td></tr>
+      <tr><td>준비</td><td><code>GET /api/graph/data/&lt;graph_id&gt;</code></td><td>D3 시각화용 노드·엣지 덤프</td></tr>
+      <tr><td>환경</td><td><code>GET /api/simulation/entities/&lt;graph_id&gt;</code></td><td>그래프 엔티티 목록 · 타입별 필터 지원</td></tr>
+      <tr><td>환경</td><td><code>POST /api/simulation/prepare</code></td><td>페르소나 + 설정 동시 생성 (6·7장)</td></tr>
+      <tr><td>환경</td><td><code>GET /api/simulation/&lt;id&gt;/profiles/realtime</code></td><td>생성 중인 페르소나 실시간 중계</td></tr>
+      <tr><td>실행</td><td><code>POST /api/simulation/start</code></td><td>subprocess 기동. <code>platform</code>, <code>max_rounds</code>, <code>enable_graph_memory_update</code></td></tr>
+      <tr><td>실행</td><td><code>GET /api/simulation/&lt;id&gt;/run-status/detail</code></td><td>라운드 진행 · 플랫폼별 상태</td></tr>
+      <tr><td>관측</td><td><code>GET /api/simulation/&lt;id&gt;/timeline</code></td><td>시간순 액션 스트림</td></tr>
+      <tr><td>관측</td><td><code>GET /api/simulation/&lt;id&gt;/posts</code> · <code>/comments</code></td><td>SQLite 직접 조회</td></tr>
+      <tr><td>관측</td><td><code>GET /api/simulation/&lt;id&gt;/agent-stats</code></td><td>에이전트별 활동 집계</td></tr>
+      <tr><td>개입</td><td><code>POST /api/simulation/interview</code> · <code>/batch</code> · <code>/all</code></td><td>IPC를 통한 실시간 인터뷰 (9장)</td></tr>
+      <tr><td>개입</td><td><code>POST /api/simulation/env-status</code> · <code>/close-env</code></td><td>환경 생존 확인 · 명시적 종료</td></tr>
+      <tr><td>리포트</td><td><code>POST /api/report/generate</code></td><td>ReACT 리포트 생성 시작 (11장)</td></tr>
+      <tr><td>리포트</td><td><code>GET /api/report/&lt;id&gt;/agent-log/stream</code></td><td>에이전트 사고 과정 스트리밍</td></tr>
+      <tr><td>리포트</td><td><code>POST /api/report/chat</code></td><td>완성된 리포트를 두고 대화 · 툴 호출 2회 제한</td></tr>
+      <tr><td>리포트</td><td><code>POST /api/report/tools/search</code> · <code>/statistics</code></td><td>검색 툴 직접 호출</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ 13 ============ -->
+<section id="s13">
+  <div class="sec-head">
+    <div class="sec-no">13</div>
+    <div>
+      <h2>유틸리티 계층</h2>
+      <p><code>app/utils/</code> · 가장 실용적인 코드가 여기 모여 있습니다</p>
+    </div>
+  </div>
+
+  <p class="lead">
+    이 디렉터리를 보면 이 팀이 <strong>어떤 문제를 실제로 겪었는지</strong>가 보입니다.
+    "아무 OpenAI 호환 모델이나 붙습니다"라는 약속을 지키기 위해 치른 비용이 여기 기록돼 있습니다.
+  </p>
+
+  <h3>llm_client.py — 프로바이더 차이를 흡수하는 곳</h3>
+
+  <div class="grid g2">
+    <div class="card">
+      <h4 style="margin-top:0"><code>_is_response_format_unsupported()</code></h4>
+      <p style="font-size:13.5px; margin:0">
+        JSON 모드를 지원하지 않는 프로바이더가 400/422를 던지면, 에러 본문의 <code>param</code>·<code>code</code>·<code>message</code>를
+        검사해 <em>진짜 <code>response_format</code> 거부인지</em> 판별하고 JSON 모드 없이 재시도합니다.
+        <code>unsupported_parameter</code>·<code>unknown parameter</code> 등 문구 목록까지 열거돼 있습니다.
+      </p>
+    </div>
+    <div class="card">
+      <h4 style="margin-top:0"><code>_clean_chat_text()</code></h4>
+      <p style="font-size:13.5px; margin:0">
+        <code>&lt;think&gt;…&lt;/think&gt;</code> 블록, BOM, 마크다운 코드펜스를 제거합니다.
+        추론 모델(DeepSeek-R1 계열)을 붙였을 때 응답 앞에 사고 과정이 붙어 나오는 문제 대응입니다.
+        <code>_contains_additional_json_container()</code>는 뒤에 딸려온 여분의 JSON까지 탐지합니다.
+      </p>
+    </div>
+  </div>
+
+  <h3>나머지 모듈</h3>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:230px">모듈</th><th style="width:70px">줄</th><th>역할</th></tr></thead>
+    <tbody>
+      <tr><td><code>retry.py</code></td><td>238</td><td>동기·비동기 양쪽 <code>retry_with_backoff</code> 데코레이터(<code>backoff_factor=2.0</code>)와 배치 재시도 클래스</td></tr>
+      <tr><td><code>zep_paging.py</code></td><td>160</td><td><code>fetch_all_nodes</code> / <code>fetch_all_edges</code> — 페이지네이션 끝까지 순회. 그래프가 커졌을 때 첫 페이지만 보고 판단하는 버그를 구조적으로 방지</td></tr>
+      <tr><td><code>zep.py</code> · <code>zep_lifecycle.py</code></td><td>162 + α</td><td>클라이언트 싱글턴, 타임아웃 상수, <code>call_zep_read_with_retry</code> 래퍼</td></tr>
+      <tr><td><code>locale.py</code></td><td>—</td><td><code>t()</code> 번역 + <code>get_language_instruction()</code>. 모든 LLM 프롬프트 끝에 언어 지시를 덧붙입니다. 스레드로컬이라 5장의 캡처 패턴이 필요</td></tr>
+      <tr><td><code>file_parser.py</code></td><td>203</td><td>PyMuPDF + <code>chardet</code>/<code>charset-normalizer</code>로 인코딩까지 자동 감지</td></tr>
+      <tr><td><code>openai_chat_compat.py</code></td><td>101</td><td><code>create_chat_completion</code> / <code>extract_chat_completion_text</code> 호환 레이어</td></tr>
+      <tr><td><code>ontology.py</code></td><td>103</td><td>예약어 집합, 속성·source_target 정규화, 상한 상수(<code>MAX_ONTOLOGY_TYPES=10</code>)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>영속화 — 관계형 DB 없음</h3>
+  <div class="grid g3">
+    <div class="stat">
+      <span>models/project.py</span><b>JSON</b>
+      <p><code>Project</code> 데이터클래스를 파일로 저장. 상태는 <code>created</code> → <code>ontology_generated</code> → <code>graph_building</code> → <code>graph_completed</code> / <code>failed</code></p>
+    </div>
+    <div class="stat">
+      <span>models/task.py</span><b>JSON</b>
+      <p><code>TaskManager</code> + <code>TaskStatus</code>. 백그라운드 작업 진행률을 담아 프론트가 폴링합니다</p>
+    </div>
+    <div class="stat mk">
+      <span>OASIS</span><b>SQLite</b>
+      <p>게시물·댓글·인터뷰 이력. 조회 API가 <code>sqlite3.connect()</code>로 직접 엽니다</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 14 ============ -->
+<section id="s14">
+  <div class="sec-head">
+    <div class="sec-no">14</div>
+    <div>
+      <h2>프론트엔드</h2>
+      <p>Vue 3 · Vite 7 · 20,414줄 · 실시간처럼 보이지만 전부 폴링</p>
+    </div>
+  </div>
+
+  <p>
+    컴포넌트 이름이 파이프라인 단계와 1:1로 대응해서 코드 찾기가 쉽습니다.
+    다만 무게가 심하게 쏠려 있습니다 — <code>Step4Report.vue</code> 한 파일이 5,162줄로 프론트 전체의 4분의 1입니다.
+  </p>
+
+  <div class="fig">
+    <div class="svgbox">
+      <svg viewBox="0 0 1000 240" role="img" aria-label="프론트 컴포넌트별 규모와 단계 대응">
+        <text x="0" y="12" font-family="IBM Plex Mono" font-size="10" letter-spacing="1.6" fill="#6B8E9B">컴포넌트 · 줄 수</text>
+        <g font-family="IBM Plex Mono" font-size="11">
+          <text x="0" y="38" fill="#082B37">Step4Report.vue</text><rect x="250" y="27" width="620" height="14" fill="#AE2D68"/><text x="880" y="38" fill="#3C6373">5,162</text>
+          <text x="0" y="63" fill="#082B37">Step2EnvSetup.vue</text><rect x="250" y="52" width="315" height="14" fill="#2C6E85"/><text x="575" y="63" fill="#3C6373">2,623</text>
+          <text x="0" y="88" fill="#082B37">Step5Interaction.vue</text><rect x="250" y="77" width="310" height="14" fill="#2C6E85"/><text x="570" y="88" fill="#3C6373">2,584</text>
+          <text x="0" y="113" fill="#082B37">Process.vue</text><rect x="250" y="102" width="249" height="14" fill="#7FA9B8"/><text x="509" y="113" fill="#3C6373">2,076</text>
+          <text x="0" y="138" fill="#082B37">GraphPanel.vue</text><rect x="250" y="127" width="171" height="14" fill="#B07C1F"/><text x="431" y="138" fill="#3C6373">1,423</text>
+          <text x="0" y="163" fill="#082B37">HistoryDatabase.vue</text><rect x="250" y="152" width="162" height="14" fill="#7FA9B8"/><text x="422" y="163" fill="#3C6373">1,348</text>
+          <text x="0" y="188" fill="#082B37">Step3Simulation.vue</text><rect x="250" y="177" width="152" height="14" fill="#2C6E85"/><text x="412" y="188" fill="#3C6373">1,268</text>
+          <text x="0" y="213" fill="#082B37">Step1GraphBuild.vue</text><rect x="250" y="202" width="84" height="14" fill="#2C6E85"/><text x="344" y="213" fill="#3C6373">700</text>
+        </g>
+        <text x="0" y="236" font-family="IBM Plex Sans KR" font-size="11.5" fill="#6B8E9B">GraphPanel은 D3로 지식그래프를 직접 그립니다 — 라이브러리 없이 force 레이아웃을 구성한 부분.</text>
+      </svg>
+    </div>
+    <p class="fig-cap"><b>Fig 20</b> 리포트 화면이 큰 이유는 목차·본문·에이전트 로그·콘솔 로그·대화를 한 화면에서 처리하기 때문입니다.</p>
+  </div>
+
+  <h3>실시간의 정체</h3>
+  <p>
+    WebSocket도 SSE도 없습니다. <code>axios</code> 인스턴스 하나(<code>baseURL</code>은 <code>VITE_API_BASE_URL</code> 또는 <code>localhost:5001</code>)로
+    전부 주기적 GET입니다. 로그만 <code>fromLine</code> 파라미터로 증분 수신합니다.
+  </p>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:330px">폴링 대상</th><th>무엇을 갱신하나</th></tr></thead>
+    <tbody>
+      <tr><td><code>getTaskStatus(taskId)</code></td><td>그래프 구축 진행률</td></tr>
+      <tr><td><code>getSimulationProfilesRealtime()</code></td><td>페르소나가 하나씩 생성되는 과정</td></tr>
+      <tr><td><code>getSimulationConfigRealtime()</code></td><td>설정 4단계 생성 과정</td></tr>
+      <tr><td><code>getRunStatus()</code> · <code>getRunStatusDetail()</code></td><td>라운드 진행, 플랫폼별 상태</td></tr>
+      <tr><td><code>getAgentLog(reportId, fromLine)</code></td><td>ReACT 사고 과정 — 증분</td></tr>
+      <tr><td><code>getConsoleLog(reportId, fromLine)</code></td><td>원시 콘솔 출력 — 증분</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p style="font-size:14px; color:var(--ink2)">
+    i18n은 <code>locales/en.json</code>과 <code>zh.json</code> 두 개(합계 75KB)뿐입니다. 한국어는 없습니다.
+    다만 <code>get_language_instruction()</code>이 LLM 출력 언어를 제어하므로, 로케일 파일을 추가하면 UI와 리포트 언어가 함께 따라오는 구조이긴 합니다.
+  </p>
+</section>
+
+<!-- ============ 15 ============ -->
+<section id="s15">
+  <div class="sec-head">
+    <div class="sec-no">15</div>
+    <div>
+      <h2>배포와 설정</h2>
+      <p>직접 돌려볼 때 걸리는 지점들</p>
+    </div>
+  </div>
+
+  <div class="grid g2">
+    <div>
+      <h4 style="margin-top:0">소스 실행</h4>
+<pre>cp .env.example .env    <i># 키 채우기</i>
+npm run setup:all       <i># root + frontend + backend(uv sync)</i>
+npm run dev             <i># concurrently 로 동시 기동</i>
+
+<i># 프론트 :3000  ·  백엔드 :5001</i></pre>
+    </div>
+    <div>
+      <h4 style="margin-top:0">Docker</h4>
+<pre>docker compose up -d
+
+<i># ghcr.io/666ghj/mirofish:latest</i>
+<i># CMD 가 npm run dev — 개발 서버 그대로</i>
+<i># 볼륨: ./backend/uploads 만 마운트</i></pre>
+    </div>
+  </div>
+
+  <h4>사전 요구</h4>
+  <p>
+    <span class="tag a">Node ≥ 18</span><span class="tag a">Python ≥ 3.11, &lt; 3.13</span><span class="tag a">uv</span>
+  </p>
+
+  <h3>환경 변수</h3>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:220px">변수</th><th style="width:90px">필수</th><th>주의</th></tr></thead>
+    <tbody>
+      <tr><td><code>LLM_API_KEY</code></td><td><b style="color:var(--mark)">필수</b></td><td>없으면 <code>run.py</code>가 기동 직전 종료</td></tr>
+      <tr><td><code>LLM_BASE_URL</code></td><td>—</td><td>기본 <code>api.openai.com/v1</code>. 예제는 알리바바 바이롄</td></tr>
+      <tr><td><code>LLM_MODEL_NAME</code></td><td>—</td><td>기본 <code>gpt-4o-mini</code>, 예제는 <code>qwen-plus</code></td></tr>
+      <tr><td><code>ZEP_API_KEY</code></td><td><b style="color:var(--mark)">필수</b></td><td>Zep Cloud 전용</td></tr>
+      <tr><td><code>ZEP_API_URL</code></td><td><b style="color:var(--mark)">금지</b></td><td>설정하면 <code>Config.validate()</code>가 에러를 반환하고 기동을 막습니다 — 셀프호스팅 Zep 미지원</td></tr>
+      <tr><td><code>LLM_BOOST_*</code></td><td>선택</td><td><strong>빈 값으로 두면 안 됩니다.</strong> 안 쓸 거면 <code>.env</code>에서 세 줄을 통째로 지워야 합니다</td></tr>
+      <tr><td><code>OASIS_DEFAULT_MAX_ROUNDS</code></td><td>선택</td><td>기본 10</td></tr>
+      <tr><td><code>REPORT_AGENT_MAX_TOOL_CALLS</code></td><td>선택</td><td>기본 5 · 리포트 품질과 비용의 주된 조절 손잡이</td></tr>
+      <tr><td><code>FLASK_DEBUG</code></td><td>선택</td><td>켜면 <code>validate()</code>가 <code>RuntimeWarning</code>을 냅니다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note">
+    <b>비용 감각</b>
+    라운드마다 활성 에이전트 수만큼 LLM 호출이 발생하고, 여기에 페르소나 생성 N회 + 설정 생성 + 리포트 섹션당 최소 3회 검색이 더해집니다.
+    <code>semaphore=30</code>이 동시성만 제한할 뿐 총량은 제한하지 않습니다.
+    README가 40라운드 미만을 권하는 건 <code>max_rounds</code> 파라미터를 쓰라는 뜻입니다.
+  </div>
+</section>
+
+<!-- ============ 16 ============ -->
+<section id="s16">
+  <div class="sec-head">
+    <div class="sec-no">16</div>
+    <div>
+      <h2>총평</h2>
+      <p>27,787줄을 다 읽고 남는 인상</p>
+    </div>
+  </div>
+
+  <p class="lead">
+    이 코드베이스는 <strong>"LLM 출력은 믿을 수 없다"는 전제 위에 세워져</strong> 있습니다.
+    거의 모든 경계마다 정규화, JSON 수선, 룰 기반 폴백, 재시도가 겹겹이 깔려 있고,
+    프로바이더 호환성 문제를 만날 때마다 대응 코드를 덧댄 흔적이 명확합니다.
+    실험실 코드가 아니라 <em>사용자에게 노출되고 나서 계속 고쳐진 코드</em>입니다.
+  </p>
+
+  <div class="grid g2">
+    <div class="card" style="border-top:3px solid var(--shelf)">
+      <h4 style="margin-top:0; color:var(--shelf)">잘 만든 부분</h4>
+      <ul class="lst" style="margin:0">
+        <li><strong>동적 온톨로지</strong> — LLM이 만든 스키마로 Pydantic 클래스를 찍어 다시 LLM 추출에 쓰는 구조가 깔끔합니다.</li>
+        <li><strong>멱등성</strong> — 청크 해시 기반 <code>operation_id</code>로 재시도가 그래프를 오염시키지 않습니다.</li>
+        <li><strong>프로세스 위생</strong> — <code>atexit</code>+시그널, SIGTERM 후 강제 종료, 앱 팩토리 레벨 훅 등록.</li>
+        <li><strong>되먹임 그래프</strong> — 시뮬 결과를 문장으로 바꿔 역주입하는 발상과, 그걸 활용하는 <code>PanoramaSearch</code>가 한 쌍으로 설계돼 있습니다.</li>
+        <li><strong>검색 강제</strong> — <code>min_tool_calls=3</code>으로 근거 없는 서술을 산술적으로 막았습니다.</li>
+        <li><strong>실패 내성</strong> — 500명 중 몇 명의 페르소나 생성이 실패해도 전체가 멈추지 않습니다.</li>
+      </ul>
+    </div>
+    <div class="card" style="border-top:3px solid var(--mark)">
+      <h4 style="margin-top:0; color:var(--mark)">구조적 한계</h4>
+      <ul class="lst" style="margin:0">
+        <li><strong>단일 프로세스 전제</strong> — 상태를 클래스 변수와 프로세스 로컬 락에 두어 gunicorn 멀티 워커로 띄우는 순간 깨집니다. "dev 서버를 쓴다"보다 깊은 문제입니다.</li>
+        <li><strong>재현 불가</strong> — 라운드마다 난수 3회, 시드 고정 없음. 결과 하나를 예측으로 인용할 수 없습니다.</li>
+        <li><strong>라우트 비대</strong> — <code>api/simulation.py</code> 2,878줄. 서비스 계층이 있는데도 로직이 상당수 라우트에 남아 있습니다.</li>
+        <li><strong>죽은 설정</strong> — 7장의 아침·근무 시간대 배수는 생성·저장되지만 아무도 읽지 않습니다.</li>
+        <li><strong>클라우드 락인</strong> — Zep Cloud 외의 선택지가 코드 레벨에서 차단돼 있습니다.</li>
+        <li><strong>검증 공백</strong> — 테스트 18개 중 9개가 Zep 계약. 시뮬 루프와 리포트 로직은 사실상 미커버이고, 예측 정확도 검증은 아예 없습니다.</li>
+        <li><strong>지역성</strong> — 기본 시간 모델이 중국 생활 패턴이고, 프롬프트가 중국어로 소스에 하드코딩돼 있습니다.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>누구에게 맞는 코드인가</h3>
+  <div class="grid g3">
+    <div class="stat">
+      <span>잘 맞음</span><b>학습·연구</b>
+      <p>멀티에이전트 시뮬레이션 + 시간축 지식그래프를 실제로 결합한 드문 사례입니다. 아이디어를 가져오기 좋습니다.</p>
+    </div>
+    <div class="stat">
+      <span>조건부</span><b>내부 도구</b>
+      <p>단일 사용자·단일 호스트라면 그대로 쓸 만합니다. 다만 AGPL-3.0이라 서비스로 제공하면 소스 공개 의무가 붙습니다.</p>
+    </div>
+    <div class="stat mk">
+      <span>안 맞음</span><b>프로덕션 SaaS</b>
+      <p>인증·멀티테넌시·수평 확장이 전부 없습니다. 얹는 게 아니라 아키텍처를 다시 짜야 하는 수준입니다.</p>
+    </div>
+  </div>
+
+  <div class="note m">
+    <b>결과를 읽을 때</b>
+    이 엔진이 만드는 것은 <strong>정교하게 근거를 갖춘 시나리오</strong>이지 확률적 예측이 아닙니다.
+    난수가 세 겹으로 들어가고 백테스트가 없다는 두 사실만으로도, 한 번의 실행 결과를 의사결정 근거로 삼는 건 위험합니다.
+    같은 설정으로 여러 번 돌려 어떤 결말이 반복되는지 보는 게 이 도구의 올바른 사용법에 가깝습니다.
+  </div>
+</section>
+
+<footer style="margin-top:80px; border-top:2px solid var(--deep); padding:34px 0 60px">
+  <div style="display:flex; flex-wrap:wrap; gap:28px; justify-content:space-between; align-items:flex-start">
+    <div style="max-width:520px">
+      <p style="font-family:var(--mono); font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:var(--ink3); margin:0 0 8px">조사 범위</p>
+      <p style="font-size:13.5px; color:var(--ink2); margin:0; line-height:1.7">
+        <code>main</code> 브랜치 <code>60757b3</code>(2026-07-23) 전체 클론 후 백엔드 Python 전 파일과 프론트엔드 구조를 직접 확인했습니다.
+        라인 수·상수·함수명·기본값은 모두 소스에서 읽은 값이며, README와 어긋나는 부분은 소스를 따랐습니다.
+      </p>
+    </div>
+    <div style="font-family:var(--mono); font-size:11px; color:var(--ink3); line-height:2">
+      <div>github.com/666ghj/MiroFish</div>
+      <div>AGPL-3.0 · v0.1.2</div>
+      <div>Python 57.6% · Vue 41.2%</div>
+    </div>
+  </div>
+</footer>
+
+</div><!-- /inner -->
+</div><!-- /wrap -->
+
+<script>
+(function(){
+  var s = document.getElementById('swarm');
+  if (s) {
+    var ns = 'http://www.w3.org/2000/svg', frag = document.createDocumentFragment();
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    for (var i = 0; i < 210; i++) {
+      var cx = 120 + Math.random() * 1000;
+      var cy = 90 + Math.random() * 520 + Math.sin(cx / 180) * 46;
+      var ang = -14 + Math.sin(cx / 220) * 16 + (Math.random() - 0.5) * 22;
+      var sc = 0.55 + Math.random() * 0.75;
+      var g = document.createElementNS(ns, 'g');
+      g.setAttribute('transform', 'translate(' + cx.toFixed(1) + ',' + cy.toFixed(1) + ') rotate(' + ang.toFixed(1) + ') scale(' + sc.toFixed(2) + ')');
+      var p = document.createElementNS(ns, 'path');
+      p.setAttribute('d', 'M0 0 L-9 3.4 L-6.6 0 L-9 -3.4 Z');
+      var hot = Math.random() < 0.055;
+      p.setAttribute('fill', hot ? '#AE2D68' : '#2C6E85');
+      p.setAttribute('opacity', hot ? 0.95 : (0.22 + Math.random() * 0.4).toFixed(2));
+      if (!reduce) {
+        p.style.animation = 'drift ' + (7 + Math.random() * 9).toFixed(1) + 's ease-in-out ' + (-Math.random() * 12).toFixed(1) + 's infinite';
+      }
+      g.appendChild(p);
+      frag.appendChild(g);
+    }
+    s.appendChild(frag);
+    var st = document.createElement('style');
+    st.textContent = '@keyframes drift{0%,100%{transform:translateX(0)}50%{transform:translateX(18px)}}';
+    document.head.appendChild(st);
+  }
+
+  var links = Array.prototype.slice.call(document.querySelectorAll('.rail a'));
+  var secs = links.map(function(a){ return document.querySelector(a.getAttribute('href')); });
+  var prog = document.getElementById('prog');
+
+  function sync(){
+    var y = window.scrollY + window.innerHeight * 0.28;
+    var cur = -1;
+    for (var i = 0; i < secs.length; i++) {
+      if (secs[i] && secs[i].offsetTop <= y) cur = i;
+    }
+    links.forEach(function(a, i){ a.classList.toggle('on', i === cur); });
+    if (prog) {
+      var h = document.body.scrollHeight - window.innerHeight;
+      prog.style.width = (h > 0 ? Math.min(100, (window.scrollY / h) * 100) : 0) + '%';
+    }
+    var act = links[cur];
+    if (act && act.offsetTop !== undefined) {
+      var box = act.parentElement;
+      if (box && box.scrollHeight > box.clientHeight) {
+        var t = act.offsetTop - box.clientHeight / 2;
+        if (Math.abs(box.scrollTop - t) > 60) box.scrollTop = t;
+      }
+    }
+  }
+  window.addEventListener('scroll', sync, { passive: true });
+  window.addEventListener('resize', sync);
+  sync();
+})();
+</script>
+</body>
+</html>
