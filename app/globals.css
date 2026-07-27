@@ -58,7 +58,7 @@ select:focus-visible {
   top: 0;
   height: 68px;
   display: grid;
-  grid-template-columns: 238px minmax(0, 1fr) auto;
+  grid-template-columns: 238px minmax(0, 1fr);
   align-items: center;
   border-bottom: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.96);
@@ -267,6 +267,11 @@ select:focus-visible {
 
 .main-content {
   min-width: 0;
+}
+
+.empty-tab-content {
+  min-height: calc(100vh - 68px);
+  background: var(--surface);
 }
 
 .view-shell {
@@ -1943,7 +1948,7 @@ footer > span {
 
 @media (max-width: 900px) {
   .topbar {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr;
     height: 62px;
   }
 
