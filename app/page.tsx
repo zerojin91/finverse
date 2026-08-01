@@ -66,6 +66,7 @@ const makeTradingDates = (endDate: string, count: number) => {
 };
 
 const actualDates = makeTradingDates("2026-07-28", actualPath.length);
+const scenarioAssetBase = "https://raw.githubusercontent.com/zerojin91/finverse/main/public/scenarios";
 
 const scenarios: Scenario[] = [
   {
@@ -75,7 +76,7 @@ const scenarios: Scenario[] = [
     tags: ["외국인 순매수", "AI CapEx"],
     forecast: "KOSPI +24.5%",
     tone: "up",
-    image: "/scenarios/kospi-rebound.png",
+    image: `${scenarioAssetBase}/kospi-rebound.png`,
     summary:
       "2026년 7월 28일 종가 6,023.66에서 출발하는 조건부 전망입니다. 외국인 수급 회복, 7월 29일 SK하이닉스 영업이익의 컨센서스 10% 이상 상회(약 70.5조원), Microsoft·Meta의 AI CapEx 유지·확대가 모두 확인되면 1주 6,650, 2주 7,050, 1개월 7,500까지 반등을 시도합니다. 선행 PER 5.7~5.8배와 RSI 31~34의 과매도 구간은 반등 여지를 주지만, MACD 하락과 연환산 변동성 80%는 큰 변동성을 경고합니다.",
     path: [6023.66, 6200, 6400, 6650, 6800, 6900, 7050, 7180, 7300, 7400, 7460, 7500],
@@ -98,7 +99,7 @@ const scenarios: Scenario[] = [
     tags: ["SK하이닉스 실적 하회", "AI 투자 재평가"],
     forecast: "KOSPI -13.8%",
     tone: "down",
-    image: "/scenarios/chip-miss.png",
+    image: `${scenarioAssetBase}/chip-miss.png`,
     summary:
       "7월 29일 SK하이닉스 영업이익이 컨센서스 64.1조원을 밑돌거나 가이던스가 보수적으로 제시되고, Microsoft·Meta가 AI CapEx의 수익성 검증을 이유로 투자 속도를 늦추는 조건부 하방 경로입니다. 7월 28일 급락을 만든 CXMT 경쟁 우려와 AI 투자수익성 논란이 실적 확인 뒤에도 이어지면 반도체 중심으로 이익 추정치와 멀티플이 함께 낮아질 수 있습니다. 적용 가중치: 뉴스 20% · 애널리스트 55% · 퀀트 25%.",
     path: [6023.66, 5900, 5750, 5650, 5480, 5380, 5300, 5230, 5180, 5150, 5180, 5190],
@@ -121,7 +122,7 @@ const scenarios: Scenario[] = [
     tags: ["외국인 순매도", "원·달러·금리"],
     forecast: "KOSPI -8.7%",
     tone: "down",
-    image: "/scenarios/risk-off.png",
+    image: `${scenarioAssetBase}/risk-off.png`,
     summary:
       "외국인 매도가 3~5거래일 이상 이어지고 원화 약세가 재확산되는 조건부 충격 경로입니다. 한국은행이 기준금리를 2.75%로 올린 가운데 미국 금리·에너지·지정학 리스크가 겹치면 위험 프리미엄과 선물 베이시스가 동시에 악화될 수 있습니다. 7월 28일처럼 프로그램 매매 중단과 레버리지 포지션 청산이 반복되는 수급형 시나리오라 뉴스 40% · 애널리스트 20% · 퀀트 40%를 적용합니다.",
     path: [6023.66, 5920, 5780, 5650, 5600, 5550, 5525, 5480, 5460, 5480, 5490, 5500],
