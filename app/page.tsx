@@ -618,7 +618,7 @@ export default function Home() {
   const [scenarioPrompt, setScenarioPrompt] = useState("8월 말까지 외국인 수급과 반도체 실적이 KOSPI에 미치는 영향을 비교해줘.");
   const [uploadedSeedFile, setUploadedSeedFile] = useState<UploadedSeed | null>(null);
   const scenarioScrollY = useRef<number | null>(null);
-  const buildTimer = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const buildTimer = useRef<number | null>(null);
 
   useLayoutEffect(() => {
     if (scenarioScrollY.current === null) return;
