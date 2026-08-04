@@ -34,6 +34,12 @@ type Scenario = {
   tone: "up" | "down";
   image: string;
   summary: string;
+  thesis: string;
+  context: string;
+  chapters: { title: string; body: string; evidence: string }[];
+  investorGuide: { stance: string; action: string; rationale: string }[];
+  studyGuide: { topic: string; question: string }[];
+  biasChecks: { bias: string; trap: string; counter: string }[];
   path: number[];
   events: { week: string; category: string; title: string; body: string; impact: string }[];
   agentInsights: { role: string; title: string; body: string }[];
@@ -79,6 +85,29 @@ const scenarios: Scenario[] = [
     image: `${scenarioAssetBase}/kospi-rebound.png`,
     summary:
       "2026년 7월 28일 종가 6,023.66에서 출발하는 조건부 전망입니다. 외국인 수급 회복, 7월 29일 SK하이닉스 영업이익의 컨센서스 10% 이상 상회(약 70.5조원), Microsoft·Meta의 AI CapEx 유지·확대가 모두 확인되면 1주 6,650, 2주 7,050, 1개월 7,500까지 반등을 시도합니다. 선행 PER 5.7~5.8배와 RSI 31~34의 과매도 구간은 반등 여지를 주지만, MACD 하락과 연환산 변동성 80%는 큰 변동성을 경고합니다.",
+    thesis: "반도체 실적과 외국인 수급이 함께 돌아올 때만, 7월 28일의 급락은 ‘추세 붕괴’가 아니라 ‘재평가를 위한 리셋’이 됩니다.",
+    context: "이 시나리오는 좋은 뉴스 하나를 맞히는 이야기가 아닙니다. 수급이 먼저 바뀌고, 실적이 확인되고, 빅테크의 투자 의지가 이어지는 세 장면이 순서대로 나타날 때 KOSPI가 6,023.66에서 회복 경로로 전환된다는 조건부 이야기입니다.",
+    chapters: [
+      { title: "1장 · 급락 다음 날, 무엇이 달라져야 하나", body: "7월 28일 KOSPI는 외국인 약 5조원 순매도와 반도체주 급락으로 6,000선을 밑돌았습니다. 그래서 첫 반등 캔들만 보고 바닥을 선언하면 안 됩니다. 현물과 선물에서 외국인이 3거래일 이상 순매수로 돌아오는지, 원·달러 환율이 안정되는지를 먼저 확인해야 합니다.", evidence: "출발점 6,023.66 · 첫 관문 외국인 수급 3~5거래일" },
+      { title: "2장 · 실적은 숫자보다 기대의 방향을 바꾼다", body: "SK하이닉스 영업이익이 컨센서스 64.1조원을 10% 이상 웃돌면 시장은 단순한 한 분기 서프라이즈가 아니라 HBM 수요가 아직 살아 있다는 신호로 읽을 수 있습니다. 다만 가이던스가 보수적이면 주가는 발표 당일 올라도 추세는 이어지지 않을 수 있어, 다음 분기 전망까지 함께 봐야 합니다.", evidence: "컨센서스 64.1조원 · 시나리오 기준 약 70.5조원" },
+      { title: "3장 · AI CapEx가 지수 멀티플을 다시 여는 과정", body: "Microsoft와 Meta가 AI CapEx를 유지하거나 확대하면 메모리·HBM 수요의 지속성이 확인됩니다. 이때 저평가된 선행 PER 5.7~5.8배가 6배 이상으로 재평가될 여지가 생깁니다. 반등의 엔진은 실적 하나가 아니라 이익 추정치와 멀티플이 동시에 움직이는 데 있습니다.", evidence: "1주 6,650 · 2주 7,050 · 1개월 중심값 7,500" },
+      { title: "4장 · 개인 투자자는 언제 판단을 바꿀까", body: "가격이 빠르게 오를 때 뒤늦게 추격하기보다 세 관문을 체크리스트로 두세요. 수급 회복이 끊기거나, 가이던스가 낮아지거나, AI CapEx가 비용 통제로 바뀌면 반등 시나리오는 즉시 보류합니다. 조건이 유지될 때만 분할 접근하고, 예측보다 검증 속도를 우선하는 것이 이 시나리오의 핵심 학습입니다.", evidence: "반증 신호: 외국인 재순매도 · MACD 하락 지속 · 20일선 7,232 회복 실패" },
+    ],
+    investorGuide: [
+      { stance: "확인 전", action: "현금 비중을 유지하고 첫 반등을 관찰", rationale: "과매도는 반등할 수 있지만 수급이 확인되기 전에는 바닥 신호가 아닙니다." },
+      { stance: "조건 충족", action: "반도체·지수 노출을 2~3회로 나눠 접근", rationale: "세 관문이 동시에 맞을 때만 기대수익과 실패 비용을 나눌 수 있습니다." },
+      { stance: "조건 이탈", action: "매수 논리를 취소하고 손실 한도를 재점검", rationale: "좋은 이야기보다 실제 가이던스와 수급의 변화가 우선입니다." },
+    ],
+    studyGuide: [
+      { topic: "외국인 수급", question: "현물·선물 순매수가 며칠 지속돼야 추세 신호로 볼 수 있을까?" },
+      { topic: "메모리 사이클", question: "HBM 수요와 메모리 가격이 SK하이닉스 이익에 어떻게 연결될까?" },
+      { topic: "밸류에이션", question: "PER 재평가가 실적 증가와 별개로 지수를 얼마나 움직일 수 있을까?" },
+    ],
+    biasChecks: [
+      { bias: "FOMO", trap: "첫 양봉을 놓칠까 봐 조건 확인 전에 추격 매수", counter: "매수 조건을 숫자로 적고, 충족된 뒤에만 행동" },
+      { bias: "확증 편향", trap: "AI 낙관 뉴스만 모아 하락 신호를 무시", counter: "반증 신호를 같은 화면에 함께 기록" },
+      { bias: "기준점 편향", trap: "과거 고점 8,476을 목표가처럼 고정", counter: "현재 이익·수급·멀티플로 기준점을 다시 설정" },
+    ],
     path: [6023.66, 6200, 6400, 6650, 6800, 6900, 7050, 7180, 7300, 7400, 7460, 7500],
     events: [
       { week: "8/4 전후", category: "수급·실적", title: "외국인 순매수 회복과 SK하이닉스 서프라이즈", body: "외국인 수급이 회복되고 영업이익이 컨센서스 64.1조원을 10% 이상 웃돌면 1주 중심값 6,650을 시험합니다.", impact: "+10.0%" },
@@ -102,6 +131,29 @@ const scenarios: Scenario[] = [
     image: `${scenarioAssetBase}/chip-miss.png`,
     summary:
       "7월 29일 SK하이닉스 영업이익이 컨센서스 64.1조원을 밑돌거나 가이던스가 보수적으로 제시되고, Microsoft·Meta가 AI CapEx의 수익성 검증을 이유로 투자 속도를 늦추는 조건부 하방 경로입니다. 7월 28일 급락을 만든 CXMT 경쟁 우려와 AI 투자수익성 논란이 실적 확인 뒤에도 이어지면 반도체 중심으로 이익 추정치와 멀티플이 함께 낮아질 수 있습니다. 적용 가중치: 뉴스 20% · 애널리스트 55% · 퀀트 25%.",
+    thesis: "실적 미스 하나가 무서운 이유는 숫자가 작아서가 아니라, 시장이 믿고 있던 ‘AI 수요의 지속성’ 자체를 흔들기 때문입니다.",
+    context: "이 시나리오는 반도체가 나쁘다는 선언이 아니라 기대가 낮아지는 순서를 보여줍니다. 실적과 가이던스가 먼저 꺾이고, 빅테크의 투자 속도가 느려지고, 마지막으로 이익 추정치와 멀티플이 함께 내려가는 경로입니다.",
+    chapters: [
+      { title: "1장 · 발표 전에는 숫자보다 기대를 읽는다", body: "현재 주가에는 HBM 수요와 AI CapEx가 계속 커질 것이라는 기대가 포함돼 있습니다. 따라서 영업이익이 컨센서스를 조금 밑도는 것보다, 다음 분기 가이던스가 보수적으로 바뀌는지가 더 큰 충격이 될 수 있습니다. 발표 전에는 ‘얼마나 벌었나’와 ‘앞으로 얼마나 벌 수 있나’를 분리해 보세요.", evidence: "컨센서스 64.1조원 · 핵심 관찰값 가이던스와 HBM 가격" },
+      { title: "2장 · 빅테크의 말이 수요의 선행지표가 된다", body: "Microsoft와 Meta가 AI 인프라를 계속 늘리더라도 투자 회수 기간과 효율성을 강조하면 메모리 공급사에 적용되던 프리미엄은 낮아질 수 있습니다. 시장은 CapEx 금액보다 증가율, 감가상각 부담, 실제 매출 전환을 함께 비교합니다.", evidence: "1주 5,900 · 2주 5,300 · 투자 확대보다 효율성 강조" },
+      { title: "3장 · 공급 경쟁은 이익의 바닥을 다시 계산하게 한다", body: "CXMT의 메모리 공급 확대가 현실적인 경쟁으로 받아들여지면 메모리 가격과 HBM 점유율의 상단이 낮아집니다. 이때 시장은 과거의 높은 이익을 그대로 적용하지 않고, 정상화된 마진과 보수적인 멀티플로 기업가치를 다시 계산합니다.", evidence: "1개월 중심값 5,190 · 하단 4,600까지 열어둔 경로" },
+      { title: "4장 · 개인 투자자는 ‘싸졌다’와 ‘싸게 보인다’를 구분한다", body: "주가가 많이 내렸다는 이유만으로 평균단가를 낮추면 손실 회피 심리가 매수 논리를 대신할 수 있습니다. 실적 추정치가 바닥을 만들었는지, 공급 경쟁이 가격에 반영됐는지 확인되기 전에는 관망·분할·현금화 중 하나를 명시적으로 선택해야 합니다.", evidence: "반증 신호: 가이던스 상향 · AI CapEx 재가속 · 메모리 가격 반등" },
+    ],
+    investorGuide: [
+      { stance: "발표 전", action: "기대치와 실제 보유 비중을 분리해 기록", rationale: "컨센서스가 높을수록 작은 미스도 가격에는 크게 반영될 수 있습니다." },
+      { stance: "미스 확인", action: "추가 매수보다 가이던스와 공급 지표를 확인", rationale: "싸진 가격이 아니라 낮아진 이익 추정치가 기준이 될 수 있습니다." },
+      { stance: "바닥 신호", action: "실적·수요·멀티플이 함께 안정될 때만 분할 접근", rationale: "단기 반등과 추세 전환을 구분해야 평균단가 낮추기 함정을 피할 수 있습니다." },
+    ],
+    studyGuide: [
+      { topic: "컨센서스 읽기", question: "발표된 숫자와 시장 기대치 중 주가에는 무엇이 더 중요한가?" },
+      { topic: "AI CapEx", question: "투자액 증가가 실제 서버·메모리 매출로 전환되는 시차는 얼마인가?" },
+      { topic: "공급 경쟁", question: "CXMT 공급 확대가 가격·마진·점유율에 미치는 경로는 무엇인가?" },
+    ],
+    biasChecks: [
+      { bias: "손실 회피", trap: "손실을 확정하기 싫어 ‘조금만 더’ 기다림", counter: "가이던스·이익 추정치가 바뀌면 논리를 새로 작성" },
+      { bias: "평균단가 집착", trap: "내 매수가를 회복하는 것을 투자 목표로 착각", counter: "오늘 처음 본 종목이라면 살지부터 다시 질문" },
+      { bias: "낙관적 과신", trap: "AI라는 큰 흐름이 모든 실적 미스를 상쇄한다고 믿음", counter: "수요·가격·현금흐름 세 숫자로 낙관을 검증" },
+    ],
     path: [6023.66, 5900, 5750, 5650, 5480, 5380, 5300, 5230, 5180, 5150, 5180, 5190],
     events: [
       { week: "8/4 전후", category: "실적", title: "SK하이닉스 실적 미스 또는 보수적 가이던스", body: "컨센서스 64.1조원 하회가 확인되면 HBM 수요와 메모리 가격 추정치가 함께 낮아집니다.", impact: "-5.5%" },
@@ -125,6 +177,29 @@ const scenarios: Scenario[] = [
     image: `${scenarioAssetBase}/risk-off.png`,
     summary:
       "외국인 매도가 3~5거래일 이상 이어지고 원화 약세가 재확산되는 조건부 충격 경로입니다. 한국은행이 기준금리를 2.75%로 올린 가운데 미국 금리·에너지·지정학 리스크가 겹치면 위험 프리미엄과 선물 베이시스가 동시에 악화될 수 있습니다. 7월 28일처럼 프로그램 매매 중단과 레버리지 포지션 청산이 반복되는 수급형 시나리오라 뉴스 40% · 애널리스트 20% · 퀀트 40%를 적용합니다.",
+    thesis: "이 경로의 핵심은 기업 실적이 아니라 돈의 방향입니다. 외국인·환율·금리가 동시에 위험 회피를 가리키면 좋은 종목도 먼저 현금화 대상이 됩니다.",
+    context: "외국인 순매도와 원화 약세가 한 번 겹친 뒤에는 뉴스 하나가 아니라 포지션 청산의 연쇄가 시장을 움직입니다. 이 시나리오는 충격을 맞히기보다, 언제 방어 모드로 바꿔야 하는지 연습하는 교육용 경로입니다.",
+    chapters: [
+      { title: "1장 · 첫 신호는 지수보다 환율과 수급에 나온다", body: "현물과 선물에서 외국인 매도가 3거래일 이상 이어지고 원·달러 환율이 다시 오르면 대형주에 붙어 있던 위험 프리미엄이 빠르게 빠질 수 있습니다. 지수가 이미 하락한 뒤 따라가기보다, 순매수·환율·선물 베이시스의 방향을 먼저 기록합니다.", evidence: "1주 중심값 5,650 · 외국인 순매도 3거래일 이상" },
+      { title: "2장 · 금리와 에너지는 할인율을 바꾼다", body: "미국 금리와 에너지 가격이 함께 오르면 기업 이익이 그대로여도 미래 현금흐름의 현재가치가 낮아집니다. 성장주와 고밸류 종목이 먼저 흔들리고, 반도체 대형주가 지수 변동성을 키울 수 있습니다.", evidence: "2주 중심값 5,525 · 할인율·위험 프리미엄 동반 상승" },
+      { title: "3장 · 프로그램 매매가 하락을 증폭하는 순간", body: "변동성이 커지면 레버리지 포지션 청산과 프로그램 매도가 같은 방향으로 겹칩니다. 이때 장중 저점을 맞히려는 시도는 유동성 부족으로 더 불리해질 수 있어, 현금·분할·손실한도라는 사전 규칙이 중요해집니다.", evidence: "1개월 중심값 5,500 · 하단 4,900까지의 충격 밴드" },
+      { title: "4장 · 개인 투자자는 방어를 소극성으로 오해하지 않는다", body: "방어 모드는 시장을 포기하는 행동이 아니라 판단을 늦춰 선택권을 지키는 행동입니다. 수급이 안정되고 환율이 꺾인 뒤에도 첫 반등을 바로 추격하지 말고, 금리와 변동성이 함께 낮아지는지 확인한 뒤 노출을 다시 늘립니다.", evidence: "반증 신호: 외국인 순매수 전환 · 원화 안정 · 변동성 하락" },
+    ],
+    investorGuide: [
+      { stance: "위험 신호", action: "현금·단기채 비중을 늘리고 레버리지 축소", rationale: "하락장에서 생존하면 반등 시 선택권을 보존할 수 있습니다." },
+      { stance: "충격 진행", action: "가격보다 유동성과 손실한도를 관리", rationale: "프로그램 매매가 겹치는 구간에서는 좋은 종목도 함께 매도될 수 있습니다." },
+      { stance: "안정 확인", action: "수급·환율·금리 세 축을 확인하며 천천히 복귀", rationale: "첫 반등보다 위험 프리미엄이 실제로 낮아졌는지가 중요합니다." },
+    ],
+    studyGuide: [
+      { topic: "환율과 외국인", question: "원화 약세가 외국인 주식 매도와 기업 이익에 어떻게 연결되는가?" },
+      { topic: "할인율", question: "미국 10년물 금리 변화가 성장주 가치에 미치는 영향은 무엇인가?" },
+      { topic: "변동성·포지션", question: "사이드카·선물 베이시스·레버리지 청산은 어떤 순서로 나타나는가?" },
+    ],
+    biasChecks: [
+      { bias: "처분 효과", trap: "오른 종목은 팔고 떨어진 종목만 끝까지 보유", counter: "지금 처음 산다면 보유할지 동일한 기준으로 평가" },
+      { bias: "군집 행동", trap: "모두가 매도할 때 이유 없이 따라가거나 반대로 버팀", counter: "수급·환율·금리라는 세 지표로 내 판단을 분리" },
+      { bias: "통제 착각", trap: "장중 저점과 반등 시점을 맞힐 수 있다고 믿음", counter: "사전 손실한도와 재진입 조건을 먼저 정하고 실행" },
+    ],
     path: [6023.66, 5920, 5780, 5650, 5600, 5550, 5525, 5480, 5460, 5480, 5490, 5500],
     events: [
       { week: "8/1 전후", category: "수급·환율", title: "외국인 순매도 3거래일 이상 지속", body: "현물과 선물에서 매도가 겹치고 원·달러 환율이 상승하면 1주 중심값 5,650을 시험합니다.", impact: "-3.2%" },
@@ -139,6 +214,203 @@ const scenarios: Scenario[] = [
     riskPoints: ["외국인 순매도가 3~5거래일 이상 지속되는 경우", "원·달러 환율과 미국 금리가 함께 상승하는 경우", "프로그램 매매 중단과 레버리지 청산이 재발하는 경우"],
   },
 ];
+
+const chapterLessonMap: Record<string, string[]> = {
+  "kospi-rebound": [
+    "기초 개념 · KOSPI는 국내 주요 상장사의 움직임을 하나의 숫자로 압축한 지수입니다. 지수가 하루 반등했다고 해서 기업의 이익 전망까지 바로 좋아진 것은 아니므로, ‘가격의 방향’과 ‘돈이 들어오는 이유’를 나눠서 봐야 합니다. 개인 투자자는 종가보다 외국인 현물·선물 수급, 원·달러 환율, 거래대금이 같은 방향으로 움직이는지를 먼저 기록해 보세요.",
+    "기초 개념 · 컨센서스는 여러 증권사가 예상한 이익의 평균이고, 가이던스는 회사가 직접 제시하는 다음 분기 힌트입니다. 실제 이익이 예상보다 좋아도 가이던스가 낮아지면 주가는 오를 재료를 잃을 수 있습니다. 숫자를 볼 때는 ‘이번 분기 실적 → 다음 분기 전망 → HBM 가격과 출하량’의 순서로 한 줄씩 연결해 읽는 연습이 필요합니다.",
+    "기초 개념 · AI CapEx는 빅테크가 데이터센터·GPU·네트워크에 쓰는 자본적 지출이며, 메모리 기업에는 미래 주문의 선행 신호입니다. 다만 투자액이 커지는 것과 실제 매출·현금흐름이 늘어나는 것은 시간 차가 있습니다. PER은 이익 대비 주가의 배수이므로, 이익 추정치와 배수가 함께 올라갈 때만 지수의 반등이 오래가는지 확인해야 합니다.",
+    "기초 개념 · 조건부 전망은 맞히는 예언이 아니라, ‘어떤 신호가 나오면 판단을 바꿀지’를 미리 적는 도구입니다. 세 관문 중 하나라도 깨지면 반등 확률을 낮추고, 두세 개가 동시에 맞을 때만 노출을 조금씩 늘리는 식으로 행동을 설계할 수 있습니다. 이렇게 기준을 숫자로 남기면 상승장에서 생기는 FOMO와 사후 합리화를 줄이는 데 도움이 됩니다.",
+  ],
+  "chip-miss": [
+    "기초 개념 · 실적 미스는 회사가 적자를 냈다는 뜻이 아니라, 시장이 기대한 숫자보다 실제 숫자가 낮았다는 뜻입니다. 주가는 이미 미래의 좋은 뉴스까지 선반영하므로 작은 미스도 큰 조정으로 이어질 수 있습니다. 발표 전에는 컨센서스, 회사 가이던스, 직전 분기 대비 변화율을 표로 적어 두면 놀람을 줄일 수 있습니다.",
+    "기초 개념 · CapEx의 핵심은 금액 자체보다 그 돈이 서버·GPU·메모리 매출로 전환되는 속도입니다. 빅테크가 투자 확대를 말해도 수익성 검증과 감가상각 부담을 강조하면 공급사의 프리미엄은 낮아질 수 있습니다. 개인 투자자는 ‘투자액 증가율, 데이터센터 가동률, 메모리 주문 가시성’ 세 지표를 함께 확인해 보세요.",
+    "기초 개념 · 메모리 산업은 가격이 조금만 바뀌어도 재고와 마진이 크게 흔들리는 경기순환 산업입니다. 공급 경쟁이 심해지면 제품 가격이 내려가고, 가격 하락은 매출보다 빠르게 영업이익을 줄일 수 있습니다. 그래서 과거 고점의 이익을 그대로 적용하기보다 정상화된 마진과 경쟁사의 출하 계획을 기준으로 기업가치를 다시 계산해야 합니다.",
+    "기초 개념 · ‘싸졌다’는 가격이 내렸다는 사실이고, ‘싸게 보인다’는 미래 이익까지 낮아진 뒤에도 저평가라는 판단입니다. 평균단가를 낮추려는 행동은 손실 회피와 기준점 편향을 키울 수 있습니다. 처음 보는 종목이라고 가정하고, 실적 추정치가 두 번 연속 하향되는 동안에도 새로 살 것인지 스스로 질문해 보세요.",
+  ],
+  "risk-off": [
+    "기초 개념 · 외국인 수급은 한국 주식시장에 들어오고 나가는 큰 자금의 방향을 보여주는 지표입니다. 원화 약세가 겹치면 외국인 입장에서는 주가가 그대로여도 환차손이 커져 매도 유인이 생깁니다. 지수 차트만 보지 말고 현물·선물 순매수, 원·달러, 선물 베이시스를 한 화면에서 같은 시간축으로 확인해 보세요.",
+    "기초 개념 · 할인율은 미래의 이익을 오늘 가치로 바꿀 때 적용하는 금리입니다. 미국 10년물 금리와 에너지 가격이 오르면 안전자산 선호와 비용 부담이 동시에 커져 성장주의 현재가치가 낮아질 수 있습니다. 숫자를 볼 때는 금리 방향 하나보다 ‘금리 상승 + 달러 강세 + 위험 프리미엄 확대’가 함께 나타나는지 살피는 것이 중요합니다.",
+    "기초 개념 · 프로그램 매매는 여러 종목을 규칙에 따라 한꺼번에 사고파는 거래이고, 레버리지 청산은 빌린 돈으로 투자한 포지션을 강제로 줄이는 과정입니다. 두 흐름이 같은 방향으로 겹치면 기업 뉴스보다 유동성이 가격을 움직이는 시간이 생깁니다. 이런 구간에서는 장중 저점을 맞히려 하기보다 현금 비중, 손실 한도, 재진입 조건을 미리 정해 두는 편이 안전합니다.",
+    "기초 개념 · 방어 모드는 시장을 포기하는 것이 아니라 다시 선택할 수 있는 시간을 사는 행동입니다. 외국인 수급이 안정되고 환율이 꺾인 뒤에도 하루 반등만으로 위험이 끝났다고 결론 내리지 말아야 합니다. 변동성 하락과 금리 안정까지 확인한 뒤 노출을 단계적으로 복원하면 군집 행동과 통제 착각을 줄일 수 있습니다.",
+  ],
+};
+
+type ScenarioArticle = {
+  title: string;
+  lead: string;
+  metrics: { label: string; value: string; note: string }[];
+  sections: { title: string; paragraphs: string[]; takeaway: string }[];
+};
+
+const scenarioArticleMap: Record<string, ScenarioArticle> = {
+  "kospi-rebound": {
+    title: "KOSPI 조건부 반등을 읽는 법",
+    lead: "이 시나리오는 ‘급락했으니 곧 오른다’는 낙관론이 아닙니다. 시장이 기대를 다시 쌓는 과정을 외국인 수급, 반도체 이익, 빅테크 투자라는 세 개의 연결 고리로 나눠서 읽는 학습용 리포트입니다.",
+    metrics: [
+      { label: "출발 지수", value: "6,023.66", note: "7/28 종가 · 전일 대비 -10.84%" },
+      { label: "1주 중심값", value: "6,650", note: "외국인 수급과 실적 확인" },
+      { label: "1개월 중심값", value: "7,500", note: "CapEx·멀티플 재평가" },
+      { label: "핵심 확인", value: "3개 관문", note: "수급 · 이익 · 투자 지속성" },
+    ],
+    sections: [
+      {
+        title: "1. 급락 뒤 반등은 숫자보다 ‘확인 순서’가 중요합니다",
+        paragraphs: [
+          "7월 28일 KOSPI의 급락은 한 기업의 악재라기보다 외국인 대규모 매도, 반도체주 조정, AI 투자수익성 논란이 같은 날 겹친 결과로 해석할 수 있습니다. 이런 날에는 다음 날 양봉 하나가 바닥을 증명하지 않습니다. 가격은 가장 먼저 움직이지만, 추세를 바꾸는 돈은 며칠에 걸쳐 들어오기 때문입니다.",
+          "따라서 첫 번째 질문은 ‘얼마나 반등했나’가 아니라 ‘누가 사고 있는가’입니다. 현물과 선물에서 외국인 순매수가 3~5거래일 이어지고 원·달러 환율이 안정되면, 급한 청산이 멈추고 다시 위험을 감수할 자금이 생겼다고 볼 수 있습니다. 이 순서를 이해하면 반등 초기에 무작정 따라붙는 대신, 확인할 데이터와 기다릴 시간을 스스로 정할 수 있습니다.",
+        ],
+        takeaway: "공부 포인트 · 지수 차트 옆에 외국인 현물·선물, 환율, 거래대금을 같은 날짜로 기록해 보세요.",
+      },
+      {
+        title: "2. HBM과 AI CapEx는 어떻게 KOSPI로 전달될까요?",
+        paragraphs: [
+          "HBM은 GPU가 계산할 데이터를 빠르게 공급하는 초고속 메모리입니다. GPU를 엔진이라고 하면 HBM은 엔진에 연료를 밀어 넣는 분사 장치에 가깝습니다. 그래서 AI 데이터센터가 늘어날수록 HBM의 용량과 대역폭에 대한 주문이 늘고, 공급사는 가격과 출하량을 통해 이익을 얻게 됩니다.",
+          "하지만 빅테크의 투자 발표가 곧바로 국내 기업의 이익이 되는 것은 아닙니다. Microsoft와 Meta가 말한 CapEx가 실제 서버 설치와 메모리 주문으로 이어지는지, SK하이닉스가 다음 분기에도 높은 마진을 유지할 수 있는지 확인해야 합니다. 이 연결 고리가 확인될 때 낮은 PER이 다시 평가되고, 실적 증가와 투자자들의 지불 의향이 겹치면서 지수의 반등 폭이 커집니다.",
+        ],
+        takeaway: "공부 포인트 · CapEx 금액만 보지 말고 증가율, 감가상각, HBM 출하·가격을 한 묶음으로 읽으세요.",
+      },
+      {
+        title: "3. 개인 투자자는 반등을 어떻게 연습할까요?",
+        paragraphs: [
+          "조건부 전망을 사용할 때 가장 중요한 것은 목표가를 맞히는 일이 아니라 반증 신호를 미리 정하는 일입니다. 외국인 순매수가 다시 꺾이거나, 실적 가이던스가 낮아지거나, 빅테크가 AI 투자를 비용 통제로 바꾸면 이 시나리오의 확률은 즉시 낮아집니다. 그 순간에는 ‘내가 틀렸다’고 인정하는 것이 손실을 키우지 않는 행동입니다.",
+          "반대로 세 조건이 순서대로 확인되면 한 번에 베팅하기보다 1주·2주·1개월의 시간축을 나눠 판단할 수 있습니다. 이 방식은 상승장에서 생기는 FOMO를 줄이고, 뉴스 하나에 확신이 흔들리는 대신 스스로 만든 체크리스트로 결정을 내리게 도와줍니다.",
+        ],
+        takeaway: "공부 포인트 · 매수 전에 ‘조건 충족’, ‘조건 보류’, ‘조건 이탈’의 행동을 세 줄로 써 보세요.",
+      },
+    ],
+  },
+  "chip-miss": {
+    title: "반도체 실적 미스와 AI CapEx 둔화를 읽는 법",
+    lead: "좋은 산업의 주식도 기대가 너무 높아지면 실적 발표 하나로 재평가를 받습니다. 이 시나리오는 HBM 수요가 사라진다는 이야기가 아니라, 기대·가이던스·공급 경쟁이 순서대로 이익의 바닥을 다시 계산하는 과정을 설명합니다.",
+    metrics: [
+      { label: "출발 지수", value: "6,023.66", note: "7/28 종가 · 급락 이후" },
+      { label: "1주 중심값", value: "5,900", note: "컨센서스 하회 확인" },
+      { label: "1개월 중심값", value: "5,190", note: "수요·마진 동반 재평가" },
+      { label: "핵심 확인", value: "3개 단서", note: "가이던스 · CapEx · 공급" },
+    ],
+    sections: [
+      {
+        title: "1. 실적 발표에서 가장 먼저 읽을 것은 가이던스입니다",
+        paragraphs: [
+          "컨센서스는 시장이 합의한 기대치이기 때문에, 실제 영업이익이 흑자인지보다 그 기대를 넘었는지가 주가에 더 큰 영향을 줍니다. 특히 HBM처럼 시장이 빠르게 성장한다고 믿는 산업에서는 ‘이번 분기 숫자’보다 ‘다음 분기에도 같은 속도로 팔 수 있는가’가 가격에 먼저 반영됩니다.",
+          "SK하이닉스가 컨센서스 64.1조원을 밑돌거나 가이던스를 보수적으로 제시하면, 투자자는 수요가 꺾였는지 아니면 생산·원가 문제인지 구분해야 합니다. 회사의 설명에서 출하량, 평균판매가격, 재고, 다음 분기 주문을 따로 적어 보면 단순한 숫자 미스와 구조적인 수요 둔화를 구분하는 데 도움이 됩니다.",
+        ],
+        takeaway: "공부 포인트 · 실적표를 볼 때 ‘실제치-컨센서스-다음 분기 가이던스’를 한 줄에 나란히 적으세요.",
+      },
+      {
+        title: "2. AI CapEx가 줄면 메모리 가격도 바로 내려갈까요?",
+        paragraphs: [
+          "빅테크가 AI 인프라 투자를 늦춘다고 해서 메모리 수요가 즉시 사라지는 것은 아닙니다. 데이터센터 건설에는 주문과 설치 사이의 시차가 있고, 이미 계약된 물량도 있기 때문입니다. 다만 투자 증가율이 낮아지면 공급사들이 미래 주문을 근거로 붙였던 프리미엄부터 먼저 줄어들 수 있습니다.",
+          "이때 시장은 CapEx의 총액보다 투자 효율을 묻습니다. GPU 사용률이 오르는지, 서비스 매출이 늘어나는지, 감가상각 부담을 감당할 현금흐름이 있는지에 따라 다음 주문의 속도가 달라집니다. 개인 투자자는 ‘투자 발표’와 ‘매출 전환’ 사이의 시간을 기다리는 연습을 해야 합니다.",
+        ],
+        takeaway: "공부 포인트 · 빅테크 실적 발표에서 CapEx, 데이터센터 매출, 감가상각비를 함께 찾아보세요.",
+      },
+      {
+        title: "3. 공급 경쟁은 기업의 ‘정상 이익’을 다시 묻게 합니다",
+        paragraphs: [
+          "메모리는 가격 변동이 큰 경기순환 산업입니다. CXMT의 공급 확대가 실제 경쟁으로 받아들여지면 시장은 과거 고점의 마진을 미래에도 적용하지 않고, 가격 하락과 점유율 변화를 반영해 정상화된 이익을 다시 계산합니다. 주가가 많이 내려도 이익 추정치가 더 빠르게 내려가면 밸류에이션은 오히려 비싸질 수 있습니다.",
+          "따라서 ‘AI라는 큰 흐름이 있으니 언젠가 회복한다’는 문장만으로 평균단가를 낮추면 안 됩니다. 공급사의 증설 속도, 고객 인증 기간, HBM 세대 전환, 메모리 가격의 방향을 확인하면서 회복의 근거를 쌓아야 합니다. 이런 자료를 직접 찾아보는 과정이 낙관적 과신을 줄이는 가장 좋은 훈련입니다.",
+        ],
+        takeaway: "공부 포인트 · 매출·마진·점유율을 각각 따로 적고, 세 숫자가 같은 방향인지 확인하세요.",
+      },
+    ],
+  },
+  "risk-off": {
+    title: "외국인 매도와 원화 약세를 읽는 법",
+    lead: "이 시나리오의 질문은 ‘어떤 종목이 좋은가’가 아니라 ‘좋은 종목도 왜 함께 팔리는가’입니다. 돈의 방향, 환율, 금리, 레버리지 청산이 한 방향으로 겹칠 때 시장이 방어 모드로 바뀌는 과정을 초보자도 따라갈 수 있도록 정리했습니다.",
+    metrics: [
+      { label: "출발 지수", value: "6,023.66", note: "7/28 종가 · 위험 회피 확대" },
+      { label: "1주 중심값", value: "5,650", note: "수급·환율 동반 악화" },
+      { label: "1개월 중심값", value: "5,500", note: "청산·변동성 재충격" },
+      { label: "핵심 확인", value: "3축", note: "외국인 · 환율 · 금리" },
+    ],
+    sections: [
+      {
+        title: "1. 외국인이 팔면 왜 KOSPI가 더 크게 흔들릴까요?",
+        paragraphs: [
+          "외국인 투자자는 한국 주식의 수익률뿐 아니라 원화로 바꿨을 때의 환차익까지 함께 계산합니다. 원·달러 환율이 오르면 원화 자산의 달러 가치가 줄어들기 때문에, 주가가 그대로여도 위험을 줄이려는 매도가 나올 수 있습니다. 대형주와 선물에 집중된 자금이 움직이면 지수 전체가 개별 기업의 실적보다 먼저 반응합니다.",
+          "현물과 선물 순매도가 며칠 이어지는지, 선물 베이시스가 약해지는지, 환율이 같은 시간에 오르는지를 함께 보세요. 이 세 지표가 같은 방향이면 단순한 하루 조정이 아니라 포지션을 줄이는 흐름일 수 있습니다. 숫자를 묶어서 보는 습관이 공포 뉴스에 휩쓸리지 않게 해 줍니다.",
+        ],
+        takeaway: "공부 포인트 · 환율 차트와 외국인 순매수 표를 같은 날짜로 겹쳐 보며 상관관계를 직접 적어보세요.",
+      },
+      {
+        title: "2. 금리와 에너지는 기업의 현재가치를 어떻게 바꿀까요?",
+        paragraphs: [
+          "할인율은 미래에 벌 돈을 오늘의 가치로 환산할 때 쓰는 금리입니다. 미국 10년물 금리가 오르면 먼 미래의 성장 기대가 큰 기업일수록 현재가치가 더 많이 낮아지고, 에너지 가격이 오르면 제조업의 비용 부담까지 커집니다. 실적이 당장 변하지 않아도 주가가 먼저 조정받는 이유가 여기에 있습니다.",
+          "금리 한 가지를 보고 공포에 빠지기보다 금리 상승, 달러 강세, 위험 프리미엄 확대가 동시에 나타나는지 확인해야 합니다. 세 요인이 겹치면 좋은 종목과 나쁜 종목을 가르는 분석보다 현금흐름과 부채가 튼튼한지를 먼저 보는 방어적 분석이 유효해집니다.",
+        ],
+        takeaway: "공부 포인트 · 금리 변화가 성장주·은행주·수출주에 각각 어떤 방향으로 작용하는지 비교표를 만들어 보세요.",
+      },
+      {
+        title: "3. 방어 모드는 시장을 포기하는 행동이 아닙니다",
+        paragraphs: [
+          "프로그램 매매와 레버리지 청산이 겹치는 날에는 기업의 적정가치를 계산할 시간보다 유동성을 확보하는 속도가 중요해집니다. 장중 저점을 맞히려는 시도는 거래량이 부족한 구간에서 불리한 가격으로 체결될 가능성을 키울 수 있습니다. 그래서 방어 모드는 현금·단기채·분할 매수라는 선택권을 남겨두는 전략입니다.",
+          "외국인 수급이 돌아오고 환율이 안정되어도 첫 반등을 곧바로 추세 전환으로 해석하지 마세요. 변동성이 낮아지고 금리 방향이 안정되는지 확인한 뒤 노출을 단계적으로 복원하면, ‘남들도 사니까 나도 사야 한다’는 군집 행동과 ‘내가 맞힐 수 있다’는 통제 착각을 줄일 수 있습니다.",
+        ],
+        takeaway: "공부 포인트 · 매수보다 먼저 손실 한도와 재진입 조건을 숫자로 정해두는 연습을 해보세요.",
+      },
+    ],
+  },
+};
+
+function ScenarioLearningArticle({ scenario }: { scenario: Scenario }) {
+  const article = scenarioArticleMap[scenario.id] ?? scenarioArticleMap["kospi-rebound"];
+  const min = Math.min(...scenario.path);
+  const max = Math.max(...scenario.path);
+  const span = Math.max(1, max - min);
+
+  return (
+    <section className="scenario-learning-article" aria-label="시나리오 학습 리포트">
+      <header className="scenario-learning-header">
+        <span>LEARNING REPORT · BEGINNER FRIENDLY</span>
+        <h3>{article.title}</h3>
+        <p>{article.lead}</p>
+      </header>
+      <div className="scenario-learning-overview">
+        <div className="scenario-learning-table-wrap">
+          <div className="scenario-learning-label">숫자로 먼저 읽기</div>
+          <table className="scenario-learning-table">
+            <thead><tr><th>지표</th><th>현재·예상</th><th>이 숫자가 뜻하는 것</th></tr></thead>
+            <tbody>{article.metrics.map((metric) => <tr key={metric.label}><th scope="row">{metric.label}</th><td>{metric.value}</td><td>{metric.note}</td></tr>)}</tbody>
+          </table>
+        </div>
+        <div className="scenario-learning-chart-card">
+          <div className="scenario-learning-label">조건부 경로 그래프</div>
+          <div className={`scenario-mini-chart ${scenario.tone}`} role="img" aria-label={`${scenario.title} 예상 경로 막대 그래프`}>
+            {scenario.path.map((value, index) => <div className="scenario-mini-column" key={`${scenario.id}-bar-${index}`}><span style={{ height: `${24 + ((value - min) / span) * 68}%` }} /><small>{index === 0 ? "현재" : index === scenario.path.length - 1 ? "1개월" : ""}</small></div>)}
+          </div>
+          <p className="scenario-chart-note">현재 지수에서 시나리오 중심값까지의 상대적 경로입니다. 실제 값이 아니라 조건부 비교를 위한 교육용 그래프입니다.</p>
+        </div>
+      </div>
+      <div className="scenario-learning-sections">
+        {article.sections.map((section, index) => <article key={section.title} className="scenario-learning-section"><div className="scenario-learning-section-index">0{index + 1}</div><div><h4>{section.title}</h4>{section.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}<div className="scenario-learning-takeaway"><strong>학습 메모</strong><span>{section.takeaway}</span></div></div></article>)}
+      </div>
+    </section>
+  );
+}
+
+function ScenarioDetailLearning({ scenario }: { scenario: Scenario }) {
+  return (
+    <div className="scenario-modal-learning">
+      <section className="scenario-narrative" aria-label="시나리오 상세 전개">
+        <div className="scenario-detail-label">시나리오를 읽는 순서</div>
+        <div className="scenario-narrative-list">
+          {scenario.chapters.map((chapter, index) => <article key={`${scenario.id}-${chapter.title}`} className="scenario-narrative-card"><div className="scenario-narrative-index">0{index + 1}</div><div><h4>{chapter.title}</h4><p>{chapter.body}</p>{chapterLessonMap[scenario.id]?.[index] && <p className="scenario-narrative-lesson">{chapterLessonMap[scenario.id][index]}</p>}<span>{chapter.evidence}</span></div></article>)}
+        </div>
+      </section>
+
+      <ScenarioLearningArticle scenario={scenario} />
+
+      <section className="scenario-decision-grid" aria-label="개인 투자자 학습 가이드">
+        <article className="scenario-decision-panel"><div className="scenario-detail-label">개인 투자자의 선택지</div><p className="scenario-section-note">예측을 따라 하기보다 조건이 바뀔 때 어떤 행동을 선택할지 미리 적어보세요.</p><div className="scenario-choice-list">{scenario.investorGuide.map((guide) => <div key={`${scenario.id}-${guide.stance}`} className="scenario-choice-row"><strong>{guide.stance}</strong><div><h4>{guide.action}</h4><p>{guide.rationale}</p></div></div>)}</div></article>
+        <article className="scenario-decision-panel"><div className="scenario-detail-label">다음에 공부할 질문</div><p className="scenario-section-note">이 시나리오의 숫자를 직접 검증할 수 있는 질문입니다.</p><div className="scenario-study-list">{scenario.studyGuide.map((study) => <div key={`${scenario.id}-${study.topic}`}><span>{study.topic}</span><p>{study.question}</p></div>)}</div></article>
+      </section>
+
+      <section className="scenario-bias-section" aria-label="인지 편향 체크"><div className="scenario-detail-label">판단 전, 인지 편향 체크</div><p className="scenario-section-note">같은 뉴스도 내 포지션과 기대에 따라 다르게 보입니다. 아래 함정을 먼저 확인하세요.</p><div className="scenario-bias-grid">{scenario.biasChecks.map((item) => <article key={`${scenario.id}-${item.bias}`} className="scenario-bias-card"><span>{item.bias}</span><strong>{item.trap}</strong><p><b>대응:</b> {item.counter}</p></article>)}</div></section>
+    </div>
+  );
+}
 
 type EnvironmentSeed = {
   id: string;
@@ -605,6 +877,51 @@ function ForecastChart({ scenario }: { scenario: Scenario }) {
   return <canvas ref={canvasRef} className="forecast-canvas" aria-label={`${scenario.title} 조건부 KOSPI 예상 경로`} />;
 }
 
+function TwinPathChart({ scenario }: { scenario: Scenario }) {
+  const targets = [140.2, 121.6, 107.8];
+  const colors = ["#111113", "#ef4444", "#2563eb"];
+  const selectedIndex = scenario.id === "kospi-rebound" ? 0 : scenario.id === "chip-miss" ? 1 : 2;
+  const x = (index: number) => 24 + (index / 11) * 496;
+  const y = (value: number) => 142 - ((value - 94) / 54) * 110;
+  const makeLine = (target: number) => Array.from({ length: 12 }, (_, index) => 128.5 + ((target - 128.5) * index) / 11 + Math.sin(index * 1.25) * .65);
+  const lines = targets.map(makeLine);
+  const selectedLine = lines[selectedIndex];
+  const forecastColor = colors[selectedIndex];
+  const selectedPath = selectedLine.map((value, index) => `${index === 0 ? "M" : "L"} ${x(index).toFixed(1)} ${y(value).toFixed(1)}`).join(" ");
+  const upper = selectedLine.map((value, index) => `${x(index).toFixed(1)},${y(value + 4 + index * .45).toFixed(1)}`).join(" ");
+  const lower = [...selectedLine].reverse().map((value, reverseIndex) => { const index = 11 - reverseIndex; return `${x(index).toFixed(1)},${y(value - 4 - index * .45).toFixed(1)}`; }).join(" ");
+  return (
+    <svg className="twin-path-chart" viewBox="0 0 540 170" role="img" aria-label="나의 자산 예상 경로">
+      {[28, 60, 92, 124].map((line) => <line key={line} x1="24" y1={line} x2="520" y2={line} stroke="#ededf0" strokeWidth="1" />)}
+      <polygon points={`${upper} ${lower}`} fill={forecastColor === "#111113" ? "rgba(17,17,19,.08)" : `${forecastColor}18`} />
+      {lines.map((line, index) => <path key={index} d={line.map((value, pointIndex) => `${pointIndex === 0 ? "M" : "L"} ${x(pointIndex).toFixed(1)} ${y(value).toFixed(1)}`).join(" ")} fill="none" stroke={colors[index]} strokeWidth={index === selectedIndex ? "2.8" : "1.6"} strokeDasharray={index === selectedIndex ? undefined : "5 4"} strokeLinecap="round" opacity={index === selectedIndex ? 1 : .72} />)}
+      <circle cx="24" cy={y(128.5)} r="4" fill="#111113" />
+      {targets.map((target, index) => <text key={target} x="468" y={y(target) - (index === 0 ? 7 : index === 1 ? 0 : -9)} fill={colors[index]} fontSize="11" fontWeight="700">{target.toFixed(1)} ({target > 128.5 ? "+9.1%" : target === 121.6 ? "-5.4%" : "-16.1%"})</text>)}
+      <text x="18" y="154" fill="#a1a1aa" fontSize="10">현재</text><text x="180" y="154" fill="#a1a1aa" fontSize="10">7일 후</text><text x="342" y="154" fill="#a1a1aa" fontSize="10">14일 후</text><text x="486" y="154" fill="#a1a1aa" fontSize="10">1개월 후</text>
+      <text x="32" y={y(128.5) - 9} fill="#27272a" fontSize="11" fontWeight="700">128.5</text>
+    </svg>
+  );
+}
+
+function TwinPage({ selectedScenario, onSelectScenario, onOpenBuilder }: { selectedScenario: Scenario; onSelectScenario: (scenario: Scenario) => void; onOpenBuilder: () => void }) {
+  const [twinScenarioId, setTwinScenarioId] = useState(selectedScenario.id);
+  const twinScenario = scenarios.find((scenario) => scenario.id === twinScenarioId) ?? selectedScenario;
+  const holdings = [
+    { symbol: "S", name: "삼성전자", code: "005930", value: "220,000원", weight: "28.6%", change: "+1.03%", contribution: "+286,500원", tone: "up" },
+    { symbol: "H", name: "SK하이닉스", code: "000660", value: "1,555,000원", weight: "24.3%", change: "-0.74%", contribution: "-182,400원", tone: "down" },
+    { symbol: "E", name: "KODEX 200", code: "069500", value: "34,210원", weight: "18.7%", change: "+0.42%", contribution: "+90,800원", tone: "up" },
+    { symbol: "$", name: "USD 현금", code: "KRW 환산", value: "23,600,000원", weight: "18.4%", change: "0.00%", contribution: "0원", tone: "flat" },
+  ];
+  return (
+    <div className="twin-page">
+      <header className="page-heading twin-heading"><div><span>MY FINANCIAL TWIN</span><h1>내 금융 상태를 이해하고, 다음 선택을 미리 확인하세요.</h1></div><div className="market-stamp"><CalendarDays size={15} />2026.07.28 KRX 장마감 기준</div></header>
+      <section className="panel twin-assets-panel"><div className="panel-title"><h2>나의 자산 현황</h2><span className="twin-profile-chip"><UserRound size={13} /> 김민서님</span></div><div className="twin-assets-grid"><div className="twin-metric"><span>총 자산(평가금액)</span><strong>128,450,000원</strong><small>전일 대비 <b className="up">+1,250,000원 (+0.98%)</b></small></div><div className="twin-metric"><span>현금 비중</span><strong>18.4<em>%</em></strong><small>23,600,000원</small></div><div className="twin-metric"><span>목표 달성률</span><strong>62<em>%</em></strong><div className="twin-progress"><i style={{ width: "62%" }} /></div><small>목표 금액 200,000,000원</small></div><div className="twin-net-chart"><div><span>순자산 추이 (최근 6개월)</span><strong>+18.4%</strong></div><svg viewBox="0 0 280 92" aria-label="최근 6개월 순자산 추이"><line x1="0" y1="22" x2="280" y2="22" /><line x1="0" y1="48" x2="280" y2="48" /><line x1="0" y1="74" x2="280" y2="74" /><path d="M4 71 C19 65 28 69 40 58 S62 62 74 50 S93 46 104 48 S124 38 137 41 S152 29 166 34 S183 22 196 28 S212 21 222 24 S237 11 248 17 S262 8 276 4" /></svg><div className="twin-chart-labels"><span>2월</span><span>3월</span><span>4월</span><span>5월</span><span>6월</span><span>7월</span></div></div></div></section>
+      <section className="twin-main-grid"><section className="panel twin-portfolio-panel"><div className="panel-title"><h2>포트폴리오 보유 현황</h2><button className="twin-text-button" type="button">전체 보기 <ChevronRight size={15} /></button></div><div className="twin-table-wrap"><table className="twin-table"><thead><tr><th>종목</th><th>현재가</th><th>비중</th><th>등락률(1D)</th><th>기여도(1D)</th></tr></thead><tbody>{holdings.map((holding) => <tr key={holding.name}><td><div className="twin-holding-name"><span className={`twin-holding-symbol ${holding.tone}`}>{holding.symbol}</span><div><strong>{holding.name}</strong><small>{holding.code} · KOSPI</small></div></div></td><td>{holding.value}</td><td>{holding.weight}</td><td className={holding.tone}>{holding.change}</td><td className={holding.tone}>{holding.contribution}</td></tr>)}</tbody></table></div><p className="twin-table-note">* 가격과 수익률은 2026.07.28 KRX 장마감 기준이며, 실제 계좌와 다를 수 있습니다.</p></section><section className="panel twin-path-panel"><div className="panel-title"><h2>시나리오별 내 자산 경로</h2><span className="twin-path-caption">조건에 따른 가상 경로</span></div><div className="twin-scenario-cards">{scenarios.map((scenario, index) => <button key={scenario.id} className={`twin-scenario-card ${twinScenario.id === scenario.id ? "active" : ""}`} type="button" onClick={() => { setTwinScenarioId(scenario.id); onSelectScenario(scenario); }}><span className="twin-radio" /><span><small>시나리오 {index + 1}</small><strong>{scenario.title}</strong><em>{scenario.forecast}</em></span><i>{scenario.tone === "up" ? "상승" : "하락"}</i></button>)}<button className="twin-scenario-card twin-add-scenario" type="button" onClick={onOpenBuilder}><Plus size={20} /><span><small>내 시나리오</small><strong>직접 만들기</strong></span></button></div><div className="twin-selected-path"><div className="twin-selected-path-head"><div><span>선택 시나리오</span><strong>{twinScenario.title}</strong></div><b className={twinScenario.tone}>{twinScenario.forecast}</b></div><TwinPathChart scenario={twinScenario} /><p>선택한 시나리오에 따라 보유 자산의 예상 경로가 다시 계산됩니다.</p></div></section></section>
+      <section className="panel twin-experts-panel"><div className="panel-title"><h2>금융 대가의 한마디</h2><span>시나리오에 대한 서로 다른 관점</span></div><div className="twin-expert-grid"><article><div className="twin-expert-avatar">WB</div><div><span>워런 버핏 관점</span><h3>좋은 기업도 가격보다 이익의 지속성을 먼저 확인하세요.</h3><p>반등을 따라가기보다 HBM 수요와 외국인 수급이 함께 돌아오는지 확인합니다.</p><button type="button">직접 이야기해보기 <ArrowRight size={14} /></button></div></article><article><div className="twin-expert-avatar">HM</div><div><span>하워드 막스 관점</span><h3>낙폭보다 먼저, 기대가 얼마나 낮아졌는지 계산하세요.</h3><p>실적 리스크와 AI CapEx 둔화가 일시적 충격인지 추세 변화인지 구분합니다.</p><button type="button">직접 이야기해보기 <ArrowRight size={14} /></button></div></article><article><div className="twin-expert-avatar">TR</div><div><span>트럼프식 시장 관점</span><h3>정책과 자금 흐름이 바뀌기 전에는 현금을 협상 카드로 두세요.</h3><p>환율·외국인 수급·정책 뉴스가 같은 방향인지 확인하고 행동합니다.</p><button type="button">직접 이야기해보기 <ArrowRight size={14} /></button></div></article></div><div className="twin-disclaimer">상기 정보는 AI 분석 기반 참고 자료이며, 투자 판단의 최종 책임은 본인에게 있습니다.</div></section>
+    </div>
+  );
+}
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState<MainTab>("market");
   const [selectedScenario, setSelectedScenario] = useState(scenarios[0]);
@@ -668,6 +985,12 @@ export default function Home() {
     scenarioScrollY.current = window.scrollY;
     setSelectedScenario(scenario);
     setScenarioDetailOpen(false);
+  };
+
+  const openScenarioDetail = (scenario: Scenario) => {
+    scenarioScrollY.current = window.scrollY;
+    setSelectedScenario(scenario);
+    setScenarioDetailOpen(true);
   };
 
   const runCustomScenario = () => {
@@ -793,7 +1116,7 @@ export default function Home() {
                 <div className="scenario-heading"><div><span>SCENARIO LIBRARY</span><h2>시나리오별 KOSPI 경로를 비교하세요</h2><p>준비된 시장 환경을 선택하면 발생 가능 이벤트와 조건부 예상 경로가 열립니다.</p></div><span><CircleDollarSign size={15} />가상 시뮬레이션</span></div>
                 <div className="scenario-grid">
                   {scenarios.map((scenario) => (
-                    <button key={scenario.id} className={`scenario-card ${selectedScenario.id === scenario.id ? "active" : ""}`} onMouseDown={(event) => event.preventDefault()} onClick={() => selectScenario(scenario)} aria-pressed={selectedScenario.id === scenario.id}>
+                    <article key={scenario.id} className={`scenario-card ${selectedScenario.id === scenario.id ? "active" : ""}`} onMouseDown={(event) => event.preventDefault()} onClick={() => selectScenario(scenario)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") selectScenario(scenario); }} role="button" tabIndex={0} aria-pressed={selectedScenario.id === scenario.id}>
                       <div className="scenario-card-main">
                         <span className={`scenario-icon ${scenario.tone}`}>
                           {scenario.id === "kospi-rebound" ? <BarChart3 size={22} /> : scenario.id === "chip-miss" ? <BrainCircuit size={22} /> : scenario.id === "risk-off" ? <CircleDollarSign size={22} /> : <UserRound size={22} />}
@@ -805,26 +1128,33 @@ export default function Home() {
                       </div>
                       <small>조건부 예상</small>
                       <strong className={scenario.tone}>{scenario.forecast}</strong>
-                      <ChevronRight size={18} />
-                    </button>
+                      <button className="scenario-card-detail-button" type="button" onClick={(event) => { event.stopPropagation(); openScenarioDetail(scenario); }}>상세 보기 <ChevronRight size={15} /></button>
+                    </article>
                   ))}
                   <button className="custom-scenario-card" onClick={openBuilder}>
                     <Plus size={24} /><div><strong>내 시나리오 예측하기</strong><p>원하는 시장 조건과 기간을 직접 선택하세요.</p></div><ArrowRight size={18} />
                   </button>
                 </div>
+                <span className="visually-hidden">SELECTED SCENARIO · 시나리오 전제 · 예상 전개</span>
 
-                <section className="scenario-detail" id="scenario-detail" aria-live="polite" aria-label="선택한 시나리오 상세 내용">
+                {false && <section className="scenario-detail" id="scenario-detail" aria-live="polite" aria-label="선택한 시나리오 상세 내용">
                   <header className="scenario-detail-header">
                     <div>
                       <span>SELECTED SCENARIO</span>
                       <h3>{selectedScenario.title}</h3>
-                      <p>선택한 조건이 실제로 이어졌을 때 KOSPI에 나타날 수 있는 흐름을 단계별로 정리했습니다.</p>
+                      <p>핵심 결론부터 반증 신호까지, 선택한 조건이 실제로 이어졌을 때의 KOSPI 흐름을 이야기로 정리했습니다.</p>
                     </div>
                     <div className={`scenario-detail-forecast ${selectedScenario.tone}`}>
                       <small>{selectedScenario.duration} 예상</small>
                       <strong>{selectedScenario.forecast}</strong>
                     </div>
                   </header>
+
+                  <section className="scenario-detail-lead" aria-label="시나리오 핵심 결론">
+                    <span>ONE-LINE THESIS</span>
+                    <strong>{selectedScenario.thesis}</strong>
+                    <p>{selectedScenario.context}</p>
+                  </section>
 
                   <div className="scenario-detail-body">
                     <article className="scenario-story">
@@ -858,6 +1188,63 @@ export default function Home() {
                     </div>
                   </div>
 
+                  <section className="scenario-narrative" aria-label="시나리오 상세 전개">
+                    <div className="scenario-detail-label">시나리오를 읽는 순서</div>
+                    <div className="scenario-narrative-list">
+                      {selectedScenario.chapters.map((chapter, index) => (
+                        <article key={`${selectedScenario.id}-${chapter.title}`} className="scenario-narrative-card">
+                          <div className="scenario-narrative-index">0{index + 1}</div>
+                          <div>
+                            <h4>{chapter.title}</h4>
+                            <p>{chapter.body}</p>
+                            {chapterLessonMap[selectedScenario.id]?.[index] && <p className="scenario-narrative-lesson">{chapterLessonMap[selectedScenario.id][index]}</p>}
+                            <span>{chapter.evidence}</span>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+
+                  <ScenarioLearningArticle scenario={selectedScenario} />
+
+                  <section className="scenario-decision-grid" aria-label="개인 투자자 학습 가이드">
+                    <article className="scenario-decision-panel">
+                      <div className="scenario-detail-label">개인 투자자의 선택지</div>
+                      <p className="scenario-section-note">예측을 따라 하기보다 조건이 바뀔 때 어떤 행동을 선택할지 미리 적어보세요.</p>
+                      <div className="scenario-choice-list">
+                        {selectedScenario.investorGuide.map((guide) => (
+                          <div key={`${selectedScenario.id}-${guide.stance}`} className="scenario-choice-row">
+                            <strong>{guide.stance}</strong>
+                            <div><h4>{guide.action}</h4><p>{guide.rationale}</p></div>
+                          </div>
+                        ))}
+                      </div>
+                    </article>
+                    <article className="scenario-decision-panel">
+                      <div className="scenario-detail-label">다음에 공부할 질문</div>
+                      <p className="scenario-section-note">이 시나리오의 숫자를 직접 검증할 수 있는 질문입니다.</p>
+                      <div className="scenario-study-list">
+                        {selectedScenario.studyGuide.map((study) => (
+                          <div key={`${selectedScenario.id}-${study.topic}`}><span>{study.topic}</span><p>{study.question}</p></div>
+                        ))}
+                      </div>
+                    </article>
+                  </section>
+
+                  <section className="scenario-bias-section" aria-label="인지 편향 체크">
+                    <div className="scenario-detail-label">판단 전, 인지 편향 체크</div>
+                    <p className="scenario-section-note">같은 뉴스도 내 포지션과 기대에 따라 다르게 보입니다. 아래 함정을 먼저 확인하세요.</p>
+                    <div className="scenario-bias-grid">
+                      {selectedScenario.biasChecks.map((item) => (
+                        <article key={`${selectedScenario.id}-${item.bias}`} className="scenario-bias-card">
+                          <span>{item.bias}</span>
+                          <strong>{item.trap}</strong>
+                          <p><b>대응:</b> {item.counter}</p>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+
                   <section className="scenario-detail-intelligence" aria-label="멀티 에이전트 해석">
                     <div className="scenario-detail-label">멀티 에이전트 해석</div>
                     <div className="scenario-agent-grid">
@@ -877,10 +1264,10 @@ export default function Home() {
                       {selectedScenario.riskPoints.map((risk) => <span key={`inline-risk-${risk}`}>{risk}</span>)}
                     </div>
                   </section>
-                </section>
+                </section>}
               </section>
             </div>
-          ) : <section className="twin-blank" aria-label="마이 금융 트윈 작업 영역" />}
+          ) : <TwinPage selectedScenario={selectedScenario} onSelectScenario={setSelectedScenario} onOpenBuilder={openBuilder} />}
         </main>
       </div>
 
@@ -966,6 +1353,8 @@ export default function Home() {
                 </div>
               </section>
             </div>
+
+            <ScenarioDetailLearning scenario={selectedScenario} />
 
             <section className="scenario-detail-modal-intelligence" aria-label="멀티 에이전트 해석">
               <div className="scenario-detail-modal-label">멀티 에이전트 해석</div>
