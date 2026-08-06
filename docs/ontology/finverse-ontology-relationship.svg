@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="920" viewBox="0 0 1400 920" role="img" aria-labelledby="title desc">
+  <title id="title">FINVERSE 시나리오 온톨리지 전체 관계도</title>
+  <desc id="desc">사용자 질문에서 네 가지 정보 영역을 검색하고 현재 시장 상황 온톨리지를 만든 뒤 MiroFish로 미래 시나리오를 생성하는 흐름</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#64748b"/>
+    </marker>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0f172a" flood-opacity="0.12"/>
+    </filter>
+    <style>
+      .box { rx: 18; ry: 18; stroke-width: 2; filter: url(#shadow); }
+      .title { font: 700 25px Pretendard, Arial, sans-serif; fill: #0f172a; }
+      .body { font: 500 17px Pretendard, Arial, sans-serif; fill: #334155; }
+      .small { font: 500 15px Pretendard, Arial, sans-serif; fill: #475569; }
+      .arrow { stroke: #64748b; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+      .dashed { stroke-dasharray: 9 8; }
+    </style>
+  </defs>
+
+  <rect width="1400" height="920" fill="#f8fafc"/>
+  <text x="700" y="52" text-anchor="middle" class="title" font-size="32">FINVERSE 시나리오 온톨리지 전체 관계도</text>
+  <text x="700" y="82" text-anchor="middle" class="small">사용자 질문에 맞는 정보를 수집하고, 현재 시장 상황을 구성한 뒤 MiroFish로 시뮬레이션한다</text>
+
+  <rect x="500" y="115" width="400" height="88" class="box" fill="#e0f2fe" stroke="#0284c7"/>
+  <text x="700" y="151" text-anchor="middle" class="title">사용자 질문</text>
+  <text x="700" y="180" text-anchor="middle" class="body">“반도체 수급 증가 시 3개월 시나리오”</text>
+
+  <path d="M700 203 L700 255" class="arrow"/>
+  <rect x="500" y="260" width="400" height="75" class="box" fill="#f1f5f9" stroke="#64748b"/>
+  <text x="700" y="291" text-anchor="middle" class="title">질문 분석·검색 범위 결정</text>
+  <text x="700" y="316" text-anchor="middle" class="small">필수 정보 자동 보완, 부족한 정보는 중립 처리</text>
+
+  <path d="M570 335 L220 395" class="arrow"/>
+  <path d="M640 335 L530 395" class="arrow"/>
+  <path d="M760 335 L870 395" class="arrow"/>
+  <path d="M830 335 L1180 395" class="arrow"/>
+
+  <rect x="70" y="400" width="300" height="150" class="box" fill="#ecfdf5" stroke="#10b981"/>
+  <text x="220" y="438" text-anchor="middle" class="title">시장</text>
+  <text x="220" y="470" text-anchor="middle" class="body">지수·섹터·종목</text>
+  <text x="220" y="497" text-anchor="middle" class="small">가격·거래량·수급·변동성</text>
+  <text x="220" y="523" text-anchor="middle" class="small">최소 1년 히스토리</text>
+
+  <rect x="380" y="400" width="300" height="150" class="box" fill="#fff7ed" stroke="#f97316"/>
+  <text x="530" y="438" text-anchor="middle" class="title">경제</text>
+  <text x="530" y="470" text-anchor="middle" class="body">금리·환율·물가·고용</text>
+  <text x="530" y="497" text-anchor="middle" class="small">국채 수익률·경기지표</text>
+  <text x="530" y="523" text-anchor="middle" class="small">예상값과 실제값</text>
+
+  <rect x="720" y="400" width="300" height="150" class="box" fill="#fef2f2" stroke="#ef4444"/>
+  <text x="870" y="438" text-anchor="middle" class="title">외부 사건</text>
+  <text x="870" y="470" text-anchor="middle" class="body">뉴스·정책·기업 실적</text>
+  <text x="870" y="497" text-anchor="middle" class="small">지정학·무역·공급망</text>
+  <text x="870" y="523" text-anchor="middle" class="small">출처·시각·영향</text>
+
+  <rect x="1050" y="400" width="300" height="150" class="box" fill="#faf5ff" stroke="#a855f7"/>
+  <text x="1200" y="438" text-anchor="middle" class="title">사람들의 심리</text>
+  <text x="1200" y="470" text-anchor="middle" class="body">커뮤니티·관심도</text>
+  <text x="1200" y="497" text-anchor="middle" class="small">공포·낙관·FOMO</text>
+  <text x="1200" y="523" text-anchor="middle" class="small">군집행동·심리 변화</text>
+
+  <path d="M220 550 L520 625" class="arrow"/>
+  <path d="M530 550 L610 625" class="arrow"/>
+  <path d="M870 550 L790 625" class="arrow"/>
+  <path d="M1200 550 L880 625" class="arrow"/>
+
+  <rect x="430" y="630" width="540" height="110" class="box" fill="#eff6ff" stroke="#2563eb"/>
+  <text x="700" y="670" text-anchor="middle" class="title">현재 시장 상황 온톨리지</text>
+  <text x="700" y="700" text-anchor="middle" class="body">네 가지 영역의 정보와 영향관계를 연결</text>
+  <text x="700" y="724" text-anchor="middle" class="small">예: 수급 증가 → 섹터 상승 → 낙관 심리 확대</text>
+
+  <path d="M700 740 L700 790" class="arrow"/>
+  <rect x="500" y="795" width="400" height="75" class="box" fill="#fefce8" stroke="#ca8a04"/>
+  <text x="700" y="826" text-anchor="middle" class="title">MiroFish 시뮬레이션</text>
+  <text x="700" y="851" text-anchor="middle" class="small">현재 상황 + 사용자 조건 + 기간</text>
+
+  <path d="M900 832 C1050 832 1080 735 1080 650" class="arrow"/>
+  <rect x="1050" y="610" width="280" height="110" class="box" fill="#e0e7ff" stroke="#6366f1"/>
+  <text x="1190" y="649" text-anchor="middle" class="title">미래 시나리오</text>
+  <text x="1190" y="680" text-anchor="middle" class="body">가능한 경로·조건·위험</text>
+  <text x="1190" y="704" text-anchor="middle" class="small">사용자 질문에 맞는 결과</text>
+
+  <path d="M370 475 C370 300 1030 285 1050 475" class="arrow dashed"/>
+  <text x="700" y="370" text-anchor="middle" class="small">네 가지 영역은 서로 영향을 주고받음</text>
+</svg>
