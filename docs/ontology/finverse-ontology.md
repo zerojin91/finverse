@@ -17,7 +17,11 @@ FINVERSE는 사용자의 질문에 맞는 자료를 모은 뒤, 현재 시장 �
 
 ## 네 가지 기본 개념
 
-![네 가지 기본 개념의 연결관계](./finverse-four-concepts.svg)
+### 네 가지 개념의 연결관계
+
+<img src="./finverse-four-concepts.svg" alt="FINVERSE 네 가지 기본 개념의 연결관계" width="100%" />
+
+[관계도 원본 이미지 열기](./finverse-four-concepts.svg)
 
 네 가지 영역은 각각 따로 존재하지만, 실제 시장 상황에서는 서로 영향을 주고받는다.
 
