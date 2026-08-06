@@ -1,12 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="820" viewBox="0 0 1400 820" role="img" aria-labelledby="title desc">
-  <title id="title">FINVERSE 네 가지 기본 개념의 연결관계</title>
-  <desc id="desc">시장, 경제, 외부 사건, 사람들의 심리가 서로 영향을 주고받는 관계도</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900" role="img" aria-labelledby="title desc">
+  <title id="title">FINVERSE 네 가지 기본 개념과 현재 시장 상황</title>
+  <desc id="desc">현재 시장 상황을 큰 원으로 감싸고 시장, 경제, 외부 사건, 사람들의 심리의 관계를 보여주는 관계도</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
       <path d="M0,0 L10,5 L0,10 Z" fill="#64748b"/>
     </marker>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0f172a" flood-opacity="0.12"/>
+      <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#0f172a" flood-opacity="0.12"/>
     </filter>
     <style>
       .box { rx: 22; ry: 22; stroke-width: 2; filter: url(#shadow); }
@@ -14,48 +14,50 @@
       .body { font: 500 18px Pretendard, Arial, sans-serif; fill: #334155; }
       .small { font: 500 16px Pretendard, Arial, sans-serif; fill: #475569; }
       .arrow { stroke: #64748b; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+      .legend { font: 600 16px Pretendard, Arial, sans-serif; fill: #334155; }
     </style>
   </defs>
-  <rect width="1400" height="820" fill="#f8fafc"/>
-  <text x="700" y="56" text-anchor="middle" class="title" font-size="34">네 가지 기본 개념은 서로 연결되어 있다</text>
-  <text x="700" y="88" text-anchor="middle" class="small">시장 상황을 이해하려면 네 영역의 정보와 상호작용을 함께 봐야 한다</text>
 
-  <rect x="80" y="180" width="300" height="180" class="box" fill="#ecfdf5" stroke="#10b981"/>
-  <text x="230" y="230" text-anchor="middle" class="title">시장</text>
-  <text x="230" y="270" text-anchor="middle" class="body">지수·섹터·종목</text>
-  <text x="230" y="301" text-anchor="middle" class="small">가격·거래량·수급</text>
-  <text x="230" y="328" text-anchor="middle" class="small">실제로 무엇이 움직였나?</text>
+  <rect width="1400" height="900" fill="#f8fafc"/>
+  <text x="700" y="58" text-anchor="middle" class="title" font-size="34">FINVERSE 네 가지 기본 개념</text>
+  <text x="700" y="90" text-anchor="middle" class="small">네 영역의 정보와 관계를 연결해 현재 시장 상황을 이해한다</text>
 
-  <rect x="1020" y="180" width="300" height="180" class="box" fill="#fff7ed" stroke="#f97316"/>
-  <text x="1170" y="230" text-anchor="middle" class="title">경제</text>
-  <text x="1170" y="270" text-anchor="middle" class="body">금리·환율·물가·고용</text>
-  <text x="1170" y="301" text-anchor="middle" class="small">국채 수익률·경기지표</text>
-  <text x="1170" y="328" text-anchor="middle" class="small">어떤 환경에 놓였나?</text>
+  <ellipse cx="700" cy="475" rx="625" ry="340" fill="#eff6ff" fill-opacity="0.78" stroke="#2563eb" stroke-width="3"/>
+  <rect x="505" y="145" width="390" height="58" rx="29" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+  <text x="700" y="182" text-anchor="middle" class="title" font-size="24">현재 시장 상황</text>
 
-  <rect x="80" y="520" width="300" height="180" class="box" fill="#fef2f2" stroke="#ef4444"/>
-  <text x="230" y="570" text-anchor="middle" class="title">외부 사건</text>
-  <text x="230" y="610" text-anchor="middle" class="body">뉴스·정책·기업 실적</text>
-  <text x="230" y="641" text-anchor="middle" class="small">지정학·공급망 이슈</text>
-  <text x="230" y="668" text-anchor="middle" class="small">무슨 일이 원인이었나?</text>
+  <rect x="150" y="265" width="310" height="165" class="box" fill="#ecfdf5" stroke="#10b981"/>
+  <text x="305" y="313" text-anchor="middle" class="title">시장</text>
+  <text x="305" y="350" text-anchor="middle" class="body">지수·섹터·종목</text>
+  <text x="305" y="379" text-anchor="middle" class="small">가격·거래량·수급</text>
+  <text x="305" y="405" text-anchor="middle" class="small">실제로 무엇이 움직였나?</text>
 
-  <rect x="1020" y="520" width="300" height="180" class="box" fill="#faf5ff" stroke="#a855f7"/>
-  <text x="1170" y="570" text-anchor="middle" class="title">사람들의 심리</text>
-  <text x="1170" y="610" text-anchor="middle" class="body">커뮤니티·관심도</text>
-  <text x="1170" y="641" text-anchor="middle" class="small">공포·낙관·FOMO</text>
-  <text x="1170" y="668" text-anchor="middle" class="small">사람들은 어떻게 반응하나?</text>
+  <rect x="940" y="265" width="310" height="165" class="box" fill="#fff7ed" stroke="#f97316"/>
+  <text x="1095" y="313" text-anchor="middle" class="title">경제</text>
+  <text x="1095" y="350" text-anchor="middle" class="body">금리·환율·물가·고용</text>
+  <text x="1095" y="379" text-anchor="middle" class="small">국채 수익률·경기지표</text>
+  <text x="1095" y="405" text-anchor="middle" class="small">어떤 환경에 놓였나?</text>
 
-  <path d="M1020 250 C800 125 600 125 380 250" class="arrow"/>
-  <text x="700" y="145" text-anchor="middle" class="small">경제 환경 → 시장</text>
-  <path d="M230 520 L230 360" class="arrow"/>
-  <text x="155" y="450" text-anchor="middle" class="small" transform="rotate(-90 155 450)">외부 사건 → 시장</text>
-  <path d="M380 590 C620 480 830 410 1020 350" class="arrow"/>
-  <text x="700" y="455" text-anchor="middle" class="small">외부 사건 → 경제·시장</text>
-  <path d="M380 330 C600 410 820 470 1020 560" class="arrow"/>
-  <text x="700" y="445" text-anchor="middle" class="small">시장 변화 → 사람들의 심리</text>
-  <path d="M1020 620 C820 520 600 430 380 300" class="arrow"/>
-  <text x="700" y="315" text-anchor="middle" class="small">사람들의 심리 → 시장 움직임 확대·완화</text>
+  <rect x="150" y="565" width="310" height="165" class="box" fill="#fef2f2" stroke="#ef4444"/>
+  <text x="305" y="613" text-anchor="middle" class="title">외부 사건</text>
+  <text x="305" y="650" text-anchor="middle" class="body">뉴스·정책·기업 실적</text>
+  <text x="305" y="679" text-anchor="middle" class="small">지정학·공급망 이슈</text>
+  <text x="305" y="705" text-anchor="middle" class="small">무슨 일이 원인이었나?</text>
 
-  <rect x="485" y="470" width="430" height="72" rx="18" fill="#e0e7ff" stroke="#6366f1" stroke-width="2"/>
-  <text x="700" y="500" text-anchor="middle" class="title" font-size="23">현재 시장 상황</text>
-  <text x="700" y="526" text-anchor="middle" class="small">네 영역의 정보와 관계를 연결한 결과</text>
+  <rect x="940" y="565" width="310" height="165" class="box" fill="#faf5ff" stroke="#a855f7"/>
+  <text x="1095" y="613" text-anchor="middle" class="title">사람들의 심리</text>
+  <text x="1095" y="650" text-anchor="middle" class="body">커뮤니티·관심도</text>
+  <text x="1095" y="679" text-anchor="middle" class="small">공포·낙관·FOMO</text>
+  <text x="1095" y="705" text-anchor="middle" class="small">사람들은 어떻게 반응하나?</text>
+
+  <!-- Relationships: labels are kept in a separate legend to avoid overlap. -->
+  <path d="M940 300 C800 235 600 235 460 300" class="arrow"/>
+  <path d="M305 565 L305 430" class="arrow"/>
+  <path d="M460 660 C620 760 820 760 940 660" class="arrow"/>
+  <path d="M460 385 C640 475 800 520 940 610" class="arrow"/>
+  <path d="M940 635 C800 545 640 500 460 405" class="arrow"/>
+
+  <rect x="470" y="805" width="460" height="55" rx="16" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="700" y="827" text-anchor="middle" class="legend">경제 → 시장  ·  외부 사건 → 경제·시장</text>
+  <text x="700" y="849" text-anchor="middle" class="legend">시장 ↔ 사람들의 심리</text>
 </svg>
