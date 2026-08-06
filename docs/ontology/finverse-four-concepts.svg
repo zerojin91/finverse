@@ -52,12 +52,22 @@
 
   <!-- Relationships: labels are kept in a separate legend to avoid overlap. -->
   <path d="M940 300 C800 235 600 235 460 300" class="arrow"/>
+  <rect x="616" y="216" width="168" height="30" rx="10" fill="#ffffff"/>
+  <text x="700" y="237" text-anchor="middle" class="small">경제 → 시장</text>
   <path d="M305 565 L305 430" class="arrow"/>
+  <rect x="165" y="470" width="160" height="30" rx="10" fill="#ffffff"/>
+  <text x="245" y="491" text-anchor="middle" class="small">외부 사건 → 시장</text>
   <path d="M460 660 C620 760 820 760 940 660" class="arrow"/>
+  <rect x="606" y="738" width="188" height="30" rx="10" fill="#ffffff"/>
+  <text x="700" y="759" text-anchor="middle" class="small">외부 사건 → 심리</text>
   <path d="M460 385 C640 475 800 520 940 610" class="arrow"/>
+  <rect x="584" y="445" width="232" height="30" rx="10" fill="#ffffff"/>
+  <text x="700" y="466" text-anchor="middle" class="small">시장 → 사람들의 심리</text>
   <path d="M940 635 C800 545 640 500 460 405" class="arrow"/>
+  <rect x="570" y="535" width="260" height="30" rx="10" fill="#ffffff"/>
+  <text x="700" y="556" text-anchor="middle" class="small">사람들의 심리 → 시장</text>
 
   <rect x="470" y="805" width="460" height="55" rx="16" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
-  <text x="700" y="827" text-anchor="middle" class="legend">경제 → 시장  ·  외부 사건 → 경제·시장</text>
-  <text x="700" y="849" text-anchor="middle" class="legend">시장 ↔ 사람들의 심리</text>
+  <text x="700" y="827" text-anchor="middle" class="legend">각 화살표는 한 방향의 영향관계를 나타낸다</text>
+  <text x="700" y="849" text-anchor="middle" class="legend">사람들의 심리는 시장 움직임을 확대하거나 완화할 수 있다</text>
 </svg>
