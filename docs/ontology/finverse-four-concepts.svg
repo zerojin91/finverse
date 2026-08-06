@@ -44,16 +44,16 @@
   <text x="1170" y="641" text-anchor="middle" class="small">공포·낙관·FOMO</text>
   <text x="1170" y="668" text-anchor="middle" class="small">사람들은 어떻게 반응하나?</text>
 
-  <path d="M380 250 C590 150 810 150 1020 250" class="arrow"/>
-  <text x="700" y="165" text-anchor="middle" class="small">경제 환경이 시장에 영향</text>
-  <path d="M380 610 C600 720 800 720 1020 610" class="arrow"/>
-  <text x="700" y="760" text-anchor="middle" class="small">외부 사건이 심리와 시장 반응을 자극</text>
+  <path d="M1020 250 C800 125 600 125 380 250" class="arrow"/>
+  <text x="700" y="145" text-anchor="middle" class="small">경제 환경 → 시장</text>
   <path d="M230 520 L230 360" class="arrow"/>
-  <text x="170" y="450" text-anchor="middle" class="small" transform="rotate(-90 170 450)">외부 사건이 시장을 움직임</text>
-  <path d="M1170 520 L1170 360" class="arrow"/>
-  <text x="1230" y="450" text-anchor="middle" class="small" transform="rotate(90 1230 450)">심리가 시장 움직임을 확대·완화</text>
-  <path d="M380 330 C600 420 800 420 1020 330" class="arrow"/>
-  <text x="700" y="395" text-anchor="middle" class="small">시장 변화가 사람들의 심리를 바꿈</text>
+  <text x="155" y="450" text-anchor="middle" class="small" transform="rotate(-90 155 450)">외부 사건 → 시장</text>
+  <path d="M380 590 C620 480 830 410 1020 350" class="arrow"/>
+  <text x="700" y="455" text-anchor="middle" class="small">외부 사건 → 경제·시장</text>
+  <path d="M380 330 C600 410 820 470 1020 560" class="arrow"/>
+  <text x="700" y="445" text-anchor="middle" class="small">시장 변화 → 사람들의 심리</text>
+  <path d="M1020 620 C820 520 600 430 380 300" class="arrow"/>
+  <text x="700" y="315" text-anchor="middle" class="small">사람들의 심리 → 시장 움직임 확대·완화</text>
 
   <rect x="485" y="470" width="430" height="72" rx="18" fill="#e0e7ff" stroke="#6366f1" stroke-width="2"/>
   <text x="700" y="500" text-anchor="middle" class="title" font-size="23">현재 시장 상황</text>
