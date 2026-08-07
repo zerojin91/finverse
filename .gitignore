@@ -43,3 +43,7 @@ next-env.d.ts
 /outputs/
 /work/
 /.tools/
+
+# python
+__pycache__/
+*.pyc
