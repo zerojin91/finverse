@@ -1,0 +1,7 @@
+# Keep the lake layout and source catalog in Git, but never commit collected data
+# or API-derived metadata by accident.
+*
+!.gitignore
+!manifest.json
+!config/
+!config/sources.json

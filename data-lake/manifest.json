@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "storage": {
+    "provider": "cloudflare-r2",
+    "bucket": "finverse-macro-lake",
+    "prefix": "data-lake",
+    "endpoint": "https://bec052b2788934fef20c248cd8a026ff.r2.cloudflarestorage.com",
+    "public": false
+  },
+  "sync": {
+    "script": "tools/r2_sync.py",
+    "include": ["bronze", "silver", "warehouse", "config"],
+    "excluded_local_paths": ["staging", ".interrupted-backfill", ".pre-one-year-window-correction", ".pre-policy-test"]
+  }
+}

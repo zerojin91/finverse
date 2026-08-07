@@ -1,0 +1,280 @@
+{
+  "selection_policy": {
+    "target_country_codes": ["KR", "US"],
+    "target_country_terms": [
+      "korea", "south korea", "korean", "seoul", "bank of korea", "won", "krw", "한국", "한국은행", "국내", "코스피", "원화",
+      "united states", "u.s.", "american", "washington", "federal reserve", "fed", "dollar", "usd", "미국", "미 증시", "연준", "달러화"
+    ],
+    "event_terms": {
+      "INTEREST_RATES": ["interest rate", "rate decision", "rate hike", "rate cut", "policy rate", "fomc", "monetary policy", "yield", "bond yield", "금리", "기준금리"],
+      "REAL_ECONOMY": ["inflation", "cpi", "ppi", "gdp", "employment", "jobs report", "unemployment", "payroll", "retail sales", "pmi", "industrial production", "실물경제", "물가", "고용", "실업", "성장률"],
+      "FOREIGN_EXCHANGE": ["exchange rate", "currency", "foreign exchange", "fx market", "dollar index", "balance of payments", "current account", "won", "krw", "usd", "환율", "외환", "경상수지"],
+      "POLICY": ["tariff", "sanction", "regulation", "subsidy", "fiscal policy", "budget", "trade policy", "export control", "관세", "제재", "규제", "보조금", "정책"],
+      "GEOPOLITICAL": ["war", "conflict", "invasion", "military", "missile", "nuclear", "taiwan strait", "north korea", "china", "russia", "middle east", "red sea", "geopolitical", "전쟁", "분쟁", "군사", "미사일", "북한", "중국", "대만", "중동"]
+    },
+    "impact_terms": {
+      "MAJOR_INDICES": ["kospi", "s&p 500", "nasdaq", "dow jones", "stock market", "equities", "주가지수", "증시", "주식시장"],
+      "SEMICONDUCTOR_AI_INFRA": ["semiconductor", "chip", "memory", "hbm", "foundry", "nvidia", "ai infrastructure", "data center", "semiconductor equipment", "반도체", "메모리", "인공지능", "ai 인프라", "데이터센터"],
+      "FLOWS": ["capital flows", "foreign investor", "fund flows", "liquidity", "risk appetite", "외국인", "수급", "유동성"],
+      "FOREIGN_EXCHANGE": ["exchange rate", "currency", "foreign exchange", "dollar", "won", "krw", "usd", "환율", "외환"]
+    },
+    "minimum_score": 4,
+    "geopolitical_minimum_score": 3,
+    "high_trust_tier_max": 2,
+    "geopolitical_trust_tier_max": 3
+  },
+  "sources": [
+    {
+      "source_id": "fred",
+      "source_type": "official_api",
+      "publisher": "Federal Reserve Bank of St. Louis",
+      "base_url": "https://api.stlouisfed.org/fred",
+      "trust_tier": 1,
+      "license_note": "Use subject to the FRED API terms; API key required."
+    },
+    {
+      "source_id": "fed_press",
+      "source_type": "rss",
+      "publisher": "Board of Governors of the Federal Reserve System",
+      "url": "https://www.federalreserve.gov/feeds/press_all.xml",
+      "country_code": "US",
+      "topic_codes": ["CENTRAL_BANK", "MONETARY_POLICY"],
+      "trust_tier": 1,
+      "license_note": "Store metadata and respect the publisher's terms."
+    },
+    {
+      "source_id": "bok_monetary_policy",
+      "source_type": "rss",
+      "publisher": "Bank of Korea",
+      "url": "https://www.bok.or.kr/eng/bbs/E0000627/news.rss?menuNo=400022",
+      "country_code": "KR",
+      "topic_codes": ["CENTRAL_BANK", "MONETARY_POLICY"],
+      "trust_tier": 1,
+      "license_note": "Store metadata and respect the publisher's terms."
+    },
+    {
+      "source_id": "bok_press",
+      "source_type": "rss",
+      "publisher": "Bank of Korea",
+      "url": "https://www.bok.or.kr/eng/bbs/E0000634/news.rss?menuNo=400069",
+      "country_code": "KR",
+      "topic_codes": ["CENTRAL_BANK", "MACRO_RELEASE"],
+      "trust_tier": 1,
+      "license_note": "Store metadata and respect the publisher's terms."
+    },
+    {
+      "source_id": "moef_press",
+      "source_type": "rss",
+      "publisher": "Ministry of Economy and Finance, Republic of Korea",
+      "url": "https://english.moef.go.kr/pc/engmosfrss.do?boardCd=N0001",
+      "country_code": "KR",
+      "topic_codes": ["FISCAL_POLICY", "FINANCIAL_POLICY", "TRADE_POLICY"],
+      "trust_tier": 1,
+      "license_note": "Store metadata and respect the publisher's terms."
+    },
+    {
+      "source_id": "moef_economic_policy",
+      "source_type": "rss",
+      "publisher": "Ministry of Economy and Finance, Republic of Korea",
+      "url": "https://english.moef.go.kr/ec/engmosfpolicyrss.do?boardCd=E0005",
+      "country_code": "KR",
+      "topic_codes": ["ECONOMIC_POLICY"],
+      "trust_tier": 1,
+      "license_note": "Store metadata and respect the publisher's terms."
+    },
+    {
+      "source_id": "google_news_us_macro",
+      "source_type": "rss",
+      "publisher": "Google News RSS — US macro query",
+      "url": "https://news.google.com/rss/search?q=%28%22Federal+Reserve%22+OR+FOMC+OR+%22U.S.+economy%22%29+%28%22interest+rate%22+OR+inflation+OR+CPI+OR+payroll+OR+employment+OR+GDP+OR+%22retail+sales%22+OR+PMI%29+when%3A1y&hl=en-US&gl=US&ceid=US%3Aen",
+      "country_code": "US",
+      "topic_codes": ["INTEREST_RATES", "REAL_ECONOMY"],
+      "identity_namespace": "google_news",
+      "trust_tier": 3,
+      "license_note": "Personal, non-commercial Google News RSS metadata use only; retain title, timestamp, attribution and link, not article body."
+    },
+    {
+      "source_id": "google_news_kr_macro",
+      "source_type": "rss",
+      "publisher": "Google News RSS — Korea macro query",
+      "url": "https://news.google.com/rss/search?q=%28%22South+Korea%22+OR+%22Bank+of+Korea%22+OR+Korean%29+%28%22interest+rate%22+OR+inflation+OR+CPI+OR+GDP+OR+exports+OR+%22exchange+rate%22+OR+won%29+when%3A1y&hl=en-US&gl=US&ceid=US%3Aen",
+      "country_code": "KR",
+      "topic_codes": ["INTEREST_RATES", "REAL_ECONOMY", "FOREIGN_EXCHANGE"],
+      "identity_namespace": "google_news",
+      "trust_tier": 3,
+      "license_note": "Personal, non-commercial Google News RSS metadata use only; retain title, timestamp, attribution and link, not article body."
+    },
+    {
+      "source_id": "google_news_kr_macro_ko",
+      "source_type": "rss",
+      "publisher": "Google News RSS — Korea macro Korean-language query",
+      "url": "https://news.google.com/rss/search?q=%ED%95%9C%EA%B5%AD+%28%EA%B8%88%EB%A6%AC+OR+%EA%B8%B0%EC%A4%80%EA%B8%88%EB%A6%AC+OR+%EB%AC%BC%EA%B0%80+OR+%EA%B3%A0%EC%9A%A9+OR+%EC%84%B1%EC%9E%A5%EB%A5%A0+OR+%ED%99%98%EC%9C%A8+OR+%EC%88%98%EC%B6%9C%29+when%3A1y&hl=ko&gl=KR&ceid=KR%3Ako",
+      "country_code": "KR",
+      "topic_codes": ["INTEREST_RATES", "REAL_ECONOMY", "FOREIGN_EXCHANGE"],
+      "identity_namespace": "google_news",
+      "trust_tier": 3,
+      "license_note": "Personal, non-commercial Google News RSS metadata use only; retain title, timestamp, attribution and link, not article body."
+    },
+    {
+      "source_id": "google_news_fx",
+      "source_type": "rss",
+      "publisher": "Google News RSS — Korea/US FX query",
+      "url": "https://news.google.com/rss/search?q=%28%22Korean+won%22+OR+KRW+OR+%22U.S.+dollar%22+OR+USD%29+%28%22exchange+rate%22+OR+%22foreign+exchange%22+OR+currency%29+when%3A1y&hl=en-US&gl=US&ceid=US%3Aen",
+      "country_code": "KR",
+      "topic_codes": ["FOREIGN_EXCHANGE"],
+      "identity_namespace": "google_news",
+      "trust_tier": 3,
+      "license_note": "Personal, non-commercial Google News RSS metadata use only; retain title, timestamp, attribution and link, not article body."
+    },
+    {
+      "source_id": "google_news_policy_semis",
+      "source_type": "rss",
+      "publisher": "Google News RSS — Korea/US policy and semiconductor query",
+      "url": "https://news.google.com/rss/search?q=%28%22United+States%22+OR+%22South+Korea%22+OR+Korea%29+%28tariff+OR+sanction+OR+%22export+control%22+OR+subsidy+OR+regulation+OR+%22trade+policy%22%29+%28semiconductor+OR+chip+OR+AI+OR+market%29+when%3A1y&hl=en-US&gl=US&ceid=US%3Aen",
+      "country_code": "US",
+      "topic_codes": ["POLICY", "SEMICONDUCTOR_AI_INFRA"],
+      "identity_namespace": "google_news",
+      "trust_tier": 3,
+      "license_note": "Personal, non-commercial Google News RSS metadata use only; retain title, timestamp, attribution and link, not article body."
+    },
+    {
+      "source_id": "google_news_geopolitical",
+      "source_type": "rss",
+      "publisher": "Google News RSS — geopolitical risk query",
+      "url": "https://news.google.com/rss/search?q=%28%22North+Korea%22+OR+Taiwan+OR+China+OR+%22Middle+East%22+OR+%22Red+Sea%22%29+%28war+OR+conflict+OR+missile+OR+tariff+OR+sanction+OR+%22export+control%22%29+%28Korea+OR+%22United+States%22+OR+semiconductor+OR+chip+OR+market+OR+currency%29+when%3A1y&hl=en-US&gl=US&ceid=US%3Aen",
+      "country_code": "US",
+      "topic_codes": ["GEOPOLITICAL", "POLICY"],
+      "identity_namespace": "google_news",
+      "trust_tier": 3,
+      "license_note": "Personal, non-commercial Google News RSS metadata use only; retain title, timestamp, attribution and link, not article body."
+    },
+    {
+      "source_id": "saveticker_news_ui",
+      "source_type": "public_ui_snapshot",
+      "publisher": "SaveTicker public news feed",
+      "url": "https://www.saveticker.com/news",
+      "topic_codes": ["MARKET_NEWS", "BREAKING_NEWS"],
+      "trust_tier": 4,
+      "license_note": "Respect robots.txt: collect public /news card metadata for personal reference only; never call disallowed /api routes or store article body."
+    },
+    {
+      "source_id": "bbc_business",
+      "source_type": "rss",
+      "publisher": "BBC News Business",
+      "url": "https://feeds.bbci.co.uk/news/business/rss.xml",
+      "country_code": "GB",
+      "topic_codes": ["MARKET_NEWS", "REAL_ECONOMY", "POLICY"],
+      "trust_tier": 2,
+      "license_note": "Store RSS metadata and respect the publisher's terms; do not store article body."
+    },
+    {
+      "source_id": "yonhap_english",
+      "source_type": "rss",
+      "publisher": "Yonhap News Agency English",
+      "url": "https://en.yna.co.kr/RSS/news.xml",
+      "country_code": "KR",
+      "topic_codes": ["MARKET_NEWS", "POLICY", "GEOPOLITICAL"],
+      "trust_tier": 2,
+      "license_note": "Store RSS metadata and respect the publisher's terms; do not store article body."
+    },
+    {
+      "source_id": "korea_herald_business",
+      "source_type": "rss",
+      "publisher": "The Korea Herald",
+      "url": "https://www.koreaherald.com/rss/newsAll",
+      "country_code": "KR",
+      "topic_codes": ["MARKET_NEWS", "POLICY", "SEMICONDUCTOR_AI_INFRA"],
+      "trust_tier": 3,
+      "license_note": "Store RSS metadata and respect the publisher's terms; do not store article body."
+    },
+    {
+      "source_id": "marketwatch_top",
+      "source_type": "rss",
+      "publisher": "MarketWatch",
+      "url": "https://feeds.content.dowjones.io/public/rss/mw_topstories",
+      "country_code": "US",
+      "topic_codes": ["MARKET_NEWS", "MAJOR_INDICES", "FOREIGN_EXCHANGE"],
+      "trust_tier": 2,
+      "license_note": "Store RSS metadata and respect the publisher's terms; do not store article body."
+    },
+    {
+      "source_id": "investing_markets",
+      "source_type": "rss",
+      "publisher": "Investing.com Markets",
+      "url": "https://www.investing.com/rss/news_25.rss",
+      "topic_codes": ["MARKET_NEWS", "FOREIGN_EXCHANGE", "COMMODITIES"],
+      "trust_tier": 3,
+      "license_note": "Store RSS metadata and respect the publisher's terms; do not store article body."
+    },
+    {
+      "source_id": "bbc_world",
+      "source_type": "rss",
+      "publisher": "BBC News World",
+      "url": "https://feeds.bbci.co.uk/news/world/rss.xml",
+      "country_code": "GB",
+      "topic_codes": ["GEOPOLITICAL", "POLICY", "FOREIGN_EXCHANGE"],
+      "trust_tier": 2,
+      "license_note": "Store RSS metadata and respect the publisher's terms; do not store article body."
+    },
+    {
+      "source_id": "guardian_world",
+      "source_type": "rss",
+      "publisher": "The Guardian World",
+      "url": "https://www.theguardian.com/world/rss",
+      "country_code": "GB",
+      "topic_codes": ["GEOPOLITICAL", "POLICY"],
+      "trust_tier": 2,
+      "license_note": "Store RSS metadata and respect the publisher's terms; do not store article body."
+    },
+    {
+      "source_id": "guardian_business",
+      "source_type": "rss",
+      "publisher": "The Guardian Business",
+      "url": "https://www.theguardian.com/business/rss",
+      "country_code": "GB",
+      "topic_codes": ["MARKET_NEWS", "POLICY", "REAL_ECONOMY"],
+      "trust_tier": 2,
+      "license_note": "Store RSS metadata and respect the publisher's terms; do not store article body."
+    },
+    {
+      "source_id": "npr_world",
+      "source_type": "rss",
+      "publisher": "NPR World",
+      "url": "https://feeds.npr.org/1004/rss.xml",
+      "country_code": "US",
+      "topic_codes": ["GEOPOLITICAL", "POLICY"],
+      "trust_tier": 2,
+      "license_note": "Store RSS metadata and respect the publisher's terms; do not store article body."
+    },
+    {
+      "source_id": "npr_business",
+      "source_type": "rss",
+      "publisher": "NPR Business",
+      "url": "https://feeds.npr.org/1017/rss.xml",
+      "country_code": "US",
+      "topic_codes": ["MARKET_NEWS", "REAL_ECONOMY", "POLICY"],
+      "trust_tier": 2,
+      "license_note": "Store RSS metadata and respect the publisher's terms; do not store article body."
+    },
+    {
+      "source_id": "ecb_press",
+      "source_type": "rss",
+      "publisher": "European Central Bank",
+      "url": "https://www.ecb.europa.eu/rss/press.html",
+      "country_code": "EU",
+      "topic_codes": ["CENTRAL_BANK", "MONETARY_POLICY"],
+      "trust_tier": 1,
+      "license_note": "Store metadata and respect the publisher's terms."
+    },
+    {
+      "source_id": "boe_news",
+      "source_type": "rss",
+      "publisher": "Bank of England",
+      "url": "https://www.bankofengland.co.uk/rss/news",
+      "country_code": "GB",
+      "topic_codes": ["CENTRAL_BANK", "MONETARY_POLICY"],
+      "trust_tier": 1,
+      "license_note": "Store metadata and respect the publisher's terms."
+    }
+  ]
+}
