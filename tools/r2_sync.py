@@ -104,12 +104,26 @@ def remote_keys(client: Any, bucket: str, prefix: str) -> set[str]:
     return keys
 
 
+def remote_manifest_hashes(client: Any, bucket: str, prefix: str) -> dict[str, str] | None:
+    """Use the prior manifest to make regular incremental syncs O(local files)."""
+    key = f"{prefix.strip('/')}/manifests/latest.json"
+    try:
+        payload = client.get_object(Bucket=bucket, Key=key)["Body"].read()
+    except ClientError as error:
+        if error.response.get("Error", {}).get("Code") in {"404", "NoSuchKey", "NotFound"}:
+            return None
+        raise
+    document = json.loads(payload)
+    return {entry["key"]: entry["sha256"] for entry in document.get("files", [])}
+
+
 def push(
     lake_root: Path, bucket: str, prefix: str, dry_run: bool, workers: int,
     includes: list[str], offset: int, limit: int | None, write_manifest: bool, manifest_only: bool = False,
 ) -> int:
     client = r2_client()
-    existing_keys = remote_keys(client, bucket, prefix)
+    prior_hashes = remote_manifest_hashes(client, bucket, prefix)
+    existing_keys = set() if prior_hashes is not None else remote_keys(client, bucket, prefix)
     entries: list[dict[str, Any]] = []
     pending: list[tuple[Path, str, str]] = []
     skipped = 0
@@ -123,6 +137,9 @@ def push(
         key = object_key(prefix, lake_root, path)
         entry = {"key": key, "sha256": checksum, "size": path.stat().st_size}
         entries.append(entry)
+        if prior_hashes is not None and prior_hashes.get(key) == checksum:
+            skipped += 1
+            continue
         if key in existing_keys and remote_hash(client, bucket, key) == checksum:
             skipped += 1
             continue
