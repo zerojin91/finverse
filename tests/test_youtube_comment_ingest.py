@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from contextlib import redirect_stdout
 from datetime import UTC, date, datetime, timedelta
 import json
@@ -529,7 +529,7 @@ class YouTubeCollectorTest(unittest.TestCase):
             youtube.apply_absence([retry], "missing", "scan", totals, "scan-2")
             deleted = store.get_latest(record["record_id"])
             self.assertTrue(deleted["is_deleted"])
-            with store.connect() as connection:
+            with closing(store.connect()) as connection, connection:
                 versions = connection.execute(
                     "SELECT COUNT(*) FROM versions WHERE record_id = ?",
                     (record["record_id"],),
@@ -602,7 +602,7 @@ class YouTubeCollectorTest(unittest.TestCase):
             ):
                 youtube.collect(collector_args(channel_count=1))
 
-            with store.connect() as connection:
+            with closing(store.connect()) as connection, connection:
                 run = json.loads(
                     connection.execute(
                         "SELECT run_json FROM runs ORDER BY seq DESC LIMIT 1"
