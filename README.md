@@ -23,6 +23,8 @@ uv run python tools/site.py build
 
 경제 데이터 수집기는 [`collectors/economic_ingest.py`](collectors/economic_ingest.py)에 있고, API 키 설정과 백필·업데이트 방법은 [`docs/collectors/economic_ingest.md`](docs/collectors/economic_ingest.md)에 정리되어 있습니다.
 
+국내 주식 YouTube 채널 30개의 공개 영상·댓글·답글 수집기는 [`collectors/youtube_comment_ingest.py`](collectors/youtube_comment_ingest.py)에 있고, 채널 고정·백필·일일 업데이트·AWS 실행 방법은 [`docs/collectors/youtube_comment_ingest.md`](docs/collectors/youtube_comment_ingest.md)에 정리되어 있습니다.
+
 브라우저에서 `http://localhost:3000`을 열면 B2C 핵심 경험을 바로 체험할 수 있습니다. 현재 MVP는 **2026 AI 반도체 랠리 이후 KOSPI 변곡점**을 주제로 시장 한 줄 요약, 섹터 도미넌스, 주요 이벤트와 관련 뉴스, AI 조건부 경로와 신뢰구간을 보여줍니다. 사용자는 이 시장 환경을 낙관·기준·위험 경로로 시뮬레이션하고, 결과를 가상 금융 프로필에 적용해 목표 영향과 행동 편향을 확인할 수 있습니다.
 
 <br />

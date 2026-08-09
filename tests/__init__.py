@@ -1,0 +1,1 @@
+"""FINVERSE collector tests."""

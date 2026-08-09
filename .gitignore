@@ -46,4 +46,5 @@ next-env.d.ts
 /outputs/
 /data/
 /work/
+/config/youtube_channels.json
 /.tools/
