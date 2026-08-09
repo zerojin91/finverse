@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import closing
 from datetime import UTC, date, datetime, time as wall_time, timedelta
 import hashlib
 import hmac
@@ -242,7 +243,7 @@ class WorkState:
         return connection
 
     def _initialize(self) -> None:
-        with self.connect() as connection:
+        with closing(self.connect()) as connection, connection:
             connection.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS youtube_state (
@@ -274,14 +275,14 @@ class WorkState:
             )
 
     def operation(self) -> dict[str, Any]:
-        with self.connect() as connection:
+        with closing(self.connect()) as connection, connection:
             row = connection.execute(
                 "SELECT value FROM youtube_state WHERE key = 'operation'"
             ).fetchone()
         return json.loads(row["value"]) if row else {}
 
     def save_operation(self, operation: dict[str, Any]) -> None:
-        with self.connect() as connection:
+        with closing(self.connect()) as connection, connection:
             connection.execute(
                 "INSERT INTO youtube_state(key, value) VALUES('operation', ?) "
                 "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
@@ -289,7 +290,7 @@ class WorkState:
             )
 
     def reset(self) -> None:
-        with self.connect() as connection:
+        with closing(self.connect()) as connection, connection:
             for table in (
                 "youtube_state",
                 "youtube_channel_queue",
@@ -301,7 +302,7 @@ class WorkState:
         unlink_thread_page()
 
     def set_channels(self, channels: list[dict[str, Any]]) -> None:
-        with self.connect() as connection:
+        with closing(self.connect()) as connection, connection:
             connection.execute("DELETE FROM youtube_channel_queue")
             connection.executemany(
                 "INSERT INTO youtube_channel_queue(position, channel_id, uploads_playlist_id) "
@@ -313,7 +314,7 @@ class WorkState:
             )
 
     def channel_at(self, position: int) -> dict[str, str] | None:
-        with self.connect() as connection:
+        with closing(self.connect()) as connection, connection:
             row = connection.execute(
                 "SELECT channel_id, uploads_playlist_id FROM youtube_channel_queue "
                 "WHERE position = ?",
@@ -322,13 +323,13 @@ class WorkState:
         return dict(row) if row else None
 
     def clear_upload_seen(self, channel: str) -> None:
-        with self.connect() as connection:
+        with closing(self.connect()) as connection, connection:
             connection.execute(
                 "DELETE FROM youtube_upload_seen WHERE channel_id = ?", (channel,)
             )
 
     def mark_upload_seen(self, channel: str, video_ids: Iterable[str]) -> None:
-        with self.connect() as connection:
+        with closing(self.connect()) as connection, connection:
             connection.executemany(
                 "INSERT OR IGNORE INTO youtube_upload_seen(channel_id, video_id) VALUES(?, ?)",
                 ((channel, identity) for identity in video_ids),
@@ -351,7 +352,7 @@ class WorkState:
             conditions.append("l.published_at >= ?")
             values.append(lower)
         query = "SELECT l.record_json FROM latest l WHERE " + " AND ".join(conditions)
-        with self.connect() as connection:
+        with closing(self.connect()) as connection, connection:
             cursor = connection.execute(query, values)
             for row in cursor:
                 yield json.loads(row["record_json"])
@@ -385,7 +386,7 @@ class WorkState:
             "last_full_comment_scan_at, published_at DESC, video_id"
         )
         count = 0
-        with self.connect() as connection:
+        with closing(self.connect()) as connection, connection:
             connection.execute("DELETE FROM youtube_video_queue")
             for count, row in enumerate(connection.execute(query, values), 1):
                 connection.execute(
@@ -396,7 +397,7 @@ class WorkState:
         return count
 
     def add_priority_video(self, video_id: str, channel: str) -> None:
-        with self.connect() as connection:
+        with closing(self.connect()) as connection, connection:
             row = connection.execute(
                 "SELECT COALESCE(MAX(position), 0) + 1 AS position "
                 "FROM youtube_video_queue WHERE priority = 0"
@@ -408,7 +409,7 @@ class WorkState:
             )
 
     def next_video(self, current_video_id: str | None = None) -> dict[str, str] | None:
-        with self.connect() as connection:
+        with closing(self.connect()) as connection, connection:
             if current_video_id:
                 row = connection.execute(
                     "SELECT video_id, channel_id FROM youtube_video_queue WHERE video_id = ?",
@@ -423,28 +424,28 @@ class WorkState:
         return dict(row) if row else None
 
     def complete_video(self, video_id: str) -> None:
-        with self.connect() as connection:
+        with closing(self.connect()) as connection, connection:
             connection.execute("DELETE FROM youtube_video_queue WHERE video_id = ?", (video_id,))
 
     def remaining_videos(self) -> int:
-        with self.connect() as connection:
+        with closing(self.connect()) as connection, connection:
             return int(
                 connection.execute("SELECT COUNT(*) FROM youtube_video_queue").fetchone()[0]
             )
 
     def clear_comment_seen(self) -> None:
-        with self.connect() as connection:
+        with closing(self.connect()) as connection, connection:
             connection.execute("DELETE FROM youtube_comment_seen")
 
     def mark_comment_seen(self, record_ids: Iterable[str]) -> None:
-        with self.connect() as connection:
+        with closing(self.connect()) as connection, connection:
             connection.executemany(
                 "INSERT OR IGNORE INTO youtube_comment_seen(record_id) VALUES(?)",
                 ((identity,) for identity in record_ids),
             )
 
     def preserve_thread(self, video_id: str, thread_id: str) -> None:
-        with self.connect() as connection:
+        with closing(self.connect()) as connection, connection:
             connection.execute(
                 "INSERT OR IGNORE INTO youtube_comment_seen(record_id) "
                 "SELECT record_id FROM latest WHERE record_type = 'youtube_comment' "
@@ -453,7 +454,7 @@ class WorkState:
             )
 
     def unseen_comments(self, video_id: str) -> Iterator[dict[str, Any]]:
-        with self.connect() as connection:
+        with closing(self.connect()) as connection, connection:
             cursor = connection.execute(
                 "SELECT l.record_json FROM latest l WHERE l.record_type = 'youtube_comment' "
                 "AND l.video_id = ? AND l.is_deleted = 0 AND NOT EXISTS "
@@ -464,7 +465,7 @@ class WorkState:
                 yield json.loads(row["record_json"])
 
     def comments_for_video(self, video_id: str) -> Iterator[dict[str, Any]]:
-        with self.connect() as connection:
+        with closing(self.connect()) as connection, connection:
             cursor = connection.execute(
                 "SELECT record_json FROM latest WHERE record_type = 'youtube_comment' "
                 "AND video_id = ? AND is_deleted = 0",
@@ -485,7 +486,7 @@ class WorkState:
         if lower:
             conditions.append("published_at >= ?")
             values.append(lower)
-        with self.connect() as connection:
+        with closing(self.connect()) as connection, connection:
             return int(
                 connection.execute(
                     "SELECT COUNT(*) FROM latest WHERE " + " AND ".join(conditions),
