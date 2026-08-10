@@ -49,7 +49,7 @@ GUI 도구(DBeaver, TablePlus, DataGrip 등)도 같은 정보로 붙습니다.
 
 | 계정 | 할 수 있는 것 | 할 수 없는 것 |
 | --- | --- | --- |
-| 조회 전용 (`finverse_read`) | `lake`·`market` 스키마 `SELECT` | 모든 쓰기, 스테이징 테이블 조회 |
+| 조회 전용 (`finverse_read`) | `lake`·`market`·`events` 스키마 `SELECT` | 모든 쓰기, 스테이징 테이블 조회 |
 | 관리자 (`finverse_admin`) | 위 + 데이터 수정, 스키마 변경, 계정 관리 | 슈퍼유저 권한(다른 DB 접근, 서버 파일시스템) |
 
 조회 전용 계정에는 안전장치가 걸려 있습니다.
@@ -80,6 +80,8 @@ CREATE ROLE hacker LOGIN;                  -> ERROR: permission denied to create
 | `market.security` | 종목 마스터 |
 | `market.investor_flow_daily` | 외국인·기관 수급 |
 | `market.foreign_holding_daily` | 외국인 보유주수·보유율 |
+| `events.news` | 매크로·지정학 뉴스 (Fed·한국은행·기재부 보도자료, 연합뉴스, BBC, MarketWatch, Google 뉴스) |
+| `events.news_daily` | 날짜·피드·이벤트유형별 기사 건수 |
 | `lake.coverage` | 수집기·유형·소스별 적재 현황과 기간 |
 
 ```sql
@@ -91,6 +93,29 @@ SELECT trade_date, close, volume, trading_value
 FROM market.price_daily
 WHERE ticker = '005930' AND source = 'krx_open_api'
 ORDER BY trade_date DESC LIMIT 10;
+
+-- 최근 뉴스
+SELECT published_at, feed, title, url
+FROM events.news
+ORDER BY published_at DESC NULLS LAST LIMIT 20;
+
+-- 한국 관련 기사만. country_codes / event_types 는 배열이라 = ANY 로 거른다
+SELECT published_at, feed, title
+FROM events.news
+WHERE 'KR' = ANY(country_codes)
+ORDER BY published_at DESC LIMIT 20;
+
+-- 이벤트 유형별 분포
+SELECT unnest(event_types) AS event_type, count(*)
+FROM events.news GROUP BY 1 ORDER BY 2 DESC;
+
+-- 큰 시장 움직임이 있던 날 어떤 뉴스가 있었나
+SELECT n.published_at, n.feed, n.title
+FROM events.news n
+JOIN market.index_daily i
+  ON i.trade_date = n.published_at::date
+WHERE i.idx_name = 'KOSPI' AND abs(i.change_pct) >= 2
+ORDER BY n.published_at DESC LIMIT 30;
 ```
 
 ### 반드시 알아야 할 것: `source`를 지정하세요
@@ -170,3 +195,18 @@ scripts/db_user.sh revoke minsu           # 로그인 차단 + 진행 중 세션
 **쿼리가 10분에 잘림** — 조회 전용 계정의 `statement_timeout`입니다. 범위를 좁히거나 관리자에게 문의하세요.
 
 **연결은 되는데 테이블이 비어 있음** — 아직 적재 전일 수 있습니다. `SELECT * FROM lake.coverage;` 로 현재 적재 범위를 확인하세요.
+
+**`ORDER BY 2` 같은 위치 참조가 안 먹음** — 뷰가 아니라 SQL 문법 문제입니다. 집계 뷰에서는 `ORDER BY count(*) DESC` 처럼 식을 그대로 쓰세요.
+
+## 현재 적재 상태
+
+수집이 끝난 것부터 순차적으로 들어옵니다. 지금 조회 가능한 것은 이렇습니다.
+
+| 영역 | 뷰 | 상태 |
+| --- | --- | --- |
+| 1. 시장 | `market.*` | 수집 진행 중 — 완료 후 전량 반영 |
+| 2. 경제 | (뷰 준비 중) | ECOS 수집 완료 |
+| 3. 외부 사건 | `events.news` | **236건 조회 가능** |
+| 4. 심리 | — | YouTube API 키 대기 |
+
+`lake.coverage`를 보면 지금 이 순간 무엇이 얼마나 들어와 있는지 항상 확인할 수 있습니다.

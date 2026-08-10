@@ -10,6 +10,7 @@
 
 CREATE SCHEMA IF NOT EXISTS lake;
 CREATE SCHEMA IF NOT EXISTS market;
+CREATE SCHEMA IF NOT EXISTS events;
 
 -- ---------------------------------------------------------------------------
 -- Landing tables
@@ -226,6 +227,40 @@ SELECT
     record_id
 FROM lake.records
 WHERE record_type = 'market_foreign_holding_daily';
+
+-- ---------------------------------------------------------------------------
+-- External-event views (온톨로지 3. 외부 사건)
+
+-- One row per article. country_codes and event_types are arrays in the payload,
+-- exposed as text[] so they can be filtered with the && / = ANY operators.
+CREATE OR REPLACE VIEW events.news AS
+SELECT
+    (payload->>'published_at')::timestamptz  AS published_at,
+    payload->>'title'                        AS title,
+    payload->>'summary'                      AS summary,
+    payload->>'url'                          AS url,
+    payload->>'source'                       AS feed,
+    payload->>'origin_publisher'             AS publisher,
+    ARRAY(SELECT jsonb_array_elements_text(payload->'country_codes'))  AS country_codes,
+    ARRAY(SELECT jsonb_array_elements_text(payload->'event_types'))    AS event_types,
+    ARRAY(SELECT jsonb_array_elements_text(coalesce(payload->'tickers', '[]'::jsonb))) AS tickers,
+    (payload->>'selection_score')::numeric   AS selection_score,
+    collected_at,
+    record_id
+FROM lake.records
+WHERE record_type = 'news_article';
+
+-- Daily article counts per feed and event type; useful for spotting a news
+-- burst around a market move.
+CREATE OR REPLACE VIEW events.news_daily AS
+SELECT
+    published_at::date        AS publish_date,
+    feed,
+    unnest(event_types)       AS event_type,
+    count(*)                  AS articles
+FROM events.news
+WHERE published_at IS NOT NULL
+GROUP BY 1, 2, 3;
 
 -- ---------------------------------------------------------------------------
 -- Coverage summary, for checking what actually landed.
