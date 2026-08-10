@@ -114,8 +114,26 @@ SELECT n.published_at, n.feed, n.title
 FROM events.news n
 JOIN market.index_daily i
   ON i.trade_date = n.published_at::date
-WHERE i.idx_name = 'KOSPI' AND abs(i.change_pct) >= 2
+WHERE i.idx_name = '코스피' AND abs(i.change_pct) >= 2
 ORDER BY n.published_at DESC LIMIT 30;
+```
+
+### 지수명은 소스마다 다릅니다
+
+KRX는 지수명을 **한글**로 내려줍니다 — `코스피`, `코스피 200`, `KRX 반도체`, `IT 서비스`.
+Naver는 `KOSPI`, `KOSDAQ`, `KOSPI200`을 씁니다. 이름을 잘못 쓰면 에러 없이 **0건**이 나오니
+먼저 실제 값을 확인하세요.
+
+```sql
+-- 쓸 수 있는 지수명 목록
+SELECT source, idx_class, idx_name, count(*)
+FROM market.index_daily
+GROUP BY 1, 2, 3 ORDER BY 1, 3;
+
+-- 업종(섹터) 지수만
+SELECT DISTINCT idx_name FROM market.index_daily
+WHERE idx_class IN ('KOSPI', 'KOSDAQ') AND idx_name NOT LIKE '코스피%'
+ORDER BY 1;
 ```
 
 ### 반드시 알아야 할 것: `source`를 지정하세요
