@@ -23,6 +23,12 @@ uv run python tools/site.py build
 
 경제 데이터 수집기는 [`collectors/economic_ingest.py`](collectors/economic_ingest.py)에 있고, API 키 설정과 백필·업데이트 방법은 [`docs/collectors/economic_ingest.md`](docs/collectors/economic_ingest.md)에 정리되어 있습니다.
 
+시장 데이터 수집기는 [`collectors/market_ingest.py`](collectors/market_ingest.py)에 있고, KRX Open API 키 신청·백필·업데이트 방법과 공식·보조 소스의 수정주가 차이는 [`docs/collectors/market_ingest.md`](docs/collectors/market_ingest.md)에 정리되어 있습니다.
+
+수집 결과를 담는 PostgreSQL 데이터 레이크는 [`docker-compose.yml`](docker-compose.yml)로 띄우고, 접속·계정 분리·적재 방법은 [`docs/database.md`](docs/database.md)에 정리되어 있습니다. 전체 수집은 [`scripts/ingest_all.py`](scripts/ingest_all.py)로 한 번에 실행합니다.
+
+데이터베이스에 접속하는 방법(Tailscale 설치, 계정 발급, 조회 예시)은 [`docs/access.md`](docs/access.md)에 정리되어 있습니다.
+
 국내 주식 YouTube 채널 30개의 공개 영상·댓글·답글 수집기는 [`collectors/youtube_comment_ingest.py`](collectors/youtube_comment_ingest.py)에 있고, 채널 고정·백필·일일 업데이트·AWS 실행 방법은 [`docs/collectors/youtube_comment_ingest.md`](docs/collectors/youtube_comment_ingest.md)에 정리되어 있습니다.
 
 브라우저에서 `http://localhost:3000`을 열면 B2C 핵심 경험을 바로 체험할 수 있습니다. 현재 MVP는 **2026 AI 반도체 랠리 이후 KOSPI 변곡점**을 주제로 시장 한 줄 요약, 섹터 도미넌스, 주요 이벤트와 관련 뉴스, AI 조건부 경로와 신뢰구간을 보여줍니다. 사용자는 이 시장 환경을 낙관·기준·위험 경로로 시뮬레이션하고, 결과를 가상 금융 프로필에 적용해 목표 영향과 행동 편향을 확인할 수 있습니다.
