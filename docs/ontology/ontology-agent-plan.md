@@ -430,3 +430,74 @@ Moderator는 네 개의 Evidence 문서를 취합해 다음을 만든다.
 ```
 
 이 문서는 확정적인 KOSPI 예측이 아니다. MiroFish가 여러 에이전트의 상호작용을 시작할 수 있도록 현재 시장 환경과 조건을 설명하는 입력 자료다.
+
+## 8. CompiledSubAgent 구성 예시
+
+각 Domain Agent를 먼저 LangChain의 `create_agent()`로 구성한 뒤, `CompiledSubAgent`로 감싸 Moderator의 `create_deep_agent()`에 등록한다.
+
+```python
+from deepagents import CompiledSubAgent, create_deep_agent
+from langchain.agents import create_agent
+
+
+market_graph = create_agent(
+    model="anthropic:claude-sonnet-4-6",
+    tools=[query_market_data, save_market_evidence],
+    system_prompt="""
+    You are the FINVERSE market data specialist.
+    Query PostgreSQL market views and write market-evidence.md.
+    Separate observations, interpretations, relation candidates,
+    uncertainties, and missing data.
+    """,
+)
+
+market_subagent = CompiledSubAgent(
+    name="market-agent",
+    description="Collects market evidence from PostgreSQL.",
+    runnable=market_graph,
+)
+
+
+economy_graph = create_agent(
+    model="anthropic:claude-sonnet-4-6",
+    tools=[query_economy_data, save_economic_evidence],
+    system_prompt="You are the FINVERSE economic data specialist.",
+)
+
+economy_subagent = CompiledSubAgent(
+    name="economy-agent",
+    description="Collects economic evidence from PostgreSQL.",
+    runnable=economy_graph,
+)
+
+
+moderator = create_deep_agent(
+    model="anthropic:claude-sonnet-4-6",
+    system_prompt="""
+    You are the FINVERSE Moderator Agent.
+    Delegate work to the domain agents, review their Evidence Markdown files,
+    and request missing information when necessary.
+    Do not make a final investment recommendation.
+    """,
+    subagents=[market_subagent, economy_subagent],
+)
+
+result = moderator.invoke({
+    "messages": [
+        {
+            "role": "user",
+            "content": "오늘 이후 코스피가 어떻게 변할까?",
+        }
+    ]
+})
+```
+
+나머지 `events-agent`와 `psychology-agent`도 같은 방식으로 구성한다.
+
+```text
+Domain Agent 직접 구성
+  -> LangChain create_agent()
+  -> CompiledSubAgent
+  -> Moderator create_deep_agent(subagents=[...])
+  -> Moderator의 task()로 호출
+```
