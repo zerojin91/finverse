@@ -41,13 +41,40 @@ graph   온톨로지 (실체 · 사건 · 해석 · 시나리오)              �
 | 라벨 | uid | 속성 | 유래 |
 |---|---|---|---|
 | `Market` | `market:{code}` | `code`(KOSPI/KOSDAQ/KONEX), `name` | `market_security.market` |
-| `Index` | `index:{source}:{idx_class}:{slug(idx_name)}` | `idx_class`, `idx_name`, `source` | `market_index_daily` |
-| `Sector` | `sector:{scheme}:{slug(name)}` | `scheme`(krx_sect/krx_idx), `name` | `market_security.sector_type` + 업종지수 |
-| `Security` | `security:{isin}` | `isin`, `ticker`, `name`, `short_name`, `english_name`, `share_type`, `listed_on`, `par_value` | `market_security` |
+| `Index` | `index:{source}:{idx_class}:{slug(idx_name)}` | `idx_class`, `idx_name`, `source`, **`kind`**, `universe?`, `classified_by` | `market_index_daily` |
+| `Sector` | `sector:{scheme}:{slug(name)}` | `scheme`, `name` | **업종지수에서 도출** (§1-1) |
+| `Security` | `security:{isin}` | `isin`, `ticker`, `name`, `short_name`, `english_name`, `share_type`, `listed_on`, `par_value`, `board_segment?` | `market_security` |
 | `Indicator` | `indicator:{source}:{external_series_id}` | `series_name`, `unit`, `cycle`, `stat_code`, `item_codes`, `seasonal_adj` | `economic_observation` |
 | `Actor` | `actor:{scheme}:{id}` | `name`, `kind`(company/regulator/media/analyst/retail_group) | `Event`·`Brief`에서 추출. §5의 MiroFish 경계에 필요 |
 
 `Security.ticker`는 속성이지 키가 아니다 — §6-8.
+
+### 1-1. `Index.kind` — 지수 131개는 같은 종류가 아니다
+
+KRX 지수 시리즈에는 `코스피`, `코스피 200 금융`, `KRX 삼성전자 지수`, `코스닥 벤처기업부`가
+**전부 같은 엔드포인트로** 들어온다. 한 라벨로 뭉치면 "지수 평균 변동률" 같은 계산이 곧바로 무의미해진다.
+`kind` 없이 `Index` 노드를 만들지 않는다.
+
+| `kind` | 예 | 개수 |
+|---|---|---|
+| `market` | 코스피, 코스닥, 코스피 (외국주포함) | 4 |
+| `size` | 코스피 대형주/중형주/소형주, 코스닥 대형주/… | 6 |
+| `sector` | 건설, 금융, 화학, 전기전자, KRX 반도체, 코스피 200 금융, KRX 300 헬스케어 | ~80 |
+| `strategy` | 코스피 200, KRX 300, KTOP 30, 코스닥 150, 코리아 밸류업 지수 | ~25 |
+| `board_segment` | 코스닥 벤처기업부, 코스닥 우량기업부 | 4 |
+| `single_stock` | KRX 삼성전자 지수, KRX SK하이닉스 지수 | 2 |
+| `factor` | K-샤프지수(1·3·5·10년), KRX TMI 시리즈 | ~8 |
+
+`Sector` 노드는 `kind='sector'`인 지수에서만 도출한다. `scheme`은 세 가지다 —
+`krx_industry`(건설·금융·화학 등 전통 업종), `gics_like`(코스피200·KRX300·코스닥150 하위의
+산업재·소재·정보기술 등), `krx_thematic`(KRX 반도체·자동차·K콘텐츠).
+같은 섹터를 서로 다른 유니버스가 추종하므로 `SECTOR_INDEX_OF` 엣지에 `universe`를 적는다.
+
+분류는 이름 패턴 규칙이고 `classified_by`에 규칙명을 박는다 — §8의 지수 코드 부채가 해소되면 교체한다.
+
+**`market_security.sector_type`은 섹터가 아니다.** 실제 값은 `중견기업부`·`우량기업부`·
+`벤처기업부`·`기술성장기업부`이고 KOSPI 종목 943건은 아예 비어 있다. 이건 업종이 아니라
+**코스닥 소속부**다. `Security.board_segment` 속성으로 두고, 여기서 `Sector` 노드를 만들지 않는다.
 
 ## 2. 사건 노드 — 시간 위의 한 점
 
@@ -68,10 +95,10 @@ graph   온톨로지 (실체 · 사건 · 해석 · 시나리오)              �
 | 엣지 | 방향 | 규칙 |
 |---|---|---|
 | `LISTED_ON` | (Security)→(Market) | `market_security.market` |
-| `IN_SECTOR` | (Security)→(Sector) | `market_security.sector_type`. 빈값이면 엣지 생략 |
+| `IN_SECTOR` | (Security)→(Sector) | **소스 없음** — §8. 소속부로 대신 만들지 않는다 |
 | `COMPONENT_OF` | (Security)→(Index) | 지수 구성종목. **KOSDAQ150은 구성종목 미확보** — `membership="proxy_marketcap"` 표시 |
-| `TRACKS` | (Index)→(Market) | 지수가 대표하는 시장 |
-| `SECTOR_INDEX_OF` | (Index)→(Sector) | 업종지수는 별도 엔드포인트가 아니라 지수 시리즈 안에 있다 |
+| `TRACKS` | (Index)→(Market) | `idx_class`. `kind='sector'`인 지수도 자기 시장을 가리킨다 |
+| `SECTOR_INDEX_OF` | (Index)→(Sector) | `kind='sector'`인 지수만. `universe` 속성 필수 |
 | `MOVED` | (MarketMove)→(Index\|Sector\|Security) | 무엇이 움직였나 |
 | `REPORTED` | (Release)→(Indicator) | 어느 지표의 발표인가 |
 | `MENTIONS` | (Event)→(Security\|Sector\|Index\|Indicator) | 기사가 명시적으로 지목한 대상만. 추론 금지 |
@@ -213,10 +240,11 @@ Situation ──SIMULATED_AS──> Brief ──FED──> Simulation ──PROD
 
 | 자리 | 상태 |
 |---|---|
+| `IN_SECTOR` (종목→섹터) | **소스 없음.** KRX 업종지수는 구성종목을 주지 않고, `market_security.sector_type`은 소속부다. 섹터 분석의 전제인 종목↔업종 매핑이 통째로 비어 있다 — 온톨로지 원문 "섹터: 반도체, 금융, 자동차"가 아직 종목까지 닿지 못한다 |
 | `SentimentWindow` | **데이터 0건.** `data/youtube_comments/`에 `latest.jsonl`이 없다. 4번 영역 전체가 비어 있다 |
 | `Event` (공시) | DART 미수집. 외부 사건이 RSS 뉴스뿐이라 기업 실적·CapEx·공시가 없다 |
 | `Release.consensus` / `surprise` | 예상값 소스 없음. "시장 예상값과 실제 발표값의 차이"를 아직 못 만든다 |
 | `MarketMove` | 탐지기(±3σ / ZigZag 15%)는 로컬 `finverse/analyze.py`에만 있고 서버 파이프라인에 없다 |
 | `COMPONENT_OF` (KOSDAQ150) | Naver가 구성종목을 노출하지 않아 시총상위 프록시. `membership`으로 구분해 기록 |
-| `Index.uid` | KRX 지수 코드(`IDX_IND_CD`)를 수집하지 않아 `idx_name` 기반. **이름 기반 uid 금지 원칙 위반** — 코드 수집 후 교체해야 할 부채 |
+| `Index.uid` · `Index.kind` | KRX 지수 코드(`IDX_IND_CD`)를 수집하지 않아 uid도 분류도 `idx_name` 문자열 패턴에 기댄다. **이름 기반 uid 금지 원칙 위반** — 코드 수집 후 함께 교체해야 할 부채. 지수 이름이 바뀌면 uid가 끊긴다 |
 | `Regime` | 국면 라벨링 규칙 미정 |
