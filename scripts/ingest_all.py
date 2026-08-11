@@ -49,7 +49,8 @@ class Job:
     def __init__(self, name: str, script: str, *, provider: str,
                  requires: tuple[str, ...] = (),
                  backfill: tuple[str, ...] = (), update: tuple[str, ...] = (),
-                 note: str = "", needs_input: bool = False):
+                 note: str = "", needs_input: bool = False,
+                 lake_collector: str | None = None):
         self.name = name
         self.script = script
         self.provider = provider
@@ -58,6 +59,11 @@ class Job:
         self.update = update
         self.note = note
         self.needs_input = needs_input
+        # The name load_postgres.py knows this output by, which is the data/
+        # directory it lands in rather than the job. Two jobs can share one
+        # directory, and asking to load a job name that is not a directory is
+        # rejected outright.
+        self.lake_collector = lake_collector or name
 
     def args(self, mode: str) -> tuple[str, ...]:
         return self.backfill if mode == "backfill" else self.update
@@ -82,6 +88,7 @@ JOBS = [
         requires=("KOSIS_API_KEY",),
         backfill=("--source", "kosis", "--series", "all"),
         update=("--source", "kosis", "--series", "all"),
+        lake_collector="economic_ingest",
         note="경제. KOSIS. Shares the collector with ECOS, so runs after it."),
     Job("macro_news_ingest", "macro_news_ingest.py",
         provider="rss",
@@ -156,8 +163,19 @@ def run_job(job: Job, mode: str, *, timeout: int | None) -> dict:
     return result
 
 
-def load_into_postgres() -> dict:
-    command = [sys.executable, str(ROOT / "scripts" / "load_postgres.py"), "--all"]
+def load_into_postgres(collectors: list[str]) -> dict:
+    """Load only what this run collected.
+
+    Loading is a full re-read of each collector's latest.jsonl, and the market
+    one is 5.9 GB -- close to an hour of COPY and promotion. Asking for --all
+    made the nightly ECOS/RSS job, which collects a few hundred rows, drag the
+    entire market lake through Postgres behind it.
+    """
+    if not collectors:
+        return {"skipped": "no collector produced output"}
+    command = [sys.executable, str(ROOT / "scripts" / "load_postgres.py")]
+    for name in collectors:
+        command += ["--collector", name]
     completed = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
     report: dict = {"exit_code": completed.returncode}
     output = (completed.stdout or "").strip().splitlines()
@@ -254,7 +272,11 @@ def main() -> int:
               "seconds": round(time.monotonic() - started, 1),
               "collectors": results}
     if args.load:
-        report["postgres"] = load_into_postgres()
+        # A collector that exited non-zero still wrote whatever it got before
+        # failing, and loading is idempotent, so its output is loaded too.
+        collected = sorted({by_name[entry["collector"]].lake_collector
+                            for entry in results if "skipped" not in entry})
+        report["postgres"] = load_into_postgres(collected)
         if report["postgres"].get("exit_code"):
             status = 1
 
