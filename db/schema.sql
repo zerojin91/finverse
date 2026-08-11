@@ -11,6 +11,7 @@
 CREATE SCHEMA IF NOT EXISTS lake;
 CREATE SCHEMA IF NOT EXISTS market;
 CREATE SCHEMA IF NOT EXISTS events;
+CREATE SCHEMA IF NOT EXISTS economy;
 
 -- ---------------------------------------------------------------------------
 -- Landing tables
@@ -261,6 +262,39 @@ SELECT
 FROM events.news
 WHERE published_at IS NOT NULL
 GROUP BY 1, 2, 3;
+
+-- ---------------------------------------------------------------------------
+-- Economy views (온톨로지 2. 경제)
+--
+-- One row per (series, period). period_start is the comparable date across
+-- cycles: ECOS reports quarterly series as '2006Q3' and monthly ones as
+-- '200607', so ordering on period text alone would interleave them wrongly.
+
+CREATE OR REPLACE VIEW economy.observation AS
+SELECT
+    payload->>'source'                       AS source,
+    payload->>'series_name'                  AS series_name,
+    payload->>'external_series_id'           AS series_id,
+    payload->>'stat_code'                    AS stat_code,
+    payload->>'cycle'                        AS cycle,
+    payload->>'period'                       AS period,
+    nullif(payload->>'period_start','')::date AS period_start,
+    (payload->>'value')::numeric             AS value,
+    payload->>'unit'                         AS unit,
+    collected_at,
+    record_id
+FROM lake.records
+WHERE record_type = 'economic_observation';
+
+-- What series exist and how far back they go.
+CREATE OR REPLACE VIEW economy.series AS
+SELECT
+    source, series_name, series_id, cycle, unit,
+    count(*)          AS observations,
+    min(period_start) AS first_period,
+    max(period_start) AS last_period
+FROM economy.observation
+GROUP BY source, series_name, series_id, cycle, unit;
 
 -- ---------------------------------------------------------------------------
 -- Coverage summary, for checking what actually landed.

@@ -1,0 +1,24 @@
+# FINVERSE 수집 스케줄.  설치: crontab deploy/crontab
+#
+# 서버는 UTC로 동작하므로 CRON_TZ로 한국 시간을 명시한다. 이게 없으면
+# "장 마감 후"로 잡은 시각이 아침에 실행된다.
+CRON_TZ=Asia/Seoul
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# 모든 작업은 run_ingest.sh를 거친다. flock으로 중복 실행을 막으므로
+# 앞선 수집이 아직 돌고 있으면 조용히 건너뛴다.
+
+# 평일 19:00 KST — 시장(KRX). 장 마감과 거래소 확정 반영 이후.
+# 최근 7일을 다시 읽어 뒤늦은 정정분을 잡고, 이어서 DB에 적재한다.
+0 19 * * 1-5 cd /home/ubuntu/finverse && scripts/run_ingest.sh update --only market_ingest --load >> logs/cron.log 2>&1
+
+# 매일 05:30 KST — 경제(ECOS·KOSIS)와 뉴스(RSS). 시장은 위에서 따로 돈다.
+30 5 * * * cd /home/ubuntu/finverse && scripts/run_ingest.sh update --skip market_ingest --load >> logs/cron.log 2>&1
+
+# 일요일 03:00 KST — Naver 시세 정정분. 전 종목을 다시 읽어 20분 이상 걸리므로
+# 매일이 아니라 주 1회. 수급은 훨씬 오래 걸려 여기서 제외한다.
+0 3 * * 0 cd /home/ubuntu/finverse && flock -n data/.naver.lock python3 collectors/market_ingest.py update --source naver --lookback-days 30 --no-flows >> logs/cron.log 2>&1
+
+# 매일 04:00 KST — 로그 정리. 30일 지난 것은 지운다.
+0 4 * * * find /home/ubuntu/finverse/logs -name '*.log' -mtime +30 -delete

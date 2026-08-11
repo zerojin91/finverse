@@ -19,6 +19,7 @@ which keeps this repository on the standard library like every collector.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -28,6 +29,15 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_ROOT = ROOT / "data"
+
+# Collectors that predate the shared store write their own JSONL without a
+# record envelope. Give them one here rather than rewriting a working collector
+# and invalidating its existing output: (record_type, natural key fields).
+IDENTITY_FALLBACK = {
+    "economic_ingest": ("economic_observation",
+                        ("source", "external_series_id", "period")),
+}
+
 
 # data/<dir> -> collector name recorded in lake.records.collector
 COLLECTOR_DIRS = {
@@ -81,28 +91,55 @@ def psql(sql: str, *, stdin: bytes | None = None, quiet: bool = False) -> str:
     return result.stdout.decode("utf-8", "replace")
 
 
-def stream_jsonl(path: Path) -> bytes:
+def add_identity(record: dict, collector: str) -> dict | None:
+    """Give a record the envelope the lake expects, if it lacks one."""
+    if record.get("record_id"):
+        return record
+    spec = IDENTITY_FALLBACK.get(collector)
+    if not spec:
+        return None               # no key to build from; skip rather than guess
+    record_type, key_fields = spec
+    key = "|".join(str(record.get(f, "")) for f in key_fields)
+    record["record_id"] = hashlib.sha256(key.encode("utf-8")).hexdigest()
+    record.setdefault("record_type", record_type)
+    if not record.get("record_hash"):
+        body = {k: v for k, v in record.items()
+                if k not in ("collected_at", "record_hash")}
+        record["record_hash"] = hashlib.sha256(
+            json.dumps(body, ensure_ascii=False, sort_keys=True,
+                       default=str).encode("utf-8")).hexdigest()
+    return record
+
+
+def stream_jsonl(path: Path, collector: str) -> tuple[bytes, int]:
     """Re-emit JSONL as a single-column COPY payload.
 
     COPY splits on tabs and newlines, so any that appear inside the JSON must be
     escaped or the row will be cut in half.
     """
     chunks: list[bytes] = []
+    skipped = 0
     with path.open(encoding="utf-8") as handle:
         for line in handle:
             line = line.strip()
             if not line:
                 continue
             try:
-                json.loads(line)
+                record = json.loads(line)
             except json.JSONDecodeError:
-                continue          # skip a torn trailing line rather than abort
-            escaped = (line.replace("\\", "\\\\")
-                           .replace("\t", "\\t")
-                           .replace("\n", "\\n")
-                           .replace("\r", "\\r"))
+                skipped += 1      # skip a torn trailing line rather than abort
+                continue
+            record = add_identity(record, collector)
+            if record is None:
+                skipped += 1
+                continue
+            encoded = json.dumps(record, ensure_ascii=False, default=str)
+            escaped = (encoded.replace("\\", "\\\\")
+                              .replace("\t", "\\t")
+                              .replace("\n", "\\n")
+                              .replace("\r", "\\r"))
             chunks.append(escaped.encode("utf-8") + b"\n")
-    return b"".join(chunks)
+    return b"".join(chunks), skipped
 
 
 def count_lines(path: Path) -> int:
@@ -128,11 +165,13 @@ def load_collector(directory: str, collector: str, *, dry_run: bool) -> dict:
 
     psql("TRUNCATE lake.staging_records; TRUNCATE lake.staging_changes;", quiet=True)
 
-    payload = stream_jsonl(latest)
+    payload, skipped = stream_jsonl(latest, collector)
+    if skipped:
+        report["skipped_rows"] = skipped
     if payload:
         psql("COPY lake.staging_records (doc) FROM STDIN", stdin=payload, quiet=True)
     if changes.exists():
-        change_payload = stream_jsonl(changes)
+        change_payload, _ = stream_jsonl(changes, collector)
         if change_payload:
             psql("COPY lake.staging_changes (doc) FROM STDIN",
                  stdin=change_payload, quiet=True)
