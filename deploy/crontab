@@ -1,0 +1,31 @@
+# FINVERSE 수집 스케줄.  설치: crontab deploy/crontab
+#
+# 시각은 전부 UTC다. Debian/Ubuntu가 쓰는 vixie cron은 CRON_TZ를 지원하지 않는다
+# -- cronie(RHEL) 전용 확장이라 여기서는 조용히 무시된다. 이전 크론탭은
+# CRON_TZ=Asia/Seoul을 믿고 시각을 KST로 적어놨지만 실제로는 그 숫자가 그대로
+# UTC로 해석돼, 의도한 시각과 9시간 어긋난 채로 돌고 있었다. 실측으로 확인함:
+# "0 4 * * *"가 04:00 KST가 아니라 04:00 UTC에 발화했다.
+#
+# 그래서 UTC로 직접 적고 KST를 주석으로 남긴다. 서버 TZ(Etc/UTC)를 바꾸면
+# 이 파일도 같이 고쳐야 한다.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# 모든 작업은 run_ingest.sh를 거친다. 락은 범위별로 나뉘어 있어서, 시장 백필이
+# 돌고 있어도 경제·뉴스 수집은 막히지 않는다. 락을 못 잡으면 cron.log에 한 줄
+# 남기고 종료한다.
+
+# 10:00 UTC = 19:00 KST, 평일 -- 시장(KRX). 장 마감과 거래소 확정 반영 이후.
+# 최근 7일을 다시 읽어 뒤늦은 정정분을 잡고, 이어서 DB에 적재한다.
+0 10 * * 1-5 cd /home/ubuntu/finverse && scripts/run_ingest.sh update --only market_ingest --load >> logs/cron.log 2>&1
+
+# 20:30 UTC = 05:30 KST, 매일 -- 경제(ECOS·KOSIS)와 뉴스(RSS). 시장은 위에서 따로 돈다.
+30 20 * * * cd /home/ubuntu/finverse && scripts/run_ingest.sh update --skip market_ingest --load >> logs/cron.log 2>&1
+
+# 18:00 UTC 토요일 = 03:00 KST 일요일 -- Naver 시세 정정분. 전 종목을 다시 읽어
+# 20분 이상 걸리므로 매일이 아니라 주 1회. 수급은 훨씬 오래 걸려 여기서 제외한다.
+# 시장 데이터를 건드리므로 market 락(.ingest_all.lock)을 그대로 쓴다.
+0 18 * * 6 cd /home/ubuntu/finverse && flock -n data/.ingest_all.lock python3 collectors/market_ingest.py update --source naver --lookback-days 30 --no-flows >> logs/cron.log 2>&1
+
+# 19:00 UTC = 04:00 KST, 매일 -- 로그 정리. 30일 지난 것은 지운다.
+0 19 * * * find /home/ubuntu/finverse/logs -name '*.log' -mtime +30 -delete

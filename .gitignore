@@ -48,3 +48,8 @@ next-env.d.ts
 /work/
 /config/youtube_channels.json
 /.tools/
+
+# collector run logs
+/logs/
+# timestamped backups taken before editing a live script
+*.bak.*
