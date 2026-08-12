@@ -173,6 +173,22 @@ BEGIN
     WHERE graph.slug(src) IS NOT NULL
     GROUP BY src, sid;
 
+    -- Naver 업종 분류. KRX 업종지수(krx_industry)와 이름 체계가 다르고 구성종목이
+    -- 있다는 점이 다르다 -- IN_SECTOR 를 만들 수 있는 유일한 소스다.
+    INSERT INTO graph.node (uid, label, props, evidence)
+    SELECT 'sector:naver_wics:' || graph.slug(sname),
+           'Sector',
+           jsonb_build_object('scheme', 'naver_wics', 'name', sname,
+                              'sector_code', min(scode)),
+           graph.sample_evidence(array_agg(record_id))
+    FROM (SELECT payload->>'sector_name' AS sname,
+                 payload->>'sector_code' AS scode, record_id
+          FROM lake.records
+          WHERE record_type = 'market_sector_membership'
+            AND nullif(payload->>'sector_name', '') IS NOT NULL) t
+    WHERE graph.slug(sname) IS NOT NULL
+    GROUP BY sname;
+
     -- ---------------------------------------------------------------- §2 사건
     --
     -- §6-11: 제목만 저장하지 않는다. RSS 가 주는 것은 사실 요약까지이므로
@@ -263,8 +279,24 @@ BEGIN
       AND graph.slug(graph.sector_name(n.props->>'idx_name')) IS NOT NULL
     ON CONFLICT DO NOTHING;
 
-    -- IN_SECTOR (종목→섹터) 는 만들지 않는다. KRX 업종지수가 구성종목을 주지
-    -- 않아 소스가 없다(문서 §8). 소속부를 업종으로 대신 쓰면 조용히 틀린다.
+    -- 종목→섹터. sector_ingest 가 가져온 Naver 업종 분류에서만 나온다.
+    -- KRX 업종지수 쪽으로는 여전히 만들 수 없다 -- 구성종목을 주지 않는다.
+    -- 매핑은 단축코드로 오고 Security 의 키는 isin 이라 ticker 로 조인한다(§6-8).
+    INSERT INTO graph.edge (type, src_uid, dst_uid, props)
+    SELECT DISTINCT 'IN_SECTOR',
+           s.uid,
+           'sector:naver_wics:' || graph.slug(r.payload->>'sector_name'),
+           jsonb_build_object('source', r.payload->>'source',
+                              'scheme', 'naver_wics')
+    FROM lake.records r
+    JOIN graph.node s
+      ON s.label = 'Security' AND s.props->>'ticker' = r.payload->>'ticker'
+    WHERE r.record_type = 'market_sector_membership'
+      AND graph.slug(r.payload->>'sector_name') IS NOT NULL
+      AND EXISTS (SELECT 1 FROM graph.node x
+                  WHERE x.uid = 'sector:naver_wics:'
+                              || graph.slug(r.payload->>'sector_name'))
+    ON CONFLICT DO NOTHING;
 
     SELECT jsonb_object_agg(label, n) INTO counts
     FROM (SELECT label, count(*) AS n FROM graph.node GROUP BY label) t;

@@ -77,6 +77,10 @@ JOBS = [
         backfill=("--source", "all"),
         update=("--source", "krx"),
         note="시장. KRX backfill takes 6-7h; Naver adds prices back to 1990."),
+    Job("sector_ingest", "sector_ingest.py",
+        provider="krx_naver",
+        note="시장. 종목↔업종 매핑. Naver 를 치므로 market_ingest 와 같은 provider "
+             "에 두어 순서대로 돈다."),
     Job("economic_ingest", "economic_ingest.py",
         provider="ecos_kosis",
         requires=("ECOS_API_KEY",),

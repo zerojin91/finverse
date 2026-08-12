@@ -29,7 +29,8 @@ graph   온톨로지 (실체 · 사건 · 해석 · 시나리오)              �
 | `market_index_daily` | 대량 | core 시계열 + `Index` 노드 |
 | `market_investor_flow_daily` | 대량 | core 시계열 (그래프 ✗) |
 | `market_foreign_holding_daily` | 대량 | core 시계열 (그래프 ✗) |
-| `market_security` | ~2.8K | `Security`·`Market`·`Sector` 노드 |
+| `market_security` | ~2.8K | `Security`·`Market` 노드 |
+| `market_sector_membership` | ~4.0K | `Sector`(naver_wics) 노드 + `IN_SECTOR` 엣지 |
 | `economic_observation` | ~24K | core 시계열 + `Indicator`·`Release` 노드 |
 | `news_article` | 수백~ | `Event` 노드 |
 | *(미수집)* youtube/reddit | 0 | `SentimentWindow` 노드 |
@@ -65,10 +66,15 @@ KRX 지수 시리즈에는 `코스피`, `코스피 200 금융`, `KRX 삼성전�
 | `single_stock` | KRX 삼성전자 지수, KRX SK하이닉스 지수 | 2 |
 | `factor` | K-샤프지수(1·3·5·10년), KRX TMI 시리즈 | ~8 |
 
-`Sector` 노드는 `kind='sector'`인 지수에서만 도출한다. `scheme`은 세 가지다 —
+`kind='sector'`인 지수에서 `Sector` 노드가 나온다. `scheme`은 네 가지다 —
 `krx_industry`(건설·금융·화학 등 전통 업종), `gics_like`(코스피200·KRX300·코스닥150 하위의
-산업재·소재·정보기술 등), `krx_thematic`(KRX 반도체·자동차·K콘텐츠).
+산업재·소재·정보기술 등), `krx_thematic`(KRX 반도체·자동차·K콘텐츠), 그리고
+`naver_wics`(sector_ingest 가 가져오는 79개 업종).
 같은 섹터를 서로 다른 유니버스가 추종하므로 `SECTOR_INDEX_OF` 엣지에 `universe`를 적는다.
+
+**`naver_wics`만 구성종목을 가진다.** KRX 업종지수는 지수 *수준*은 주지만 그 안에 무엇이
+들었는지는 공개하지 않는다. 그래서 `IN_SECTOR`(종목→섹터)는 `naver_wics` 쪽으로만 생긴다.
+두 체계 사이의 대응은 아직 없다 — §8.
 
 분류는 이름 패턴 규칙이고 `classified_by`에 규칙명을 박는다 — §8의 지수 코드 부채가 해소되면 교체한다.
 
@@ -95,7 +101,7 @@ KRX 지수 시리즈에는 `코스피`, `코스피 200 금융`, `KRX 삼성전�
 | 엣지 | 방향 | 규칙 |
 |---|---|---|
 | `LISTED_ON` | (Security)→(Market) | `market_security.market` |
-| `IN_SECTOR` | (Security)→(Sector) | **소스 없음** — §8. 소속부로 대신 만들지 않는다 |
+| `IN_SECTOR` | (Security)→(Sector) | `market_sector_membership`. `naver_wics` 섹터로만. 소속부로 만들지 않는다 |
 | `COMPONENT_OF` | (Security)→(Index) | 지수 구성종목. **KOSDAQ150은 구성종목 미확보** — `membership="proxy_marketcap"` 표시 |
 | `TRACKS` | (Index)→(Market) | `idx_class`. `kind='sector'`인 지수도 자기 시장을 가리킨다 |
 | `SECTOR_INDEX_OF` | (Index)→(Sector) | `kind='sector'`인 지수만. `universe` 속성 필수 |
@@ -240,7 +246,9 @@ Situation ──SIMULATED_AS──> Brief ──FED──> Simulation ──PROD
 
 | 자리 | 상태 |
 |---|---|
-| `IN_SECTOR` (종목→섹터) | **소스 없음.** KRX 업종지수는 구성종목을 주지 않고, `market_security.sector_type`은 소속부다. 섹터 분석의 전제인 종목↔업종 매핑이 통째로 비어 있다 — 온톨로지 원문 "섹터: 반도체, 금융, 자동차"가 아직 종목까지 닿지 못한다 |
+| 섹터 체계 간 대응 | `naver_wics`(구성종목 있음)와 `krx_industry`/`gics_like`(지수 있음)가 서로 연결돼 있지 않다. "반도체와반도체장비 종목들"과 "KRX 반도체 지수"를 같이 보려면 둘을 잇는 매핑이 필요하다 |
+| `market_sector_membership` 이력 | 현재 스냅샷뿐이다. 종목이 업종을 옮긴 시점을 복원할 수 없고, 상장폐지 종목에 tombstone 이 남지 않는다 |
+| `naver_wics` 의 `기타` | 4,028쌍 중 1,236개가 `기타`로 몰려 있다. ETF·SPAC·우선주가 섞인 것으로 보이며, 섹터 분석에서 이 덩어리를 어떻게 다룰지 정해야 한다 |
 | `SentimentWindow` | **데이터 0건.** `data/youtube_comments/`에 `latest.jsonl`이 없다. 4번 영역 전체가 비어 있다 |
 | `Event` (공시) | DART 미수집. 외부 사건이 RSS 뉴스뿐이라 기업 실적·CapEx·공시가 없다 |
 | `Release.consensus` / `surprise` | 예상값 소스 없음. "시장 예상값과 실제 발표값의 차이"를 아직 못 만든다 |

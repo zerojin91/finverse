@@ -161,6 +161,11 @@ CREATE TABLE IF NOT EXISTS graph.node (
 CREATE INDEX IF NOT EXISTS node_label_idx ON graph.node (label);
 CREATE INDEX IF NOT EXISTS node_props_idx ON graph.node USING gin (props);
 
+-- 종목↔업종 매핑은 단축코드로 들어오고 Security 의 키는 isin 이다(§6-8).
+-- 그 조인을 매 projection 마다 하므로 ticker 를 따로 색인한다.
+CREATE INDEX IF NOT EXISTS node_security_ticker_idx
+    ON graph.node ((props->>'ticker')) WHERE label = 'Security';
+
 -- 해석 엣지 — 재계산이 지워도 되는 것. 이 목록에 있으면 method/computed_at/
 -- pipeline_version 3종을 반드시 들고 있어야 한다(문서 §4, §6-4).
 CREATE TABLE IF NOT EXISTS graph.derived_edge_type (type text PRIMARY KEY);

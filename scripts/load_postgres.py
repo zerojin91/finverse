@@ -49,6 +49,7 @@ IDENTITY_FALLBACK = {
 # data/<dir> -> collector name recorded in lake.records.collector
 COLLECTOR_DIRS = {
     "market": "market_ingest",
+    "sector": "sector_ingest",
     "economic": "economic_ingest",
     "macro_news": "macro_news_ingest",
     "fincept_events": "fincept_event_ingest",
