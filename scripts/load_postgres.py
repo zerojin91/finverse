@@ -24,6 +24,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import sqlite3
 import subprocess
 import sys
 import threading
@@ -163,43 +164,85 @@ def add_identity(record: dict, collector: str) -> dict | None:
     return record
 
 
-def stream_jsonl(path: Path, collector: str, stats: dict):
-    """Yield JSONL re-emitted as single-column COPY payload blocks.
+def blocks(lines, collector: str, stats: dict):
+    """Yield raw JSON lines re-emitted as single-column COPY payload blocks.
 
     A generator rather than one joined buffer, so peak memory is one block no
-    matter how large the file is.  ``stats`` is filled in as a side effect --
+    matter how large the input is.  ``stats`` is filled in as a side effect --
     a generator's return value is not reachable through iteration.
 
     COPY splits on tabs and newlines, so any that appear inside the JSON must be
     escaped or the row will be cut in half.
     """
     block = bytearray()
-    with path.open(encoding="utf-8") as handle:
-        for line in handle:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                record = json.loads(line)
-            except json.JSONDecodeError:
-                stats["skipped"] += 1   # skip a torn trailing line rather than abort
-                continue
-            record = add_identity(record, collector)
-            if record is None:
-                stats["skipped"] += 1
-                continue
-            encoded = json.dumps(record, ensure_ascii=False, default=str)
-            escaped = (encoded.replace("\\", "\\\\")
-                              .replace("\t", "\\t")
-                              .replace("\n", "\\n")
-                              .replace("\r", "\\r"))
-            block += escaped.encode("utf-8") + b"\n"
-            stats["rows"] += 1
-            if len(block) >= COPY_BLOCK_BYTES:
-                yield bytes(block)
-                block.clear()
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            stats["skipped"] += 1   # skip a torn trailing line rather than abort
+            continue
+        record = add_identity(record, collector)
+        if record is None:
+            stats["skipped"] += 1
+            continue
+        encoded = json.dumps(record, ensure_ascii=False, default=str)
+        escaped = (encoded.replace("\\", "\\\\")
+                          .replace("\t", "\\t")
+                          .replace("\n", "\\n")
+                          .replace("\r", "\\r"))
+        block += escaped.encode("utf-8") + b"\n"
+        stats["rows"] += 1
+        if len(block) >= COPY_BLOCK_BYTES:
+            yield bytes(block)
+            block.clear()
     if block:
         yield bytes(block)
+
+
+def jsonl_lines(path: Path):
+    with path.open(encoding="utf-8") as handle:
+        yield from handle
+
+
+# The indexed store keeps SQLite as the live table and only writes latest.jsonl
+# when a run finishes (market_ingest passes materialize=final). A backfill that
+# runs for days therefore leaves the JSONL frozen at the previous run, and a
+# loader reading it puts stale data into Postgres while believing it is current
+# -- the market lake sat at 9.7M KRX rows while the store already held 25.3M
+# including every Naver adjusted price. youtube_comments is worse: it has no
+# latest.jsonl at all, so it could never be loaded.
+#
+# Read the live table when it is there. WAL mode makes a read-only connection
+# safe to open while the collector is still writing.
+SQLITE_SOURCE = {"latest": ("record_json", "record_id"),
+                 "changes": ("change_json", "seq")}
+
+
+def sqlite_lines(path: Path, table: str):
+    column, order = SQLITE_SOURCE[table]
+    connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    try:
+        cursor = connection.execute(f"SELECT {column} FROM {table} ORDER BY {order}")
+        while True:
+            rows = cursor.fetchmany(10000)
+            if not rows:
+                break
+            for (raw,) in rows:
+                if raw:
+                    yield raw
+    finally:
+        connection.close()
+
+
+def sqlite_count(path: Path, table: str) -> int:
+    connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    try:
+        return connection.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
+    finally:
+        connection.close()
 
 
 def count_lines(path: Path) -> int:
@@ -211,32 +254,43 @@ def count_lines(path: Path) -> int:
 
 def load_collector(directory: str, collector: str, *, dry_run: bool) -> dict:
     root = DATA_ROOT / directory
+    index = root / "index.sqlite3"
     latest = root / "latest.jsonl"
     changes = root / "changes.jsonl"
     report = {"collector": collector, "directory": directory}
 
-    if not latest.exists():
-        report["skipped"] = "no latest.jsonl"
+    if index.exists():
+        report["read_from"] = "index.sqlite3"
+        records_in = lambda: sqlite_lines(index, "latest")
+        changes_in = lambda: sqlite_lines(index, "changes")
+        counts = lambda: (sqlite_count(index, "latest"), sqlite_count(index, "changes"))
+    elif latest.exists():
+        report["read_from"] = "latest.jsonl"
+        records_in = lambda: jsonl_lines(latest)
+        changes_in = (lambda: jsonl_lines(changes)) if changes.exists() else None
+        counts = lambda: (count_lines(latest), count_lines(changes))
+    else:
+        report["skipped"] = "no index.sqlite3 and no latest.jsonl"
         return report
+
     if dry_run:
-        # Only a dry run pays for counting: on the market lake that is a full
-        # pass over 9 GB, and a real load already counts as it streams.
-        report["latest_lines"] = count_lines(latest)
-        report["changes_lines"] = count_lines(changes)
+        # Only a dry run pays for counting: over JSONL that is a full pass on
+        # 9 GB, and a real load already counts as it streams.
+        report["latest_lines"], report["changes_lines"] = counts()
         return report
 
     psql("TRUNCATE lake.staging_records; TRUNCATE lake.staging_changes;", quiet=True)
 
     stats = {"rows": 0, "skipped": 0}
     psql("COPY lake.staging_records (doc) FROM STDIN",
-         stdin=stream_jsonl(latest, collector, stats), quiet=True)
+         stdin=blocks(records_in(), collector, stats), quiet=True)
     report["latest_lines"] = stats["rows"]
     if stats["skipped"]:
         report["skipped_rows"] = stats["skipped"]
-    if changes.exists():
+    if changes_in is not None:
         change_stats = {"rows": 0, "skipped": 0}
         psql("COPY lake.staging_changes (doc) FROM STDIN",
-             stdin=stream_jsonl(changes, collector, change_stats), quiet=True)
+             stdin=blocks(changes_in(), collector, change_stats), quiet=True)
         report["changes_lines"] = change_stats["rows"]
 
     promoted = psql(
