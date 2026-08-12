@@ -123,7 +123,12 @@ KRX 지수 시리즈에는 `코스피`, `코스피 200 금융`, `KRX 삼성전�
 | `REACTED_TO` | (SentimentWindow)→(MarketMove) | `lag_days`, `confidence` | 시장 → 사람들의 심리 |
 | `AMPLIFIED` | (SentimentWindow)→(MarketMove) | `lag_days`, `confidence` | 사람들의 심리 → 시장 |
 | `ANALOGOUS_TO` | (Situation)→(Regime\|MarketMove) | `score`, `matched_on[]`, `divergence[]` | 과거 유사 사례 → 현재 상황 해석 |
-| `CO_MOVES_WITH` | (Security)↔(Security) | `corr`, `window_days` | 섹터·종목 동조 |
+| `CO_MOVES_WITH` | (Security)↔(Security) | `corr`, `window_days`, `observations`, `sector_uid` | 섹터·종목 동조 |
+
+`CO_MOVES_WITH`는 **같은 섹터 안에서만** 짝을 만든다. 전 종목 쌍은 2,800개면 390만 쌍이라
+계산이 무의미하게 커지고, 섹터를 넘는 동조성은 그 자체로 다른 질문이다. 대상은 시총 상위
+`comove_max_universe`개로 자르며, 자른 규모를 결과에 `dropped`로 보고한다 — 조용히 줄이면
+"전 종목을 봤다"로 읽힌다. 임계값은 `derive.params` 한 곳에 있고 `method` 문자열에 박힌다.
 
 `INFLUENCED` · `TRANSMITS_TO`는 **인과가 아니라 시차 상관 관측**이다 — §6-6.
 `ANALOGOUS_TO`는 `divergence[]`(현재와 과거의 차이) 없이 만들 수 없다 — 온톨로지 원문의
@@ -175,7 +180,10 @@ KRX 지수 시리즈에는 `코스피`, `코스피 200 금융`, `KRX 삼성전�
 4. **관측(§3)과 해석(§4)을 같은 엣지로 쓰지 않는다.** 해석 엣지는 3종 속성이 반드시 있다.
 5. **`source`는 식별자의 일부다.** lake가 이미 그렇게 설계돼 있고 그래프도 따른다.
    같은 날 같은 종목이라도 소스가 다르면 각각 남고 덮어쓰지 않는다.
-   - **수익률·변동성·`MarketMove` 탐지 → `naver_finance`** (수정주가). 원주가를 쓰면 분할일에 가짜 폭락이 생긴다.
+   - **종목의 수익률·변동성·`MarketMove` → `naver_finance`** (수정주가). 원주가를 쓰면
+     분할일에 가짜 폭락이 생긴다 — 삼성전자 2018-05-04가 -98%로 잡힌다.
+   - **지수는 예외다.** 지수 수준은 액면분할의 영향을 받지 않으므로 KRX 원지수를 그대로 쓴다.
+     `price_basis='unadjusted'`인 `MarketMove`는 대상이 `Index`일 때만 정상이다.
    - **거래대금·시가총액·상장주식수 → `krx_open_api`** (Naver는 제공하지 않는다).
    - `MarketMove`는 `source`와 `price_basis`를 반드시 들고 있다. 둘을 섞은 노드는 만들지 않는다.
 6. **인과를 주장하지 않는다.** `INFLUENCED`·`TRANSMITS_TO`는 시차 상관 관측이다.

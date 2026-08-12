@@ -30,7 +30,7 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-SCHEMA_FILES = ("db/ontology.sql", "db/projection.sql")
+SCHEMA_FILES = ("db/ontology.sql", "db/projection.sql", "db/derive.sql")
 
 
 def load_dotenv(root: Path) -> None:
@@ -85,7 +85,9 @@ def main() -> int:
     parser.add_argument("--apply", action="store_true",
                         help="install db/ontology.sql and db/projection.sql first")
     parser.add_argument("--timeseries", action="store_true",
-                        help="also refill core.* from lake (expensive: ~9.7M price rows)")
+                        help="also refill core.* from lake (expensive: millions of rows)")
+    parser.add_argument("--derive", action="store_true",
+                        help="also run derive.run(): MarketMove nodes and CO_MOVES_WITH")
     parser.add_argument("--check", action="store_true",
                         help="report violations without rebuilding")
     args = parser.parse_args()
@@ -104,6 +106,11 @@ def main() -> int:
         report["core"] = json.loads(psql("SELECT core.rebuild_timeseries();"))
 
     report["graph"] = json.loads(psql("SELECT graph.rebuild();"))
+
+    # Derivation runs after projection because MarketMove attaches to Index and
+    # Security nodes that graph.rebuild() has just recreated.
+    if args.derive:
+        report["derive"] = json.loads(psql("SELECT derive.run();"))
 
     # A projection that leaves the graph inconsistent is a failed projection,
     # not a warning. Report the offending rows rather than only the count so

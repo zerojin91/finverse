@@ -1,0 +1,543 @@
+<title>FINVERSE 온톨로지</title>
+<style>
+  :root {
+    --paper:   #F5F7F9;
+    --surface: #FFFFFF;
+    --sunken:  #EDF0F4;
+    --rule:    #D9DFE7;
+    --ink:     #0F141B;
+    --ink-2:   #414C5C;
+    --ink-3:   #6C7889;
+    --observed:#2C5F8F;
+    --derived: #A8752A;
+    --absent:  #98A2B0;
+    --up:      #C4382C;
+    --down:    #1D6FB0;
+    --observed-wash: #E4EDF6;
+    --derived-wash:  #F5EBDA;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper:   #0D1218;
+      --surface: #151C25;
+      --sunken:  #1B232E;
+      --rule:    #29333F;
+      --ink:     #E8EDF3;
+      --ink-2:   #AEBAC8;
+      --ink-3:   #7C8899;
+      --observed:#6BA6DC;
+      --derived: #D9A954;
+      --absent:  #5C6673;
+      --up:      #E4695C;
+      --down:    #62A5DE;
+      --observed-wash: #1A2836;
+      --derived-wash:  #2C2519;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:#0D1218; --surface:#151C25; --sunken:#1B232E; --rule:#29333F;
+    --ink:#E8EDF3; --ink-2:#AEBAC8; --ink-3:#7C8899;
+    --observed:#6BA6DC; --derived:#D9A954; --absent:#5C6673;
+    --up:#E4695C; --down:#62A5DE;
+    --observed-wash:#1A2836; --derived-wash:#2C2519;
+  }
+  :root[data-theme="light"] {
+    --paper:#F5F7F9; --surface:#FFFFFF; --sunken:#EDF0F4; --rule:#D9DFE7;
+    --ink:#0F141B; --ink-2:#414C5C; --ink-3:#6C7889;
+    --observed:#2C5F8F; --derived:#A8752A; --absent:#98A2B0;
+    --up:#C4382C; --down:#1D6FB0;
+    --observed-wash:#E4EDF6; --derived-wash:#F5EBDA;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: Pretendard, "Pretendard Variable", -apple-system, BlinkMacSystemFont,
+                 "Apple SD Gothic Neo", "Malgun Gothic", ui-sans-serif, system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono {
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, "DejaVu Sans Mono", monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px 96px; }
+
+  /* ---- header ---- */
+  header { border-bottom: 1px solid var(--rule); margin-bottom: 40px; }
+  .head-inner { max-width: 1080px; margin: 0 auto; padding: 44px 24px 28px;
+                display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end;
+                justify-content: space-between; }
+  h1 { font-size: 34px; line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 6px;
+       font-weight: 700; text-wrap: balance; }
+  .sub { color: var(--ink-3); font-size: 14px; margin: 0; max-width: 56ch; }
+  .stamp { font-size: 12px; color: var(--ink-3); text-align: right; }
+
+  /* ---- thesis strip ---- */
+  .thesis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 1px; background: var(--rule); border: 1px solid var(--rule);
+            border-radius: 3px; overflow: hidden; margin-bottom: 14px; }
+  .metric { background: var(--surface); padding: 16px 18px; }
+  .metric .k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.09em;
+               color: var(--ink-3); margin-bottom: 6px; }
+  .metric .v { font-size: 28px; font-weight: 650; line-height: 1.1; letter-spacing: -0.02em; }
+  .metric .n { font-size: 12px; color: var(--ink-3); margin-top: 3px; }
+  .metric.gap .v { color: var(--absent); }
+
+  .lede { color: var(--ink-2); font-size: 14.5px; margin: 0 0 44px; max-width: 68ch; }
+  .lede b { color: var(--ink); font-weight: 650; }
+
+  /* ---- sections ---- */
+  section { margin-bottom: 52px; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.11em;
+       color: var(--ink-3); font-weight: 600; margin: 0 0 4px;
+       padding-bottom: 8px; border-bottom: 1px solid var(--rule); }
+  .h2note { font-size: 13.5px; color: var(--ink-3); margin: 10px 0 18px; max-width: 66ch; }
+
+  /* ---- vocabulary ---- */
+  .layer { margin-bottom: 18px; }
+  .layer-name { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+                color: var(--ink-3); margin-bottom: 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { display: inline-flex; align-items: baseline; gap: 7px;
+          background: var(--surface); border: 1px solid var(--rule);
+          border-radius: 2px; padding: 6px 10px; font-size: 13px; cursor: pointer;
+          color: var(--ink); transition: border-color .12s, background .12s; }
+  .chip:hover, .chip:focus-visible { border-color: var(--observed); outline: none; }
+  .chip[aria-pressed="true"] { background: var(--observed-wash); border-color: var(--observed); }
+  .chip .c { font-size: 12px; color: var(--ink-3); }
+  .chip.empty { color: var(--absent); border-style: dashed; }
+  .chip.empty .c { color: var(--absent); }
+
+  /* ---- ledger ---- */
+  .ledger-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+                 margin-bottom: 12px; }
+  .toggle { display: inline-flex; border: 1px solid var(--rule); border-radius: 2px;
+            overflow: hidden; }
+  .toggle button { border: 0; background: var(--surface); color: var(--ink-2);
+                   font: inherit; font-size: 12.5px; padding: 5px 12px; cursor: pointer; }
+  .toggle button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  .toggle button:focus-visible { outline: 2px solid var(--observed); outline-offset: -2px; }
+  .scroll { overflow-x: auto; border: 1px solid var(--rule); border-radius: 3px;
+            background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th { text-align: left; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+       color: var(--ink-3); font-weight: 600; padding: 10px 14px;
+       border-bottom: 1px solid var(--rule); white-space: nowrap; }
+  td { padding: 9px 14px; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+  tr:last-child td { border-bottom: 0; }
+  tr.absent td { color: var(--absent); }
+  tr.dim { opacity: .32; }
+  .etype { font-size: 12.5px; letter-spacing: 0.03em; }
+  .pair { color: var(--ink-2); white-space: nowrap; }
+  .arrow { color: var(--ink-3); padding: 0 4px; }
+  .kindtag { font-size: 10.5px; letter-spacing: 0.07em; text-transform: uppercase;
+             padding: 2px 6px; border-radius: 2px; white-space: nowrap; }
+  .kindtag.observed { background: var(--observed-wash); color: var(--observed); }
+  .kindtag.derived  { background: var(--derived-wash);  color: var(--derived); }
+  td.num { text-align: right; white-space: nowrap; }
+  .bar { height: 3px; background: var(--observed); border-radius: 2px; min-width: 2px;
+         display: block; margin-top: 4px; }
+  .bar.derived { background: var(--derived); }
+  .hollow { color: var(--absent); }
+
+  /* ---- map ---- */
+  .mapbox { border: 1px solid var(--rule); border-radius: 3px; background: var(--surface);
+            overflow-x: auto; }
+  svg { display: block; min-width: 720px; }
+  .nodebox { fill: var(--sunken); stroke: var(--rule); }
+  .nodebox.on { stroke: var(--observed); fill: var(--observed-wash); }
+  .nodelabel { font-size: 12px; fill: var(--ink); }
+  .nodecount { font-size: 10.5px; fill: var(--ink-3); }
+  .nodelabel.off, .nodecount.off { fill: var(--absent); }
+  .link { fill: none; stroke: var(--absent); stroke-width: 1; opacity: .3; }
+  .link.live { stroke: var(--observed); stroke-width: 1.6; opacity: .85; }
+  .link.live.derived { stroke: var(--derived); }
+  .colhead { font-size: 10.5px; letter-spacing: 0.09em; text-transform: uppercase;
+             fill: var(--ink-3); }
+
+  /* ---- explorer ---- */
+  .explore { display: grid; grid-template-columns: minmax(200px, 260px) 1fr; gap: 1px;
+             background: var(--rule); border: 1px solid var(--rule); border-radius: 3px;
+             overflow: hidden; }
+  .picker { background: var(--surface); max-height: 380px; overflow-y: auto; }
+  .picker button { display: flex; justify-content: space-between; gap: 10px; width: 100%;
+                   text-align: left; border: 0; border-bottom: 1px solid var(--rule);
+                   background: transparent; color: var(--ink); font: inherit;
+                   font-size: 13px; padding: 8px 14px; cursor: pointer; }
+  .picker button:hover { background: var(--sunken); }
+  .picker button[aria-pressed="true"] { background: var(--observed-wash); color: var(--observed); font-weight: 600; }
+  .picker button:focus-visible { outline: 2px solid var(--observed); outline-offset: -2px; }
+  .picker .n { color: var(--ink-3); font-size: 12px; }
+  .detail { background: var(--surface); padding: 18px 20px; min-height: 240px; }
+  .detail h3 { margin: 0 0 2px; font-size: 18px; font-weight: 650; letter-spacing: -0.01em; }
+  .detail .meta { font-size: 12px; color: var(--ink-3); margin-bottom: 16px; }
+  .grouplabel { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+                color: var(--ink-3); margin: 16px 0 7px; }
+  .items { display: flex; flex-wrap: wrap; gap: 5px; }
+  .item { font-size: 12.5px; background: var(--sunken); border: 1px solid var(--rule);
+          border-radius: 2px; padding: 4px 8px; }
+  .item .u { color: var(--ink-3); font-size: 11px; margin-left: 5px; }
+
+  /* ---- empty state ---- */
+  .empty-state { border: 1px dashed var(--rule); border-radius: 3px; padding: 22px 24px;
+                 background: var(--surface); color: var(--ink-2); font-size: 14px; }
+  .empty-state b { color: var(--ink); font-weight: 650; }
+  .empty-state code { font-size: 12.5px; background: var(--sunken); padding: 1px 5px;
+                      border-radius: 2px; }
+  ul.gaps { margin: 12px 0 0; padding-left: 18px; color: var(--ink-2); font-size: 13.5px; }
+  ul.gaps li { margin-bottom: 4px; }
+  footer { border-top: 1px solid var(--rule); padding-top: 18px; font-size: 12.5px;
+           color: var(--ink-3); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  @media (max-width: 720px) {
+    .explore { grid-template-columns: 1fr; }
+    h1 { font-size: 27px; }
+    .head-inner { padding-top: 32px; }
+  }
+</style>
+
+<header>
+  <div class="head-inner">
+    <div>
+      <h1>FINVERSE 온톨로지</h1>
+      <p class="sub">시장·경제·외부 사건·심리를 하나의 그래프로 놓고, 무엇이 실제로
+        연결돼 있고 무엇이 아직 선언만 돼 있는지 보여준다.</p>
+    </div>
+    <div class="stamp mono" id="stamp"></div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="thesis" id="thesis"></div>
+  <p class="lede" id="lede"></p>
+
+  <section>
+    <h2>어휘</h2>
+    <p class="h2note">노드 라벨 17종. 점선은 스키마에는 있지만 아직 한 건도 없는 것이다.
+      누르면 아래 연결 표와 스키마 맵이 그 라벨만 남긴다.</p>
+    <div id="vocab"></div>
+  </section>
+
+  <section>
+    <h2>연결</h2>
+    <p class="h2note">선언된 라벨 조합마다 한 줄. <b>관측</b>은 원본에서 그대로 도출한
+      사실이고, <b>해석</b>은 배치 계산이라 재계산이 지워도 되는 것이다 —
+      <span class="mono">method·computed_at·pipeline_version</span> 세 속성이 그 계약이다.</p>
+    <div class="ledger-head">
+      <div class="toggle" role="group" aria-label="표시 범위">
+        <button type="button" id="btn-all" aria-pressed="true">선언된 전부</button>
+        <button type="button" id="btn-live" aria-pressed="false">실현된 것만</button>
+      </div>
+      <span class="h2note" style="margin:0" id="ledger-count"></span>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th>엣지</th><th>연결</th><th>성격</th><th class="num">건수</th></tr>
+        </thead>
+        <tbody id="ledger"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>스키마 맵</h2>
+    <p class="h2note">왼쪽부터 실체 · 사건 · 시나리오. 진한 선이 실제로 존재하는 연결이고,
+      흐린 선은 스키마에만 있는 연결이다.</p>
+    <div class="mapbox"><svg id="map" viewBox="0 0 980 560" role="img"
+      aria-label="온톨로지 스키마 맵"></svg></div>
+  </section>
+
+  <section>
+    <h2>섹터 탐색</h2>
+    <p class="h2note">섹터 하나를 고르면 그것을 추종하는 지수와 소속 종목이 나온다.
+      같은 이름의 섹터가 체계마다 따로 있는 것은 의도된 것이다 — 코스피 업종의 금융과
+      KRX 300의 금융은 정의가 다르다.</p>
+    <div class="explore">
+      <div class="picker" id="picker"></div>
+      <div class="detail" id="detail"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>급등락</h2>
+    <p class="h2note">250일 기준 ±3σ 또는 절대 ±3%(지수), ±4σ 또는 ±15%(종목)를
+      넘은 날이 <span class="mono">MarketMove</span> 노드가 된다.</p>
+    <div id="moves"></div>
+  </section>
+
+  <section>
+    <h2>아직 비어 있는 연결</h2>
+    <p class="h2note">스키마에 선언돼 있으나 인스턴스가 0건인 것들. 화면에서 지우지 않는
+      이유는, 지우면 온톨로지가 실제보다 완성돼 보이기 때문이다.</p>
+    <div class="empty-state" id="gaps"></div>
+  </section>
+
+  <footer>
+    <p>단일 진실은 <span class="mono">docs/ontology/scenario-ontology.md</span>이고,
+      불변식은 <span class="mono">db/ontology.sql</span>의 CHECK 제약으로 강제된다.
+      이 화면은 <span class="mono">scripts/export_graph.py</span>가 뜬 스냅샷이다.</p>
+  </footer>
+</div>
+
+<script id="graph-data" type="application/json">__GRAPH_JSON__</script>
+<script>
+(function () {
+  "use strict";
+  const G = JSON.parse(document.getElementById("graph-data").textContent);
+
+  const LAYERS = [
+    { name: "실체 — 시간이 지나도 같은 것",
+      labels: ["Market", "Index", "Sector", "Security", "Indicator", "Actor"] },
+    { name: "사건 — 시간 위의 한 점",
+      labels: ["MarketMove", "Release", "Event", "SentimentWindow", "Regime"] },
+    { name: "시나리오 — 질문에서 분기까지",
+      labels: ["Question", "Situation", "Brief", "Simulation", "Branch", "Assumption"] }
+  ];
+
+  const count = {};
+  G.labels.forEach(r => { count[r.label] = r.n; });
+  const nodeTotal = G.labels.reduce((a, r) => a + r.n, 0);
+  const edgeTotal = G.edge_types.reduce((a, r) => a + r.n, 0);
+  const declared = G.spec.length;
+  const realised = G.spec.filter(s => s.n > 0).length;
+
+  const fmt = n => n.toLocaleString("ko-KR");
+
+  /* ---------- thesis ---------- */
+  document.getElementById("thesis").innerHTML = [
+    ["노드", fmt(nodeTotal), G.labels.length + "종 라벨"],
+    ["엣지", fmt(edgeTotal), realised + "종 관계"],
+    ["선언된 연결", declared, "라벨 조합"],
+    ["비어 있는 연결", declared - realised, "인스턴스 0건"]
+  ].map(([k, v, n], i) =>
+    `<div class="metric${i === 3 ? " gap" : ""}"><div class="k">${k}</div>
+     <div class="v mono">${v}</div><div class="n">${n}</div></div>`).join("");
+
+  document.getElementById("lede").innerHTML =
+    `스키마는 <b>${declared}개</b>의 라벨 조합을 선언하고 있고, 그중 실제로 인스턴스가 있는 것은
+     <b>${realised}개</b>다. 나머지 <b>${declared - realised}개</b>는 수집이 아직 닿지 않은
+     자리다 — 심리 데이터가 한 건도 없고, 공시는 뉴스 RSS로만 대신하고 있으며,
+     시나리오 계층은 사용자가 질문을 던져야 생긴다.`;
+
+  document.getElementById("stamp").innerHTML =
+    `노드 ${fmt(nodeTotal)} · 엣지 ${fmt(edgeTotal)}<br>섹터당 종목 ${G.limits.securities_per_sector}개까지만 실음`;
+
+  /* ---------- vocabulary ---------- */
+  let picked = null;
+  const vocab = document.getElementById("vocab");
+  vocab.innerHTML = LAYERS.map(layer => `
+    <div class="layer">
+      <div class="layer-name">${layer.name}</div>
+      <div class="chips">${layer.labels.map(l => {
+        const n = count[l] || 0;
+        return `<button type="button" class="chip${n ? "" : " empty"}" data-label="${l}"
+                 aria-pressed="false"><span>${l}</span><span class="c mono">${fmt(n)}</span></button>`;
+      }).join("")}</div>
+    </div>`).join("");
+
+  vocab.addEventListener("click", e => {
+    const chip = e.target.closest(".chip");
+    if (!chip) return;
+    const label = chip.dataset.label;
+    picked = picked === label ? null : label;
+    vocab.querySelectorAll(".chip").forEach(c =>
+      c.setAttribute("aria-pressed", String(c.dataset.label === picked)));
+    renderLedger();
+    renderMap();
+  });
+
+  /* ---------- ledger ---------- */
+  let liveOnly = false;
+  const btnAll = document.getElementById("btn-all");
+  const btnLive = document.getElementById("btn-live");
+  btnAll.addEventListener("click", () => { liveOnly = false; syncToggle(); });
+  btnLive.addEventListener("click", () => { liveOnly = true; syncToggle(); });
+  function syncToggle() {
+    btnAll.setAttribute("aria-pressed", String(!liveOnly));
+    btnLive.setAttribute("aria-pressed", String(liveOnly));
+    renderLedger();
+  }
+
+  const maxN = Math.max(1, ...G.spec.map(s => s.n));
+  function renderLedger() {
+    const rows = G.spec.filter(s => (!liveOnly || s.n > 0));
+    document.getElementById("ledger").innerHTML = rows.map(s => {
+      const touched = !picked || s.src_label === picked || s.dst_label === picked;
+      const w = s.n ? Math.max(2, Math.round(120 * Math.sqrt(s.n) / Math.sqrt(maxN))) : 0;
+      return `<tr class="${s.n ? "" : "absent "}${touched ? "" : "dim"}">
+        <td class="mono etype">${s.type}</td>
+        <td class="pair">${s.src_label}<span class="arrow">→</span>${s.dst_label}</td>
+        <td><span class="kindtag ${s.derived ? "derived" : "observed"}">${s.derived ? "해석" : "관측"}</span></td>
+        <td class="num mono">${s.n ? fmt(s.n) : '<span class="hollow">—</span>'}
+          ${s.n ? `<span class="bar${s.derived ? " derived" : ""}" style="width:${w}px"></span>` : ""}</td>
+      </tr>`;
+    }).join("");
+    document.getElementById("ledger-count").textContent =
+      `${rows.length}줄${picked ? ` · ${picked} 강조` : ""}`;
+  }
+
+  /* ---------- schema map ---------- */
+  const NS = "http://www.w3.org/2000/svg";
+  const pos = {};
+  function layout() {
+    const colX = [90, 420, 750];
+    LAYERS.forEach((layer, ci) => {
+      const step = 470 / (layer.labels.length + 1);
+      layer.labels.forEach((l, i) => {
+        pos[l] = { x: colX[ci], y: 70 + step * (i + 1), col: ci };
+      });
+    });
+  }
+  layout();
+
+  function renderMap() {
+    const svg = document.getElementById("map");
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    const W = 132, H = 34;
+
+    ["실체", "사건", "시나리오"].forEach((t, i) => {
+      const el = document.createElementNS(NS, "text");
+      el.setAttribute("x", [90, 420, 750][i]);
+      el.setAttribute("y", 40);
+      el.setAttribute("class", "colhead");
+      el.textContent = t;
+      svg.appendChild(el);
+    });
+
+    G.spec.forEach(s => {
+      const a = pos[s.src_label], b = pos[s.dst_label];
+      if (!a || !b) return;
+      const touched = !picked || s.src_label === picked || s.dst_label === picked;
+      const p = document.createElementNS(NS, "path");
+      const x1 = a.x + W / 2, y1 = a.y, x2 = b.x - W / 2, y2 = b.y;
+      const dx = Math.max(40, Math.abs(x2 - x1) * 0.4);
+      p.setAttribute("d", `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}`);
+      p.setAttribute("class", "link" + (s.n > 0 ? " live" : "") + (s.derived ? " derived" : ""));
+      if (!touched) p.setAttribute("opacity", ".08");
+      svg.appendChild(p);
+    });
+
+    Object.entries(pos).forEach(([label, p]) => {
+      const n = count[label] || 0;
+      const touched = !picked || label === picked;
+      const g = document.createElementNS(NS, "g");
+      if (!touched) g.setAttribute("opacity", ".3");
+      const r = document.createElementNS(NS, "rect");
+      r.setAttribute("x", p.x - W / 2); r.setAttribute("y", p.y - H / 2);
+      r.setAttribute("width", W); r.setAttribute("height", H);
+      r.setAttribute("rx", 2);
+      r.setAttribute("class", "nodebox" + (n && label === picked ? " on" : ""));
+      if (!n) r.setAttribute("stroke-dasharray", "3 3");
+      g.appendChild(r);
+      const t = document.createElementNS(NS, "text");
+      t.setAttribute("x", p.x - W / 2 + 10); t.setAttribute("y", p.y + 1);
+      t.setAttribute("class", "nodelabel" + (n ? "" : " off"));
+      t.textContent = label;
+      g.appendChild(t);
+      const c = document.createElementNS(NS, "text");
+      c.setAttribute("x", p.x + W / 2 - 10); c.setAttribute("y", p.y + 1);
+      c.setAttribute("text-anchor", "end");
+      c.setAttribute("class", "nodecount mono" + (n ? "" : " off"));
+      c.textContent = n ? fmt(n) : "0";
+      g.appendChild(c);
+      svg.appendChild(g);
+    });
+  }
+
+  /* ---------- sector explorer ---------- */
+  const byUid = {};
+  G.nodes.forEach(n => { byUid[n.uid] = n; });
+  const sectors = G.nodes.filter(n => n.label === "Sector")
+    .sort((a, b) => a.name.localeCompare(b.name, "ko"));
+  const inbound = {};
+  G.edges.forEach(e => {
+    (inbound[e.dst_uid] = inbound[e.dst_uid] || []).push(e);
+  });
+
+  const picker = document.getElementById("picker");
+  picker.innerHTML = sectors.map((s, i) => {
+    const n = (inbound[s.uid] || []).length;
+    return `<button type="button" data-uid="${s.uid}" aria-pressed="${i === 0}">
+      <span>${s.name}</span><span class="n mono">${n}</span></button>`;
+  }).join("");
+
+  function showSector(uid) {
+    const s = byUid[uid];
+    if (!s) return;
+    const links = inbound[uid] || [];
+    const idx = links.filter(e => e.type === "SECTOR_INDEX_OF")
+      .map(e => ({ node: byUid[e.src_uid], universe: e.universe }))
+      .filter(x => x.node);
+    const secs = links.filter(e => e.type === "IN_SECTOR")
+      .map(e => byUid[e.src_uid]).filter(Boolean);
+
+    const block = (title, body) => `<div class="grouplabel">${title}</div>${body}`;
+    document.getElementById("detail").innerHTML = `
+      <h3>${s.name}</h3>
+      <div class="meta mono">${s.uid} · scheme ${s.scheme || "—"}</div>
+      ${block(`추종 지수 ${idx.length}`, idx.length
+        ? `<div class="items">${idx.map(x =>
+            `<span class="item">${x.node.name}${x.universe
+              ? `<span class="u mono">${x.universe}</span>` : ""}</span>`).join("")}</div>`
+        : `<div class="empty-state" style="padding:12px 14px">이 체계에는 추종 지수가 없다.
+           KRX 업종지수는 지수 수준만 주고 구성종목은 공개하지 않는다.</div>`)}
+      ${block(`소속 종목 ${secs.length}${secs.length >= G.limits.securities_per_sector
+          ? ` (앞 ${G.limits.securities_per_sector}개만 실음)` : ""}`, secs.length
+        ? `<div class="items">${secs.map(x =>
+            `<span class="item">${x.name}<span class="u mono">${x.ticker || ""}</span></span>`).join("")}</div>`
+        : `<div class="empty-state" style="padding:12px 14px">
+           <code>IN_SECTOR</code>가 아직 이 섹터로 들어오지 않았다. 종목↔업종 매핑은
+           <code>naver_wics</code> 체계에만 있다.</div>`)}`;
+  }
+
+  picker.addEventListener("click", e => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    picker.querySelectorAll("button").forEach(x =>
+      x.setAttribute("aria-pressed", String(x === b)));
+    showSector(b.dataset.uid);
+  });
+  if (sectors.length) showSector(sectors[0].uid);
+
+  /* ---------- moves ---------- */
+  const movesEl = document.getElementById("moves");
+  if (!G.biggest_moves.length) {
+    movesEl.innerHTML = `<div class="empty-state">
+      <b>아직 0건이다.</b> 탐지기는 <code>db/derive.sql</code>에 있지만
+      <code>core.price_daily</code>·<code>core.index_daily</code>가 아직 채워지지 않았다.
+      시계열을 채운 뒤 <code>scripts/project_ontology.py --timeseries --derive</code>로 만든다.
+      <br><br>종목 급등락은 <b>수정주가로만</b> 탐지한다. 원주가로 계산하면 액면분할일마다
+      가짜 폭락이 잡힌다 — 삼성전자 2018-05-04가 −98%로 보인다. 지수는 분할의 영향을
+      받지 않으므로 원지수를 그대로 쓴다.</div>`;
+  } else {
+    movesEl.innerHTML = `<div class="scroll"><table><thead><tr>
+      <th>날짜</th><th>대상</th><th>구분</th><th class="num">변동</th><th>탐지 기준</th>
+      </tr></thead><tbody>${G.biggest_moves.map(m => `<tr>
+      <td class="mono">${m.bas_dd}</td><td>${m.target}</td>
+      <td class="mono" style="color:${m.kind.endsWith("UP") ? "var(--up)" : "var(--down)"}">${m.kind}</td>
+      <td class="num mono" style="color:${m.magnitude > 0 ? "var(--up)" : "var(--down)"}">
+        ${Number(m.magnitude).toFixed(2)}%</td>
+      <td class="mono" style="font-size:11.5px;color:var(--ink-3)">${m.detected_by}</td>
+      </tr>`).join("")}</tbody></table></div>`;
+  }
+
+  /* ---------- gaps ---------- */
+  const grouped = {};
+  G.unrealised_edges.forEach(g => {
+    (grouped[g.type] = grouped[g.type] || []).push(`${g.src_label}→${g.dst_label}`);
+  });
+  document.getElementById("gaps").innerHTML =
+    `<b>${G.unrealised_edges.length}개 조합</b>이 선언만 돼 있다.
+     <ul class="gaps">${Object.entries(grouped).map(([t, pairs]) =>
+       `<li><span class="mono">${t}</span> — ${pairs.join(", ")}</li>`).join("")}</ul>`;
+
+  renderLedger();
+  renderMap();
+})();
+</script>
