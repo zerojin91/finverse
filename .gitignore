@@ -44,6 +44,7 @@ next-env.d.ts
 /dist/
 /.wrangler/
 /outputs/
+/output/
 /data/
 /work/
 /config/youtube_channels.json
