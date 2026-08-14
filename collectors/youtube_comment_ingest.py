@@ -916,7 +916,15 @@ def fetch_upload_page(
     }
     if page_token:
         params["pageToken"] = page_token
-    payload = client.get("playlistItems", params)
+    try:
+        payload = client.get("playlistItems", params)
+    except ApiError as exc:
+        if (
+            exc.reason == "playlistNotFound"
+            and int(channel.get("video_count", -1)) == 0
+        ):
+            return [], None
+        raise
     rows = [
         record
         for item in payload.get("items", [])

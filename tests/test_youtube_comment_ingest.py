@@ -277,6 +277,45 @@ class YouTubeCollectorTest(unittest.TestCase):
             self.assertIsNotNone(store.get_latest("youtube:video:video000002"))
             self.assertEqual(2, state.remaining_videos())
 
+    def test_missing_playlist_is_empty_only_for_zero_video_channel(self) -> None:
+        class MissingPlaylistClient:
+            def get(self, resource: str, params: dict[str, object]) -> dict[str, object]:
+                raise youtube.ApiError(404, "playlistNotFound")
+
+        with tempfile.TemporaryDirectory() as directory, isolated_collector(
+            Path(directory)
+        ) as (_, state):
+            args = collector_args(channel_count=1)
+            channel = youtube.timestamped(
+                {
+                    "record_id": f"youtube:channel:{channel_id(1)}",
+                    "record_type": "youtube_channel",
+                    "channel_id": channel_id(1),
+                    "channel_title": "empty channel",
+                    "uploads_playlist_id": "UU" + channel_id(1)[2:],
+                    "video_count": 0,
+                    "is_deleted": False,
+                }
+            )
+            youtube.begin_or_resume_operation(args, [channel])
+            totals = {"inserted": 0, "changed": 0, "unchanged": 0, "stale": 0}
+
+            operation = youtube.run_upload_phase(
+                MissingPlaylistClient(), args, {channel_id(1): channel}, totals
+            )
+
+            self.assertEqual("comments", operation["phase"])
+            self.assertEqual(0, state.remaining_videos())
+
+            with self.assertRaises(youtube.ApiError):
+                youtube.fetch_upload_page(
+                    MissingPlaylistClient(),
+                    {**channel, "video_count": 1},
+                    None,
+                    args.start,
+                    args.end,
+                )
+
     def test_reply_page_checkpoint_resumes_at_second_reply_page(self) -> None:
         salt = "s" * 32
         with tempfile.TemporaryDirectory() as directory, isolated_collector(
