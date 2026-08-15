@@ -1,1383 +1,970 @@
 "use client";
 
 import {
+  Activity,
   ArrowRight,
+  ArrowDownRight,
+  ArrowUpRight,
   BarChart3,
-  Bookmark,
-  BrainCircuit,
-  CalendarDays,
-  ChevronRight,
-  CircleDollarSign,
-  CircleHelp,
+  CalendarClock,
+  Check,
   CheckCircle2,
+  ChevronRight,
+  CircleAlert,
   Database,
   FileUp,
-  GitBranch,
-  LoaderCircle,
+  Globe2,
   Network,
+  Newspaper,
   Plus,
+  RefreshCw,
+  ShieldCheck,
   Sparkles,
-  UserRound,
+  TrendingUp,
+  UsersRound,
+  Wifi,
   X,
 } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { ChangeEvent, PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-type MainTab = "market" | "twin";
+type IndexPoint = {
+  date: string;
+  close: number;
+  changePct: number;
+};
+
+type MarketIndex = {
+  key: "KOSPI" | "KOSDAQ" | "NASDAQ";
+  name: string;
+  points: IndexPoint[];
+  source: "database" | "dummy";
+};
+
+type MarketSeries = {
+  key: string;
+  name: string;
+  points: IndexPoint[];
+  source: "database" | "dummy";
+};
+
+type SignalGroup = {
+  key: "economy" | "country" | "event" | "community";
+  label: string;
+  share: number;
+  source: "database" | "dummy";
+  keywords: Array<{ label: string; share: number }>;
+};
+
+type Stock = {
+  ticker: string;
+  name: string;
+  close: number;
+  changePct: number;
+  volume: number;
+  points: IndexPoint[];
+  source: "database" | "dummy";
+};
+
+type Macro = {
+  name: string;
+  value: number;
+  unit: string;
+  observedAt: string;
+};
+
+type Flow = {
+  market: string;
+  investor: string;
+  netValue: number;
+};
+
+type NewsItem = {
+  title: string;
+  publishedAt: string;
+  eventTypes: string[];
+  score: number;
+  url: string | null;
+};
+
+type DashboardData = {
+  asOf: string;
+  generatedAt: string;
+  indices: MarketIndex[];
+  stocks: Stock[];
+  macros: Macro[];
+  flows: Flow[];
+  news: NewsItem[];
+  signals: SignalGroup[];
+};
 
 type Scenario = {
   id: string;
+  eyebrow: string;
   title: string;
-  duration: string;
-  tags: string[];
-  forecast: string;
-  tone: "up" | "down";
-  image: string;
   summary: string;
-  thesis: string;
-  context: string;
-  chapters: { title: string; body: string; evidence: string }[];
-  investorGuide: { stance: string; action: string; rationale: string }[];
-  studyGuide: { topic: string; question: string }[];
-  biasChecks: { bias: string; trap: string; counter: string }[];
-  path: number[];
-  events: { week: string; category: string; title: string; body: string; impact: string }[];
-  agentInsights: { role: string; title: string; body: string }[];
-  riskPoints: string[];
+  impact: number;
+  tone: "positive" | "negative";
+  icon: typeof TrendingUp;
+  forecast: number[];
+  assumptions: string[];
 };
-
-const marketConnections = [
-  { symbol: "S", name: "삼성전자", code: "005930 · KOSPI", value: "220,000원", change: "-13.39%", contribution: "-1.68%p", tone: "down" },
-  { symbol: "H", name: "SK하이닉스", code: "000660 · KOSPI", value: "1,555,000원", change: "-14.65%", contribution: "-2.42%p", tone: "down" },
-  { symbol: "$", name: "원·달러 환율", code: "USD/KRW", value: "1,462.50", change: "-0.41%", contribution: "+0.12%p", tone: "up" },
-  { symbol: "F", name: "외국인 수급", code: "KOSPI", value: "-5조 1,200억원", change: "순매도", contribution: "-3.12%p", tone: "down" },
-  { symbol: "C", name: "반도체 지수", code: "KRX 반도체", value: "4,318.72", change: "-13.82%", contribution: "-3.46%p", tone: "down" },
-] as const;
-
-const actualPath = [
-  5224.36, 5350, 5480, 5610, 5760, 5920, 6080, 6244.13, 6000, 5700, 5350,
-  5052.46, 5450, 5900, 6300, 6598.87, 7100, 7600, 8050, 8476.15, 8420,
-  8300, 8200, 8476.48, 7900, 7400, 7000, 6720, 6500, 6250, 6100, 6023.66,
-];
-
-const makeTradingDates = (endDate: string, count: number) => {
-  const cursor = new Date(`${endDate}T12:00:00`);
-  const dates: string[] = [];
-  while (dates.length < count) {
-    const day = cursor.getDay();
-    if (day !== 0 && day !== 6) dates.unshift(`${cursor.getMonth() + 1}/${cursor.getDate()}`);
-    cursor.setDate(cursor.getDate() - 1);
-  }
-  return dates;
-};
-
-const actualDates = makeTradingDates("2026-07-28", actualPath.length);
-const scenarioAssetBase = "https://raw.githubusercontent.com/zerojin91/finverse/main/public/scenarios";
-
-const scenarios: Scenario[] = [
-  {
-    id: "kospi-rebound",
-    title: "KOSPI 조건부 반등",
-    duration: "1개월",
-    tags: ["외국인 순매수", "AI CapEx"],
-    forecast: "KOSPI +24.5%",
-    tone: "up",
-    image: `${scenarioAssetBase}/kospi-rebound.png`,
-    summary:
-      "2026년 7월 28일 종가 6,023.66에서 출발하는 조건부 전망입니다. 외국인 수급 회복, 7월 29일 SK하이닉스 영업이익의 컨센서스 10% 이상 상회(약 70.5조원), Microsoft·Meta의 AI CapEx 유지·확대가 모두 확인되면 1주 6,650, 2주 7,050, 1개월 7,500까지 반등을 시도합니다. 선행 PER 5.7~5.8배와 RSI 31~34의 과매도 구간은 반등 여지를 주지만, MACD 하락과 연환산 변동성 80%는 큰 변동성을 경고합니다.",
-    thesis: "반도체 실적과 외국인 수급이 함께 돌아올 때만, 7월 28일의 급락은 ‘추세 붕괴’가 아니라 ‘재평가를 위한 리셋’이 됩니다.",
-    context: "이 시나리오는 좋은 뉴스 하나를 맞히는 이야기가 아닙니다. 수급이 먼저 바뀌고, 실적이 확인되고, 빅테크의 투자 의지가 이어지는 세 장면이 순서대로 나타날 때 KOSPI가 6,023.66에서 회복 경로로 전환된다는 조건부 이야기입니다.",
-    chapters: [
-      { title: "1장 · 급락 다음 날, 무엇이 달라져야 하나", body: "7월 28일 KOSPI는 외국인 약 5조원 순매도와 반도체주 급락으로 6,000선을 밑돌았습니다. 그래서 첫 반등 캔들만 보고 바닥을 선언하면 안 됩니다. 현물과 선물에서 외국인이 3거래일 이상 순매수로 돌아오는지, 원·달러 환율이 안정되는지를 먼저 확인해야 합니다.", evidence: "출발점 6,023.66 · 첫 관문 외국인 수급 3~5거래일" },
-      { title: "2장 · 실적은 숫자보다 기대의 방향을 바꾼다", body: "SK하이닉스 영업이익이 컨센서스 64.1조원을 10% 이상 웃돌면 시장은 단순한 한 분기 서프라이즈가 아니라 HBM 수요가 아직 살아 있다는 신호로 읽을 수 있습니다. 다만 가이던스가 보수적이면 주가는 발표 당일 올라도 추세는 이어지지 않을 수 있어, 다음 분기 전망까지 함께 봐야 합니다.", evidence: "컨센서스 64.1조원 · 시나리오 기준 약 70.5조원" },
-      { title: "3장 · AI CapEx가 지수 멀티플을 다시 여는 과정", body: "Microsoft와 Meta가 AI CapEx를 유지하거나 확대하면 메모리·HBM 수요의 지속성이 확인됩니다. 이때 저평가된 선행 PER 5.7~5.8배가 6배 이상으로 재평가될 여지가 생깁니다. 반등의 엔진은 실적 하나가 아니라 이익 추정치와 멀티플이 동시에 움직이는 데 있습니다.", evidence: "1주 6,650 · 2주 7,050 · 1개월 중심값 7,500" },
-      { title: "4장 · 개인 투자자는 언제 판단을 바꿀까", body: "가격이 빠르게 오를 때 뒤늦게 추격하기보다 세 관문을 체크리스트로 두세요. 수급 회복이 끊기거나, 가이던스가 낮아지거나, AI CapEx가 비용 통제로 바뀌면 반등 시나리오는 즉시 보류합니다. 조건이 유지될 때만 분할 접근하고, 예측보다 검증 속도를 우선하는 것이 이 시나리오의 핵심 학습입니다.", evidence: "반증 신호: 외국인 재순매도 · MACD 하락 지속 · 20일선 7,232 회복 실패" },
-    ],
-    investorGuide: [
-      { stance: "확인 전", action: "현금 비중을 유지하고 첫 반등을 관찰", rationale: "과매도는 반등할 수 있지만 수급이 확인되기 전에는 바닥 신호가 아닙니다." },
-      { stance: "조건 충족", action: "반도체·지수 노출을 2~3회로 나눠 접근", rationale: "세 관문이 동시에 맞을 때만 기대수익과 실패 비용을 나눌 수 있습니다." },
-      { stance: "조건 이탈", action: "매수 논리를 취소하고 손실 한도를 재점검", rationale: "좋은 이야기보다 실제 가이던스와 수급의 변화가 우선입니다." },
-    ],
-    studyGuide: [
-      { topic: "외국인 수급", question: "현물·선물 순매수가 며칠 지속돼야 추세 신호로 볼 수 있을까?" },
-      { topic: "메모리 사이클", question: "HBM 수요와 메모리 가격이 SK하이닉스 이익에 어떻게 연결될까?" },
-      { topic: "밸류에이션", question: "PER 재평가가 실적 증가와 별개로 지수를 얼마나 움직일 수 있을까?" },
-    ],
-    biasChecks: [
-      { bias: "FOMO", trap: "첫 양봉을 놓칠까 봐 조건 확인 전에 추격 매수", counter: "매수 조건을 숫자로 적고, 충족된 뒤에만 행동" },
-      { bias: "확증 편향", trap: "AI 낙관 뉴스만 모아 하락 신호를 무시", counter: "반증 신호를 같은 화면에 함께 기록" },
-      { bias: "기준점 편향", trap: "과거 고점 8,476을 목표가처럼 고정", counter: "현재 이익·수급·멀티플로 기준점을 다시 설정" },
-    ],
-    path: [6023.66, 6200, 6400, 6650, 6800, 6900, 7050, 7180, 7300, 7400, 7460, 7500],
-    events: [
-      { week: "8/4 전후", category: "수급·실적", title: "외국인 순매수 회복과 SK하이닉스 서프라이즈", body: "외국인 수급이 회복되고 영업이익이 컨센서스 64.1조원을 10% 이상 웃돌면 1주 중심값 6,650을 시험합니다.", impact: "+10.0%" },
-      { week: "8/11 전후", category: "빅테크·AI", title: "Microsoft·Meta AI CapEx 유지·확대", body: "메모리·HBM 수요가 재확인되고 밸류에이션 재평가가 겹치면 2주 중심값 7,050까지 반등이 이어집니다.", impact: "+17.0%" },
-      { week: "8/28 전후", category: "분기점", title: "20일 이동평균 7,232 회복 여부", body: "조건이 모두 유지될 때 1개월 중심값은 7,500, 기본 시나리오 밴드는 6,700~8,300입니다.", impact: "+24.5%" },
-    ],
-    agentInsights: [
-      { role: "뉴스 수집가", title: "반도체 실적과 수급의 동시 확인", body: "외국인 순매수 전환과 SK하이닉스 실적 서프라이즈가 동시에 확인될 때 반등 신호의 질이 높아집니다." },
-      { role: "애널리스트", title: "저평가 구간의 멀티플 회복", body: "선행 PER 5.7~5.8배에서 6배 이상으로 재평가되면 실적 상향분이 지수에 더 빠르게 반영될 수 있습니다." },
-      { role: "퀀트 트레이더", title: "과매도 이후의 기술적 반등", body: "RSI 31~34의 과매도와 20일선 7,232 회복 시도가 반등의 속도를 결정하는 분기점입니다." },
-    ],
-    riskPoints: ["외국인 순매수가 3~5거래일 안에 꺾이는 경우", "AI CapEx 확대가 실제 수요로 연결되지 않는 경우", "MACD 하락과 높은 변동성이 계속되는 경우"],
-  },
-  {
-    id: "chip-miss",
-    title: "반도체 실적 미스·AI CapEx 둔화",
-    duration: "1개월",
-    tags: ["SK하이닉스 실적 하회", "AI 투자 재평가"],
-    forecast: "KOSPI -13.8%",
-    tone: "down",
-    image: `${scenarioAssetBase}/chip-miss.png`,
-    summary:
-      "7월 29일 SK하이닉스 영업이익이 컨센서스 64.1조원을 밑돌거나 가이던스가 보수적으로 제시되고, Microsoft·Meta가 AI CapEx의 수익성 검증을 이유로 투자 속도를 늦추는 조건부 하방 경로입니다. 7월 28일 급락을 만든 CXMT 경쟁 우려와 AI 투자수익성 논란이 실적 확인 뒤에도 이어지면 반도체 중심으로 이익 추정치와 멀티플이 함께 낮아질 수 있습니다. 적용 가중치: 뉴스 20% · 애널리스트 55% · 퀀트 25%.",
-    thesis: "실적 미스 하나가 무서운 이유는 숫자가 작아서가 아니라, 시장이 믿고 있던 ‘AI 수요의 지속성’ 자체를 흔들기 때문입니다.",
-    context: "이 시나리오는 반도체가 나쁘다는 선언이 아니라 기대가 낮아지는 순서를 보여줍니다. 실적과 가이던스가 먼저 꺾이고, 빅테크의 투자 속도가 느려지고, 마지막으로 이익 추정치와 멀티플이 함께 내려가는 경로입니다.",
-    chapters: [
-      { title: "1장 · 발표 전에는 숫자보다 기대를 읽는다", body: "현재 주가에는 HBM 수요와 AI CapEx가 계속 커질 것이라는 기대가 포함돼 있습니다. 따라서 영업이익이 컨센서스를 조금 밑도는 것보다, 다음 분기 가이던스가 보수적으로 바뀌는지가 더 큰 충격이 될 수 있습니다. 발표 전에는 ‘얼마나 벌었나’와 ‘앞으로 얼마나 벌 수 있나’를 분리해 보세요.", evidence: "컨센서스 64.1조원 · 핵심 관찰값 가이던스와 HBM 가격" },
-      { title: "2장 · 빅테크의 말이 수요의 선행지표가 된다", body: "Microsoft와 Meta가 AI 인프라를 계속 늘리더라도 투자 회수 기간과 효율성을 강조하면 메모리 공급사에 적용되던 프리미엄은 낮아질 수 있습니다. 시장은 CapEx 금액보다 증가율, 감가상각 부담, 실제 매출 전환을 함께 비교합니다.", evidence: "1주 5,900 · 2주 5,300 · 투자 확대보다 효율성 강조" },
-      { title: "3장 · 공급 경쟁은 이익의 바닥을 다시 계산하게 한다", body: "CXMT의 메모리 공급 확대가 현실적인 경쟁으로 받아들여지면 메모리 가격과 HBM 점유율의 상단이 낮아집니다. 이때 시장은 과거의 높은 이익을 그대로 적용하지 않고, 정상화된 마진과 보수적인 멀티플로 기업가치를 다시 계산합니다.", evidence: "1개월 중심값 5,190 · 하단 4,600까지 열어둔 경로" },
-      { title: "4장 · 개인 투자자는 ‘싸졌다’와 ‘싸게 보인다’를 구분한다", body: "주가가 많이 내렸다는 이유만으로 평균단가를 낮추면 손실 회피 심리가 매수 논리를 대신할 수 있습니다. 실적 추정치가 바닥을 만들었는지, 공급 경쟁이 가격에 반영됐는지 확인되기 전에는 관망·분할·현금화 중 하나를 명시적으로 선택해야 합니다.", evidence: "반증 신호: 가이던스 상향 · AI CapEx 재가속 · 메모리 가격 반등" },
-    ],
-    investorGuide: [
-      { stance: "발표 전", action: "기대치와 실제 보유 비중을 분리해 기록", rationale: "컨센서스가 높을수록 작은 미스도 가격에는 크게 반영될 수 있습니다." },
-      { stance: "미스 확인", action: "추가 매수보다 가이던스와 공급 지표를 확인", rationale: "싸진 가격이 아니라 낮아진 이익 추정치가 기준이 될 수 있습니다." },
-      { stance: "바닥 신호", action: "실적·수요·멀티플이 함께 안정될 때만 분할 접근", rationale: "단기 반등과 추세 전환을 구분해야 평균단가 낮추기 함정을 피할 수 있습니다." },
-    ],
-    studyGuide: [
-      { topic: "컨센서스 읽기", question: "발표된 숫자와 시장 기대치 중 주가에는 무엇이 더 중요한가?" },
-      { topic: "AI CapEx", question: "투자액 증가가 실제 서버·메모리 매출로 전환되는 시차는 얼마인가?" },
-      { topic: "공급 경쟁", question: "CXMT 공급 확대가 가격·마진·점유율에 미치는 경로는 무엇인가?" },
-    ],
-    biasChecks: [
-      { bias: "손실 회피", trap: "손실을 확정하기 싫어 ‘조금만 더’ 기다림", counter: "가이던스·이익 추정치가 바뀌면 논리를 새로 작성" },
-      { bias: "평균단가 집착", trap: "내 매수가를 회복하는 것을 투자 목표로 착각", counter: "오늘 처음 본 종목이라면 살지부터 다시 질문" },
-      { bias: "낙관적 과신", trap: "AI라는 큰 흐름이 모든 실적 미스를 상쇄한다고 믿음", counter: "수요·가격·현금흐름 세 숫자로 낙관을 검증" },
-    ],
-    path: [6023.66, 5900, 5750, 5650, 5480, 5380, 5300, 5230, 5180, 5150, 5180, 5190],
-    events: [
-      { week: "8/4 전후", category: "실적", title: "SK하이닉스 실적 미스 또는 보수적 가이던스", body: "컨센서스 64.1조원 하회가 확인되면 HBM 수요와 메모리 가격 추정치가 함께 낮아집니다.", impact: "-5.5%" },
-      { week: "8/11 전후", category: "빅테크·AI", title: "AI CapEx 수익성 검증 국면", body: "Microsoft·Meta가 투자 확대보다 회수 속도를 강조하면 반도체 밸류에이션 재평가가 지연되고 2주 중심값은 5,300까지 낮아질 수 있습니다.", impact: "-9.8%" },
-      { week: "8/28 전후", category: "산업", title: "CXMT 경쟁 우려와 이익 추정치 하향", body: "중국 메모리 공급 확대 우려가 지속되면 1개월 중심값 5,190, 하단 4,600까지 열어둡니다.", impact: "-13.8%" },
-    ],
-    agentInsights: [
-      { role: "뉴스 수집가", title: "실적 확인 뒤에도 남는 공급 경쟁", body: "CXMT 공급 확대 우려와 AI 투자수익성 논란이 실적 발표 이후에도 이어지는지 확인합니다." },
-      { role: "애널리스트", title: "이익 추정치와 멀티플 동반 하향", body: "컨센서스 하회가 확인되면 HBM 수요와 메모리 가격 전망이 낮아져 지수 상단이 함께 낮아집니다." },
-      { role: "퀀트 트레이더", title: "하락 추세 속 단기 반등", body: "과매도에 따른 기술적 반등은 가능하지만 5일·10일·20일 이동평균 아래에서는 추세 전환으로 보기 어렵습니다." },
-    ],
-    riskPoints: ["SK하이닉스 가이던스가 컨센서스를 밑도는 경우", "빅테크가 CapEx 확대보다 회수 속도를 강조하는 경우", "메모리 공급 경쟁이 예상보다 빨라지는 경우"],
-  },
-  {
-    id: "risk-off",
-    title: "외국인 매도·원화 약세 재확산",
-    duration: "1개월",
-    tags: ["외국인 순매도", "원·달러·금리"],
-    forecast: "KOSPI -8.7%",
-    tone: "down",
-    image: `${scenarioAssetBase}/risk-off.png`,
-    summary:
-      "외국인 매도가 3~5거래일 이상 이어지고 원화 약세가 재확산되는 조건부 충격 경로입니다. 한국은행이 기준금리를 2.75%로 올린 가운데 미국 금리·에너지·지정학 리스크가 겹치면 위험 프리미엄과 선물 베이시스가 동시에 악화될 수 있습니다. 7월 28일처럼 프로그램 매매 중단과 레버리지 포지션 청산이 반복되는 수급형 시나리오라 뉴스 40% · 애널리스트 20% · 퀀트 40%를 적용합니다.",
-    thesis: "이 경로의 핵심은 기업 실적이 아니라 돈의 방향입니다. 외국인·환율·금리가 동시에 위험 회피를 가리키면 좋은 종목도 먼저 현금화 대상이 됩니다.",
-    context: "외국인 순매도와 원화 약세가 한 번 겹친 뒤에는 뉴스 하나가 아니라 포지션 청산의 연쇄가 시장을 움직입니다. 이 시나리오는 충격을 맞히기보다, 언제 방어 모드로 바꿔야 하는지 연습하는 교육용 경로입니다.",
-    chapters: [
-      { title: "1장 · 첫 신호는 지수보다 환율과 수급에 나온다", body: "현물과 선물에서 외국인 매도가 3거래일 이상 이어지고 원·달러 환율이 다시 오르면 대형주에 붙어 있던 위험 프리미엄이 빠르게 빠질 수 있습니다. 지수가 이미 하락한 뒤 따라가기보다, 순매수·환율·선물 베이시스의 방향을 먼저 기록합니다.", evidence: "1주 중심값 5,650 · 외국인 순매도 3거래일 이상" },
-      { title: "2장 · 금리와 에너지는 할인율을 바꾼다", body: "미국 금리와 에너지 가격이 함께 오르면 기업 이익이 그대로여도 미래 현금흐름의 현재가치가 낮아집니다. 성장주와 고밸류 종목이 먼저 흔들리고, 반도체 대형주가 지수 변동성을 키울 수 있습니다.", evidence: "2주 중심값 5,525 · 할인율·위험 프리미엄 동반 상승" },
-      { title: "3장 · 프로그램 매매가 하락을 증폭하는 순간", body: "변동성이 커지면 레버리지 포지션 청산과 프로그램 매도가 같은 방향으로 겹칩니다. 이때 장중 저점을 맞히려는 시도는 유동성 부족으로 더 불리해질 수 있어, 현금·분할·손실한도라는 사전 규칙이 중요해집니다.", evidence: "1개월 중심값 5,500 · 하단 4,900까지의 충격 밴드" },
-      { title: "4장 · 개인 투자자는 방어를 소극성으로 오해하지 않는다", body: "방어 모드는 시장을 포기하는 행동이 아니라 판단을 늦춰 선택권을 지키는 행동입니다. 수급이 안정되고 환율이 꺾인 뒤에도 첫 반등을 바로 추격하지 말고, 금리와 변동성이 함께 낮아지는지 확인한 뒤 노출을 다시 늘립니다.", evidence: "반증 신호: 외국인 순매수 전환 · 원화 안정 · 변동성 하락" },
-    ],
-    investorGuide: [
-      { stance: "위험 신호", action: "현금·단기채 비중을 늘리고 레버리지 축소", rationale: "하락장에서 생존하면 반등 시 선택권을 보존할 수 있습니다." },
-      { stance: "충격 진행", action: "가격보다 유동성과 손실한도를 관리", rationale: "프로그램 매매가 겹치는 구간에서는 좋은 종목도 함께 매도될 수 있습니다." },
-      { stance: "안정 확인", action: "수급·환율·금리 세 축을 확인하며 천천히 복귀", rationale: "첫 반등보다 위험 프리미엄이 실제로 낮아졌는지가 중요합니다." },
-    ],
-    studyGuide: [
-      { topic: "환율과 외국인", question: "원화 약세가 외국인 주식 매도와 기업 이익에 어떻게 연결되는가?" },
-      { topic: "할인율", question: "미국 10년물 금리 변화가 성장주 가치에 미치는 영향은 무엇인가?" },
-      { topic: "변동성·포지션", question: "사이드카·선물 베이시스·레버리지 청산은 어떤 순서로 나타나는가?" },
-    ],
-    biasChecks: [
-      { bias: "처분 효과", trap: "오른 종목은 팔고 떨어진 종목만 끝까지 보유", counter: "지금 처음 산다면 보유할지 동일한 기준으로 평가" },
-      { bias: "군집 행동", trap: "모두가 매도할 때 이유 없이 따라가거나 반대로 버팀", counter: "수급·환율·금리라는 세 지표로 내 판단을 분리" },
-      { bias: "통제 착각", trap: "장중 저점과 반등 시점을 맞힐 수 있다고 믿음", counter: "사전 손실한도와 재진입 조건을 먼저 정하고 실행" },
-    ],
-    path: [6023.66, 5920, 5780, 5650, 5600, 5550, 5525, 5480, 5460, 5480, 5490, 5500],
-    events: [
-      { week: "8/1 전후", category: "수급·환율", title: "외국인 순매도 3거래일 이상 지속", body: "현물과 선물에서 매도가 겹치고 원·달러 환율이 상승하면 1주 중심값 5,650을 시험합니다.", impact: "-3.2%" },
-      { week: "8/8 전후", category: "금리·매크로", title: "금리·에너지·지정학 리스크 재부각", body: "할인율과 위험 프리미엄이 함께 올라 대형주 중심의 반등 시도가 제한되고 2주 중심값은 5,525를 가리킵니다.", impact: "-6.1%" },
-      { week: "8/28 전후", category: "변동성", title: "레버리지 청산과 프로그램 매매 재충격", body: "사이드카·서킷브레이커가 반복되면 1개월 중심값 5,500, 하단 4,900까지 열어둡니다.", impact: "-8.7%" },
-    ],
-    agentInsights: [
-      { role: "뉴스 수집가", title: "수급과 환율이 만드는 충격", body: "현물·선물 동반 매도와 원화 약세가 겹치면 대형주 중심의 위험 회피가 빠르게 번질 수 있습니다." },
-      { role: "애널리스트", title: "할인율 상승과 위험 프리미엄", body: "미국 금리와 에너지 가격이 동시에 오르면 실적보다 할인율 변화가 지수 방향을 먼저 결정합니다." },
-      { role: "퀀트 트레이더", title: "변동성 확대와 포지션 청산", body: "변동성 급등 구간에서는 레버리지 포지션 청산이 하락을 증폭시키고 장중 회복을 어렵게 만듭니다." },
-    ],
-    riskPoints: ["외국인 순매도가 3~5거래일 이상 지속되는 경우", "원·달러 환율과 미국 금리가 함께 상승하는 경우", "프로그램 매매 중단과 레버리지 청산이 재발하는 경우"],
-  },
-];
-
-const chapterLessonMap: Record<string, string[]> = {
-  "kospi-rebound": [
-    "기초 개념 · KOSPI는 국내 주요 상장사의 움직임을 하나의 숫자로 압축한 지수입니다. 지수가 하루 반등했다고 해서 기업의 이익 전망까지 바로 좋아진 것은 아니므로, ‘가격의 방향’과 ‘돈이 들어오는 이유’를 나눠서 봐야 합니다. 개인 투자자는 종가보다 외국인 현물·선물 수급, 원·달러 환율, 거래대금이 같은 방향으로 움직이는지를 먼저 기록해 보세요.",
-    "기초 개념 · 컨센서스는 여러 증권사가 예상한 이익의 평균이고, 가이던스는 회사가 직접 제시하는 다음 분기 힌트입니다. 실제 이익이 예상보다 좋아도 가이던스가 낮아지면 주가는 오를 재료를 잃을 수 있습니다. 숫자를 볼 때는 ‘이번 분기 실적 → 다음 분기 전망 → HBM 가격과 출하량’의 순서로 한 줄씩 연결해 읽는 연습이 필요합니다.",
-    "기초 개념 · AI CapEx는 빅테크가 데이터센터·GPU·네트워크에 쓰는 자본적 지출이며, 메모리 기업에는 미래 주문의 선행 신호입니다. 다만 투자액이 커지는 것과 실제 매출·현금흐름이 늘어나는 것은 시간 차가 있습니다. PER은 이익 대비 주가의 배수이므로, 이익 추정치와 배수가 함께 올라갈 때만 지수의 반등이 오래가는지 확인해야 합니다.",
-    "기초 개념 · 조건부 전망은 맞히는 예언이 아니라, ‘어떤 신호가 나오면 판단을 바꿀지’를 미리 적는 도구입니다. 세 관문 중 하나라도 깨지면 반등 확률을 낮추고, 두세 개가 동시에 맞을 때만 노출을 조금씩 늘리는 식으로 행동을 설계할 수 있습니다. 이렇게 기준을 숫자로 남기면 상승장에서 생기는 FOMO와 사후 합리화를 줄이는 데 도움이 됩니다.",
-  ],
-  "chip-miss": [
-    "기초 개념 · 실적 미스는 회사가 적자를 냈다는 뜻이 아니라, 시장이 기대한 숫자보다 실제 숫자가 낮았다는 뜻입니다. 주가는 이미 미래의 좋은 뉴스까지 선반영하므로 작은 미스도 큰 조정으로 이어질 수 있습니다. 발표 전에는 컨센서스, 회사 가이던스, 직전 분기 대비 변화율을 표로 적어 두면 놀람을 줄일 수 있습니다.",
-    "기초 개념 · CapEx의 핵심은 금액 자체보다 그 돈이 서버·GPU·메모리 매출로 전환되는 속도입니다. 빅테크가 투자 확대를 말해도 수익성 검증과 감가상각 부담을 강조하면 공급사의 프리미엄은 낮아질 수 있습니다. 개인 투자자는 ‘투자액 증가율, 데이터센터 가동률, 메모리 주문 가시성’ 세 지표를 함께 확인해 보세요.",
-    "기초 개념 · 메모리 산업은 가격이 조금만 바뀌어도 재고와 마진이 크게 흔들리는 경기순환 산업입니다. 공급 경쟁이 심해지면 제품 가격이 내려가고, 가격 하락은 매출보다 빠르게 영업이익을 줄일 수 있습니다. 그래서 과거 고점의 이익을 그대로 적용하기보다 정상화된 마진과 경쟁사의 출하 계획을 기준으로 기업가치를 다시 계산해야 합니다.",
-    "기초 개념 · ‘싸졌다’는 가격이 내렸다는 사실이고, ‘싸게 보인다’는 미래 이익까지 낮아진 뒤에도 저평가라는 판단입니다. 평균단가를 낮추려는 행동은 손실 회피와 기준점 편향을 키울 수 있습니다. 처음 보는 종목이라고 가정하고, 실적 추정치가 두 번 연속 하향되는 동안에도 새로 살 것인지 스스로 질문해 보세요.",
-  ],
-  "risk-off": [
-    "기초 개념 · 외국인 수급은 한국 주식시장에 들어오고 나가는 큰 자금의 방향을 보여주는 지표입니다. 원화 약세가 겹치면 외국인 입장에서는 주가가 그대로여도 환차손이 커져 매도 유인이 생깁니다. 지수 차트만 보지 말고 현물·선물 순매수, 원·달러, 선물 베이시스를 한 화면에서 같은 시간축으로 확인해 보세요.",
-    "기초 개념 · 할인율은 미래의 이익을 오늘 가치로 바꿀 때 적용하는 금리입니다. 미국 10년물 금리와 에너지 가격이 오르면 안전자산 선호와 비용 부담이 동시에 커져 성장주의 현재가치가 낮아질 수 있습니다. 숫자를 볼 때는 금리 방향 하나보다 ‘금리 상승 + 달러 강세 + 위험 프리미엄 확대’가 함께 나타나는지 살피는 것이 중요합니다.",
-    "기초 개념 · 프로그램 매매는 여러 종목을 규칙에 따라 한꺼번에 사고파는 거래이고, 레버리지 청산은 빌린 돈으로 투자한 포지션을 강제로 줄이는 과정입니다. 두 흐름이 같은 방향으로 겹치면 기업 뉴스보다 유동성이 가격을 움직이는 시간이 생깁니다. 이런 구간에서는 장중 저점을 맞히려 하기보다 현금 비중, 손실 한도, 재진입 조건을 미리 정해 두는 편이 안전합니다.",
-    "기초 개념 · 방어 모드는 시장을 포기하는 것이 아니라 다시 선택할 수 있는 시간을 사는 행동입니다. 외국인 수급이 안정되고 환율이 꺾인 뒤에도 하루 반등만으로 위험이 끝났다고 결론 내리지 말아야 합니다. 변동성 하락과 금리 안정까지 확인한 뒤 노출을 단계적으로 복원하면 군집 행동과 통제 착각을 줄일 수 있습니다.",
-  ],
-};
-
-type ScenarioArticle = {
-  title: string;
-  lead: string;
-  metrics: { label: string; value: string; note: string }[];
-  sections: { title: string; paragraphs: string[]; takeaway: string }[];
-};
-
-const scenarioArticleMap: Record<string, ScenarioArticle> = {
-  "kospi-rebound": {
-    title: "KOSPI 조건부 반등을 읽는 법",
-    lead: "이 시나리오는 ‘급락했으니 곧 오른다’는 낙관론이 아닙니다. 시장이 기대를 다시 쌓는 과정을 외국인 수급, 반도체 이익, 빅테크 투자라는 세 개의 연결 고리로 나눠서 읽는 학습용 리포트입니다.",
-    metrics: [
-      { label: "출발 지수", value: "6,023.66", note: "7/28 종가 · 전일 대비 -10.84%" },
-      { label: "1주 중심값", value: "6,650", note: "외국인 수급과 실적 확인" },
-      { label: "1개월 중심값", value: "7,500", note: "CapEx·멀티플 재평가" },
-      { label: "핵심 확인", value: "3개 관문", note: "수급 · 이익 · 투자 지속성" },
-    ],
-    sections: [
-      {
-        title: "1. 급락 뒤 반등은 숫자보다 ‘확인 순서’가 중요합니다",
-        paragraphs: [
-          "7월 28일 KOSPI의 급락은 한 기업의 악재라기보다 외국인 대규모 매도, 반도체주 조정, AI 투자수익성 논란이 같은 날 겹친 결과로 해석할 수 있습니다. 이런 날에는 다음 날 양봉 하나가 바닥을 증명하지 않습니다. 가격은 가장 먼저 움직이지만, 추세를 바꾸는 돈은 며칠에 걸쳐 들어오기 때문입니다.",
-          "따라서 첫 번째 질문은 ‘얼마나 반등했나’가 아니라 ‘누가 사고 있는가’입니다. 현물과 선물에서 외국인 순매수가 3~5거래일 이어지고 원·달러 환율이 안정되면, 급한 청산이 멈추고 다시 위험을 감수할 자금이 생겼다고 볼 수 있습니다. 이 순서를 이해하면 반등 초기에 무작정 따라붙는 대신, 확인할 데이터와 기다릴 시간을 스스로 정할 수 있습니다.",
-        ],
-        takeaway: "공부 포인트 · 지수 차트 옆에 외국인 현물·선물, 환율, 거래대금을 같은 날짜로 기록해 보세요.",
-      },
-      {
-        title: "2. HBM과 AI CapEx는 어떻게 KOSPI로 전달될까요?",
-        paragraphs: [
-          "HBM은 GPU가 계산할 데이터를 빠르게 공급하는 초고속 메모리입니다. GPU를 엔진이라고 하면 HBM은 엔진에 연료를 밀어 넣는 분사 장치에 가깝습니다. 그래서 AI 데이터센터가 늘어날수록 HBM의 용량과 대역폭에 대한 주문이 늘고, 공급사는 가격과 출하량을 통해 이익을 얻게 됩니다.",
-          "하지만 빅테크의 투자 발표가 곧바로 국내 기업의 이익이 되는 것은 아닙니다. Microsoft와 Meta가 말한 CapEx가 실제 서버 설치와 메모리 주문으로 이어지는지, SK하이닉스가 다음 분기에도 높은 마진을 유지할 수 있는지 확인해야 합니다. 이 연결 고리가 확인될 때 낮은 PER이 다시 평가되고, 실적 증가와 투자자들의 지불 의향이 겹치면서 지수의 반등 폭이 커집니다.",
-        ],
-        takeaway: "공부 포인트 · CapEx 금액만 보지 말고 증가율, 감가상각, HBM 출하·가격을 한 묶음으로 읽으세요.",
-      },
-      {
-        title: "3. 개인 투자자는 반등을 어떻게 연습할까요?",
-        paragraphs: [
-          "조건부 전망을 사용할 때 가장 중요한 것은 목표가를 맞히는 일이 아니라 반증 신호를 미리 정하는 일입니다. 외국인 순매수가 다시 꺾이거나, 실적 가이던스가 낮아지거나, 빅테크가 AI 투자를 비용 통제로 바꾸면 이 시나리오의 확률은 즉시 낮아집니다. 그 순간에는 ‘내가 틀렸다’고 인정하는 것이 손실을 키우지 않는 행동입니다.",
-          "반대로 세 조건이 순서대로 확인되면 한 번에 베팅하기보다 1주·2주·1개월의 시간축을 나눠 판단할 수 있습니다. 이 방식은 상승장에서 생기는 FOMO를 줄이고, 뉴스 하나에 확신이 흔들리는 대신 스스로 만든 체크리스트로 결정을 내리게 도와줍니다.",
-        ],
-        takeaway: "공부 포인트 · 매수 전에 ‘조건 충족’, ‘조건 보류’, ‘조건 이탈’의 행동을 세 줄로 써 보세요.",
-      },
-    ],
-  },
-  "chip-miss": {
-    title: "반도체 실적 미스와 AI CapEx 둔화를 읽는 법",
-    lead: "좋은 산업의 주식도 기대가 너무 높아지면 실적 발표 하나로 재평가를 받습니다. 이 시나리오는 HBM 수요가 사라진다는 이야기가 아니라, 기대·가이던스·공급 경쟁이 순서대로 이익의 바닥을 다시 계산하는 과정을 설명합니다.",
-    metrics: [
-      { label: "출발 지수", value: "6,023.66", note: "7/28 종가 · 급락 이후" },
-      { label: "1주 중심값", value: "5,900", note: "컨센서스 하회 확인" },
-      { label: "1개월 중심값", value: "5,190", note: "수요·마진 동반 재평가" },
-      { label: "핵심 확인", value: "3개 단서", note: "가이던스 · CapEx · 공급" },
-    ],
-    sections: [
-      {
-        title: "1. 실적 발표에서 가장 먼저 읽을 것은 가이던스입니다",
-        paragraphs: [
-          "컨센서스는 시장이 합의한 기대치이기 때문에, 실제 영업이익이 흑자인지보다 그 기대를 넘었는지가 주가에 더 큰 영향을 줍니다. 특히 HBM처럼 시장이 빠르게 성장한다고 믿는 산업에서는 ‘이번 분기 숫자’보다 ‘다음 분기에도 같은 속도로 팔 수 있는가’가 가격에 먼저 반영됩니다.",
-          "SK하이닉스가 컨센서스 64.1조원을 밑돌거나 가이던스를 보수적으로 제시하면, 투자자는 수요가 꺾였는지 아니면 생산·원가 문제인지 구분해야 합니다. 회사의 설명에서 출하량, 평균판매가격, 재고, 다음 분기 주문을 따로 적어 보면 단순한 숫자 미스와 구조적인 수요 둔화를 구분하는 데 도움이 됩니다.",
-        ],
-        takeaway: "공부 포인트 · 실적표를 볼 때 ‘실제치-컨센서스-다음 분기 가이던스’를 한 줄에 나란히 적으세요.",
-      },
-      {
-        title: "2. AI CapEx가 줄면 메모리 가격도 바로 내려갈까요?",
-        paragraphs: [
-          "빅테크가 AI 인프라 투자를 늦춘다고 해서 메모리 수요가 즉시 사라지는 것은 아닙니다. 데이터센터 건설에는 주문과 설치 사이의 시차가 있고, 이미 계약된 물량도 있기 때문입니다. 다만 투자 증가율이 낮아지면 공급사들이 미래 주문을 근거로 붙였던 프리미엄부터 먼저 줄어들 수 있습니다.",
-          "이때 시장은 CapEx의 총액보다 투자 효율을 묻습니다. GPU 사용률이 오르는지, 서비스 매출이 늘어나는지, 감가상각 부담을 감당할 현금흐름이 있는지에 따라 다음 주문의 속도가 달라집니다. 개인 투자자는 ‘투자 발표’와 ‘매출 전환’ 사이의 시간을 기다리는 연습을 해야 합니다.",
-        ],
-        takeaway: "공부 포인트 · 빅테크 실적 발표에서 CapEx, 데이터센터 매출, 감가상각비를 함께 찾아보세요.",
-      },
-      {
-        title: "3. 공급 경쟁은 기업의 ‘정상 이익’을 다시 묻게 합니다",
-        paragraphs: [
-          "메모리는 가격 변동이 큰 경기순환 산업입니다. CXMT의 공급 확대가 실제 경쟁으로 받아들여지면 시장은 과거 고점의 마진을 미래에도 적용하지 않고, 가격 하락과 점유율 변화를 반영해 정상화된 이익을 다시 계산합니다. 주가가 많이 내려도 이익 추정치가 더 빠르게 내려가면 밸류에이션은 오히려 비싸질 수 있습니다.",
-          "따라서 ‘AI라는 큰 흐름이 있으니 언젠가 회복한다’는 문장만으로 평균단가를 낮추면 안 됩니다. 공급사의 증설 속도, 고객 인증 기간, HBM 세대 전환, 메모리 가격의 방향을 확인하면서 회복의 근거를 쌓아야 합니다. 이런 자료를 직접 찾아보는 과정이 낙관적 과신을 줄이는 가장 좋은 훈련입니다.",
-        ],
-        takeaway: "공부 포인트 · 매출·마진·점유율을 각각 따로 적고, 세 숫자가 같은 방향인지 확인하세요.",
-      },
-    ],
-  },
-  "risk-off": {
-    title: "외국인 매도와 원화 약세를 읽는 법",
-    lead: "이 시나리오의 질문은 ‘어떤 종목이 좋은가’가 아니라 ‘좋은 종목도 왜 함께 팔리는가’입니다. 돈의 방향, 환율, 금리, 레버리지 청산이 한 방향으로 겹칠 때 시장이 방어 모드로 바뀌는 과정을 초보자도 따라갈 수 있도록 정리했습니다.",
-    metrics: [
-      { label: "출발 지수", value: "6,023.66", note: "7/28 종가 · 위험 회피 확대" },
-      { label: "1주 중심값", value: "5,650", note: "수급·환율 동반 악화" },
-      { label: "1개월 중심값", value: "5,500", note: "청산·변동성 재충격" },
-      { label: "핵심 확인", value: "3축", note: "외국인 · 환율 · 금리" },
-    ],
-    sections: [
-      {
-        title: "1. 외국인이 팔면 왜 KOSPI가 더 크게 흔들릴까요?",
-        paragraphs: [
-          "외국인 투자자는 한국 주식의 수익률뿐 아니라 원화로 바꿨을 때의 환차익까지 함께 계산합니다. 원·달러 환율이 오르면 원화 자산의 달러 가치가 줄어들기 때문에, 주가가 그대로여도 위험을 줄이려는 매도가 나올 수 있습니다. 대형주와 선물에 집중된 자금이 움직이면 지수 전체가 개별 기업의 실적보다 먼저 반응합니다.",
-          "현물과 선물 순매도가 며칠 이어지는지, 선물 베이시스가 약해지는지, 환율이 같은 시간에 오르는지를 함께 보세요. 이 세 지표가 같은 방향이면 단순한 하루 조정이 아니라 포지션을 줄이는 흐름일 수 있습니다. 숫자를 묶어서 보는 습관이 공포 뉴스에 휩쓸리지 않게 해 줍니다.",
-        ],
-        takeaway: "공부 포인트 · 환율 차트와 외국인 순매수 표를 같은 날짜로 겹쳐 보며 상관관계를 직접 적어보세요.",
-      },
-      {
-        title: "2. 금리와 에너지는 기업의 현재가치를 어떻게 바꿀까요?",
-        paragraphs: [
-          "할인율은 미래에 벌 돈을 오늘의 가치로 환산할 때 쓰는 금리입니다. 미국 10년물 금리가 오르면 먼 미래의 성장 기대가 큰 기업일수록 현재가치가 더 많이 낮아지고, 에너지 가격이 오르면 제조업의 비용 부담까지 커집니다. 실적이 당장 변하지 않아도 주가가 먼저 조정받는 이유가 여기에 있습니다.",
-          "금리 한 가지를 보고 공포에 빠지기보다 금리 상승, 달러 강세, 위험 프리미엄 확대가 동시에 나타나는지 확인해야 합니다. 세 요인이 겹치면 좋은 종목과 나쁜 종목을 가르는 분석보다 현금흐름과 부채가 튼튼한지를 먼저 보는 방어적 분석이 유효해집니다.",
-        ],
-        takeaway: "공부 포인트 · 금리 변화가 성장주·은행주·수출주에 각각 어떤 방향으로 작용하는지 비교표를 만들어 보세요.",
-      },
-      {
-        title: "3. 방어 모드는 시장을 포기하는 행동이 아닙니다",
-        paragraphs: [
-          "프로그램 매매와 레버리지 청산이 겹치는 날에는 기업의 적정가치를 계산할 시간보다 유동성을 확보하는 속도가 중요해집니다. 장중 저점을 맞히려는 시도는 거래량이 부족한 구간에서 불리한 가격으로 체결될 가능성을 키울 수 있습니다. 그래서 방어 모드는 현금·단기채·분할 매수라는 선택권을 남겨두는 전략입니다.",
-          "외국인 수급이 돌아오고 환율이 안정되어도 첫 반등을 곧바로 추세 전환으로 해석하지 마세요. 변동성이 낮아지고 금리 방향이 안정되는지 확인한 뒤 노출을 단계적으로 복원하면, ‘남들도 사니까 나도 사야 한다’는 군집 행동과 ‘내가 맞힐 수 있다’는 통제 착각을 줄일 수 있습니다.",
-        ],
-        takeaway: "공부 포인트 · 매수보다 먼저 손실 한도와 재진입 조건을 숫자로 정해두는 연습을 해보세요.",
-      },
-    ],
-  },
-};
-
-function ScenarioLearningArticle({ scenario }: { scenario: Scenario }) {
-  const article = scenarioArticleMap[scenario.id] ?? scenarioArticleMap["kospi-rebound"];
-  const min = Math.min(...scenario.path);
-  const max = Math.max(...scenario.path);
-  const span = Math.max(1, max - min);
-
-  return (
-    <section className="scenario-learning-article" aria-label="시나리오 학습 리포트">
-      <header className="scenario-learning-header">
-        <span>LEARNING REPORT · BEGINNER FRIENDLY</span>
-        <h3>{article.title}</h3>
-        <p>{article.lead}</p>
-      </header>
-      <div className="scenario-learning-overview">
-        <div className="scenario-learning-table-wrap">
-          <div className="scenario-learning-label">숫자로 먼저 읽기</div>
-          <table className="scenario-learning-table">
-            <thead><tr><th>지표</th><th>현재·예상</th><th>이 숫자가 뜻하는 것</th></tr></thead>
-            <tbody>{article.metrics.map((metric) => <tr key={metric.label}><th scope="row">{metric.label}</th><td>{metric.value}</td><td>{metric.note}</td></tr>)}</tbody>
-          </table>
-        </div>
-        <div className="scenario-learning-chart-card">
-          <div className="scenario-learning-label">조건부 경로 그래프</div>
-          <div className={`scenario-mini-chart ${scenario.tone}`} role="img" aria-label={`${scenario.title} 예상 경로 막대 그래프`}>
-            {scenario.path.map((value, index) => <div className="scenario-mini-column" key={`${scenario.id}-bar-${index}`}><span style={{ height: `${24 + ((value - min) / span) * 68}%` }} /><small>{index === 0 ? "현재" : index === scenario.path.length - 1 ? "1개월" : ""}</small></div>)}
-          </div>
-          <p className="scenario-chart-note">현재 지수에서 시나리오 중심값까지의 상대적 경로입니다. 실제 값이 아니라 조건부 비교를 위한 교육용 그래프입니다.</p>
-        </div>
-      </div>
-      <div className="scenario-learning-sections">
-        {article.sections.map((section, index) => <article key={section.title} className="scenario-learning-section"><div className="scenario-learning-section-index">0{index + 1}</div><div><h4>{section.title}</h4>{section.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}<div className="scenario-learning-takeaway"><strong>학습 메모</strong><span>{section.takeaway}</span></div></div></article>)}
-      </div>
-    </section>
-  );
-}
-
-function ScenarioDetailLearning({ scenario }: { scenario: Scenario }) {
-  return (
-    <div className="scenario-modal-learning">
-      <section className="scenario-narrative" aria-label="시나리오 상세 전개">
-        <div className="scenario-detail-label">시나리오를 읽는 순서</div>
-        <div className="scenario-narrative-list">
-          {scenario.chapters.map((chapter, index) => <article key={`${scenario.id}-${chapter.title}`} className="scenario-narrative-card"><div className="scenario-narrative-index">0{index + 1}</div><div><h4>{chapter.title}</h4><p>{chapter.body}</p>{chapterLessonMap[scenario.id]?.[index] && <p className="scenario-narrative-lesson">{chapterLessonMap[scenario.id][index]}</p>}<span>{chapter.evidence}</span></div></article>)}
-        </div>
-      </section>
-
-      <ScenarioLearningArticle scenario={scenario} />
-
-      <section className="scenario-decision-grid" aria-label="개인 투자자 학습 가이드">
-        <article className="scenario-decision-panel"><div className="scenario-detail-label">개인 투자자의 선택지</div><p className="scenario-section-note">예측을 따라 하기보다 조건이 바뀔 때 어떤 행동을 선택할지 미리 적어보세요.</p><div className="scenario-choice-list">{scenario.investorGuide.map((guide) => <div key={`${scenario.id}-${guide.stance}`} className="scenario-choice-row"><strong>{guide.stance}</strong><div><h4>{guide.action}</h4><p>{guide.rationale}</p></div></div>)}</div></article>
-        <article className="scenario-decision-panel"><div className="scenario-detail-label">다음에 공부할 질문</div><p className="scenario-section-note">이 시나리오의 숫자를 직접 검증할 수 있는 질문입니다.</p><div className="scenario-study-list">{scenario.studyGuide.map((study) => <div key={`${scenario.id}-${study.topic}`}><span>{study.topic}</span><p>{study.question}</p></div>)}</div></article>
-      </section>
-
-      <section className="scenario-bias-section" aria-label="인지 편향 체크"><div className="scenario-detail-label">판단 전, 인지 편향 체크</div><p className="scenario-section-note">같은 뉴스도 내 포지션과 기대에 따라 다르게 보입니다. 아래 함정을 먼저 확인하세요.</p><div className="scenario-bias-grid">{scenario.biasChecks.map((item) => <article key={`${scenario.id}-${item.bias}`} className="scenario-bias-card"><span>{item.bias}</span><strong>{item.trap}</strong><p><b>대응:</b> {item.counter}</p></article>)}</div></section>
-    </div>
-  );
-}
 
 type EnvironmentSeed = {
   id: string;
   label: string;
   category: string;
   detail: string;
+  direction: 1 | -1;
 };
+
+const fallback: DashboardData = {
+  asOf: "2026-08-07",
+  generatedAt: "2026-08-12T00:00:00.000Z",
+  indices: [
+    {
+      key: "KOSPI",
+      name: "코스피",
+      source: "dummy",
+      points: [
+        ["2026-07-20", 6516.27, -4.46],
+        ["2026-07-21", 6747.95, 3.56],
+        ["2026-07-22", 6797.7, 0.74],
+        ["2026-07-23", 7096.89, 4.4],
+        ["2026-07-24", 6690.62, -5.72],
+        ["2026-07-27", 6755.75, 0.97],
+        ["2026-07-28", 6023.66, -10.84],
+        ["2026-07-29", 5663.24, -5.98],
+        ["2026-07-30", 5593.56, -1.23],
+        ["2026-07-31", 6595.45, 17.91],
+        ["2026-08-03", 6257.45, -5.12],
+        ["2026-08-04", 6358.95, 1.62],
+        ["2026-08-05", 6598.26, 3.76],
+        ["2026-08-06", 6296.38, -4.58],
+        ["2026-08-07", 6258.77, -0.6],
+      ].map(([date, close, changePct]) => ({
+        date: String(date),
+        close: Number(close),
+        changePct: Number(changePct),
+      })),
+    },
+    {
+      key: "KOSDAQ",
+      name: "코스닥",
+      source: "dummy",
+      points: [
+        ["2026-07-20", 749.64, -5.33],
+        ["2026-07-21", 753.34, 0.49],
+        ["2026-07-22", 751.09, -0.3],
+        ["2026-07-23", 790.28, 5.22],
+        ["2026-07-24", 748.22, -5.32],
+        ["2026-07-27", 764.86, 2.22],
+        ["2026-07-28", 705.85, -7.72],
+        ["2026-07-29", 662.68, -6.12],
+        ["2026-07-30", 644.78, -2.7],
+        ["2026-07-31", 719.76, 11.63],
+        ["2026-08-03", 737.35, 2.44],
+        ["2026-08-04", 780.72, 5.88],
+        ["2026-08-05", 799.59, 2.42],
+        ["2026-08-06", 801.67, 0.26],
+        ["2026-08-07", 798.81, -0.36],
+      ].map(([date, close, changePct]) => ({
+        date: String(date),
+        close: Number(close),
+        changePct: Number(changePct),
+      })),
+    },
+    {
+      key: "NASDAQ",
+      name: "나스닥",
+      source: "dummy",
+      points: [
+        ["2026-07-20", 22418.12, -0.42],
+        ["2026-07-21", 22502.3, 0.38],
+        ["2026-07-22", 22380.44, -0.54],
+        ["2026-07-23", 22612.88, 1.04],
+        ["2026-07-24", 22490.15, -0.54],
+        ["2026-07-27", 22560.33, 0.31],
+        ["2026-07-28", 22240.19, -1.42],
+        ["2026-07-29", 22110.51, -0.58],
+        ["2026-07-30", 22305.73, 0.88],
+        ["2026-07-31", 22698.42, 1.76],
+        ["2026-08-03", 22740.13, 0.18],
+        ["2026-08-04", 22680.9, -0.26],
+        ["2026-08-05", 22810.66, 0.57],
+        ["2026-08-06", 22762.44, -0.21],
+        ["2026-08-07", 22914.05, 0.67],
+      ].map(([date, close, changePct]) => ({
+        date: String(date),
+        close: Number(close),
+        changePct: Number(changePct),
+      })),
+    },
+  ],
+  stocks: [
+    {
+      ticker: "005930", name: "삼성전자", close: 231000, changePct: 0.22, volume: 20546010, source: "dummy",
+      points: [
+        ["2026-07-27", 218000, -1.1], ["2026-07-28", 222500, 2.06], ["2026-07-29", 227000, 2.02],
+        ["2026-07-30", 224500, -1.1], ["2026-07-31", 226000, 0.67], ["2026-08-03", 230500, 1.99],
+        ["2026-08-04", 229000, -0.65], ["2026-08-05", 232500, 1.53], ["2026-08-06", 230500, -0.86],
+        ["2026-08-07", 231000, 0.22],
+      ].map(([date, close, changePct]) => ({ date: String(date), close: Number(close), changePct: Number(changePct) })),
+    },
+    {
+      ticker: "000660", name: "SK하이닉스", close: 1422000, changePct: -4.88, volume: 5002539, source: "dummy",
+      points: [
+        ["2026-07-27", 1315000, -1.13], ["2026-07-28", 1340000, 1.9], ["2026-07-29", 1385000, 3.36],
+        ["2026-07-30", 1360000, -1.81], ["2026-07-31", 1398000, 2.79], ["2026-08-03", 1430000, 2.29],
+        ["2026-08-04", 1410000, -1.4], ["2026-08-05", 1448000, 2.7], ["2026-08-06", 1495000, 3.25],
+        ["2026-08-07", 1422000, -4.88],
+      ].map(([date, close, changePct]) => ({ date: String(date), close: Number(close), changePct: Number(changePct) })),
+    },
+  ],
+  macros: [
+    { name: "한국은행 기준금리", value: 2.75, unit: "%", observedAt: "2026-08-10" },
+    { name: "원달러환율", value: 1415.3, unit: "KRW", observedAt: "2026-08-11" },
+    { name: "국고채3년", value: 3.808, unit: "%", observedAt: "2026-08-11" },
+    { name: "국고채10년", value: 4.301, unit: "%", observedAt: "2026-08-11" },
+  ],
+  flows: [
+    { market: "KOSPI", investor: "외국인", netValue: -865100000000 },
+    { market: "KOSPI", investor: "개인", netValue: 267500000000 },
+    { market: "KOSPI", investor: "기관 합계", netValue: 585400000000 },
+  ],
+  news: [
+    {
+      title: "BOK: Inflationary pressures persist; additional rate hikes remain possible",
+      publishedAt: "2026-08-11T06:51:00.000Z",
+      eventTypes: ["INTEREST_RATES", "REAL_ECONOMY"],
+      score: 4,
+      url: null,
+    },
+    {
+      title: "Zelensky says Russia war is strengthening North Korea military",
+      publishedAt: "2026-08-11T08:04:52.000Z",
+      eventTypes: ["GEOPOLITICAL"],
+      score: 4,
+      url: null,
+    },
+    {
+      title: "Fire at chemical warehouse in Pyeongtaek fully extinguished",
+      publishedAt: "2026-08-11T13:31:07.000Z",
+      eventTypes: ["GEOPOLITICAL"],
+      score: 4,
+      url: null,
+    },
+  ],
+  signals: [
+    { key: "economy", label: "경제", share: 34, source: "dummy", keywords: [{ label: "기준금리 경계", share: 18 }, { label: "원화 약세", share: 16 }] },
+    { key: "country", label: "국가", share: 26, source: "dummy", keywords: [{ label: "미국 금리 정책", share: 14 }, { label: "한국 통화 정책", share: 12 }] },
+    { key: "event", label: "이벤트", share: 24, source: "dummy", keywords: [{ label: "금리 인상 경계", share: 13 }, { label: "지정학 리스크", share: 11 }] },
+    { key: "community", label: "커뮤니티", share: 16, source: "dummy", keywords: [{ label: "반도체 저가매수", share: 9 }, { label: "환율 불안", share: 7 }] },
+  ],
+};
+
+const mergeDashboard = (payload: Partial<DashboardData>): DashboardData => {
+  const liveIndices = payload.indices ?? [];
+  const liveSignals = payload.signals ?? [];
+  return {
+    ...fallback,
+    ...payload,
+    indices: fallback.indices.map((item) => liveIndices.find((live) => live.key === item.key) ?? item),
+    stocks: fallback.stocks.map((item) => {
+      const live = payload.stocks?.find((stock) => stock.ticker === item.ticker);
+      return live ? { ...item, ...live, points: live.points?.length ? live.points : item.points } : item;
+    }),
+    macros: payload.macros?.length ? payload.macros : fallback.macros,
+    flows: payload.flows?.length ? payload.flows : fallback.flows,
+    news: payload.news?.length ? payload.news : fallback.news,
+    signals: fallback.signals.map((item) => liveSignals.find((live) => live.key === item.key) ?? item),
+  };
+};
+
+const scenarios: Scenario[] = [
+  {
+    id: "rebound",
+    eyebrow: "유동성 회복",
+    title: "KOSPI 조건부 반등",
+    summary: "외국인 매도 진정과 원화 안정이 동시에 나타나는 경우",
+    impact: 8.4,
+    tone: "positive",
+    icon: TrendingUp,
+    forecast: [1, 1.018, 1.045, 1.084],
+    assumptions: ["외국인 순매도 축소", "원·달러 1,390원 하회", "반도체 수급 회복"],
+  },
+  {
+    id: "semiconductor",
+    eyebrow: "실적 충격",
+    title: "AI CapEx 둔화",
+    summary: "반도체 실적 기대가 낮아지고 투자 계획이 조정되는 경우",
+    impact: -9.6,
+    tone: "negative",
+    icon: Activity,
+    forecast: [1, 0.977, 0.942, 0.904],
+    assumptions: ["메모리 가격 약세", "실적 컨센서스 하향", "AI 투자 지연"],
+  },
+  {
+    id: "fx",
+    eyebrow: "거시 압력",
+    title: "원화 약세 재확산",
+    summary: "고금리 장기화와 달러 강세로 외국인 이탈이 커지는 경우",
+    impact: -6.2,
+    tone: "negative",
+    icon: Globe2,
+    forecast: [1, 0.986, 0.959, 0.938],
+    assumptions: ["원·달러 1,450원 상회", "국고채 금리 상승", "외국인 매도 지속"],
+  },
+];
 
 const environmentSeeds: EnvironmentSeed[] = [
-  { id: "foreign-buying", label: "외국인 순매수 회복", category: "수급", detail: "현물·선물에서 3거래일 이상 순매수 전환" },
-  { id: "hynix-surprise", label: "SK하이닉스 실적 서프라이즈", category: "기업실적", detail: "영업이익 컨센서스 대비 10% 이상 상회" },
-  { id: "ai-capex", label: "AI CapEx 유지·확대", category: "산업", detail: "글로벌 빅테크의 AI 인프라 투자 가이던스 유지" },
-  { id: "won-weakness", label: "원·달러 1,450원 상회", category: "환율", detail: "원화 약세가 외국인 위험 프리미엄을 자극" },
-  { id: "us-rates", label: "미국 금리 상승", category: "금리", detail: "미 10년물 상승으로 할인율과 변동성 확대" },
-  { id: "cxmt-supply", label: "CXMT 메모리 공급 확대", category: "경쟁", detail: "중국 메모리 공급 우려로 이익 추정치 재평가" },
-  { id: "exports", label: "반도체 수출 증가", category: "수출", detail: "메모리 가격과 HBM 출하량 회복 신호" },
-  { id: "china-slowdown", label: "중국 경기 둔화", category: "매크로", detail: "대중 수요 둔화로 국내 대형주 위험선호 약화" },
+  { id: "foreign-buying", label: "외국인 순매수 회복", category: "수급", detail: "현물·선물 3거래일 이상 순매수", direction: 1 },
+  { id: "hynix-surprise", label: "SK하이닉스 실적 상회", category: "실적", detail: "영업이익 컨센서스 10% 이상 상회", direction: 1 },
+  { id: "ai-capex", label: "AI CapEx 유지·확대", category: "산업", detail: "글로벌 빅테크 투자 가이던스 유지", direction: 1 },
+  { id: "exports", label: "반도체 수출 증가", category: "수출", detail: "메모리 가격과 HBM 출하 회복", direction: 1 },
+  { id: "won-weakness", label: "원·달러 1,450원 상회", category: "환율", detail: "원화 약세와 위험 프리미엄 확대", direction: -1 },
+  { id: "us-rates", label: "미국 금리 상승", category: "금리", detail: "미 10년물 상승과 할인율 부담", direction: -1 },
+  { id: "cxmt-supply", label: "CXMT 메모리 공급 확대", category: "경쟁", detail: "중국 공급 증가와 이익 추정치 하향", direction: -1 },
+  { id: "china-slowdown", label: "중국 경기 둔화", category: "매크로", detail: "대중 수요 둔화와 위험선호 약화", direction: -1 },
 ];
 
-type UploadedSeed = { name: string; size: number; preview?: string };
+const gapItems = [
+  { icon: CalendarClock, title: "미래 이벤트 캘린더", detail: "실적 발표·정책 일정·경제지표 발표 예정 시각" },
+  { icon: UsersRound, title: "커뮤니티 심리", detail: "뉴스 외 투자자 반응, 언급량, 감성 변화" },
+  { icon: Globe2, title: "글로벌 시장", detail: "S&P 500·NASDAQ·환율 선물의 동시간 흐름" },
+  { icon: Sparkles, title: "검증된 시나리오 모델", detail: "예측값, 신뢰구간, 백테스트와 모델 버전" },
+];
 
-type GraphPreviewNode = {
-  id: string;
-  label: string;
-  type: string;
-  x: number;
-  y: number;
-  color: string;
+const eventLabels: Record<string, string> = {
+  INTEREST_RATES: "금리",
+  REAL_ECONOMY: "실물경제",
+  GEOPOLITICAL: "지정학",
+  FX: "환율",
+  FOREIGN_EXCHANGE: "환율",
+  EARNINGS: "실적",
 };
 
-const graphPreviewNodes: GraphPreviewNode[] = [
-  { id: "kospi", label: "KOSPI", type: "지수", x: 320, y: 250, color: "#18181b" },
-  { id: "semiconductor", label: "반도체", type: "섹터", x: 162, y: 130, color: "#2563eb" },
-  { id: "samsung", label: "삼성전자", type: "종목", x: 78, y: 268, color: "#0f766e" },
-  { id: "hynix", label: "SK하이닉스", type: "종목", x: 135, y: 400, color: "#0f766e" },
-  { id: "auto", label: "자동차", type: "섹터", x: 460, y: 90, color: "#2563eb" },
-  { id: "internet", label: "인터넷", type: "섹터", x: 560, y: 180, color: "#2563eb" },
-  { id: "finance", label: "금융", type: "섹터", x: 525, y: 340, color: "#2563eb" },
-  { id: "hyundai", label: "현대차", type: "종목", x: 490, y: 30, color: "#0f766e" },
-  { id: "naver", label: "NAVER", type: "종목", x: 615, y: 165, color: "#0f766e" },
-  { id: "kb", label: "KB금융", type: "종목", x: 615, y: 355, color: "#0f766e" },
-  { id: "lg-energy", label: "LG에너지솔루션", type: "종목", x: 50, y: 70, color: "#0f766e" },
-  { id: "foreign", label: "외국인 수급", type: "수급", x: 310, y: 90, color: "#d97706" },
-  { id: "fx", label: "원·달러", type: "환율", x: 470, y: 120, color: "#7c3aed" },
-  { id: "ai", label: "AI CapEx", type: "이벤트", x: 560, y: 260, color: "#dc2626" },
-  { id: "rates", label: "미국 금리", type: "금리", x: 520, y: 420, color: "#64748b" },
-  { id: "exports", label: "반도체 수출", type: "수출", x: 340, y: 455, color: "#0891b2" },
-  { id: "cxmt", label: "CXMT 경쟁", type: "경쟁", x: 80, y: 500, color: "#be123c" },
-  { id: "memory", label: "메모리 가격", type: "지표", x: 210, y: 520, color: "#4f46e5" },
-  { id: "risk", label: "위험 프리미엄", type: "리스크", x: 565, y: 520, color: "#52525b" },
-  { id: "fomc", label: "FOMC 결정", type: "이벤트", x: 430, y: 510, color: "#dc2626" },
-  { id: "earnings", label: "실적 발표", type: "이벤트", x: 245, y: 75, color: "#dc2626" },
-  { id: "policy", label: "산업 정책", type: "규제", x: 55, y: 385, color: "#ea580c" },
-  { id: "china", label: "중국 경기", type: "매크로", x: 34, y: 175, color: "#ea580c" },
-  { id: "export-data", label: "수출 데이터", type: "데이터", x: 330, y: 555, color: "#0891b2" },
-  { id: "valuation", label: "선행 PER", type: "밸류에이션", x: 370, y: 180, color: "#4f46e5" },
-  { id: "rsi", label: "RSI14", type: "기술지표", x: 205, y: 300, color: "#4f46e5" },
-  { id: "sentiment", label: "시장 심리", type: "심리", x: 390, y: 350, color: "#a21caf" },
-  { id: "hbm", label: "HBM 수요", type: "수요", x: 170, y: 190, color: "#0891b2" },
-  { id: "won", label: "원화 강세", type: "환율", x: 430, y: 40, color: "#7c3aed" },
-];
+const signalIcons: Record<SignalGroup["key"], typeof Activity> = {
+  economy: Activity,
+  country: Globe2,
+  event: CalendarClock,
+  community: UsersRound,
+};
 
-const graphPreviewEdges = [
-  ["kospi", "semiconductor", "구성"], ["kospi", "foreign", "수급영향"], ["kospi", "fx", "환율영향"],
-  ["kospi", "ai", "이벤트영향"], ["kospi", "rates", "할인율"], ["kospi", "exports", "실적연결"],
-  ["semiconductor", "samsung", "대표종목"], ["semiconductor", "hynix", "대표종목"], ["semiconductor", "memory", "가격연결"],
-  ["semiconductor", "cxmt", "경쟁구도"], ["foreign", "samsung", "순매수"], ["foreign", "hynix", "순매수"],
-  ["fx", "foreign", "자금흐름"], ["rates", "fx", "달러강세"], ["ai", "memory", "수요견인"],
-  ["exports", "memory", "출하량"], ["cxmt", "memory", "공급압력"], ["rates", "risk", "위험회피"],
-  ["kospi", "auto", "구성"], ["kospi", "internet", "구성"], ["kospi", "finance", "구성"],
-  ["auto", "hyundai", "대표종목"], ["auto", "lg-energy", "공급망"], ["internet", "naver", "대표종목"], ["finance", "kb", "대표종목"],
-  ["foreign", "auto", "순매수"], ["foreign", "internet", "순매수"], ["fx", "rates", "환율전이"], ["fx", "won", "원화강세"],
-  ["ai", "hynix", "HBM수요"], ["ai", "naver", "클라우드수요"], ["rates", "finance", "조달비용"], ["rates", "valuation", "할인율"],
-  ["earnings", "samsung", "실적연결"], ["earnings", "hynix", "실적연결"], ["earnings", "hyundai", "실적연결"],
-  ["fomc", "rates", "금리결정"], ["fomc", "risk", "위험회피"], ["policy", "semiconductor", "지원정책"], ["policy", "auto", "보조금"],
-  ["china", "cxmt", "경쟁심화"], ["china", "exports", "수요둔화"], ["export-data", "exports", "월별발표"], ["export-data", "kospi", "선행신호"],
-  ["valuation", "kospi", "멀티플"], ["rsi", "kospi", "과매도"], ["sentiment", "foreign", "위험선호"], ["sentiment", "kospi", "심리"],
-  ["hbm", "memory", "수요견인"], ["hbm", "hynix", "제품믹스"], ["won", "foreign", "자금유입"], ["won", "samsung", "환차익"],
-] as const;
+const signalImpacts: Record<SignalGroup["key"], string> = {
+  economy: "금리·환율 변화는 기업 조달비용과 수출주 이익 전망을 바꿔 지수의 적정 가치에 직접 반영됩니다.",
+  country: "미국·한국의 정책 방향은 외국인 자금 흐름, 원화 가치와 성장주 밸류에이션에 영향을 줍니다.",
+  event: "뉴스 이벤트는 위험 선호와 변동성을 빠르게 바꾸지만, 영향의 방향과 지속 기간은 사건마다 다릅니다.",
+  community: "투자자 관심과 심리는 단기 거래량과 수급 쏠림을 키울 수 있지만 펀더멘털 신호로 단독 사용하지 않습니다.",
+};
 
-type BuildStage = 1 | 2 | 3 | 4 | 5 | 6;
+const formatNumber = (value: number, digits = 2) =>
+  new Intl.NumberFormat("ko-KR", { maximumFractionDigits: digits, minimumFractionDigits: digits }).format(value);
 
-function KnowledgeGraphPreview({ seeds, prompt, stage }: { seeds: string[]; prompt: string; stage: BuildStage }) {
-  const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>(() =>
-    Object.fromEntries(graphPreviewNodes.map((node) => [node.id, { x: node.x, y: node.y }])),
-  );
-  const [selectedNode, setSelectedNode] = useState("kospi");
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const dragRef = useRef<{ id: string; moved: boolean } | null>(null);
-  const panRef = useRef<{ active: boolean; x: number; y: number; startX: number; startY: number } | null>(null);
+const formatFlow = (value: number) => {
+  const absolute = Math.abs(value);
+  const formatted = absolute >= 1_000_000_000_000
+    ? `${(absolute / 1_000_000_000_000).toFixed(2)}조`
+    : `${Math.round(absolute / 100_000_000).toLocaleString("ko-KR")}억`;
+  return `${value < 0 ? "−" : "+"}${formatted}`;
+};
 
-  useEffect(() => {
-    const velocity = Object.fromEntries(graphPreviewNodes.map((node) => [node.id, { x: 0, y: 0 }])) as Record<string, { x: number; y: number }>;
-    let frame = 0;
-    let last = performance.now();
-    let cancelled = false;
-    const tick = (now: number) => {
-      if (cancelled) return;
-      const dt = Math.min(2.5, Math.max(.3, (now - last) / 16.67));
-      last = now;
-      const next = Object.fromEntries(graphPreviewNodes.map((node) => [node.id, { ...(positions[node.id] ?? { x: node.x, y: node.y }) }])) as Record<string, { x: number; y: number }>;
-      graphPreviewNodes.forEach((node, index) => {
-        const current = next[node.id];
-        graphPreviewNodes.slice(index + 1).forEach((other) => {
-          const otherPosition = next[other.id];
-          const dx = current.x - otherPosition.x;
-          const dy = current.y - otherPosition.y;
-          const distance = Math.max(18, Math.hypot(dx, dy));
-          const force = 115 / (distance * distance);
-          const nx = (dx / distance) * force * dt;
-          const ny = (dy / distance) * force * dt;
-          velocity[node.id].x += nx;
-          velocity[node.id].y += ny;
-          velocity[other.id].x -= nx;
-          velocity[other.id].y -= ny;
-        });
-      });
-      graphPreviewEdges.forEach(([source, target]) => {
-        const from = next[source];
-        const to = next[target];
-        const dx = to.x - from.x;
-        const dy = to.y - from.y;
-        const distance = Math.max(1, Math.hypot(dx, dy));
-        const force = (distance - 105) * .0019 * dt;
-        const nx = (dx / distance) * force;
-        const ny = (dy / distance) * force;
-        velocity[source].x += nx;
-        velocity[source].y += ny;
-        velocity[target].x -= nx;
-        velocity[target].y -= ny;
-      });
-      graphPreviewNodes.forEach((node) => {
-        const p = next[node.id];
-        const v = velocity[node.id];
-        v.x *= .88;
-        v.y *= .88;
-        p.x = Math.max(28, Math.min(612, p.x + v.x));
-        p.y = Math.max(28, Math.min(552, p.y + v.y));
-      });
-      if (frame % 2 === 0) setPositions(next);
-      frame += 1;
-      if (frame < 220) requestAnimationFrame(tick);
-    };
-    const raf = requestAnimationFrame(tick);
-    return () => { cancelled = true; cancelAnimationFrame(raf); };
-    // The graph gets one deterministic settling pass when a new build stage appears.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage]);
+const formatDate = (date: string) => {
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return date;
+  return new Intl.DateTimeFormat("ko-KR", { month: "short", day: "numeric", timeZone: "Asia/Seoul" }).format(parsed);
+};
 
-  const handlePointerDown = (id: string) => {
-    dragRef.current = { id, moved: false };
-  };
-
-  const handlePointerMove = (event: ReactPointerEvent<SVGGElement>) => {
-    if (!dragRef.current) return;
-    const svg = event.currentTarget.ownerSVGElement;
-    if (!svg) return;
-    const rect = svg.getBoundingClientRect();
-    const x = Math.max(30, Math.min(610, (event.clientX - rect.left - 320) / zoom + 320));
-    const y = Math.max(36, Math.min(540, (event.clientY - rect.top - 250) / zoom + 250));
-    dragRef.current.moved = true;
-    setPositions((current) => ({ ...current, [dragRef.current!.id]: { x, y } }));
-  };
-
-  const handlePointerUp = (id: string) => {
-    if (dragRef.current?.id === id && !dragRef.current.moved) setSelectedNode(id);
-    dragRef.current = null;
-  };
-
-  const handleCanvasPointerDown = (event: ReactPointerEvent<SVGSVGElement>) => {
-    if (event.target !== event.currentTarget && (event.target as Element).tagName !== "rect") return;
-    panRef.current = { active: true, x: pan.x, y: pan.y, startX: event.clientX, startY: event.clientY };
-    event.currentTarget.setPointerCapture(event.pointerId);
-  };
-
-  const handleCanvasPointerMove = (event: ReactPointerEvent<SVGSVGElement>) => {
-    if (!panRef.current?.active) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    setPan({
-      x: panRef.current.x + ((event.clientX - panRef.current.startX) / rect.width) * 640,
-      y: panRef.current.y + ((event.clientY - panRef.current.startY) / rect.height) * 570,
-    });
-  };
-
+function Trend({ value }: { value: number }) {
+  const positive = value >= 0;
+  const Icon = positive ? ArrowUpRight : ArrowDownRight;
   return (
-    <div className="knowledge-graph-wrap">
-      <div className="knowledge-graph-toolbar">
-        <span><Network size={14} /> 지식그래프 구성요소</span>
-        <span>{seeds.length} seeds · {prompt ? "prompt linked" : "prompt empty"}</span>
-      </div>
-      <svg className="knowledge-graph-svg" viewBox="0 0 640 570" role="img" aria-label="환경 시드 기반 KOSPI 지식그래프" onPointerDown={handleCanvasPointerDown} onPointerMove={handleCanvasPointerMove} onPointerUp={() => { panRef.current = null; }} onWheel={(event) => { event.preventDefault(); setZoom((current) => Math.max(.72, Math.min(1.55, current + (event.deltaY > 0 ? -.06 : .06)))); }}>
-        <defs>
-          <pattern id="graph-grid" width="28" height="28" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.2" fill="#e4e4e7" /></pattern>
-        </defs>
-        <rect width="640" height="570" fill="url(#graph-grid)" />
-        <g transform={`translate(${pan.x + 320} ${pan.y + 250}) scale(${zoom}) translate(-320 -250)`}>
-          {graphPreviewEdges.map(([source, target, label]) => {
-            const from = positions[source] ?? { x: 320, y: 250 };
-            const to = positions[target] ?? { x: 320, y: 250 };
-            return <g key={`${source}-${target}`}><line x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke="#c7c7cc" strokeWidth="1.35" /><text x={(from.x + to.x) / 2} y={(from.y + to.y) / 2 - 4} className="knowledge-edge-label">{label}</text></g>;
-          })}
-          {graphPreviewNodes.map((node) => {
-            const position = positions[node.id] ?? { x: 320, y: 250 };
-            const active = selectedNode === node.id;
-            return <g key={node.id} className="knowledge-node" transform={`translate(${position.x} ${position.y})`} onPointerDown={() => handlePointerDown(node.id)} onPointerMove={handlePointerMove} onPointerUp={() => handlePointerUp(node.id)} onPointerCancel={() => { dragRef.current = null; }}>
-              <circle r={active ? 15 : 11} fill={node.color} stroke="#fff" strokeWidth="3" />
-              <text x="17" y="4" className={active ? "knowledge-node-label active" : "knowledge-node-label"}>{node.label}</text>
-              <text x="17" y="17" className="knowledge-node-type">{node.type}</text>
-            </g>;
-          })}
-        </g>
-      </svg>
-      <div className="knowledge-graph-footer"><span>노드를 드래그하거나 빈 공간을 끌어 이동하세요</span><span>휠 확대·축소 · 선택: {graphPreviewNodes.find((node) => node.id === selectedNode)?.label}</span></div>
-    </div>
+    <span className={`trend ${positive ? "positive" : "negative"}`}>
+      <Icon aria-hidden="true" size={14} strokeWidth={2.4} />
+      {positive ? "+" : ""}{formatNumber(value)}%
+    </span>
   );
 }
 
-function ScenarioBuildScreen({
-  seeds,
-  prompt,
-  uploadedFile,
-  stage,
-  period,
-  onStartSimulation,
-  simulationStarted,
-  onClose,
-}: {
-  seeds: string[];
-  prompt: string;
-  uploadedFile: UploadedSeed | null;
-  stage: BuildStage;
-  period: string;
-  onStartSimulation: () => void;
-  simulationStarted: boolean;
-  onClose: () => void;
-}) {
-  const complete = stage === 6;
-  const entityTypes = ["지수", "종목", "섹터", "이벤트", "환율", "수급", "금리"];
-  const relationTypes = ["DRIVES", "IMPACTS", "TRACKS", "CORRELATES_WITH", "CONSTRAINS", "TRIGGERS"];
-  const statusFor = (step: number) => stage > step ? "COMPLETED" : stage === step ? "IN PROGRESS" : "WAITING";
-  const cardClass = (step: number) => `build-step-card ${stage > step ? "done" : stage === step ? "active" : "waiting"}`;
-  const profileCards = [
-    { name: "외국인 수급 에이전트", handle: "@foreign_flow_01", type: "Flow Analyst", stance: "SUPPORTIVE", body: "글로벌 자금 흐름과 원·달러 변화를 추적해 순매수 전환의 지속성을 판단합니다." },
-    { name: "반도체 실적 에이전트", handle: "@semiconductor_02", type: "Earnings Analyst", stance: "BULLISH", body: "삼성전자·SK하이닉스의 실적, HBM 수요, 메모리 가격을 연결해 섹터 반응을 계산합니다." },
-    { name: "거시경제 에이전트", handle: "@macro_policy_03", type: "Macro Agent", stance: "NEUTRAL", body: "미국 금리와 중국 경기, 환율을 바탕으로 위험 프리미엄과 할인율 변화를 반영합니다." },
-    { name: "시장 심리 에이전트", handle: "@sentiment_04", type: "Sentiment Agent", stance: "CAUTIOUS", body: "뉴스의 방향성과 투자자 심리를 읽어 과매도 반등과 추세 전환을 구분합니다." },
-  ];
-  return (
-    <div className="scenario-build-screen">
-      <header className="scenario-build-header">
-        <div><span>FINVERSE · SCENARIO LAB</span><h2>온톨로지와 지식그래프를 준비합니다</h2><p>환경 시드와 사용자 프롬프트에서 KOSPI에 영향을 주는 엔터티와 관계를 추출했습니다.</p></div>
-        <button className="scenario-modal-close" type="button" onClick={onClose} aria-label="시나리오 빌더 닫기"><X size={20} /></button>
-      </header>
-      <div className="scenario-build-meta"><span><Database size={14} /> {seeds.length}개 환경 시드</span><span><FileUp size={14} /> {uploadedFile ? uploadedFile.name : "추가 데이터 없음"}</span><span><GitBranch size={14} /> KOSPI · 2026.08.01</span></div>
-      <div className="scenario-build-grid">
-        <section className="knowledge-graph-panel" aria-label="시나리오 지식그래프">
-          <div className="build-panel-heading"><div><span>GRAPH RELATIONSHIP VISUALIZATION</span><h3>시나리오 지식그래프</h3></div><span className="build-live-badge">{complete ? "BUILD COMPLETE" : "BUILDING"}</span></div>
-          <KnowledgeGraphPreview seeds={seeds} prompt={prompt} stage={stage} />
-        </section>
-        <section className="build-process-panel" aria-label="온톨로지 빌드 진행 상태">
-          <article className={cardClass(1)}>
-            <div className="build-step-header"><span className="build-step-number">01</span><div><h3>Ontology Generation</h3><small>POST /api/graph/ontology/generate</small></div><strong>{statusFor(1)}</strong></div>
-            <p>환경 시드와 예측 요구사항을 분석해 시장에 맞는 엔터티·관계 타입을 구성합니다.</p>
-            <div className="build-chip-group"><small>GENERATED ENTITY TYPES</small><div>{entityTypes.map((item) => <span key={item}>{item}</span>)}</div></div>
-            {stage === 1 && <div className="build-progress-line"><LoaderCircle size={15} className="spin" /> 시나리오 문맥에서 구성요소를 추출하는 중</div>}
-          </article>
-          <article className={cardClass(2)}>
-            <div className="build-step-header"><span className="build-step-number">02</span><div><h3>GraphRAG Build</h3><small>POST /api/graph/build</small></div><strong>{statusFor(2)}</strong></div>
-            <p>추출된 온톨로지를 바탕으로 KOSPI 지수·종목·환율·이벤트 사이의 연결을 그래프로 묶습니다.</p>
-            <div className="build-result-grid"><div><b>{stage > 1 ? "42" : "—"}</b><small>ENTITY NODES</small></div><div><b>{stage > 1 ? "68" : "—"}</b><small>RELATION EDGES</small></div><div><b>{stage > 1 ? "7" : "—"}</b><small>SCHEMA TYPES</small></div></div>
-            <div className="build-chip-group"><small>GENERATED RELATION TYPES</small><div>{relationTypes.map((item) => <span key={item}>{item}</span>)}</div></div>
-          </article>
-          <article className={cardClass(3)}>
-            <div className="build-step-header"><span className="build-step-number">03</span><div><h3>Generate Agent Profiles</h3><small>POST /api/simulation/prepare</small></div><strong>{statusFor(3)}</strong></div>
-            <p>환경 시드와 연결된 엔터티를 역할별 에이전트로 바꾸고, 각자의 관점·활동량·편향을 설정합니다.</p>
-            <div className="build-result-grid"><div><b>{stage > 3 ? "24" : "—"}</b><small>CURRENT AGENTS</small></div><div><b>{stage > 3 ? "24" : "—"}</b><small>EXPECTED TOTAL</small></div><div><b>{stage > 3 ? "96" : "—"}</b><small>RELATED TOPICS</small></div></div>
-            {stage >= 3 && <div className="agent-profile-grid">{profileCards.map((profile) => <article key={profile.handle} className="agent-profile-card"><div className="agent-profile-top"><span className="agent-avatar"><UserRound size={16} /></span><div><strong>{profile.name}</strong><small>{profile.handle}</small></div><em>{profile.stance}</em></div><span className="agent-profile-type">{profile.type}</span><p>{profile.body}</p><div className="agent-topic-row"><span>반도체</span><span>수급</span><span>변동성</span></div></article>)}</div>}
-            {stage === 3 && <div className="build-progress-line"><LoaderCircle size={15} className="spin" /> 에이전트 프로필과 관련 토픽을 생성하는 중</div>}
-          </article>
-          <article className={cardClass(4)}>
-            <div className="build-step-header"><span className="build-step-number">04</span><div><h3>Generate Config</h3><small>POST /api/simulation/prepare</small></div><strong>{statusFor(4)}</strong></div>
-            <p>시나리오 요구사항과 에이전트 프로필을 바탕으로 시장 환경값, 라운드, 활동 시간과 모델 설정을 계산합니다.</p>
-            <div className="config-metric-grid"><div><span>Duration</span><b>{period === "7일" ? "7 days" : period === "3개월" ? "90 days" : "30 days"}</b></div><div><span>Round Duration</span><b>60 min</b></div><div><span>Total Rounds</span><b>{period === "7일" ? "168" : period === "3개월" ? "2160" : "720"} rounds</b></div><div><span>Active / Hour</span><b>12–34</b></div></div>
-            <div className="config-row-list"><div><strong>Peak Hours</strong><span>19:00, 20:00, 21:00, 22:00</span><em>×1.5</em></div><div><strong>Work Hours</strong><span>09:00–18:00</span><em>×0.7</em></div><div><strong>Morning Hours</strong><span>06:00–08:00</span><em>×0.4</em></div><div><strong>Off-Peak Hours</strong><span>00:00–05:00</span><em>×0.05</em></div></div>
-            {stage === 4 && <div className="build-progress-line"><LoaderCircle size={15} className="spin" /> 시뮬레이션 환경값을 계산하는 중</div>}
-            {stage >= 4 && <div className="llm-reasoning"><small>LLM CONFIG REASONING</small><p><strong>Time config:</strong> KOSPI 시나리오는 장중 수급과 미국 시장 반응이 겹치는 30일을 기준으로 설정했습니다. 저녁 피크에는 미국 금리·AI CapEx 뉴스가 집중되고, 장 시작 전에는 환율과 외국인 선물 수급이 반영되도록 활동량을 조정합니다.</p><p><strong>Event config:</strong> SK하이닉스 실적과 외국인 순매수 회복을 초기 이벤트로 두고, 원·달러와 CXMT 경쟁 심화가 반대 방향의 변동성을 만들도록 구성했습니다.</p></div>}
-          </article>
-          <article className={cardClass(5)}>
-            <div className="build-step-header"><span className="build-step-number">04</span><div><h3>Initial Activation Orchestration</h3><small>POST /api/simulation/prepare</small></div><strong>{statusFor(5)}</strong></div>
-            <p>에이전트의 첫 행동과 시장 내러티브 방향을 정해 시뮬레이션의 출발점을 고정합니다.</p>
-            <div className="narrative-guide"><span><Sparkles size={14} /> NARRATIVE GUIDE DIRECTION</span><p>외국인 수급이 돌아오고 반도체 실적이 기대를 웃돌면서 KOSPI가 기술적 반등을 시도합니다. 다만 환율과 금리 변수에 따라 반등의 폭은 달라집니다.</p></div>
-            <div className="hot-topic-row"><small>INITIAL HOT TOPICS</small><div><span># KOSPI</span><span># 외국인 순매수</span><span># SK하이닉스</span><span># AI CapEx</span><span># 원·달러</span></div></div>
-            {stage >= 5 && <div className="activation-sequence"><small>INITIAL ACTIVATION SEQUENCE (4)</small>{["SK하이닉스 실적 발표가 컨센서스를 웃돌았습니다.","외국인 현물·선물 순매수가 동시에 포착됩니다.","미국 빅테크가 AI CapEx 유지 계획을 발표합니다.","원·달러 환율이 안정되며 위험 선호가 회복됩니다."].map((item,index)=><div key={item}><b>0{index+1}</b><span>{item}</span></div>)}</div>}
-          </article>
-          <article className={`build-step-card build-ready-card ${stage > 6 ? "done" : stage === 6 ? "active" : "waiting"}`}>
-            <div className="build-step-header"><span className="build-step-number">05</span><div><h3>Ready</h3><small>POST /api/simulation/start</small></div><strong>{simulationStarted ? "RUNNING" : stage >= 6 ? "READY" : statusFor(6)}</strong></div>
-            <p>{simulationStarted ? "시뮬레이션이 시작되었습니다. 에이전트들이 초기 환경에서 상호작용을 생성하고 있습니다." : "시뮬레이션 환경이 준비되었습니다. 설정을 확인한 뒤 실행할 수 있습니다."}</p>
-            <div className="ready-rounds"><b>{period === "7일" ? "168" : period === "3개월" ? "2160" : "720"}</b><span>rounds</span><em>Est. {period === "7일" ? "~6 min" : period === "3개월" ? "~72 min" : "~24 min"}</em></div>
-            <button className="build-continue-button" type="button" onClick={onStartSimulation} disabled={stage < 6 || simulationStarted}>{simulationStarted ? <>시뮬레이션 실행 중 <LoaderCircle size={17} className="spin" /></> : stage >= 6 ? <>Start KOSPI Scenario Simulation <ArrowRight size={17} /></> : <><LoaderCircle size={17} className="spin" /> 이전 단계 처리 중</>}</button>
-          </article>
-        </section>
-      </div>
-    </div>
-  );
-}
+function MarketChart({ series, scenario }: { series: MarketSeries; scenario: Scenario }) {
+  const [hoverIndex, setHoverIndex] = useState(series.points.length - 1);
+  const chartRef = useRef<HTMLDivElement>(null);
 
-function ForecastChart({ scenario }: { scenario: Scenario }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const draw = () => {
-      const rect = canvas.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = Math.round(rect.width * dpr);
-      canvas.height = Math.round(rect.height * dpr);
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      ctx.scale(dpr, dpr);
-
-      const width = rect.width;
-      const height = rect.height;
-      const pad = { top: 22, right: 24, bottom: 36, left: 50 };
-      const plotW = width - pad.left - pad.right;
-      const plotH = height - pad.top - pad.bottom;
-      const splitX = pad.left + plotW * 0.58;
-      const rightX = width - pad.right;
-      const outerUpper = scenario.path.map((value, index) => value + 80 + index * 60);
-      const outerLower = scenario.path.map((value, index) => value - 80 - index * 60);
-      const innerUpper = scenario.path.map((value, index) => value + 45 + index * 32);
-      const innerLower = scenario.path.map((value, index) => value - 45 - index * 32);
-      const all = [...actualPath, ...outerUpper, ...outerLower];
-      const axisStep = 500;
-      const min = Math.floor((Math.min(...all) - 40) / axisStep) * axisStep;
-      const max = Math.ceil((Math.max(...all) + 40) / axisStep) * axisStep;
-      const xActual = (index: number) => pad.left + (index / (actualPath.length - 1)) * (splitX - pad.left);
-      const xForecast = (index: number) => splitX + (index / (scenario.path.length - 1)) * (rightX - splitX);
-      const y = (value: number) => pad.top + ((max - value) / (max - min)) * plotH;
-
-      ctx.clearRect(0, 0, width, height);
-      ctx.font = '10px "Pretendard Variable", sans-serif';
-      ctx.textAlign = "right";
-      ctx.fillStyle = "#a1a1aa";
-      ctx.strokeStyle = "#ececef";
-      ctx.lineWidth = 1;
-      const tickCount = Math.round((max - min) / axisStep);
-      for (let i = 0; i <= tickCount; i += 1) {
-        const value = max - axisStep * i;
-        const py = y(value);
-        ctx.beginPath();
-        ctx.moveTo(pad.left, py);
-        ctx.lineTo(width - pad.right, py);
-        ctx.stroke();
-        ctx.fillText(Math.round(value).toLocaleString("ko-KR"), pad.left - 10, py + 4);
-      }
-
-      const drawBand = (upper: number[], lower: number[], opacity: number) => {
-        ctx.beginPath();
-        upper.forEach((value, index) => {
-          const px = xForecast(index);
-          const py = y(value);
-          if (index === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
-        });
-        for (let index = lower.length - 1; index >= 0; index -= 1) {
-          ctx.lineTo(xForecast(index), y(lower[index]));
-        }
-        ctx.closePath();
-        ctx.fillStyle = scenario.tone === "up" ? `rgba(239,68,68,${opacity})` : `rgba(37,99,235,${opacity})`;
-        ctx.fill();
+  const chart = useMemo(() => {
+    const width = 420;
+    const height = 180;
+    const top = 12;
+    const bottom = 25;
+    const actualStart = 10;
+    const actualEnd = 286;
+    const futureEnd = 410;
+    const latest = series.points.at(-1)?.close ?? 0;
+    const observedVolatility = Math.sqrt(
+      series.points.reduce((sum, point) => sum + (point.changePct / 100) ** 2, 0) / Math.max(series.points.length, 1),
+    );
+    const forecast = scenario.forecast.map((factor, position) => {
+      const center = latest * factor;
+      const spread = Math.min(.22, Math.max(observedVolatility, .012) * Math.sqrt(position * 5) * 1.35);
+      return {
+        center,
+        upper: center * (1 + spread),
+        lower: center * (1 - spread),
+        x: actualEnd + ((futureEnd - actualEnd) * position) / Math.max(scenario.forecast.length - 1, 1),
       };
+    });
+    const values = [
+      ...series.points.map((point) => point.close),
+      ...forecast.flatMap((point) => [point.lower, point.upper]),
+    ];
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const padding = Math.max((max - min) * .12, max * .012);
+    const y = (value: number) => top + ((max + padding - value) / (max - min + padding * 2)) * (height - top - bottom);
+    const actual = series.points.map((point, position) => ({
+      ...point,
+      x: actualStart + ((actualEnd - actualStart) * position) / Math.max(series.points.length - 1, 1),
+      y: y(point.close),
+    }));
+    const actualPath = actual.map((point, position) => `${position ? "L" : "M"} ${point.x} ${point.y}`).join(" ");
+    const areaPath = `${actualPath} L ${actualEnd} ${height - bottom} L ${actualStart} ${height - bottom} Z`;
+    const medianPath = forecast.map((point, position) => `${position ? "L" : "M"} ${point.x} ${y(point.center)}`).join(" ");
+    const bandPath = [
+      ...forecast.map((point, position) => `${position ? "L" : "M"} ${point.x} ${y(point.upper)}`),
+      ...[...forecast].reverse().map((point) => `L ${point.x} ${y(point.lower)}`),
+      "Z",
+    ].join(" ");
+    return { width, height, top, bottom, actualStart, actualEnd, actual, actualPath, areaPath, medianPath, bandPath };
+  }, [series, scenario]);
 
-      drawBand(outerUpper, outerLower, 0.08);
-      drawBand(innerUpper, innerLower, 0.12);
+  const hovered = chart.actual[Math.min(Math.max(0, hoverIndex), chart.actual.length - 1)] ?? chart.actual.at(-1);
+  const valueDigits = /^\d+$/.test(series.key) ? 0 : 2;
 
-      const candleWidth = Math.max(3, Math.min(6, (splitX - pad.left) / actualPath.length * 0.58));
-      actualPath.slice(1).forEach((value, index) => {
-        const previous = actualPath[index];
-        const px = xActual(index + 1);
-        const high = Math.max(previous, value) + 5 + ((index * 7) % 8);
-        const low = Math.min(previous, value) - 5 - ((index * 5) % 7);
-        const color = value >= previous ? "#ef4444" : "#2563eb";
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(px, y(high));
-        ctx.lineTo(px, y(low));
-        ctx.stroke();
-        const bodyTop = Math.min(y(previous), y(value));
-        const bodyHeight = Math.max(2, Math.abs(y(previous) - y(value)));
-        ctx.fillStyle = color;
-        ctx.fillRect(px - candleWidth / 2, bodyTop, candleWidth, bodyHeight);
-      });
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const bounds = chartRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+    const svgX = ((event.clientX - bounds.left) / bounds.width) * chart.width;
+    const position = Math.round(
+      ((svgX - chart.actualStart) / (chart.actualEnd - chart.actualStart)) * Math.max(series.points.length - 1, 1),
+    );
+    setHoverIndex(Math.max(0, Math.min(series.points.length - 1, position)));
+  };
 
-      const currentY = y(actualPath[actualPath.length - 1]);
-      ctx.strokeStyle = "#a1a1aa";
-      ctx.setLineDash([3, 3]);
-      ctx.beginPath();
-      ctx.moveTo(pad.left, currentY);
-      ctx.lineTo(rightX, currentY);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      ctx.beginPath();
-      scenario.path.forEach((value, index) => {
-        const px = xForecast(index);
-        const py = y(value);
-        if (index === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      });
-      const forecastColor = scenario.tone === "up" ? "#ef4444" : "#2563eb";
-      ctx.strokeStyle = forecastColor;
-      ctx.lineWidth = 3;
-      ctx.stroke();
-      scenario.path.forEach((value, index) => {
-        const px = xForecast(index);
-        const py = y(value);
-        ctx.beginPath();
-        ctx.fillStyle = "#fff";
-        ctx.arc(px, py, index === scenario.path.length - 1 ? 4.5 : 3.5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = forecastColor;
-        ctx.stroke();
-      });
-
-      ctx.strokeStyle = "#18181b";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(splitX, pad.top);
-      ctx.lineTo(splitX, height - pad.bottom);
-      ctx.stroke();
-
-      ctx.textAlign = "center";
-      ctx.font = '10px "Pretendard Variable", sans-serif';
-      ctx.fillStyle = "#71717a";
-      const actualLabelIndexes = [0, 7, 15, 23, actualPath.length - 1];
-      actualLabelIndexes.forEach((pathIndex) => {
-        ctx.fillText(actualDates[pathIndex], xActual(pathIndex), height - 12);
-      });
-      ctx.fillStyle = "#fff";
-      ctx.fillRect(splitX - 20, height - 29, 40, 24);
-      ctx.fillStyle = "#18181b";
-      ctx.fillRect(splitX - 20, height - 29, 40, 24);
-      ctx.fillStyle = "#fff";
-      ctx.font = '700 10px "Pretendard Variable", sans-serif';
-      ctx.fillText("7/28", splitX, height - 13);
-      ctx.font = '10px "Pretendard Variable", sans-serif';
-      ctx.fillStyle = "#a1a1aa";
-      ["+7일", "+14일", "+21일", "+1개월"].forEach((label, index, labels) => {
-        ctx.fillText(label, splitX + ((index + 1) / labels.length) * (rightX - splitX), height - 12);
-      });
-    };
-
-    draw();
-    const observer = new ResizeObserver(draw);
-    observer.observe(canvas);
-    return () => observer.disconnect();
-  }, [scenario]);
-
-  return <canvas ref={canvasRef} className="forecast-canvas" aria-label={`${scenario.title} 조건부 KOSPI 예상 경로`} />;
-}
-
-function TwinPathChart({ scenario }: { scenario: Scenario }) {
-  const targets = [140.2, 121.6, 107.8];
-  const colors = ["#111113", "#ef4444", "#2563eb"];
-  const selectedIndex = scenario.id === "kospi-rebound" ? 0 : scenario.id === "chip-miss" ? 1 : 2;
-  const x = (index: number) => 24 + (index / 11) * 496;
-  const y = (value: number) => 142 - ((value - 94) / 54) * 110;
-  const makeLine = (target: number) => Array.from({ length: 12 }, (_, index) => 128.5 + ((target - 128.5) * index) / 11 + Math.sin(index * 1.25) * .65);
-  const lines = targets.map(makeLine);
-  const selectedLine = lines[selectedIndex];
-  const forecastColor = colors[selectedIndex];
-  const selectedPath = selectedLine.map((value, index) => `${index === 0 ? "M" : "L"} ${x(index).toFixed(1)} ${y(value).toFixed(1)}`).join(" ");
-  const upper = selectedLine.map((value, index) => `${x(index).toFixed(1)},${y(value + 4 + index * .45).toFixed(1)}`).join(" ");
-  const lower = [...selectedLine].reverse().map((value, reverseIndex) => { const index = 11 - reverseIndex; return `${x(index).toFixed(1)},${y(value - 4 - index * .45).toFixed(1)}`; }).join(" ");
   return (
-    <svg className="twin-path-chart" viewBox="0 0 540 170" role="img" aria-label="나의 자산 예상 경로">
-      {[28, 60, 92, 124].map((line) => <line key={line} x1="24" y1={line} x2="520" y2={line} stroke="#ededf0" strokeWidth="1" />)}
-      <polygon points={`${upper} ${lower}`} fill={forecastColor === "#111113" ? "rgba(17,17,19,.08)" : `${forecastColor}18`} />
-      {lines.map((line, index) => <path key={index} d={line.map((value, pointIndex) => `${pointIndex === 0 ? "M" : "L"} ${x(pointIndex).toFixed(1)} ${y(value).toFixed(1)}`).join(" ")} fill="none" stroke={colors[index]} strokeWidth={index === selectedIndex ? "2.8" : "1.6"} strokeDasharray={index === selectedIndex ? undefined : "5 4"} strokeLinecap="round" opacity={index === selectedIndex ? 1 : .72} />)}
-      <circle cx="24" cy={y(128.5)} r="4" fill="#111113" />
-      {targets.map((target, index) => <text key={target} x="468" y={y(target) - (index === 0 ? 7 : index === 1 ? 0 : -9)} fill={colors[index]} fontSize="11" fontWeight="700">{target.toFixed(1)} ({target > 128.5 ? "+9.1%" : target === 121.6 ? "-5.4%" : "-16.1%"})</text>)}
-      <text x="18" y="154" fill="#a1a1aa" fontSize="10">현재</text><text x="180" y="154" fill="#a1a1aa" fontSize="10">7일 후</text><text x="342" y="154" fill="#a1a1aa" fontSize="10">14일 후</text><text x="486" y="154" fill="#a1a1aa" fontSize="10">1개월 후</text>
-      <text x="32" y={y(128.5) - 9} fill="#27272a" fontSize="11" fontWeight="700">128.5</text>
-    </svg>
-  );
-}
-
-function TwinPage({ selectedScenario, onSelectScenario, onOpenBuilder }: { selectedScenario: Scenario; onSelectScenario: (scenario: Scenario) => void; onOpenBuilder: () => void }) {
-  const [twinScenarioId, setTwinScenarioId] = useState(selectedScenario.id);
-  const twinScenario = scenarios.find((scenario) => scenario.id === twinScenarioId) ?? selectedScenario;
-  const holdings = [
-    { symbol: "S", name: "삼성전자", code: "005930", value: "220,000원", weight: "28.6%", change: "+1.03%", contribution: "+286,500원", tone: "up" },
-    { symbol: "H", name: "SK하이닉스", code: "000660", value: "1,555,000원", weight: "24.3%", change: "-0.74%", contribution: "-182,400원", tone: "down" },
-    { symbol: "E", name: "KODEX 200", code: "069500", value: "34,210원", weight: "18.7%", change: "+0.42%", contribution: "+90,800원", tone: "up" },
-    { symbol: "$", name: "USD 현금", code: "KRW 환산", value: "23,600,000원", weight: "18.4%", change: "0.00%", contribution: "0원", tone: "flat" },
-  ];
-  return (
-    <div className="twin-page">
-      <header className="page-heading twin-heading"><div><span>MY FINANCIAL TWIN</span><h1>내 금융 상태를 이해하고, 다음 선택을 미리 확인하세요.</h1></div><div className="market-stamp"><CalendarDays size={15} />2026.07.28 KRX 장마감 기준</div></header>
-      <section className="panel twin-assets-panel"><div className="panel-title"><h2>나의 자산 현황</h2><span className="twin-profile-chip"><UserRound size={13} /> 김민서님</span></div><div className="twin-assets-grid"><div className="twin-metric"><span>총 자산(평가금액)</span><strong>128,450,000원</strong><small>전일 대비 <b className="up">+1,250,000원 (+0.98%)</b></small></div><div className="twin-metric"><span>현금 비중</span><strong>18.4<em>%</em></strong><small>23,600,000원</small></div><div className="twin-metric"><span>목표 달성률</span><strong>62<em>%</em></strong><div className="twin-progress"><i style={{ width: "62%" }} /></div><small>목표 금액 200,000,000원</small></div><div className="twin-net-chart"><div><span>순자산 추이 (최근 6개월)</span><strong>+18.4%</strong></div><svg viewBox="0 0 280 92" aria-label="최근 6개월 순자산 추이"><line x1="0" y1="22" x2="280" y2="22" /><line x1="0" y1="48" x2="280" y2="48" /><line x1="0" y1="74" x2="280" y2="74" /><path d="M4 71 C19 65 28 69 40 58 S62 62 74 50 S93 46 104 48 S124 38 137 41 S152 29 166 34 S183 22 196 28 S212 21 222 24 S237 11 248 17 S262 8 276 4" /></svg><div className="twin-chart-labels"><span>2월</span><span>3월</span><span>4월</span><span>5월</span><span>6월</span><span>7월</span></div></div></div></section>
-      <section className="twin-main-grid"><section className="panel twin-portfolio-panel"><div className="panel-title"><h2>포트폴리오 보유 현황</h2><button className="twin-text-button" type="button">전체 보기 <ChevronRight size={15} /></button></div><div className="twin-table-wrap"><table className="twin-table"><thead><tr><th>종목</th><th>현재가</th><th>비중</th><th>등락률(1D)</th><th>기여도(1D)</th></tr></thead><tbody>{holdings.map((holding) => <tr key={holding.name}><td><div className="twin-holding-name"><span className={`twin-holding-symbol ${holding.tone}`}>{holding.symbol}</span><div><strong>{holding.name}</strong><small>{holding.code} · KOSPI</small></div></div></td><td>{holding.value}</td><td>{holding.weight}</td><td className={holding.tone}>{holding.change}</td><td className={holding.tone}>{holding.contribution}</td></tr>)}</tbody></table></div><p className="twin-table-note">* 가격과 수익률은 2026.07.28 KRX 장마감 기준이며, 실제 계좌와 다를 수 있습니다.</p></section><section className="panel twin-path-panel"><div className="panel-title"><h2>시나리오별 내 자산 경로</h2><span className="twin-path-caption">조건에 따른 가상 경로</span></div><div className="twin-scenario-cards">{scenarios.map((scenario, index) => <button key={scenario.id} className={`twin-scenario-card ${twinScenario.id === scenario.id ? "active" : ""}`} type="button" onClick={() => { setTwinScenarioId(scenario.id); onSelectScenario(scenario); }}><span className="twin-radio" /><span><small>시나리오 {index + 1}</small><strong>{scenario.title}</strong><em>{scenario.forecast}</em></span><i>{scenario.tone === "up" ? "상승" : "하락"}</i></button>)}<button className="twin-scenario-card twin-add-scenario" type="button" onClick={onOpenBuilder}><Plus size={20} /><span><small>내 시나리오</small><strong>직접 만들기</strong></span></button></div><div className="twin-selected-path"><div className="twin-selected-path-head"><div><span>선택 시나리오</span><strong>{twinScenario.title}</strong></div><b className={twinScenario.tone}>{twinScenario.forecast}</b></div><TwinPathChart scenario={twinScenario} /><p>선택한 시나리오에 따라 보유 자산의 예상 경로가 다시 계산됩니다.</p></div></section></section>
-      <section className="panel twin-experts-panel"><div className="panel-title"><h2>금융 대가의 한마디</h2><span>시나리오에 대한 서로 다른 관점</span></div><div className="twin-expert-grid"><article><div className="twin-expert-avatar">WB</div><div><span>워런 버핏 관점</span><h3>좋은 기업도 가격보다 이익의 지속성을 먼저 확인하세요.</h3><p>반등을 따라가기보다 HBM 수요와 외국인 수급이 함께 돌아오는지 확인합니다.</p><button type="button">직접 이야기해보기 <ArrowRight size={14} /></button></div></article><article><div className="twin-expert-avatar">HM</div><div><span>하워드 막스 관점</span><h3>낙폭보다 먼저, 기대가 얼마나 낮아졌는지 계산하세요.</h3><p>실적 리스크와 AI CapEx 둔화가 일시적 충격인지 추세 변화인지 구분합니다.</p><button type="button">직접 이야기해보기 <ArrowRight size={14} /></button></div></article><article><div className="twin-expert-avatar">TR</div><div><span>트럼프식 시장 관점</span><h3>정책과 자금 흐름이 바뀌기 전에는 현금을 협상 카드로 두세요.</h3><p>환율·외국인 수급·정책 뉴스가 같은 방향인지 확인하고 행동합니다.</p><button type="button">직접 이야기해보기 <ArrowRight size={14} /></button></div></article></div><div className="twin-disclaimer">상기 정보는 AI 분석 기반 참고 자료이며, 투자 판단의 최종 책임은 본인에게 있습니다.</div></section>
+    <div
+      className="chart-wrap"
+      ref={chartRef}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={() => setHoverIndex(series.points.length - 1)}
+    >
+      <svg className="market-chart" viewBox={`0 0 ${chart.width} ${chart.height}`} role="img" aria-label={`${series.name} 최근 흐름과 ${scenario.title} 조건부 분포`}>
+        <defs>
+          <linearGradient id={`actual-line-${series.key}`} x1="0" x2="1">
+            <stop offset="0" stopColor="#86bfff" />
+            <stop offset="1" stopColor="#087ff5" />
+          </linearGradient>
+          <linearGradient id={`area-fill-${series.key}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#3c9cff" stopOpacity=".25" />
+            <stop offset="1" stopColor="#3c9cff" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {[0, 1, 2, 3].map((line) => {
+          const y = chart.top + ((chart.height - chart.top - chart.bottom) * line) / 3;
+          return <line key={line} className="chart-grid" x1="10" x2="410" y1={y} y2={y} />;
+        })}
+        <path className="chart-area" style={{ fill: `url(#area-fill-${series.key})` }} d={chart.areaPath} />
+        <path className="chart-line" style={{ stroke: `url(#actual-line-${series.key})` }} d={chart.actualPath} />
+        <line className="forecast-divider" x1={chart.actualEnd} x2={chart.actualEnd} y1="8" y2={chart.height - chart.bottom} />
+        <path className={`forecast-band ${scenario.tone}`} d={chart.bandPath} />
+        <path className={`forecast-median ${scenario.tone}`} d={chart.medianPath} />
+        {hovered && (
+          <>
+            <line className="hover-line" x1={hovered.x} x2={hovered.x} y1="8" y2={chart.height - chart.bottom} />
+            <circle className="hover-dot" cx={hovered.x} cy={hovered.y} r="4" />
+          </>
+        )}
+        <text className="chart-label actual-label" x="10" y="174">{series.source === "database" ? "실제 DB" : "더미"}</text>
+        <text className="chart-label forecast-label" x="294" y="174">조건부 분포</text>
+      </svg>
+      {hovered && (
+        <div className="chart-tooltip" style={{ left: `${(hovered.x / chart.width) * 100}%` }}>
+          <span>{formatDate(hovered.date)}</span>
+          <strong>{formatNumber(hovered.close, valueDigits)}</strong>
+          <Trend value={hovered.changePct} />
+        </div>
+      )}
     </div>
   );
 }
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<MainTab>("market");
+  const [data, setData] = useState<DashboardData>(fallback);
+  const [status, setStatus] = useState<"loading" | "live" | "fallback">("fallback");
+  const [selectedMarket, setSelectedMarket] = useState<"KOSPI" | "KOSDAQ" | "NASDAQ">("KOSPI");
   const [selectedScenario, setSelectedScenario] = useState(scenarios[0]);
-  const [scenarioDetailOpen, setScenarioDetailOpen] = useState(false);
+  const [eventMode, setEventMode] = useState<"news" | "conditions">("news");
+  const [refreshing, setRefreshing] = useState(false);
   const [builderOpen, setBuilderOpen] = useState(false);
-  const [builderMode, setBuilderMode] = useState<"form" | "build">("form");
-  const [buildStage, setBuildStage] = useState<BuildStage>(1);
-  const [simulationStarted, setSimulationStarted] = useState(false);
-  const [selectedSeeds, setSelectedSeeds] = useState<string[]>(["외국인 순매수 회복", "SK하이닉스 실적 서프라이즈"]);
+  const [selectedSeeds, setSelectedSeeds] = useState<string[]>(["외국인 순매수 회복", "AI CapEx 유지·확대"]);
   const [period, setPeriod] = useState("30일");
-  const [scenarioPrompt, setScenarioPrompt] = useState("8월 말까지 외국인 수급과 반도체 실적이 KOSPI에 미치는 영향을 비교해줘.");
-  const [uploadedSeedFile, setUploadedSeedFile] = useState<UploadedSeed | null>(null);
-  const scenarioScrollY = useRef<number | null>(null);
-  const buildTimer = useRef<number | null>(null);
+  const [scenarioPrompt, setScenarioPrompt] = useState("외국인 수급과 반도체 실적이 함께 회복되면 시장은 어떻게 움직일까?");
+  const [uploadedSource, setUploadedSource] = useState<{ name: string; size: number } | null>(null);
 
-  useLayoutEffect(() => {
-    if (scenarioScrollY.current === null) return;
-    const scrollTop = scenarioScrollY.current;
-    scenarioScrollY.current = null;
-    window.scrollTo(0, scrollTop);
-    window.requestAnimationFrame(() => window.scrollTo(0, scrollTop));
-  }, [selectedScenario]);
-
-  const activateTab = (tab: MainTab) => {
-    setActiveTab(tab);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const toggleSeed = (seed: string) => {
-    setSelectedSeeds((current) =>
-      current.includes(seed) ? current.filter((item) => item !== seed) : [...current, seed],
-    );
-  };
-
-  const openBuilder = () => {
-    if (buildTimer.current) window.clearTimeout(buildTimer.current);
-    setBuilderMode("form");
-    setBuildStage(1);
-    setSimulationStarted(false);
-    setBuilderOpen(true);
-  };
-
-  const closeBuilder = () => {
-    if (buildTimer.current) window.clearTimeout(buildTimer.current);
-    setBuilderOpen(false);
-    setBuilderMode("form");
-  };
-
-  const handleSeedUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    let preview = "";
-    if (file.type.startsWith("text/") || /\.(txt|md|csv|json)$/i.test(file.name)) {
-      preview = (await file.text()).replace(/\s+/g, " ").slice(0, 180);
+  const loadData = async () => {
+    setRefreshing(true);
+    try {
+      const response = await fetch("/api/dashboard", { cache: "no-store" });
+      if (!response.ok) throw new Error("dashboard request failed");
+      setData(mergeDashboard(await response.json()));
+      setStatus("live");
+    } catch {
+      setData(fallback);
+      setStatus("fallback");
+    } finally {
+      setRefreshing(false);
     }
-    setUploadedSeedFile({ name: file.name, size: file.size, preview });
-    event.target.value = "";
   };
 
-  const selectScenario = (scenario: Scenario) => {
-    scenarioScrollY.current = window.scrollY;
-    setSelectedScenario(scenario);
-    setScenarioDetailOpen(false);
-  };
+  useEffect(() => {
+    let active = true;
+    fetch("/api/dashboard", { cache: "no-store" })
+      .then((response) => {
+        if (!response.ok) throw new Error("dashboard request failed");
+        return response.json() as Promise<DashboardData>;
+      })
+      .then((payload) => {
+        if (!active) return;
+        setData(mergeDashboard(payload));
+        setStatus("live");
+      })
+      .catch(() => {
+        if (!active) return;
+        setData(fallback);
+        setStatus("fallback");
+      });
+    return () => { active = false; };
+  }, []);
 
-  const openScenarioDetail = (scenario: Scenario) => {
-    scenarioScrollY.current = window.scrollY;
-    setSelectedScenario(scenario);
-    setScenarioDetailOpen(true);
-  };
-
-  const runCustomScenario = () => {
-    const activeSeeds = selectedSeeds.length ? selectedSeeds : ["KOSPI 기본 환경"];
-    setSelectedScenario({
-      ...scenarios[0],
-      id: "custom",
-      title: activeSeeds.slice(0, 2).join(" · "),
-      duration: period,
-      tags: activeSeeds.slice(0, 2),
-      summary: `${activeSeeds.join(", ")} 조건을 바탕으로 ${period} 동안 KOSPI와 연결된 종목·환율·수급·이벤트의 상호작용을 분석하는 사용자 지정 시나리오입니다. ${scenarioPrompt}`,
-      forecast: "조건부 경로 계산",
-    });
-    setBuilderMode("build");
-    setBuildStage(1);
-    setSimulationStarted(false);
-    setScenarioDetailOpen(false);
-    let nextStage: BuildStage = 1;
-    const advanceBuild = () => {
-      if (nextStage >= 6) return;
-      nextStage = (nextStage + 1) as BuildStage;
-      setBuildStage(nextStage);
-      if (nextStage < 6) buildTimer.current = window.setTimeout(advanceBuild, 5000);
+  useEffect(() => {
+    if (!builderOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setBuilderOpen(false);
     };
-    buildTimer.current = window.setTimeout(advanceBuild, 5000);
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [builderOpen]);
+
+  const toggleSeed = (label: string) => {
+    setSelectedSeeds((current) => current.includes(label)
+      ? current.filter((item) => item !== label)
+      : [...current, label]);
   };
 
-  const startSimulation = () => {
-    setSimulationStarted(true);
+  const applyCustomScenario = () => {
+    const seeds = environmentSeeds.filter((seed) => selectedSeeds.includes(seed.label));
+    const periodWeight = period === "7일" ? 0.45 : period === "3개월" ? 1.55 : 1;
+    const impact = Number((seeds.reduce((total, seed) => total + seed.direction * 2.1, 0) * periodWeight).toFixed(1));
+    const finalRatio = 1 + impact / 100;
+    const title = seeds.length
+      ? seeds.slice(0, 2).map((seed) => seed.label).join(" · ")
+      : "기본 환경 시나리오";
+
+    setSelectedScenario({
+      id: "custom",
+      eyebrow: `나의 조건 · ${period}`,
+      title,
+      summary: scenarioPrompt.trim() || "선택한 시장 조건을 기준으로 경로를 비교합니다.",
+      impact,
+      tone: impact >= 0 ? "positive" : "negative",
+      icon: Network,
+      forecast: [1, 1 + (finalRatio - 1) * 0.25, 1 + (finalRatio - 1) * 0.58, finalRatio],
+      assumptions: seeds.length ? seeds.map((seed) => seed.label) : ["KOSPI 기본 환경"],
+    });
+    setEventMode("conditions");
+    setBuilderOpen(false);
+    window.requestAnimationFrame(() => document.querySelector("#insight")?.scrollIntoView({ behavior: "smooth" }));
   };
+
+  const foreignFlow = data.flows.find((flow) => flow.market === "KOSPI" && flow.investor === "외국인");
+  const exchangeRate = data.macros.find((item) => item.name.includes("원달러"));
+  const signals = data.signals ?? fallback.signals;
+  const databaseSignalCount = signals.filter((signal) => signal.source === "database").length;
+  const chartSeries: MarketSeries[] = [
+    data.indices.find((item) => item.key === "KOSPI") ?? fallback.indices[0],
+    data.indices.find((item) => item.key === "KOSDAQ") ?? fallback.indices[1],
+    ...(["005930", "000660"] as const).map((ticker) => {
+      const stock = data.stocks.find((item) => item.ticker === ticker)
+        ?? fallback.stocks.find((item) => item.ticker === ticker)!;
+      return { key: stock.ticker, name: stock.name, points: stock.points, source: stock.source };
+    }),
+  ];
 
   return (
-    <div className="finverse-app">
+    <div className="app-shell">
+      <aside className="sidebar" aria-label="주요 탐색">
+        <a className="sidebar-brand" href="#top" aria-label="FINVERSE 홈">FINVERSE</a>
+        <div className="sidebar-context">
+          <BarChart3 size={18} />
+          <div><span>MARKET BOARD</span><strong>시장 인사이트</strong></div>
+        </div>
+        <nav className="side-nav" aria-label="페이지 섹션">
+          <a className="active" href="#insight"><BarChart3 size={17} />시장 인사이트</a>
+          <a href="#scenarios"><Network size={17} />시나리오 분석</a>
+          <a href="#data-readiness"><Database size={17} />데이터 준비도</a>
+        </nav>
+        <div className="sidebar-footer">
+          <div>
+            <span className={`connection ${status}`}><span className="status-dot" />{status === "live" ? "PostgreSQL 실시간" : status === "loading" ? "DB 확인 중" : "저장 스냅샷"}</span>
+            <button className="icon-button" type="button" aria-label="데이터 새로고침" onClick={() => void loadData()} disabled={refreshing}><RefreshCw size={15} className={refreshing ? "spinning" : ""} /></button>
+          </div>
+          <small><ShieldCheck size={13} />LOCAL VIEW</small>
+        </div>
+      </aside>
+
       <header className="mobile-header">
-        <button className="sidebar-brand" onClick={() => activateTab("market")} aria-label="FINVERSE 시장 인사이트 홈">
-          <span className="brand-mark">F</span><span>FINVERSE</span>
-        </button>
+        <a className="brand" href="#top"><span className="brand-mark"><BarChart3 size={17} /></span>FINVERSE</a>
+        <button className="icon-button" type="button" aria-label="데이터 새로고침" onClick={() => void loadData()} disabled={refreshing}><RefreshCw size={15} className={refreshing ? "spinning" : ""} /></button>
       </header>
 
-      <div className="app-layout">
-        <aside className="sidebar" aria-label="FINVERSE 탐색">
-          <button className="sidebar-brand" onClick={() => activateTab("market")} aria-label="FINVERSE 시장 인사이트 홈">
-            <span className="brand-mark">F</span><span>FINVERSE</span>
-          </button>
-          <div className="sidebar-label"><BrainCircuit size={19} /><div><span>AI DECISION LAB</span><strong>금융 판단 실험실</strong></div></div>
-          <nav className="side-tabs">
-            <button className={activeTab === "market" ? "active" : ""} onClick={() => activateTab("market")}><BarChart3 size={18} />시장 인사이트</button>
-            <button className={activeTab === "twin" ? "active" : ""} onClick={() => activateTab("twin")}><UserRound size={18} />마이 금융 트윈</button>
-          </nav>
-          <button className="sidebar-help" type="button"><CircleHelp size={20} /><span>도움말</span><ChevronRight size={17} /></button>
+      <main className="main-content">
+
+      <section className="hero" id="top">
+        <div className="hero-copy">
+          <span className="eyebrow">MARKET OVERVIEW · LOCAL</span>
+          <h1>오늘의 시장을 읽고,<br /><span>다음 움직임을 미리 살펴보세요.</span></h1>
+          <p>실제 시장 데이터와 조건부 시나리오를 한 화면에서 연결합니다.</p>
+        </div>
+        <div className="privacy-pill"><ShieldCheck size={15} />내 컴퓨터에서만 실행 중</div>
+      </section>
+
+      <section className="dashboard-grid" id="insight">
+        <aside className="panel market-panel">
+          <div className="panel-heading">
+            <div>
+              <span className="eyebrow">MARKET PULSE</span>
+              <h2>시장 연결</h2>
+            </div>
+            <Wifi size={18} className="muted-icon" />
+          </div>
+
+          <div className="signal-summary">
+            <div>
+              <h3>오늘의 시장 구성</h3>
+              <p>항목을 눌러 비중 근거와 시장 영향 보기</p>
+            </div>
+            <span>{databaseSignalCount}/4 DB</span>
+          </div>
+
+          <div className="signal-stack">
+            {signals.map((signal) => {
+              const Icon = signalIcons[signal.key];
+              const keywords = signal.keywords.slice(0, 2);
+              return (
+                <details className={`signal-group ${signal.key}`} key={signal.key}>
+                  <summary>
+                    <span className="signal-group-head">
+                      <span className="signal-icon"><Icon size={15} /></span>
+                      <strong>{signal.label}</strong>
+                      <span className={`source-badge ${signal.source}`}>{signal.source === "database" ? "DB" : "더미"}</span>
+                      <span className="signal-share"><b>{signal.share}%</b><ChevronRight className="signal-disclosure" size={12} /></span>
+                    </span>
+                    <span className="signal-keywords">
+                      {keywords.map((keyword) => (
+                        <span key={keyword.label}>
+                          <span>{keyword.label}</span>
+                          <strong>{keyword.share}%</strong>
+                        </span>
+                      ))}
+                    </span>
+                    <span className="signal-track" aria-hidden="true">
+                      {keywords.map((keyword) => <i key={keyword.label} style={{ width: `${keyword.share}%` }} />)}
+                    </span>
+                  </summary>
+                  <div className="signal-explainer">
+                    <div>
+                      <span>비중 근거</span>
+                      <p>{keywords.map((keyword) => `${keyword.label} ${keyword.share}%`).join(" + ")}의 합계입니다. 현재 퍼센트는 비교용 데모 가중치이며 예측 확률은 아닙니다.</p>
+                    </div>
+                    <div>
+                      <span>시장 영향</span>
+                      <p>{signalImpacts[signal.key]}</p>
+                    </div>
+                    <small>{signal.source === "database" ? "키워드는 DB 수집값, 비중은 데모 기준" : "DB 미연결 시 표시되는 예시 키워드와 비중"}</small>
+                  </div>
+                </details>
+              );
+            })}
+          </div>
+
+          <div className="index-section">
+            <div className="section-row"><h3>주요 지수</h3><span>{formatDate(data.asOf)} 기준</span></div>
+            <div className="market-switch" aria-label="시장 선택">
+              {data.indices.map((item) => {
+                const point = item.points.at(-1);
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    className={selectedMarket === item.key ? "selected" : ""}
+                    onClick={() => setSelectedMarket(item.key)}
+                  >
+                    <span>{item.name}<small className={`index-source ${item.source}`}>{item.source === "database" ? "DB" : "D"}</small></span>
+                    <strong>{point ? formatNumber(point.close) : "—"}</strong>
+                    {point && <Trend value={point.changePct} />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </aside>
 
-        <main className="main-content">
-          {activeTab === "market" ? (
-            <div className="market-page">
-              <header className="page-heading">
-                <div><span>MARKET INSIGHT</span><h1>오늘의 시장을 이해하고, 다음 움직임을 미리 살펴보세요.</h1></div>
-                <div className="market-stamp"><CalendarDays size={15} />2026.07.28 KRX 장마감 기준</div>
-              </header>
-
-              <section className="market-dashboard">
-                <section className="panel connection-panel">
-                  <div className="panel-title"><h2>시장 연결</h2></div>
-                  <div className="connection-list">
-                    {marketConnections.map((item) => (
-                      <article key={item.name}>
-                        <div className="connection-main">
-                          <span className={`entity-symbol ${item.tone}`}>{item.symbol}</span>
-                          <div><strong>{item.name}</strong><small>{item.code}</small></div>
-                          <div className={item.tone}><strong>{item.value}</strong><small>{item.change}</small></div>
-                        </div>
-                        <div className="connection-contribution">
-                          <span>KOSPI 기여도</span>
-                          <strong className={item.contribution.startsWith("+") ? "up" : "down"}>{item.contribution}</strong>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                  <p className="data-note">* 모든 시장 연결 값은 2026.07.28 KRX 장마감 기준입니다.</p>
-                </section>
-
-                <section className="panel chart-panel">
-                  <div className="kospi-head">
-                      <div>
-                        <span>KOSPI LIVE</span>
-                        <h2 className="down">6,023.66 <strong>-10.84%</strong></h2>
-                        <div className="today-change down">▼ 732.09 <span>(오늘)</span></div>
-                    </div>
-                    <div><span>선택 시나리오</span><strong>{selectedScenario.title}</strong></div>
-                  </div>
-                  <div className="chart-legend"><span><i className="actual" />KOSPI</span><span><i className={`forecast ${selectedScenario.tone}`} />예상({selectedScenario.duration})</span><span><i className="range" />신뢰구간(70%)</span></div>
-                  <ForecastChart scenario={selectedScenario} />
-                  <div className="ai-summary"><Sparkles size={17} /><div><strong>AI 요약</strong><p>{selectedScenario.summary}</p></div></div>
-                </section>
-
-                <aside className="panel event-panel">
-                  <div className="panel-title"><div><span>가상 시뮬레이션</span><h2>발생 가능 이벤트</h2></div><span className="scenario-period">{selectedScenario.duration}</span></div>
-                  <div className="event-timeline">
-                    {selectedScenario.events.map((event) => (
-                      <article key={event.title}>
-                        <div className="event-week">{event.week}</div>
-                        <div className="event-dot" />
-                        <div className="event-copy">
-                          <span>{event.category}</span>
-                          <h3>{event.title}</h3>
-                          <p>{event.body}</p>
-                          <div className="event-impact">
-                            <span>예상 영향</span>
-                            <strong className={event.impact.startsWith("+") ? "up" : "down"}>{event.impact}</strong>
-                          </div>
-                          <button type="button" aria-label={`${event.title} 시나리오에 포함됨`}>
-                            <span>시나리오에 포함됨</span>
-                            <Bookmark size={14} />
-                          </button>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                </aside>
-              </section>
-
-              <section className="scenario-section">
-                <div className="scenario-heading"><div><span>SCENARIO LIBRARY</span><h2>시나리오별 KOSPI 경로를 비교하세요</h2><p>준비된 시장 환경을 선택하면 발생 가능 이벤트와 조건부 예상 경로가 열립니다.</p></div><span><CircleDollarSign size={15} />가상 시뮬레이션</span></div>
-                <div className="scenario-grid">
-                  {scenarios.map((scenario) => (
-                    <article key={scenario.id} className={`scenario-card ${selectedScenario.id === scenario.id ? "active" : ""}`} onMouseDown={(event) => event.preventDefault()} onClick={() => selectScenario(scenario)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") selectScenario(scenario); }} role="button" tabIndex={0} aria-pressed={selectedScenario.id === scenario.id}>
-                      <div className="scenario-card-main">
-                        <span className={`scenario-icon ${scenario.tone}`}>
-                          {scenario.id === "kospi-rebound" ? <BarChart3 size={22} /> : scenario.id === "chip-miss" ? <BrainCircuit size={22} /> : scenario.id === "risk-off" ? <CircleDollarSign size={22} /> : <UserRound size={22} />}
-                        </span>
-                        <div>
-                          <h3>{scenario.title}</h3>
-                          <div className="scenario-tags"><span>{scenario.duration}</span>{scenario.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
-                        </div>
-                      </div>
-                      <small>조건부 예상</small>
-                      <strong className={scenario.tone}>{scenario.forecast}</strong>
-                      <button className="scenario-card-detail-button" type="button" onClick={(event) => { event.stopPropagation(); openScenarioDetail(scenario); }}>상세 보기 <ChevronRight size={15} /></button>
-                    </article>
-                  ))}
-                  <button className="custom-scenario-card" onClick={openBuilder}>
-                    <Plus size={24} /><div><strong>내 시나리오 예측하기</strong><p>원하는 시장 조건과 기간을 직접 선택하세요.</p></div><ArrowRight size={18} />
-                  </button>
-                </div>
-                <span className="visually-hidden">SELECTED SCENARIO · 시나리오 전제 · 예상 전개</span>
-
-                {false && <section className="scenario-detail" id="scenario-detail" aria-live="polite" aria-label="선택한 시나리오 상세 내용">
-                  <header className="scenario-detail-header">
-                    <div>
-                      <span>SELECTED SCENARIO</span>
-                      <h3>{selectedScenario.title}</h3>
-                      <p>핵심 결론부터 반증 신호까지, 선택한 조건이 실제로 이어졌을 때의 KOSPI 흐름을 이야기로 정리했습니다.</p>
-                    </div>
-                    <div className={`scenario-detail-forecast ${selectedScenario.tone}`}>
-                      <small>{selectedScenario.duration} 예상</small>
-                      <strong>{selectedScenario.forecast}</strong>
-                    </div>
-                  </header>
-
-                  <section className="scenario-detail-lead" aria-label="시나리오 핵심 결론">
-                    <span>ONE-LINE THESIS</span>
-                    <strong>{selectedScenario.thesis}</strong>
-                    <p>{selectedScenario.context}</p>
-                  </section>
-
-                  <div className="scenario-detail-body">
-                    <article className="scenario-story">
-                      <div className="scenario-detail-visual">
-                        <img src={selectedScenario.image} alt={`${selectedScenario.title} 시나리오 이미지`} />
-                        <span>CONDITIONAL MARKET PATH</span>
-                      </div>
-                      <div className="scenario-detail-label">시나리오 전제</div>
-                      <p>{selectedScenario.summary}</p>
-                      <div className="scenario-signal-list">
-                        <span>핵심 전제</span>
-                        {selectedScenario.tags.map((tag) => <em key={tag}>{tag}</em>)}
-                      </div>
-                    </article>
-
-                    <div className="scenario-milestones">
-                      <div className="scenario-detail-label">예상 전개</div>
-                      <div className="scenario-milestone-list">
-                        {selectedScenario.events.map((event, index) => (
-                          <article key={`${selectedScenario.id}-${event.title}`} className="scenario-milestone">
-                            <div className="scenario-milestone-index">0{index + 1}</div>
-                            <div className="scenario-milestone-copy">
-                              <div className="scenario-milestone-meta"><span>{event.week}</span><em>{event.category}</em></div>
-                              <h4>{event.title}</h4>
-                              <p>{event.body}</p>
-                            </div>
-                            <strong className={event.impact.startsWith("+") ? "up" : "down"}>{event.impact}</strong>
-                          </article>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <section className="scenario-narrative" aria-label="시나리오 상세 전개">
-                    <div className="scenario-detail-label">시나리오를 읽는 순서</div>
-                    <div className="scenario-narrative-list">
-                      {selectedScenario.chapters.map((chapter, index) => (
-                        <article key={`${selectedScenario.id}-${chapter.title}`} className="scenario-narrative-card">
-                          <div className="scenario-narrative-index">0{index + 1}</div>
-                          <div>
-                            <h4>{chapter.title}</h4>
-                            <p>{chapter.body}</p>
-                            {chapterLessonMap[selectedScenario.id]?.[index] && <p className="scenario-narrative-lesson">{chapterLessonMap[selectedScenario.id][index]}</p>}
-                            <span>{chapter.evidence}</span>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  </section>
-
-                  <ScenarioLearningArticle scenario={selectedScenario} />
-
-                  <section className="scenario-decision-grid" aria-label="개인 투자자 학습 가이드">
-                    <article className="scenario-decision-panel">
-                      <div className="scenario-detail-label">개인 투자자의 선택지</div>
-                      <p className="scenario-section-note">예측을 따라 하기보다 조건이 바뀔 때 어떤 행동을 선택할지 미리 적어보세요.</p>
-                      <div className="scenario-choice-list">
-                        {selectedScenario.investorGuide.map((guide) => (
-                          <div key={`${selectedScenario.id}-${guide.stance}`} className="scenario-choice-row">
-                            <strong>{guide.stance}</strong>
-                            <div><h4>{guide.action}</h4><p>{guide.rationale}</p></div>
-                          </div>
-                        ))}
-                      </div>
-                    </article>
-                    <article className="scenario-decision-panel">
-                      <div className="scenario-detail-label">다음에 공부할 질문</div>
-                      <p className="scenario-section-note">이 시나리오의 숫자를 직접 검증할 수 있는 질문입니다.</p>
-                      <div className="scenario-study-list">
-                        {selectedScenario.studyGuide.map((study) => (
-                          <div key={`${selectedScenario.id}-${study.topic}`}><span>{study.topic}</span><p>{study.question}</p></div>
-                        ))}
-                      </div>
-                    </article>
-                  </section>
-
-                  <section className="scenario-bias-section" aria-label="인지 편향 체크">
-                    <div className="scenario-detail-label">판단 전, 인지 편향 체크</div>
-                    <p className="scenario-section-note">같은 뉴스도 내 포지션과 기대에 따라 다르게 보입니다. 아래 함정을 먼저 확인하세요.</p>
-                    <div className="scenario-bias-grid">
-                      {selectedScenario.biasChecks.map((item) => (
-                        <article key={`${selectedScenario.id}-${item.bias}`} className="scenario-bias-card">
-                          <span>{item.bias}</span>
-                          <strong>{item.trap}</strong>
-                          <p><b>대응:</b> {item.counter}</p>
-                        </article>
-                      ))}
-                    </div>
-                  </section>
-
-                  <section className="scenario-detail-intelligence" aria-label="멀티 에이전트 해석">
-                    <div className="scenario-detail-label">멀티 에이전트 해석</div>
-                    <div className="scenario-agent-grid">
-                      {selectedScenario.agentInsights.map((insight) => (
-                        <article key={`inline-${selectedScenario.id}-${insight.role}`} className="scenario-agent-card">
-                          <span>{insight.role}</span>
-                          <h3>{insight.title}</h3>
-                          <p>{insight.body}</p>
-                        </article>
-                      ))}
-                    </div>
-                  </section>
-
-                  <section className="scenario-detail-risks" aria-label="핵심 리스크">
-                    <div className="scenario-detail-label">이 시나리오가 빗나갈 수 있는 지점</div>
-                    <div className="scenario-risk-list">
-                      {selectedScenario.riskPoints.map((risk) => <span key={`inline-risk-${risk}`}>{risk}</span>)}
-                    </div>
-                  </section>
-                </section>}
-              </section>
+        <article className="panel chart-panel market-board">
+          <div className="chart-heading">
+            <div>
+              <div className="live-label"><span />LIVE MARKET MONITOR</div>
+              <h2>지수·반도체 4종</h2>
+              <p>실제 종가와 최근 변동성 기반 조건부 범위</p>
             </div>
-          ) : <TwinPage selectedScenario={selectedScenario} onSelectScenario={setSelectedScenario} onOpenBuilder={openBuilder} />}
-        </main>
-      </div>
+            <button className="compact-button" type="button" onClick={() => document.querySelector("#scenarios")?.scrollIntoView({ behavior: "smooth" })}>
+              시나리오 변경 <ChevronRight size={15} />
+            </button>
+          </div>
 
-      <nav className="mobile-tabs" aria-label="모바일 주요 메뉴">
-        <button className={activeTab === "market" ? "active" : ""} onClick={() => activateTab("market")}><BarChart3 size={18} /><span>시장 인사이트</span></button>
-        <button className={activeTab === "twin" ? "active" : ""} onClick={() => activateTab("twin")}><UserRound size={18} /><span>마이 금융 트윈</span></button>
-      </nav>
+          <div className="market-card-grid">
+            {chartSeries.map((series) => {
+              const latest = series.points.at(-1) ?? { date: data.asOf, close: 0, changePct: 0 };
+              const valueDigits = /^\d+$/.test(series.key) ? 0 : 2;
+              return (
+                <section className="market-card" key={series.key} aria-label={`${series.name} 시장 차트`}>
+                  <header className="market-card-head">
+                    <div>
+                      <span>{series.key}</span>
+                      <h3>{series.name}</h3>
+                    </div>
+                    <small className={`market-source ${series.source}`}>{series.source === "database" ? "DB" : "DEMO"}</small>
+                  </header>
+                  <div className="market-card-value">
+                    <strong>{formatNumber(latest.close, valueDigits)}</strong>
+                    <Trend value={latest.changePct} />
+                  </div>
+                  <MarketChart series={series} scenario={selectedScenario} />
+                  <div className="distribution-key">
+                    <span><i className="actual" />실제</span>
+                    <span><i className={`range ${selectedScenario.tone}`} />조건부 분포</span>
+                    <time>{formatDate(latest.date)}</time>
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+
+          <div className="insight-strip">
+            <div className="ai-orb"><BarChart3 size={18} /></div>
+            <div>
+              <span>MARKET BRIEF</span>
+              <p>
+                외국인은 KOSPI에서 <strong>{foreignFlow ? formatFlow(foreignFlow.netValue) : "집계 중"}</strong>, 원·달러는 <strong>{exchangeRate ? `${formatNumber(exchangeRate.value, 1)}원` : "집계 중"}</strong>입니다.
+                현재 범위는 <strong>{selectedScenario.title}</strong> 조건과 최근 변동성을 함께 반영한 교육용 분포입니다.
+              </p>
+            </div>
+          </div>
+        </article>
+
+        <aside className="panel event-panel">
+          <div className="panel-heading">
+            <div>
+              <span className="eyebrow">SIGNAL STREAM</span>
+              <h2>이벤트 흐름</h2>
+            </div>
+            <Newspaper size={18} className="muted-icon" />
+          </div>
+          <div className="segmented-control" role="tablist" aria-label="이벤트 표시 방식">
+            <button role="tab" aria-selected={eventMode === "news"} className={eventMode === "news" ? "selected" : ""} onClick={() => setEventMode("news")}>최근 뉴스</button>
+            <button role="tab" aria-selected={eventMode === "conditions"} className={eventMode === "conditions" ? "selected" : ""} onClick={() => setEventMode("conditions")}>예상 조건</button>
+          </div>
+
+          {eventMode === "news" ? (
+            <div className="timeline">
+              {data.news.slice(0, 5).map((item, position) => (
+                <article className="timeline-item" key={`${item.publishedAt}-${position}`}>
+                  <div className="timeline-rail"><span /><i /></div>
+                  <div className="timeline-content">
+                    <time>{formatDate(item.publishedAt)}</time>
+                    {item.url ? <a href={item.url} target="_blank" rel="noreferrer">{item.title}</a> : <h3>{item.title}</h3>}
+                    <div className="tag-row">
+                      {item.eventTypes.slice(0, 2).map((type) => <span key={type}>{eventLabels[type] ?? type}</span>)}
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="condition-list">
+              <div className="condition-banner"><CircleAlert size={17} /><span>아래는 일정 데이터가 아닌 시나리오 조건입니다.</span></div>
+              {selectedScenario.assumptions.map((assumption, index) => (
+                <div className="condition-row" key={assumption}>
+                  <span>{String(index + 1).padStart(2, "0")}</span>
+                  <div><strong>{assumption}</strong><small>발생 시 조건부 경로에 반영</small></div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="event-footnote"><Database size={14} />뉴스는 수집 시점, 시장은 거래일 기준으로 갱신됩니다.</div>
+        </aside>
+      </section>
+
+      <section className="scenario-section" id="scenarios">
+        <div className="section-heading">
+          <div><span className="eyebrow">SCENARIO ANALYSIS</span><h2>조건별 시장 경로</h2><p>시장 조건을 선택해 지수와 주요 종목의 변화 범위를 비교하세요.</p></div>
+          <span className="disclaimer"><CircleAlert size={14} />투자 권유가 아닌 시장 이해용 데모</span>
+        </div>
+        <div className="scenario-grid">
+          {scenarios.map((scenario) => {
+            const Icon = scenario.icon;
+            const selected = selectedScenario.id === scenario.id;
+            return (
+              <button
+                type="button"
+                key={scenario.id}
+                className={`scenario-card ${selected ? "selected" : ""}`}
+                onClick={() => setSelectedScenario(scenario)}
+                aria-pressed={selected}
+              >
+                <div className={`scenario-icon ${scenario.tone}`}><Icon size={20} /></div>
+                <span className="eyebrow">{scenario.eyebrow}</span>
+                <h3>{scenario.title}</h3>
+                <p>{scenario.summary}</p>
+                <div className="scenario-result">
+                  <span>4주 조건부 변화</span>
+                  <strong className={scenario.tone}>{scenario.impact > 0 ? "+" : ""}{scenario.impact.toFixed(1)}%</strong>
+                </div>
+                <div className="scenario-action">차트에 적용 {selected ? <span className="selected-check"><Check size={13} /></span> : <ChevronRight size={15} />}</div>
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            className={`custom-scenario-card ${selectedScenario.id === "custom" ? "selected" : ""}`}
+            onClick={() => setBuilderOpen(true)}
+            aria-pressed={selectedScenario.id === "custom"}
+          >
+            <span className="custom-scenario-icon"><Plus size={22} /></span>
+            <div>
+              <span>MY SCENARIO</span>
+              <strong>내 시나리오 예측하기</strong>
+              <p>시장 조건·기간·나만의 질문을 직접 설정하세요.</p>
+            </div>
+            <span className="custom-scenario-action">
+              {selectedScenario.id === "custom" ? "적용 중" : "조건 만들기"}
+              {selectedScenario.id === "custom" ? <Check size={15} /> : <ArrowRight size={16} />}
+            </span>
+          </button>
+        </div>
+      </section>
+
+      <section className="readiness-section" id="data-readiness">
+        <div className="readiness-copy">
+          <span className="eyebrow">DATA READINESS</span>
+          <h2>현재 DB로 가능한 것과<br />더 필요한 것을 구분했습니다.</h2>
+          <p>가격·수급·거시지표·뉴스는 연결됐습니다. 미래 예측 품질을 높이려면 아래 네 가지 데이터가 추가로 필요합니다.</p>
+          <div className="ready-list">
+            {["KRX 지수·종목 일봉", "시장별 투자자 수급", "한국 거시지표", "뉴스·이벤트 분류"].map((item) => <span key={item}><Check size={13} />{item}</span>)}
+          </div>
+        </div>
+        <div className="gap-grid">
+          {gapItems.map((item) => {
+            const Icon = item.icon;
+            return <article className="gap-card" key={item.title}><Icon size={20} /><div><h3>{item.title}</h3><p>{item.detail}</p></div><span>추가 필요</span></article>;
+          })}
+        </div>
+      </section>
+
+      <footer>
+        <div className="brand"><span className="brand-mark"><BarChart3 size={17} /></span>FINVERSE</div>
+        <p>데이터 기준 {data.asOf} · 로컬 전용 프로토타입 · 시나리오는 교육용 예시입니다.</p>
+      </footer>
 
       {builderOpen && (
-        <div className="modal-backdrop scenario-builder-backdrop" onMouseDown={closeBuilder}>
-          {builderMode === "form" ? (
-            <section className="scenario-modal scenario-builder-modal" role="dialog" aria-modal="true" aria-labelledby="scenario-modal-title" onMouseDown={(event) => event.stopPropagation()}>
-              <header className="scenario-builder-header"><div><span>MY SCENARIO LAB · 2026.08.01</span><h2 id="scenario-modal-title">내 시나리오를 설계해보세요</h2><p>환경 시드와 나만의 질문을 입력하면 KOSPI 지식그래프를 만들고 미래 경로를 비교합니다.</p></div><button className="scenario-modal-close" type="button" onClick={closeBuilder} aria-label="시나리오 빌더 닫기"><X size={20} /></button></header>
-              <div className="builder-section-heading"><div><span>01 · ENVIRONMENT SEEDS</span><h3>시장의 출발 조건을 골라주세요</h3></div><small>26년 8월 1일 기준 준비된 변수</small></div>
-              <div className="builder-seed-grid">
-                {environmentSeeds.map((seed) => <button key={seed.id} type="button" className={selectedSeeds.includes(seed.label) ? "active" : ""} onClick={() => toggleSeed(seed.label)}><span className="builder-seed-top"><em>{seed.category}</em>{selectedSeeds.includes(seed.label) ? <CheckCircle2 size={15} /> : <Plus size={15} />}</span><strong>{seed.label}</strong><small>{seed.detail}</small></button>)}
-              </div>
-              <div className="builder-input-grid">
-                <div className="builder-group builder-upload-group"><div className="builder-section-heading compact"><div><span>02 · SOURCE DATA</span><h3>나만의 데이터 추가</h3></div></div><label className="upload-dropzone" htmlFor="scenario-seed-upload"><FileUp size={18} /><span>{uploadedSeedFile ? uploadedSeedFile.name : "파일을 끌어오거나 눌러 업로드"}</span><small>{uploadedSeedFile ? `${Math.max(1, Math.round(uploadedSeedFile.size / 1024))}KB · 그래프 시드로 사용` : "TXT · MD · CSV · JSON · PDF"}</small></label><input id="scenario-seed-upload" className="visually-hidden" type="file" accept=".txt,.md,.csv,.json,.pdf,text/*,application/pdf" onChange={handleSeedUpload} />{uploadedSeedFile?.preview && <p className="upload-preview">{uploadedSeedFile.preview}</p>}</div>
-                <div className="builder-group"><div className="builder-section-heading compact"><div><span>03 · SIMULATION PROMPT</span><h3>예측 시나리오 질문</h3></div></div><textarea className="scenario-prompt" value={scenarioPrompt} onChange={(event) => setScenarioPrompt(event.target.value)} placeholder="예: 외국인 수급이 회복되고 반도체 수출이 늘면 8월 말 KOSPI는 어떻게 움직일까?" rows={5} /><div className="builder-prompt-hint"><Sparkles size={14} /> 선택한 시드와 함께 에이전트 분석에 전달됩니다.</div></div>
-              </div>
-              <div className="builder-period-row"><div><span>예측 기간</span><small>지식그래프에서 경로를 계산할 구간</small></div><div className="builder-period-options">{["7일", "30일", "3개월"].map((item) => <button key={item} type="button" className={period === item ? "active" : ""} onClick={() => setPeriod(item)}>{item}</button>)}</div></div>
-              <button className="run-custom-button" type="button" onClick={runCustomScenario}><Network size={18} /> 시나리오 시작하기 <ArrowRight size={17} /></button>
-            </section>
-          ) : (
-            <section className="scenario-modal scenario-build-modal" role="dialog" aria-modal="true" aria-labelledby="scenario-build-title" onMouseDown={(event) => event.stopPropagation()}>
-              <ScenarioBuildScreen seeds={selectedSeeds.length ? selectedSeeds : ["KOSPI 기본 환경"]} prompt={scenarioPrompt} uploadedFile={uploadedSeedFile} stage={buildStage} period={period} simulationStarted={simulationStarted} onStartSimulation={startSimulation} onClose={closeBuilder} />
-            </section>
-          )}
-        </div>
-      )}
-
-      {scenarioDetailOpen && (
-        <div className="modal-backdrop scenario-detail-backdrop" onMouseDown={() => setScenarioDetailOpen(false)}>
-          <section className="scenario-detail-modal" role="dialog" aria-modal="true" aria-labelledby="scenario-detail-modal-title" onMouseDown={(event) => event.stopPropagation()}>
-            <header className="scenario-detail-modal-header">
+        <div className="scenario-builder-backdrop" onMouseDown={() => setBuilderOpen(false)}>
+          <section
+            className="scenario-builder"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="scenario-builder-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header className="scenario-builder-header">
               <div>
-                <span>SCENARIO PREVIEW</span>
-                <h2 id="scenario-detail-modal-title">{selectedScenario.title}</h2>
-                <p>선택한 조건이 이어졌을 때 KOSPI가 어떻게 움직일지, 근거와 이벤트를 한 화면에서 확인하세요.</p>
+                <span>CUSTOM SCENARIO</span>
+                <h2 id="scenario-builder-title">내 조건으로 시장 경로 만들기</h2>
+                <p>시장 조건과 기간을 지정해 주요 지수와 종목의 조건부 범위를 비교합니다.</p>
               </div>
-              <button className="scenario-modal-close" type="button" onClick={() => setScenarioDetailOpen(false)} aria-label="시나리오 상세 닫기"><X size={20} /></button>
+              <button type="button" onClick={() => setBuilderOpen(false)} aria-label="시나리오 만들기 닫기"><X size={19} /></button>
             </header>
 
-            <div className="scenario-detail-modal-cover">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={selectedScenario.image} alt={`${selectedScenario.title} 시나리오를 설명하는 시장 일러스트`} />
-              <span>CONDITIONAL MARKET PATH</span>
+            <div className="builder-section-heading">
+              <div><span>01 · MARKET CONDITIONS</span><h3>출발 조건을 선택하세요</h3></div>
+              <small>{selectedSeeds.length}개 선택</small>
+            </div>
+            <div className="builder-seed-grid">
+              {environmentSeeds.map((seed) => {
+                const selected = selectedSeeds.includes(seed.label);
+                return (
+                  <button key={seed.id} type="button" className={selected ? "selected" : ""} onClick={() => toggleSeed(seed.label)} aria-pressed={selected}>
+                    <span><em>{seed.category}</em>{selected ? <CheckCircle2 size={15} /> : <Plus size={15} />}</span>
+                    <strong>{seed.label}</strong>
+                    <small>{seed.detail}</small>
+                  </button>
+                );
+              })}
             </div>
 
-            <div className="scenario-detail-modal-summary">
-              <div className={`scenario-detail-modal-forecast ${selectedScenario.tone}`}>
-                <small>{selectedScenario.duration} 예상</small>
-                <strong>{selectedScenario.forecast}</strong>
+            <div className="builder-input-grid">
+              <div className="builder-field">
+                <div className="builder-section-heading compact"><div><span>02 · SOURCE DATA</span><h3>나만의 데이터</h3></div></div>
+                <label className="builder-upload" htmlFor="scenario-source-upload">
+                  <FileUp size={19} />
+                  <span>{uploadedSource ? uploadedSource.name : "참고 파일 추가"}</span>
+                  <small>{uploadedSource ? `${Math.max(1, Math.round(uploadedSource.size / 1024))}KB · 브라우저에서만 보관` : "CSV · JSON · TXT · PDF"}</small>
+                </label>
+                <input
+                  className="visually-hidden"
+                  id="scenario-source-upload"
+                  type="file"
+                  accept=".csv,.json,.txt,.md,.pdf,text/*,application/pdf"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) setUploadedSource({ name: file.name, size: file.size });
+                    event.target.value = "";
+                  }}
+                />
               </div>
-              <div className="scenario-detail-modal-tags">
-                <span>핵심 조건</span>
-                {selectedScenario.tags.map((tag) => <em key={tag}>{tag}</em>)}
-              </div>
+              <label className="builder-field" htmlFor="scenario-prompt">
+                <div className="builder-section-heading compact"><div><span>03 · QUESTION</span><h3>확인하고 싶은 질문</h3></div></div>
+                <textarea id="scenario-prompt" rows={5} value={scenarioPrompt} onChange={(event) => setScenarioPrompt(event.target.value)} />
+              </label>
             </div>
 
-            <div className="scenario-detail-modal-grid">
-              <article className="scenario-detail-modal-story">
-                <div className="scenario-detail-modal-label">시나리오 전제</div>
-                <p>{selectedScenario.summary}</p>
-                <div className="scenario-modal-note"><Sparkles size={16} /><span>전제와 실제 시장 흐름이 달라지면 전망값도 함께 달라질 수 있습니다.</span></div>
-              </article>
-
-              <section className="scenario-detail-modal-events" aria-label="시나리오 예상 이벤트">
-                <div className="scenario-detail-modal-label">예상 전개 이벤트</div>
-                <div className="scenario-detail-modal-event-list">
-                  {selectedScenario.events.map((event, index) => (
-                    <article key={`modal-${selectedScenario.id}-${event.title}`} className="scenario-detail-modal-event">
-                      <div className="scenario-detail-modal-event-index">0{index + 1}</div>
-                      <div>
-                        <div className="scenario-detail-modal-event-meta"><span>{event.week}</span><em>{event.category}</em></div>
-                        <h3>{event.title}</h3>
-                        <p>{event.body}</p>
-                      </div>
-                      <strong className={event.impact.startsWith("+") ? "up" : "down"}>{event.impact}</strong>
-                    </article>
-                  ))}
-                </div>
-              </section>
-            </div>
-
-            <ScenarioDetailLearning scenario={selectedScenario} />
-
-            <section className="scenario-detail-modal-intelligence" aria-label="멀티 에이전트 해석">
-              <div className="scenario-detail-modal-label">멀티 에이전트 해석</div>
-              <div className="scenario-agent-grid">
-                {selectedScenario.agentInsights.map((insight) => (
-                  <article key={`${selectedScenario.id}-${insight.role}`} className="scenario-agent-card">
-                    <span>{insight.role}</span>
-                    <h3>{insight.title}</h3>
-                    <p>{insight.body}</p>
-                  </article>
+            <div className="builder-period-row">
+              <div><span>예측 기간</span><small>조건부 분포를 계산할 구간</small></div>
+              <div role="group" aria-label="예측 기간">
+                {["7일", "30일", "3개월"].map((item) => (
+                  <button type="button" key={item} className={period === item ? "selected" : ""} onClick={() => setPeriod(item)}>{item}</button>
                 ))}
               </div>
-            </section>
+            </div>
 
-            <section className="scenario-detail-modal-risks" aria-label="핵심 리스크">
-              <div className="scenario-detail-modal-label">이 시나리오가 빗나갈 수 있는 지점</div>
-              <div className="scenario-risk-list">
-                {selectedScenario.riskPoints.map((risk) => <span key={risk}>{risk}</span>)}
-              </div>
-            </section>
+            <button className="run-scenario-button" type="button" onClick={applyCustomScenario}>
+              <Network size={18} />이 조건을 차트에 적용<ArrowRight size={17} />
+            </button>
+            <p className="builder-footnote">현재 결과는 선택 조건을 단순 가중한 교육용 데모이며 실제 예측 모델의 출력이 아닙니다.</p>
           </section>
         </div>
       )}
+      </main>
     </div>
   );
 }
