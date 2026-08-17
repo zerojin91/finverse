@@ -58,24 +58,18 @@ Market Agent는 기간 수익률 같은 요약값만 작성하지 않는다. 정
 ```dotenv
 DATABASE_URL=postgresql://fvread:PASSWORD@HOST:5432/finverse?sslmode=prefer
 FINVERSE_DB_STATEMENT_TIMEOUT_MS=60000
-AWS_REGION=<Bedrock model access가 활성화된 리전>
-# AWS_PROFILE=finverse-bedrock
-# IAM role/profile 대신 Bedrock API key를 쓸 경우에만 설정
-# AWS_BEARER_TOKEN_BEDROCK=<Bedrock API key>
-BEDROCK_MODEL_ID=amazon.nova-lite-v1:0
-FINVERSE_AGENT_MODEL=bedrock:amazon.nova-lite-v1:0
-FINVERSE_BEDROCK_MAX_TOKENS=4096
-FINVERSE_BEDROCK_TEMPERATURE=0
-FINVERSE_BEDROCK_TIMEOUT_SECONDS=3600
+OPENAI_API_KEY=...
+FINVERSE_AGENT_MODEL=openai:gpt-5.6-terra
+FINVERSE_AGENT_REASONING_EFFORT=medium
 ```
 
-Bedrock 모델은 LangChain의 `ChatBedrockConverse`를 통해 Converse API와 function tools를 사용한다.
-동료 AWS 계정에서 Bedrock model access를 켜고, 실행 환경에는 IAM role 또는 `AWS_PROFILE`로
-`bedrock:InvokeModel` 권한을 제공해야 한다. AWS access key·secret을 `.env`나 노트북에 기록하지 않는다.
+OpenAI 모델은 LangChain의 Responses API 경로로 초기화되어 reasoning과 function tools를 함께 사용한다.
+`FINVERSE_AGENT_REASONING_EFFORT`는 `none`, `low`, `medium`, `high`, `xhigh`, `max` 중 하나로
+조정할 수 있으며 기본값은 `medium`이다. OpenAI API 키는 untracked `.env`에만 기록한다.
 
-`BEDROCK_MODEL_ID`는 계정과 리전에서 접근 가능한 모델로 바꿀 수 있다. 기본값인
-`amazon.nova-lite-v1:0`은 비용 중심의 디버깅 기본값이며, 더 높은 품질이 필요하면
-`amazon.nova-pro-v1:0` 등 승인된 모델 ID로 교체한다.
+저비용 점검에는 `FINVERSE_AGENT_MODEL=openai:gpt-5.6-luna`와
+`FINVERSE_AGENT_REASONING_EFFORT=low`를 설정할 수 있다. 최종 기능 검증에는
+`gpt-5.6-terra`와 `medium` 이상을 사용한다.
 
 DB 조회 제한시간은 기본 60초다. 원격 DB가 느리면 `FINVERSE_DB_STATEMENT_TIMEOUT_MS`를
 최대 `300000`(5분)까지 늘릴 수 있다. 시간 초과가 발생하면 DB Agent는 기간과 검색 조건을
@@ -92,7 +86,7 @@ uv sync
 시나리오만 전달하면 된다.
 
 Jupyter에서 단계별로 실행하려면
-[`agents/mirofish_seed_generator_bedrock.ipynb`](../agents/mirofish_seed_generator_bedrock.ipynb)를 사용한다.
+[`agents/mirofish_seed_generator_openai.ipynb`](../agents/mirofish_seed_generator_openai.ipynb)를 사용한다.
 
 ```bash
 uv run python -m agents.mirofish_a2a \

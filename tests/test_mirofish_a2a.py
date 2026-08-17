@@ -40,8 +40,7 @@ def test_mirofish_contract_matches_agent_plan() -> None:
     }
     assert mirofish_a2a.FINAL_FILE == "mirofish-input.md"
     assert mirofish_a2a.DEFAULT_HORIZON == "365d"
-    assert mirofish_a2a.DEFAULT_MODEL == "bedrock:amazon.nova-lite-v1:0"
-    assert mirofish_a2a.DEFAULT_BEDROCK_MODEL_ID == "amazon.nova-lite-v1:0"
+    assert mirofish_a2a.DEFAULT_MODEL == "openai:gpt-5.6-terra"
     assert mirofish_a2a.DEFAULT_REASONING_EFFORT == "medium"
     assert "read_specialist_evidence" in mirofish_a2a.ORCHESTRATOR_PROMPT
     assert "최대 1회" in mirofish_a2a.ORCHESTRATOR_PROMPT
@@ -199,22 +198,6 @@ def test_openai_model_uses_responses_api(monkeypatch) -> None:
     assert model.model_name == "gpt-5.6-terra"
     assert model.use_responses_api is True
     assert model.reasoning_effort == "low"
-
-
-def test_bedrock_model_uses_converse_api(monkeypatch) -> None:
-    monkeypatch.setenv("AWS_REGION", "ap-northeast-2")
-    monkeypatch.setenv("FINVERSE_BEDROCK_MAX_TOKENS", "2048")
-    model = mirofish_a2a._create_chat_model(mirofish_a2a.DEFAULT_MODEL)
-    assert model.model_id == "amazon.nova-lite-v1:0"
-    assert model.region_name == "ap-northeast-2"
-    assert model.max_tokens == 2048
-
-
-def test_bedrock_model_requires_region(monkeypatch) -> None:
-    monkeypatch.delenv("AWS_REGION", raising=False)
-    monkeypatch.delenv("AWS_DEFAULT_REGION", raising=False)
-    with pytest.raises(RuntimeError, match="AWS_REGION"):
-        mirofish_a2a._create_chat_model(mirofish_a2a.DEFAULT_MODEL)
 
 
 def test_reader_reports_cross_domain_duplicate_locators(tmp_path) -> None:

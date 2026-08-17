@@ -20,7 +20,6 @@ from langchain.agents import create_agent
 from langchain.chat_models import init_chat_model
 from langchain.tools import tool
 from langchain_core.tools import ToolException
-from langchain_aws import ChatBedrockConverse
 from langchain_openai import ChatOpenAI
 from psycopg.rows import dict_row
 
@@ -38,10 +37,7 @@ MAX_ROWS = 100
 DEFAULT_DB_STATEMENT_TIMEOUT_MS = 60_000
 MAX_DB_STATEMENT_TIMEOUT_MS = 300_000
 DEFAULT_HORIZON = "365d"
-DEFAULT_BEDROCK_MODEL_ID = "amazon.nova-lite-v1:0"
-DEFAULT_BEDROCK_MAX_TOKENS = 4096
-DEFAULT_BEDROCK_TIMEOUT_SECONDS = 3600
-DEFAULT_MODEL = f"bedrock:{DEFAULT_BEDROCK_MODEL_ID}"
+DEFAULT_MODEL = "openai:gpt-5.6-terra"
 DEFAULT_REASONING_EFFORT = "medium"
 
 REQUIRED_EVIDENCE_HEADINGS = {
@@ -101,52 +97,8 @@ def _statement_timeout_ms() -> int:
     return timeout_ms
 
 
-def _environment_int(name: str, default: int, *, minimum: int = 1) -> int:
-    """Read a positive integer model setting without silently accepting bad config."""
-    try:
-        value = int(os.environ.get(name, str(default)))
-    except ValueError as exc:
-        raise ValueError(f"{name} must be an integer") from exc
-    if value < minimum:
-        raise ValueError(f"{name} must be at least {minimum}")
-    return value
-
-
-def _environment_float(name: str, default: float) -> float:
-    """Read a model temperature in the Bedrock-supported 0-1 range."""
-    try:
-        value = float(os.environ.get(name, str(default)))
-    except ValueError as exc:
-        raise ValueError(f"{name} must be a number") from exc
-    if not 0 <= value <= 1:
-        raise ValueError(f"{name} must be between 0 and 1")
-    return value
-
-
 def _create_chat_model(model_id: str):
-    """Create an AWS Bedrock Converse or OpenAI Responses chat model."""
-    if model_id.startswith("bedrock:"):
-        bedrock_model_id = model_id.split(":", 1)[1] or os.environ.get(
-            "BEDROCK_MODEL_ID", DEFAULT_BEDROCK_MODEL_ID
-        )
-        region_name = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION")
-        if not region_name:
-            raise RuntimeError("AWS_REGION or AWS_DEFAULT_REGION is required for Bedrock")
-        kwargs: dict[str, Any] = {
-            "model": bedrock_model_id,
-            "region_name": region_name,
-            "max_tokens": _environment_int(
-                "FINVERSE_BEDROCK_MAX_TOKENS", DEFAULT_BEDROCK_MAX_TOKENS
-            ),
-            "temperature": _environment_float("FINVERSE_BEDROCK_TEMPERATURE", 0.0),
-            "timeout": _environment_int(
-                "FINVERSE_BEDROCK_TIMEOUT_SECONDS", DEFAULT_BEDROCK_TIMEOUT_SECONDS
-            ),
-            "max_retries": _environment_int("FINVERSE_BEDROCK_MAX_RETRIES", 3),
-        }
-        if profile_name := os.environ.get("AWS_PROFILE"):
-            kwargs["credentials_profile_name"] = profile_name
-        return ChatBedrockConverse(**kwargs)
+    """Create an OpenAI Responses model for reasoning + function-tool workflows."""
     if model_id.startswith("openai:"):
         reasoning_effort = os.environ.get(
             "FINVERSE_AGENT_REASONING_EFFORT",
