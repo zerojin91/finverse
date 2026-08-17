@@ -471,7 +471,14 @@ def _validate_public_url(url: str) -> None:
 @tool
 def fetch_web_page(url: str) -> str:
     """Fetch one HTTP(S) page to verify its content and publication-date candidates."""
-    _validate_public_url(url)
+    try:
+        _validate_public_url(url)
+    except ValueError as exc:
+        return _json({
+            "url": url,
+            "error": f"page request skipped: {exc}",
+            "retryable": False,
+        })
     try:
         extracted = DDGS(timeout=15).extract(url, fmt="text_plain")
     except Exception as exc:  # Keep source failures as evidence gaps rather than aborting the run.

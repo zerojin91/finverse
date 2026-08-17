@@ -1,5 +1,6 @@
 import json
 import re
+import socket
 from datetime import date
 
 import pytest
@@ -84,6 +85,19 @@ def test_database_timeout_becomes_retryable_tool_result(monkeypatch) -> None:
     assert result["rows"] == []
     assert result["retryable"] is True
     assert "shorter" in result["retry_hint"]
+
+
+def test_unresolvable_web_url_becomes_nonfatal_evidence_gap(monkeypatch) -> None:
+    def cannot_resolve(*_args, **_kwargs):
+        raise socket.gaierror("name resolution failed")
+
+    monkeypatch.setattr(mirofish_a2a.socket, "getaddrinfo", cannot_resolve)
+    result = json.loads(
+        mirofish_a2a.fetch_web_page.invoke({"url": "https://unresolvable.example/article"})
+    )
+    assert result["url"] == "https://unresolvable.example/article"
+    assert result["retryable"] is False
+    assert result["error"] == "page request skipped: url hostname could not be resolved"
 
 
 def test_database_tools_build_valid_bounded_queries(monkeypatch) -> None:
