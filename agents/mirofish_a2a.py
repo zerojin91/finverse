@@ -20,6 +20,7 @@ from langchain.agents import create_agent
 from langchain.chat_models import init_chat_model
 from langchain.tools import tool
 from langchain_core.tools import ToolException
+from langchain_aws import ChatBedrockConverse
 from langchain_openai import ChatOpenAI
 from psycopg.rows import dict_row
 
@@ -37,11 +38,14 @@ MAX_ROWS = 100
 DEFAULT_DB_STATEMENT_TIMEOUT_MS = 60_000
 MAX_DB_STATEMENT_TIMEOUT_MS = 300_000
 DEFAULT_HORIZON = "365d"
-DEFAULT_MODEL = "openai:gpt-5.6-terra"
+DEFAULT_BEDROCK_MODEL_ID = "amazon.nova-lite-v1:0"
+DEFAULT_BEDROCK_MAX_TOKENS = 4096
+DEFAULT_BEDROCK_TIMEOUT_SECONDS = 3600
+DEFAULT_MODEL = f"bedrock:{DEFAULT_BEDROCK_MODEL_ID}"
 DEFAULT_REASONING_EFFORT = "medium"
 
 REQUIRED_EVIDENCE_HEADINGS = {
-    "market": ("# Market Evidence", "## Current State", "## Investor Flow", "## Similar Historical Cases", "## Relation Candidates", "## Evidence Register", "## Limitations"),
+    "market": ("# Market Evidence", "## Current State", "## Raw Time Series", "## Investor Flow", "## Similar Historical Cases", "## Relation Candidates", "## Evidence Register", "## Limitations"),
     "economy": ("# Economic Evidence", "## Current Macro State", "## Recent Changes", "## Similar Historical Cases", "## Relation Candidates", "## Evidence Register", "## Limitations"),
     "events": ("# External Event Evidence", "## Event Clusters", "## Similar Historical Cases", "## Relation Candidates", "## Evidence Register", "## Limitations"),
     "web_search": ("# Web Search Evidence", "## Verified External Facts", "## Similar Historical Cases", "## Relation Candidates", "## Evidence Register", "## Limitations"),
@@ -97,8 +101,52 @@ def _statement_timeout_ms() -> int:
     return timeout_ms
 
 
+def _environment_int(name: str, default: int, *, minimum: int = 1) -> int:
+    """Read a positive integer model setting without silently accepting bad config."""
+    try:
+        value = int(os.environ.get(name, str(default)))
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an integer") from exc
+    if value < minimum:
+        raise ValueError(f"{name} must be at least {minimum}")
+    return value
+
+
+def _environment_float(name: str, default: float) -> float:
+    """Read a model temperature in the Bedrock-supported 0-1 range."""
+    try:
+        value = float(os.environ.get(name, str(default)))
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a number") from exc
+    if not 0 <= value <= 1:
+        raise ValueError(f"{name} must be between 0 and 1")
+    return value
+
+
 def _create_chat_model(model_id: str):
-    """Create an OpenAI Responses model for reasoning + function-tool workflows."""
+    """Create an AWS Bedrock Converse or OpenAI Responses chat model."""
+    if model_id.startswith("bedrock:"):
+        bedrock_model_id = model_id.split(":", 1)[1] or os.environ.get(
+            "BEDROCK_MODEL_ID", DEFAULT_BEDROCK_MODEL_ID
+        )
+        region_name = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION")
+        if not region_name:
+            raise RuntimeError("AWS_REGION or AWS_DEFAULT_REGION is required for Bedrock")
+        kwargs: dict[str, Any] = {
+            "model": bedrock_model_id,
+            "region_name": region_name,
+            "max_tokens": _environment_int(
+                "FINVERSE_BEDROCK_MAX_TOKENS", DEFAULT_BEDROCK_MAX_TOKENS
+            ),
+            "temperature": _environment_float("FINVERSE_BEDROCK_TEMPERATURE", 0.0),
+            "timeout": _environment_int(
+                "FINVERSE_BEDROCK_TIMEOUT_SECONDS", DEFAULT_BEDROCK_TIMEOUT_SECONDS
+            ),
+            "max_retries": _environment_int("FINVERSE_BEDROCK_MAX_RETRIES", 3),
+        }
+        if profile_name := os.environ.get("AWS_PROFILE"):
+            kwargs["credentials_profile_name"] = profile_name
+        return ChatBedrockConverse(**kwargs)
     if model_id.startswith("openai:"):
         reasoning_effort = os.environ.get(
             "FINVERSE_AGENT_REASONING_EFFORT",
@@ -740,7 +788,14 @@ Moderator가 준 query, target, as_of, horizon, assigned_scope, already_covered�
 
 필수 작업:
 - query_market으로 지수·가격·수급·외국인 보유·종목 마스터를 필요한 범위만 조회한다.
-- 현재 상태, 최근 5/20/60 거래일 변화, 변동성, 거래대금, 주요 섹터, 수급, 과거 유사 구간을 가능한 범위에서 정리한다.
+- 정량 판단에 앞서, target과 직접 비교할 핵심 시계열을 식별한다. 지수는 index_daily, 종목은 price_daily를 우선 사용하며 수급·외국인 보유는 보조 시계열로만 사용한다.
+- 사용자 또는 assigned_scope가 기간을 지정하면 해당 시작일·종료일의 원시 행을 전부 조회한다. 기간이 지정되지 않았으면 as_of까지 최근 60거래일(달력일로 충분한 조회 구간)의 원시 행을 조회한다.
+- 단일 도구 호출은 최대 100행이므로 기간·대상·시계열을 좁혀 요청한다. 100행을 넘는 필요한 연속 구간은 겹치지 않는 날짜 청크로 나눠 조회한다. timeout이면 DATABASE_TIMEOUT_PROTOCOL을 따르고, 누락 행을 추정하거나 보간하지 않는다.
+- 원시 행을 조회한 뒤에만 현재 상태, 최근 5/20/60 거래일 변화, 변동성, 거래대금, 주요 섹터, 수급, 과거 유사 구간을 정리한다.
+- ## Raw Time Series에는 정량 판단에 사용한 관측치를 날짜 오름차순으로 그대로 기록한다. 표 형식은 | series_id | trade_date | field | value | unit_or_price_basis | source | record_id | 이다. 각 series_id마다 조회 시작일·종료일·행 수·누락/비거래일·도구의 dataset을 바로 위에 적는다.
+- Raw Time Series의 값은 기간 수익률·평균·변동성·최대 낙폭·누적 수급 등 요약치로 대체하지 않는다. 이 요약치는 원시 행을 보조하는 계산 결과로만 Current State 또는 Investor Flow에 쓴다.
+- 모든 계산에는 사용한 series_id, 시작·종료 관측일, 행 수, 계산식과 분모를 함께 적는다. 예: 단순수익률=(종료 close/시작 close-1)*100. 서로 다른 price_basis·단위·빈도가 섞인 행은 계산하지 않는다.
+- 유사 구간의 사후 경로를 정량 비교할 때도, Top-K를 고른 뒤 anchor_date 전 60거래일과 확정된 사후 horizon의 원시 가격/지수 행을 동일한 방식으로 Raw Time Series에 기록한다.
 - 유사 구간은 추세·변동성·거래대금·수급 방향·섹터 주도력·외국인 보유 변화의 조합을 중심으로 비교한다.
 - 관측 사실과 해석을 분리하고 관계는 확정 인과가 아닌 후보 관계로 쓴다.
 - KRX/Naver price_basis 차이, 단위 차이, 누락 데이터를 명시한다.
@@ -752,6 +807,7 @@ Moderator가 준 query, target, as_of, horizon, assigned_scope, already_covered�
 # Market Evidence
 ## Analysis Context
 ## Current State
+## Raw Time Series
 ## Dominant Sectors
 ## Investor Flow
 ## Similar Historical Cases
@@ -871,7 +927,8 @@ def _specialist(name: str, output_dir: Path, as_of_date: date, model: Any) -> Co
         description=(
             f"FINVERSE {name} specialist. Writes {EVIDENCE_FILES[name]}, "
             "ranks historical analogues by scenario similarity and separates observations, "
-            "interpretations, relations, uncertainty, and missing data."
+            "interpretations, relations, uncertainty, and missing data. Market output retains "
+            "the raw dated observations used for quantitative analysis."
         ),
         runnable=graph,
     )
@@ -895,16 +952,18 @@ MiroFish가 사용할 현재 시장 상황 온톨로지와 조건부 미래 시�
 3. scenario_signature를 바탕으로 attention_plan을 만든다. 비교 차원별 가중치, Top-K=3,
    최소 후보 수=5, 반례 수=1을 명시한다. 가중치 합은 100이어야 한다.
 4. 소유권을 먼저 배정한다.
-   - market_agent: 시장 가격·지수·섹터·수급·외국인 보유
+   - market_agent: 시장 가격·지수·섹터·수급·외국인 보유 및 정량 판단에 쓴 원시 일별 시계열
    - economy_agent: 거시경제 시계열
    - events_agent: FINVERSE DB 뉴스·정책·실적 사건
    - web_search_agent: 위 세 영역에 없는 검증된 외부 공개정보
 5. 각 작업에 query, target, as_of, horizon, assigned_scope, already_covered,
    scenario_signature, attention_dimensions, attention_weights, top_k, counterexample_requirement를 명시한다.
+   market_agent의 assigned_scope에는 정량 판단에 필요한 대상·필드·정확한 조회 기간과 원시 시계열 보존을 명시한다.
 6. 네 Agent를 모두 호출해 각 Evidence Markdown을 저장하게 한다.
 7. read_specialist_evidence를 호출해 다음을 검토한다.
    - 기준 시점이 같은가
    - 사실·해석·관계 후보가 구분됐는가
+   - market Evidence의 Raw Time Series가 실제 조회한 날짜별 원시 행, source, record_id를 보존하며 요약치의 재계산 근거가 되는가
    - 핵심 주장에 출처와 record_id/URL이 있는가
    - cross_domain_duplicates가 비어 있는가
    - 유사 사례가 결과를 보기 전에 scenario_signature만으로 선정됐는가

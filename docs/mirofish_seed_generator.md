@@ -40,6 +40,17 @@ Moderator는 검색 전에 사용자 시나리오를 `scenario_signature`로 구
 
 유사 사례는 예측값이 아니라 조건부 시나리오를 구성하기 위한 참고 근거다.
 
+## 시장 원시 시계열
+
+Market Agent는 기간 수익률 같은 요약값만 작성하지 않는다. 정량 판단에 쓴 지수·종목의 일별
+원시 관측치를 Raw Time Series 섹션에 날짜 오름차순으로 보존한다. 각 행은 시계열 식별자,
+거래일, 필드, 값, 단위 또는 price basis, source, record ID를 포함한다.
+
+사용자가 기간을 지정하면 그 기간의 전 행을, 기간이 없으면 기준일 전 최근 60거래일의 전 행을
+가져온다. 단일 DB 조회가 100행을 넘으면 연속된 날짜 청크로 나누며, 누락값을 보간하거나
+요약값으로 원시 관측치를 대체하지 않는다. 수익률·변동성·최대 낙폭 등은 원시 행을 바탕으로
+계산식, 시작·종료 관측일, 행 수와 함께 별도 기재한다.
+
 ## 실행 환경
 
 프로젝트 루트의 `.env`에 다음 값을 설정한다. 실제 자격증명은 버전 관리에 포함하지 않는다.
@@ -47,27 +58,24 @@ Moderator는 검색 전에 사용자 시나리오를 `scenario_signature`로 구
 ```dotenv
 DATABASE_URL=postgresql://fvread:PASSWORD@HOST:5432/finverse?sslmode=prefer
 FINVERSE_DB_STATEMENT_TIMEOUT_MS=60000
-OPENAI_API_KEY=...
-FINVERSE_AGENT_MODEL=openai:gpt-5.6-terra
-FINVERSE_AGENT_REASONING_EFFORT=medium
+AWS_REGION=<Bedrock model access가 활성화된 리전>
+# AWS_PROFILE=finverse-bedrock
+# IAM role/profile 대신 Bedrock API key를 쓸 경우에만 설정
+# AWS_BEARER_TOKEN_BEDROCK=<Bedrock API key>
+BEDROCK_MODEL_ID=amazon.nova-lite-v1:0
+FINVERSE_AGENT_MODEL=bedrock:amazon.nova-lite-v1:0
+FINVERSE_BEDROCK_MAX_TOKENS=4096
+FINVERSE_BEDROCK_TEMPERATURE=0
+FINVERSE_BEDROCK_TIMEOUT_SECONDS=3600
 ```
 
-OpenAI 모델은 function tools와 reasoning을 함께 사용하기 위해 LangChain의 Responses API 경로로
-초기화된다. `FINVERSE_AGENT_REASONING_EFFORT`는 `none`, `low`, `medium`, `high`, `xhigh`, `max`
-중 하나로 조정할 수 있으며 기본값은 `medium`이다.
+Bedrock 모델은 LangChain의 `ChatBedrockConverse`를 통해 Converse API와 function tools를 사용한다.
+동료 AWS 계정에서 Bedrock model access를 켜고, 실행 환경에는 IAM role 또는 `AWS_PROFILE`로
+`bedrock:InvokeModel` 권한을 제공해야 한다. AWS access key·secret을 `.env`나 노트북에 기록하지 않는다.
 
-### 저비용 디버깅
-
-노트북은 기본적으로 `LOW_COST_DEBUG_MODE = True`이며 다음 설정을 `.env`보다 우선 적용한다.
-
-```dotenv
-FINVERSE_AGENT_MODEL=openai:gpt-5.6-luna
-FINVERSE_AGENT_REASONING_EFFORT=low
-```
-
-이 설정에서도 Moderator와 네 SubAgent, Responses API, function tools 구조는 그대로 실행된다.
-디버깅이 끝난 후 최종 품질 검증에서는 `LOW_COST_DEBUG_MODE = False`로 바꿔 `.env`의
-`gpt-5.6-terra`와 `medium` 설정을 사용한다.
+`BEDROCK_MODEL_ID`는 계정과 리전에서 접근 가능한 모델로 바꿀 수 있다. 기본값인
+`amazon.nova-lite-v1:0`은 비용 중심의 디버깅 기본값이며, 더 높은 품질이 필요하면
+`amazon.nova-pro-v1:0` 등 승인된 모델 ID로 교체한다.
 
 DB 조회 제한시간은 기본 60초다. 원격 DB가 느리면 `FINVERSE_DB_STATEMENT_TIMEOUT_MS`를
 최대 `300000`(5분)까지 늘릴 수 있다. 시간 초과가 발생하면 DB Agent는 기간과 검색 조건을
@@ -84,7 +92,7 @@ uv sync
 시나리오만 전달하면 된다.
 
 Jupyter에서 단계별로 실행하려면
-[`agents/mirofish_seed_generator_openai.ipynb`](../agents/mirofish_seed_generator_openai.ipynb)를 사용한다.
+[`agents/mirofish_seed_generator_bedrock.ipynb`](../agents/mirofish_seed_generator_bedrock.ipynb)를 사용한다.
 
 ```bash
 uv run python -m agents.mirofish_a2a \
