@@ -12,12 +12,16 @@ def _web_evidence(observed_at: str, locator: str = "https://example.com/source")
     return f"""# Web Search Evidence
 ## Analysis Context
 - as_of: 2026-08-01
+## Scenario-Aligned Retrieval Plan
+- case_id: CURRENT
 ## Verified External Facts
 - 검증된 사실
 ## Known Upcoming Events
 - 없음
 ## Similar Historical Cases
 - 충분한 사례 없음
+## Feedback and Scope Gaps
+- 없음
 ## Relation Candidates
 - 조건부 관계
 ## Uncertainties
@@ -60,11 +64,17 @@ def test_market_prompt_requires_raw_time_series_for_quantitative_analysis() -> N
     assert "단기=최근 20거래일" in prompt
     assert "중기=최근 60거래일" in prompt
     assert "MA20, MA60, MA120, MA240" in prompt
+    assert "case_id=CURRENT" in prompt
+    assert "Top-K와 반례" in prompt
     assert "요약치로 대체하지 않는다" in prompt
     assert "계산식과 분모" in prompt
     assert "영어 원문만 확인 가능한 사실" in mirofish_a2a.SPECIALIST_PROMPTS["web_search"]
     assert "한국어 검색어를 먼저 사용" in mirofish_a2a.SPECIALIST_PROMPTS["web_search"]
+    assert "web_evidence_window" in mirofish_a2a.SPECIALIST_PROMPTS["web_search"]
+    assert "Moderator-Subagent 조사·피드백 루프" in prompt
     assert "영어 제목·snippet·직접 인용" in mirofish_a2a.ORCHESTRATOR_PROMPT
+    assert "historical_retrieval_plan" in mirofish_a2a.ORCHESTRATOR_PROMPT
+    assert "FEEDBACK_REQUEST" in mirofish_a2a.ORCHESTRATOR_PROMPT
 
 
 def test_dates_and_slug() -> None:

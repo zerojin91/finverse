@@ -45,10 +45,10 @@ DEFAULT_MODEL = f"bedrock:{DEFAULT_BEDROCK_MODEL_ID}"
 DEFAULT_REASONING_EFFORT = "medium"
 
 REQUIRED_EVIDENCE_HEADINGS = {
-    "market": ("# Market Evidence", "## Current State", "## Raw Time Series", "## Investor Flow", "## Similar Historical Cases", "## Relation Candidates", "## Evidence Register", "## Limitations"),
-    "economy": ("# Economic Evidence", "## Current Macro State", "## Recent Changes", "## Similar Historical Cases", "## Relation Candidates", "## Evidence Register", "## Limitations"),
-    "events": ("# External Event Evidence", "## Event Clusters", "## Similar Historical Cases", "## Relation Candidates", "## Evidence Register", "## Limitations"),
-    "web_search": ("# Web Search Evidence", "## Verified External Facts", "## Similar Historical Cases", "## Relation Candidates", "## Evidence Register", "## Limitations"),
+    "market": ("# Market Evidence", "## Scenario-Aligned Retrieval Plan", "## Current State", "## Raw Time Series", "## Investor Flow", "## Similar Historical Cases", "## Feedback and Scope Gaps", "## Relation Candidates", "## Evidence Register", "## Limitations"),
+    "economy": ("# Economic Evidence", "## Scenario-Aligned Retrieval Plan", "## Current Macro State", "## Recent Changes", "## Similar Historical Cases", "## Feedback and Scope Gaps", "## Relation Candidates", "## Evidence Register", "## Limitations"),
+    "events": ("# External Event Evidence", "## Scenario-Aligned Retrieval Plan", "## Event Clusters", "## Similar Historical Cases", "## Feedback and Scope Gaps", "## Relation Candidates", "## Evidence Register", "## Limitations"),
+    "web_search": ("# Web Search Evidence", "## Scenario-Aligned Retrieval Plan", "## Verified External Facts", "## Similar Historical Cases", "## Feedback and Scope Gaps", "## Relation Candidates", "## Evidence Register", "## Limitations"),
 }
 
 
@@ -797,6 +797,18 @@ KOREAN_OUTPUT_PROTOCOL = """
 """
 
 
+RETRIEVAL_FEEDBACK_PROTOCOL = """
+
+Moderator-Subagent 조사·피드백 루프:
+1. Moderator가 제공한 scenario_scheme, similarity_dimensions, historical_retrieval_plan, web_evidence_window를 1차 조회 경계로 사용한다. 임의로 최근 데이터나 넓은 과거를 기본값으로 삼지 않는다.
+2. 첫 Evidence에는 ## Scenario-Aligned Retrieval Plan을 작성한다. 이 표에는 case_id, anchor_date 또는 후보 기간, scenario_scheme과의 일치 근거, 조회할 사전·사후 구간, 데이터 가용성, 제외 사유를 기록한다.
+3. ## Feedback and Scope Gaps에는 Moderator에게 필요한 판단 요청만 구조화해 기록한다. 형식은 | request_type | affected_case_or_scope | evidence | requested_decision | 이다. request_type은 CASE_SELECTION, RANGE_EXPAND, RANGE_NARROW, RAW_SERIES_MISSING, DUPLICATE_OWNERSHIP 중 하나다. 요청이 없으면 '없음'을 기록한다.
+4. Moderator가 FEEDBACK_REQUEST를 보내면 1회에 한해 Evidence를 보완한다. 피드백에는 type, affected_case_or_scope, reason, required_action, prohibited_action이 포함된다. 보완본의 Feedback and Scope Gaps에 적용 여부와 남은 gap을 기록한다.
+5. 사례 선택과 범위 조정은 anchor_date 당시의 특징·자료·scenario_scheme만으로 한다. 사후 수익률, 사후 사건, 사후 기사 결과가 좋았다는 이유로 사례를 채택·제외·확대하는 것은 금지한다.
+6. 반복할 수 없는 범위 확장, 데이터 부재, 도메인 소유권 충돌은 Limitations에도 남긴다.
+"""
+
+
 SPECIALIST_PROMPTS = {
     "market": """당신은 FINVERSE Market Agent다.
 PostgreSQL의 market.* 데이터만 사용해 Market Evidence Markdown을 작성한다.
@@ -806,9 +818,10 @@ Moderator가 준 query, target, as_of, horizon, assigned_scope, already_covered�
 - query_market으로 지수·가격·수급·외국인 보유·종목 마스터를 필요한 범위만 조회한다.
 - 정량 판단에 앞서, target과 직접 비교할 핵심 시계열을 식별한다. 지수는 index_daily, 종목은 price_daily를 우선 사용하며 수급·외국인 보유는 보조 시계열로만 사용한다.
 - 기본 정량 시계열은 as_of까지 최근 240거래일을 사용한다. 이를 단기=최근 20거래일, 중기=최근 60거래일, 장기=최근 240거래일로 분리하고, 사용 가능한 관측치가 부족하면 각 창의 실제 행 수와 부족 사유를 기록한다. 사용자가 더 긴 기간을 명시하면 그 기간도 전부 조회한다.
+- 현재 구간은 case_id=CURRENT, anchor_date=as_of로 취급한다. 과거 시계열은 Moderator의 historical_retrieval_plan에 맞춰 선정된 Top-K와 반례의 각 anchor_date를 기준으로 조회한다. CURRENT만 조회하고 과거 사례의 같은 정렬 창을 생략하지 않는다.
 - 단일 도구 호출은 최대 100행이므로 240거래일 이상은 겹치지 않는 날짜 청크로 나눠 조회한다. 최신 100행을 먼저 받은 뒤 가장 이른 trade_date 바로 전을 다음 end_date로 삼아 필요한 240행을 모두 확보한다. timeout이면 DATABASE_TIMEOUT_PROTOCOL을 따르고, 누락 행을 추정하거나 보간하지 않는다.
 - 원시 행을 조회한 뒤에만 단기·중기·장기 변화, 변동성, 거래대금, 주요 섹터, 수급, 과거 유사 구간을 정리한다. 5거래일만을 독립 분석 창 또는 원시 시계열의 대체물로 사용하지 않는다.
-- ## Raw Time Series에는 정량 판단에 사용한 관측치를 날짜 오름차순으로 그대로 기록한다. 표 형식은 | series_id | trade_date | field | value | unit_or_price_basis | source | record_id | 이다. 240거래일 원시 행을 기준 시계열로 보존하고, 단기 20일·중기 60일은 이 시계열의 정확한 끝부분 범위로 참조한다. 각 series_id마다 조회 시작일·종료일·행 수·누락/비거래일·도구의 dataset을 바로 위에 적는다.
+- ## Raw Time Series에는 정량 판단에 사용한 관측치를 날짜 오름차순으로 그대로 기록한다. 표 형식은 | case_id | anchor_date | window | series_id | trade_date | field | value | unit_or_price_basis | source | record_id | 이다. CURRENT와 선택된 과거 사례마다 240거래일 원시 행을 기준 시계열로 보존하고, 단기 20일·중기 60일은 같은 case_id 시계열의 정확한 끝부분 범위로 참조한다. 각 series_id마다 조회 시작일·종료일·행 수·누락/비거래일·도구의 dataset을 바로 위에 적는다.
 - Raw Time Series의 값은 기간 수익률·평균·변동성·최대 낙폭·누적 수급 등 요약치로 대체하지 않는다. 이 요약치는 원시 행을 보조하는 계산 결과로만 Current State 또는 Investor Flow에 쓴다.
 - Current State에 단기 20일·중기 60일·장기 240일별 수익률, 변동성, 최대 낙폭을 구분해 제시한다. 모든 계산에는 사용한 series_id, 시작·종료 관측일, 행 수, 계산식과 분모를 함께 적는다. 예: 단순수익률=(종료 close/시작 close-1)*100. 서로 다른 price_basis·단위·빈도가 섞인 행은 계산하지 않는다.
 - 이동평균은 같은 close·price_basis의 원시 행만으로 계산한다. 최소 MA20, MA60, MA120, MA240을 각각 제시하고, 해당 이동평균에 필요한 관측치가 부족하면 값을 만들지 말고 data gap으로 기록한다. 각 MA에는 계산 기준일과 포함 행 수를 적는다.
@@ -823,11 +836,13 @@ Moderator가 준 query, target, as_of, horizon, assigned_scope, already_covered�
 문서 형식:
 # Market Evidence
 ## Analysis Context
+## Scenario-Aligned Retrieval Plan
 ## Current State
 ## Raw Time Series
 ## Dominant Sectors
 ## Investor Flow
 ## Similar Historical Cases
+## Feedback and Scope Gaps
 ## Relation Candidates
 ## Uncertainties
 ## Evidence Register
@@ -836,7 +851,7 @@ Moderator가 준 query, target, as_of, horizon, assigned_scope, already_covered�
 ## Limitations
 
 Evidence Register의 observed_at은 YYYY-MM-DD이며 as_of 이하여야 한다.
-""" + KOREAN_OUTPUT_PROTOCOL + DATABASE_TIMEOUT_PROTOCOL + HISTORICAL_ATTENTION_PROTOCOL,
+""" + KOREAN_OUTPUT_PROTOCOL + RETRIEVAL_FEEDBACK_PROTOCOL + DATABASE_TIMEOUT_PROTOCOL + HISTORICAL_ATTENTION_PROTOCOL,
 
     "economy": """당신은 FINVERSE Economy Agent다.
 PostgreSQL의 economy.* 데이터만 사용해 Economic Evidence Markdown을 작성한다.
@@ -854,10 +869,12 @@ Moderator가 준 query, target, as_of, horizon, assigned_scope, already_covered�
 문서 형식:
 # Economic Evidence
 ## Analysis Context
+## Scenario-Aligned Retrieval Plan
 ## Current Macro State
 ## Recent Changes
 ## Known Upcoming Indicators
 ## Similar Historical Cases
+## Feedback and Scope Gaps
 ## Relation Candidates
 ## Uncertainties
 ## Evidence Register
@@ -866,7 +883,7 @@ Moderator가 준 query, target, as_of, horizon, assigned_scope, already_covered�
 ## Limitations
 
 Evidence Register의 observed_at은 YYYY-MM-DD이며 as_of 이하여야 한다.
-""" + KOREAN_OUTPUT_PROTOCOL + DATABASE_TIMEOUT_PROTOCOL + HISTORICAL_ATTENTION_PROTOCOL,
+""" + KOREAN_OUTPUT_PROTOCOL + RETRIEVAL_FEEDBACK_PROTOCOL + DATABASE_TIMEOUT_PROTOCOL + HISTORICAL_ATTENTION_PROTOCOL,
 
     "events": """당신은 FINVERSE External Event Agent다.
 PostgreSQL의 events.* 데이터만 사용해 External Event Evidence Markdown을 작성한다.
@@ -884,9 +901,11 @@ Moderator가 준 query, target, as_of, horizon, assigned_scope, already_covered�
 문서 형식:
 # External Event Evidence
 ## Analysis Context
+## Scenario-Aligned Retrieval Plan
 ## Event Clusters
 ## Known Upcoming Events
 ## Similar Historical Cases
+## Feedback and Scope Gaps
 ## Relation Candidates
 ## Uncertainties
 ## Evidence Register
@@ -895,7 +914,7 @@ Moderator가 준 query, target, as_of, horizon, assigned_scope, already_covered�
 ## Limitations
 
 Evidence Register의 observed_at은 YYYY-MM-DD이며 as_of 이하여야 한다.
-""" + KOREAN_OUTPUT_PROTOCOL + DATABASE_TIMEOUT_PROTOCOL + HISTORICAL_ATTENTION_PROTOCOL,
+""" + KOREAN_OUTPUT_PROTOCOL + RETRIEVAL_FEEDBACK_PROTOCOL + DATABASE_TIMEOUT_PROTOCOL + HISTORICAL_ATTENTION_PROTOCOL,
 
     "web_search": """당신은 FINVERSE Web Search Agent다.
 DuckDuckGo와 원문 페이지를 이용해 세 DB Agent가 채우지 못한 과거 공개정보만 보강한다.
@@ -906,6 +925,9 @@ Moderator가 준 query, target, as_of, horizon, assigned_scope, already_covered�
 - duckduckgo_search로 검색하고 fetch_web_page로 원문·발행일을 검증한다.
 - 검색결과 snippet만 증거로 사용하지 않는다.
 - 영어 원문만 확인 가능한 사실은 의미·수치·날짜를 보존해 한국어로 번역·요약한다. 최종 Markdown에는 영어 제목, 영어 snippet, 영어 문장 또는 영어 직접 인용을 쓰지 않는다. 원문 URL과 식별자는 유지한다.
+- Moderator가 준 web_evidence_window의 primary 범위와 scenario_scheme에 직접 연결되는 자료를 우선한다. 검색의 편의성, 유명도, 단순 키워드 일치만으로 너무 먼 과거 자료를 채택하지 않는다.
+- primary 범위 밖의 자료는 제도·정책·산업 구조가 지속되고 현재 전달 경로와 동일하다는 근거가 있을 때만 secondary로 확장한다. 확장 자료마다 Retrieval Plan에 날짜 범위, 확장 사유, 현재 scenario_scheme과의 연결고리, 대체 가능한 더 최근 자료의 부재를 기록한다.
+- 1차 조사본에서 자료가 부족하거나 범위가 과도하면 Feedback and Scope Gaps에 RANGE_EXPAND 또는 RANGE_NARROW를 요청한다. Moderator 승인 전에는 임의로 범위를 넓혀 일반론을 채우지 않는다.
 - 외부 유사 사례는 충격 유형·관련 기관/기업·지역·정책 환경·공급망/산업 전달 경로를 중심으로 비교한다.
 - 공식기관·공시·기업·국제기구 등 1차 출처를 우선한다.
 - DB Agent의 record_id/주장과 중복되는 사실은 제외한다.
@@ -915,9 +937,11 @@ Moderator가 준 query, target, as_of, horizon, assigned_scope, already_covered�
 문서 형식:
 # Web Search Evidence
 ## Analysis Context
+## Scenario-Aligned Retrieval Plan
 ## Verified External Facts
 ## Known Upcoming Events
 ## Similar Historical Cases
+## Feedback and Scope Gaps
 ## Relation Candidates
 ## Uncertainties
 ## Evidence Register
@@ -926,7 +950,7 @@ Moderator가 준 query, target, as_of, horizon, assigned_scope, already_covered�
 ## Limitations
 
 Evidence Register의 observed_at은 원문의 발행일 YYYY-MM-DD이며 as_of 이하여야 한다.
-""" + KOREAN_OUTPUT_PROTOCOL + HISTORICAL_ATTENTION_PROTOCOL,
+""" + KOREAN_OUTPUT_PROTOCOL + RETRIEVAL_FEEDBACK_PROTOCOL + HISTORICAL_ATTENTION_PROTOCOL,
 }
 
 
@@ -975,21 +999,30 @@ MiroFish가 사용할 현재 시장 상황 온톨로지와 조건부 미래 시�
    - horizon: 비교할 사후 관측 구간
 3. scenario_signature를 바탕으로 attention_plan을 만든다. 비교 차원별 가중치, Top-K=3,
    최소 후보 수=5, 반례 수=1을 명시한다. 가중치 합은 100이어야 한다.
-4. 소유권을 먼저 배정한다.
+4. attention_plan을 historical_retrieval_plan으로 구체화한다.
+   - scenario_scheme: 충격·전달 경로·대상·시장/거시 regime의 결합
+   - candidate_case_rules: 사례 후보의 anchor_date 조건과 제외 조건
+   - case_windows: CURRENT와 과거 사례 각각의 사전 20/60/240거래일, Top-K 선정 후의 사후 horizon
+   - web_evidence_window: primary 조사 범위, secondary 확장 조건, 오래된 자료를 허용할 구조적 지속성 기준
+   이 계획은 과거 결과가 아니라 anchor_date 당시 알 수 있었던 정보로 만든다.
+5. 소유권을 먼저 배정한다.
    - market_agent: 시장 가격·지수·섹터·수급·외국인 보유 및 정량 판단에 쓴 원시 일별 시계열
    - economy_agent: 거시경제 시계열
    - events_agent: FINVERSE DB 뉴스·정책·실적 사건
    - web_search_agent: 위 세 영역에 없는 검증된 외부 공개정보
-5. 각 작업에 query, target, as_of, horizon, assigned_scope, already_covered,
-   scenario_signature, attention_dimensions, attention_weights, top_k, counterexample_requirement를 명시한다.
-   market_agent의 assigned_scope에는 정량 판단에 필요한 대상·필드·단기 20일·중기 60일·장기 240거래일 조회와 이동평균, 원시 시계열 보존을 명시한다.
-6. 네 Agent를 모두 호출해 각 Evidence Markdown을 저장하게 한다.
-7. read_specialist_evidence를 호출해 다음을 검토한다.
+6. 각 작업에 query, target, as_of, horizon, assigned_scope, already_covered,
+   scenario_signature, attention_dimensions, attention_weights, top_k, counterexample_requirement,
+   historical_retrieval_plan, web_evidence_window를 명시한다.
+   market_agent의 assigned_scope에는 정량 판단에 필요한 대상·필드·CURRENT와 사례별 단기 20일·중기 60일·장기 240거래일 조회와 이동평균, 원시 시계열 보존을 명시한다.
+7. 네 Agent를 1차 조사 단계로 호출해 후보 사례·조회 범위·data gap을 포함한 Evidence 초안을 저장하게 한다.
+8. read_specialist_evidence를 호출해 다음을 검토한다.
    - 기준 시점이 같은가
    - 사실·해석·관계 후보가 구분됐는가
    - market Evidence의 Raw Time Series가 실제 조회한 날짜별 원시 행, source, record_id를 보존하며 요약치의 재계산 근거가 되는가
    - market Evidence가 단기 20일·중기 60일·장기 240거래일의 원시 관측치와 MA20/MA60/MA120/MA240을 각각 구분했는가
    - 영어 원문을 그대로 복사하지 않고 모든 Agent Evidence와 최종 문서가 한국어로 작성됐는가
+   - 각 Evidence의 Feedback and Scope Gaps에 범위·사례·소유권 판단 요청이 있는가
+   - web Evidence가 primary 범위 밖의 자료를 채택했다면 구조적 지속성·현재 연결고리·더 최근 대체자료 부재를 설명했는가
    - 핵심 주장에 출처와 record_id/URL이 있는가
    - cross_domain_duplicates가 비어 있는가
    - 유사 사례가 결과를 보기 전에 scenario_signature만으로 선정됐는가
@@ -998,9 +1031,13 @@ MiroFish가 사용할 현재 시장 상황 온톨로지와 조건부 미래 시�
    - 반례가 포함됐으며 구조적 차이가 설명됐는가
    - 상승·기준·하락 경로를 구성할 증거가 있는가
    - 누락 또는 충돌이 있는가
-8. 정말 필요한 경우에만 해당 Agent에 구체적인 보완을 요청한다. Agent별 보완은 최대 1회다.
-9. 다시 read_specialist_evidence를 호출해 최종 네 문서를 읽는다.
-10. 도메인별 Top-K를 그대로 합산하지 않는다. 현재 scenario_signature와의 관련성, 출처 품질,
+9. 정말 필요한 경우에만 해당 Agent에 아래 형식의 FEEDBACK_REQUEST를 보내 보완을 요청한다. Agent별 보완은 최대 1회다.
+   | type | affected_case_or_scope | reason | required_action | prohibited_action |
+   type은 CASE_SELECTION, RANGE_EXPAND, RANGE_NARROW, RAW_SERIES_MISSING, DUPLICATE_OWNERSHIP 중 하나다.
+   사후 결과가 좋거나 나빴다는 이유의 사례 선택·제외·범위 변경은 prohibited_action으로 명시한다.
+10. 보완 Agent는 Feedback and Scope Gaps에 피드백 적용 여부를 남기고 같은 Evidence를 1회 수정한다.
+11. 다시 read_specialist_evidence를 호출해 최종 네 문서를 읽는다.
+12. 도메인별 Top-K를 그대로 합산하지 않는다. 현재 scenario_signature와의 관련성, 출처 품질,
     도메인 간 독립성을 기준으로 evidence attention을 재조정해 최종 MiroFish Markdown을 작성한다.
 
 통제 원칙:
