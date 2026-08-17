@@ -1,11 +1,13 @@
 "use client";
 
 import {
+  Activity,
   ArrowRight,
   BarChart3,
   Bookmark,
   BrainCircuit,
   CalendarDays,
+  CalendarClock,
   ChevronRight,
   CircleDollarSign,
   CircleHelp,
@@ -13,11 +15,14 @@ import {
   Database,
   FileUp,
   GitBranch,
+  Globe2,
   LoaderCircle,
   Network,
   Plus,
   Sparkles,
   UserRound,
+  UsersRound,
+  Wifi,
   X,
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -46,14 +51,20 @@ type Scenario = {
   riskPoints: string[];
 };
 
-const marketConnections = [
-  { symbol: "S", name: "삼성전자", code: "005930 · KOSPI", value: "220,000원", change: "-13.39%", contribution: "-1.68%p", tone: "down" },
-  { symbol: "H", name: "SK하이닉스", code: "000660 · KOSPI", value: "1,555,000원", change: "-14.65%", contribution: "-2.42%p", tone: "down" },
-  { symbol: "$", name: "원·달러 환율", code: "USD/KRW", value: "1,462.50", change: "-0.41%", contribution: "+0.12%p", tone: "up" },
-  { symbol: "F", name: "외국인 수급", code: "KOSPI", value: "-5조 1,200억원", change: "순매도", contribution: "-3.12%p", tone: "down" },
-  { symbol: "C", name: "반도체 지수", code: "KRX 반도체", value: "4,318.72", change: "-13.82%", contribution: "-3.46%p", tone: "down" },
+const marketSignals = [
+  { key: "economy", label: "경제", events: [{ title: "금리 정책", detailTitle: "한국은행 추가 금리 인상 경계", source: "금리·정책", importance: 3, summary: "물가 압력이 이어지며 기준금리 경로가 다시 주목받고 있습니다. 할인율 상승 우려가 성장주와 KOSPI 밸류에이션에 부담을 줍니다." }, { title: "원화 약세", detailTitle: "원화 약세와 환율 변동성 확대", source: "환율 시장", importance: 2, summary: "원·달러 환율 상승으로 외국인 자금의 환차손 부담이 커졌습니다. 수출주에는 일부 우호적이지만 시장 전체에는 위험 회피 신호로 작용합니다." }] },
+  { key: "country", label: "국가", events: [{ title: "미국 금리 정책", detailTitle: "미국 금리 인하 기대 약화", source: "미국 정책", importance: 3, summary: "미국 금리 인하 기대가 약해지며 글로벌 위험자산의 할인율 부담이 커졌습니다. 외국인 투자자의 한국 주식 비중에도 영향을 줍니다." }, { title: "중국 경기", detailTitle: "중국 경기 둔화와 수요 우려", source: "중국 경기", importance: 2, summary: "중국 수요 둔화 우려가 한국 수출과 소재·산업재 전망에 부담을 줍니다. 경기 민감주의 회복을 늦추는 요인입니다." }] },
+  { key: "event", label: "이벤트", events: [{ title: "외국인 순매도", detailTitle: "외국인 KOSPI 순매도 확대", source: "수급 데이터", importance: 3, summary: "외국인이 KOSPI 현물과 선물에서 순매도를 확대하며 지수 하락 압력이 커졌습니다. 대형 반도체주가 낙폭을 키운 핵심 경로입니다." }, { title: "반도체 실적", detailTitle: "반도체 실적 기대 하향 조정", source: "기업 실적", importance: 3, summary: "메모리 가격과 AI 투자 지속성에 대한 의문이 커지며 반도체 이익 추정치가 낮아졌습니다. KOSPI에 직접적인 영향을 주는 사건입니다." }] },
+  { key: "community", label: "커뮤니티", events: [{ title: "반도체 저가매수", detailTitle: "반도체 대형주 저가매수 심리", source: "투자자 반응", importance: 2, summary: "급락 이후 반도체 대형주를 저가 매수하려는 의견이 늘었습니다. 실제 수급 전환 전까지는 반등 기대를 보여주는 보조 신호입니다." }, { title: "환율 불안", detailTitle: "환율 불안과 외국인 이탈 우려 확산", source: "투자자 반응", importance: 1, summary: "환율 상승과 외국인 이탈을 연결하는 우려가 커졌습니다. 단기 매도 쏠림을 키울 수 있지만 펀더멘털 신호로 단독 사용하지 않습니다." }] },
 ] as const;
 
+const marketSignalIcons = { economy: Activity, country: Globe2, event: CalendarClock, community: UsersRound };
+const marketSignalImpacts = {
+  economy: "금리·환율 변화는 기업 조달비용과 수출주 이익 전망을 바꿔 지수의 적정 가치에 직접 반영됩니다.",
+  country: "미국·한국의 정책 방향은 외국인 자금 흐름, 원화 가치와 성장주 밸류에이션에 영향을 줍니다.",
+  event: "뉴스 이벤트는 위험 선호와 변동성을 빠르게 바꾸지만, 영향의 방향과 지속 기간은 사건마다 다릅니다.",
+  community: "투자자 관심과 심리는 단기 거래량과 수급 쏠림을 키울 수 있지만 펀더멘털 신호로 단독 사용하지 않습니다.",
+} as const;
 const actualPath = [
   5224.36, 5350, 5480, 5610, 5760, 5920, 6080, 6244.13, 6000, 5700, 5350,
   5052.46, 5450, 5900, 6300, 6598.87, 7100, 7600, 8050, 8476.15, 8420,
@@ -924,6 +935,7 @@ function TwinPage({ selectedScenario, onSelectScenario, onOpenBuilder }: { selec
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<MainTab>("market");
+  const [selectedMarketSignal, setSelectedMarketSignal] = useState<(typeof marketSignals)[number] | null>(null);
   const [selectedScenario, setSelectedScenario] = useState(scenarios[0]);
   const [scenarioDetailOpen, setScenarioDetailOpen] = useState(false);
   const [builderOpen, setBuilderOpen] = useState(false);
@@ -1052,24 +1064,33 @@ export default function Home() {
               </header>
 
               <section className="market-dashboard">
-                <section className="panel connection-panel">
-                  <div className="panel-title"><h2>시장 연결</h2></div>
-                  <div className="connection-list">
-                    {marketConnections.map((item) => (
-                      <article key={item.name}>
-                        <div className="connection-main">
-                          <span className={`entity-symbol ${item.tone}`}>{item.symbol}</span>
-                          <div><strong>{item.name}</strong><small>{item.code}</small></div>
-                          <div className={item.tone}><strong>{item.value}</strong><small>{item.change}</small></div>
-                        </div>
-                        <div className="connection-contribution">
-                          <span>KOSPI 기여도</span>
-                          <strong className={item.contribution.startsWith("+") ? "up" : "down"}>{item.contribution}</strong>
-                        </div>
-                      </article>
-                    ))}
+                <section className="panel connection-panel market-signal-panel">
+                  <div className="panel-title">
+                    <div><span>MARKET PULSE</span><h2>시장 연결</h2></div>
+                    <Wifi size={17} className="market-signal-wifi" />
                   </div>
-                  <p className="data-note">* 모든 시장 연결 값은 2026.07.28 KRX 장마감 기준입니다.</p>
+                  <div className="signal-stack">
+                    {marketSignals.map((signal) => {
+                      const Icon = marketSignalIcons[signal.key];
+                      return (
+                        <article className={`signal-group ${signal.key}`} key={signal.key}>
+                          <button className="signal-group-button" type="button" onClick={() => setSelectedMarketSignal(signal)} aria-label={`${signal.label} 상세 보기`}>
+                            <span className="signal-group-head">
+                              <span className="signal-icon"><Icon size={15} /></span>
+                              <strong>{signal.label}</strong>
+                              <span className="signal-share"><ChevronRight className="signal-disclosure" size={12} /></span>
+                            </span>
+                            <span className="signal-events">
+                              {signal.events.map((event) => <span key={event.title}><span><strong>{event.title}</strong><small>{event.source}</small></span><b aria-label={`중요도 ${event.importance}점`}>{"★".repeat(event.importance)}{"☆".repeat(3 - event.importance)}</b></span>)}
+                            </span>
+                            <span className="signal-track" aria-hidden="true">
+                              {signal.events.map((event) => <i key={event.title} className={`importance-${event.importance}`} />)}
+                            </span>
+                          </button>
+                        </article>
+                      );
+                    })}
+                  </div>
                 </section>
 
                 <section className="panel chart-panel">
@@ -1297,6 +1318,26 @@ export default function Home() {
               <ScenarioBuildScreen seeds={selectedSeeds.length ? selectedSeeds : ["KOSPI 기본 환경"]} prompt={scenarioPrompt} uploadedFile={uploadedSeedFile} stage={buildStage} period={period} simulationStarted={simulationStarted} onStartSimulation={startSimulation} onClose={closeBuilder} />
             </section>
           )}
+        </div>
+      )}
+
+      {selectedMarketSignal && (
+        <div className="modal-backdrop market-signal-backdrop" onMouseDown={() => setSelectedMarketSignal(null)}>
+          <section className="market-signal-modal" role="dialog" aria-modal="true" aria-labelledby="market-signal-modal-title" onMouseDown={(event) => event.stopPropagation()}>
+            <header className="market-signal-modal-header">
+              <div>
+                <span>MARKET CONNECTION · DETAIL</span>
+                <h2 id="market-signal-modal-title">{selectedMarketSignal.label}</h2>
+                <p>오늘 KOSPI에 연결된 핵심 키워드와 시장 영향을 확인하세요.</p>
+              </div>
+              <button className="scenario-modal-close" type="button" onClick={() => setSelectedMarketSignal(null)} aria-label="시장 연결 상세 닫기"><X size={20} /></button>
+            </header>
+            <div className="market-signal-modal-keywords">
+              {selectedMarketSignal.events.map((event) => <article key={event.title}><div><span>{event.source}</span><strong>{event.detailTitle}</strong></div><b aria-label={`중요도 ${event.importance}점`}>{"★".repeat(event.importance)}{"☆".repeat(3 - event.importance)}</b><p>{event.summary}</p></article>)}
+            </div>
+            <div className="market-signal-modal-section"><span>시장 영향</span><p>{marketSignalImpacts[selectedMarketSignal.key]}</p></div>
+            <small className="market-signal-modal-note">카테고리별 주요 사건을 바탕으로 정리한 중요도입니다.</small>
+          </section>
         </div>
       )}
 
