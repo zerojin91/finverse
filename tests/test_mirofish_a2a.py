@@ -56,9 +56,15 @@ def test_mirofish_contract_matches_agent_plan() -> None:
 def test_market_prompt_requires_raw_time_series_for_quantitative_analysis() -> None:
     prompt = mirofish_a2a.SPECIALIST_PROMPTS["market"]
     assert "## Raw Time Series" in prompt
-    assert "원시 행을 전부 조회" in prompt
+    assert "최근 240거래일" in prompt
+    assert "단기=최근 20거래일" in prompt
+    assert "중기=최근 60거래일" in prompt
+    assert "MA20, MA60, MA120, MA240" in prompt
     assert "요약치로 대체하지 않는다" in prompt
     assert "계산식과 분모" in prompt
+    assert "영어 원문만 확인 가능한 사실" in mirofish_a2a.SPECIALIST_PROMPTS["web_search"]
+    assert "한국어 검색어를 먼저 사용" in mirofish_a2a.SPECIALIST_PROMPTS["web_search"]
+    assert "영어 제목·snippet·직접 인용" in mirofish_a2a.ORCHESTRATOR_PROMPT
 
 
 def test_dates_and_slug() -> None:

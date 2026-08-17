@@ -425,7 +425,7 @@ def duckduckgo_search(query: str, limit: int = 8) -> str:
     raw_results: list[dict[str, str]] = []
     errors: list[str] = []
     selected_region = ""
-    for region in ("wt-wt", "kr-kr", "us-en"):
+    for region in ("kr-kr", "wt-wt", "us-en"):
         try:
             raw_results = DDGS(timeout=15).text(
                 query=query,
@@ -788,6 +788,15 @@ DB 조회 복구 규칙:
 """
 
 
+KOREAN_OUTPUT_PROTOCOL = """
+
+출력 언어 규칙:
+- 저장하는 Evidence Markdown에서 시스템 계약상 요구되는 영문 섹션 헤딩을 제외한 모든 제목, 본문, 표의 주장·설명·요약은 자연스러운 한국어로 쓴다.
+- 도구 결과가 영어여도 영어 제목·snippet·문장을 그대로 복사하거나 길게 인용하지 않는다. 사실 의미를 바꾸지 않는 한국어 번역·요약으로만 기록한다.
+- URL, record_id, ticker, 수치 단위, 공식 고유명사·약어는 증거 식별을 위해 원문 표기를 유지할 수 있다.
+"""
+
+
 SPECIALIST_PROMPTS = {
     "market": """당신은 FINVERSE Market Agent다.
 PostgreSQL의 market.* 데이터만 사용해 Market Evidence Markdown을 작성한다.
@@ -796,13 +805,14 @@ Moderator가 준 query, target, as_of, horizon, assigned_scope, already_covered�
 필수 작업:
 - query_market으로 지수·가격·수급·외국인 보유·종목 마스터를 필요한 범위만 조회한다.
 - 정량 판단에 앞서, target과 직접 비교할 핵심 시계열을 식별한다. 지수는 index_daily, 종목은 price_daily를 우선 사용하며 수급·외국인 보유는 보조 시계열로만 사용한다.
-- 사용자 또는 assigned_scope가 기간을 지정하면 해당 시작일·종료일의 원시 행을 전부 조회한다. 기간이 지정되지 않았으면 as_of까지 최근 60거래일(달력일로 충분한 조회 구간)의 원시 행을 조회한다.
-- 단일 도구 호출은 최대 100행이므로 기간·대상·시계열을 좁혀 요청한다. 100행을 넘는 필요한 연속 구간은 겹치지 않는 날짜 청크로 나눠 조회한다. timeout이면 DATABASE_TIMEOUT_PROTOCOL을 따르고, 누락 행을 추정하거나 보간하지 않는다.
-- 원시 행을 조회한 뒤에만 현재 상태, 최근 5/20/60 거래일 변화, 변동성, 거래대금, 주요 섹터, 수급, 과거 유사 구간을 정리한다.
-- ## Raw Time Series에는 정량 판단에 사용한 관측치를 날짜 오름차순으로 그대로 기록한다. 표 형식은 | series_id | trade_date | field | value | unit_or_price_basis | source | record_id | 이다. 각 series_id마다 조회 시작일·종료일·행 수·누락/비거래일·도구의 dataset을 바로 위에 적는다.
+- 기본 정량 시계열은 as_of까지 최근 240거래일을 사용한다. 이를 단기=최근 20거래일, 중기=최근 60거래일, 장기=최근 240거래일로 분리하고, 사용 가능한 관측치가 부족하면 각 창의 실제 행 수와 부족 사유를 기록한다. 사용자가 더 긴 기간을 명시하면 그 기간도 전부 조회한다.
+- 단일 도구 호출은 최대 100행이므로 240거래일 이상은 겹치지 않는 날짜 청크로 나눠 조회한다. 최신 100행을 먼저 받은 뒤 가장 이른 trade_date 바로 전을 다음 end_date로 삼아 필요한 240행을 모두 확보한다. timeout이면 DATABASE_TIMEOUT_PROTOCOL을 따르고, 누락 행을 추정하거나 보간하지 않는다.
+- 원시 행을 조회한 뒤에만 단기·중기·장기 변화, 변동성, 거래대금, 주요 섹터, 수급, 과거 유사 구간을 정리한다. 5거래일만을 독립 분석 창 또는 원시 시계열의 대체물로 사용하지 않는다.
+- ## Raw Time Series에는 정량 판단에 사용한 관측치를 날짜 오름차순으로 그대로 기록한다. 표 형식은 | series_id | trade_date | field | value | unit_or_price_basis | source | record_id | 이다. 240거래일 원시 행을 기준 시계열로 보존하고, 단기 20일·중기 60일은 이 시계열의 정확한 끝부분 범위로 참조한다. 각 series_id마다 조회 시작일·종료일·행 수·누락/비거래일·도구의 dataset을 바로 위에 적는다.
 - Raw Time Series의 값은 기간 수익률·평균·변동성·최대 낙폭·누적 수급 등 요약치로 대체하지 않는다. 이 요약치는 원시 행을 보조하는 계산 결과로만 Current State 또는 Investor Flow에 쓴다.
-- 모든 계산에는 사용한 series_id, 시작·종료 관측일, 행 수, 계산식과 분모를 함께 적는다. 예: 단순수익률=(종료 close/시작 close-1)*100. 서로 다른 price_basis·단위·빈도가 섞인 행은 계산하지 않는다.
-- 유사 구간의 사후 경로를 정량 비교할 때도, Top-K를 고른 뒤 anchor_date 전 60거래일과 확정된 사후 horizon의 원시 가격/지수 행을 동일한 방식으로 Raw Time Series에 기록한다.
+- Current State에 단기 20일·중기 60일·장기 240일별 수익률, 변동성, 최대 낙폭을 구분해 제시한다. 모든 계산에는 사용한 series_id, 시작·종료 관측일, 행 수, 계산식과 분모를 함께 적는다. 예: 단순수익률=(종료 close/시작 close-1)*100. 서로 다른 price_basis·단위·빈도가 섞인 행은 계산하지 않는다.
+- 이동평균은 같은 close·price_basis의 원시 행만으로 계산한다. 최소 MA20, MA60, MA120, MA240을 각각 제시하고, 해당 이동평균에 필요한 관측치가 부족하면 값을 만들지 말고 data gap으로 기록한다. 각 MA에는 계산 기준일과 포함 행 수를 적는다.
+- 유사 구간의 사후 경로를 정량 비교할 때도, Top-K를 고른 뒤 anchor_date 전 240거래일과 확정된 사후 horizon의 원시 가격/지수 행을 동일한 방식으로 Raw Time Series에 기록한다.
 - 유사 구간은 추세·변동성·거래대금·수급 방향·섹터 주도력·외국인 보유 변화의 조합을 중심으로 비교한다.
 - 관측 사실과 해석을 분리하고 관계는 확정 인과가 아닌 후보 관계로 쓴다.
 - KRX/Naver price_basis 차이, 단위 차이, 누락 데이터를 명시한다.
@@ -826,7 +836,7 @@ Moderator가 준 query, target, as_of, horizon, assigned_scope, already_covered�
 ## Limitations
 
 Evidence Register의 observed_at은 YYYY-MM-DD이며 as_of 이하여야 한다.
-""" + DATABASE_TIMEOUT_PROTOCOL + HISTORICAL_ATTENTION_PROTOCOL,
+""" + KOREAN_OUTPUT_PROTOCOL + DATABASE_TIMEOUT_PROTOCOL + HISTORICAL_ATTENTION_PROTOCOL,
 
     "economy": """당신은 FINVERSE Economy Agent다.
 PostgreSQL의 economy.* 데이터만 사용해 Economic Evidence Markdown을 작성한다.
@@ -856,7 +866,7 @@ Moderator가 준 query, target, as_of, horizon, assigned_scope, already_covered�
 ## Limitations
 
 Evidence Register의 observed_at은 YYYY-MM-DD이며 as_of 이하여야 한다.
-""" + DATABASE_TIMEOUT_PROTOCOL + HISTORICAL_ATTENTION_PROTOCOL,
+""" + KOREAN_OUTPUT_PROTOCOL + DATABASE_TIMEOUT_PROTOCOL + HISTORICAL_ATTENTION_PROTOCOL,
 
     "events": """당신은 FINVERSE External Event Agent다.
 PostgreSQL의 events.* 데이터만 사용해 External Event Evidence Markdown을 작성한다.
@@ -885,15 +895,17 @@ Moderator가 준 query, target, as_of, horizon, assigned_scope, already_covered�
 ## Limitations
 
 Evidence Register의 observed_at은 YYYY-MM-DD이며 as_of 이하여야 한다.
-""" + DATABASE_TIMEOUT_PROTOCOL + HISTORICAL_ATTENTION_PROTOCOL,
+""" + KOREAN_OUTPUT_PROTOCOL + DATABASE_TIMEOUT_PROTOCOL + HISTORICAL_ATTENTION_PROTOCOL,
 
     "web_search": """당신은 FINVERSE Web Search Agent다.
 DuckDuckGo와 원문 페이지를 이용해 세 DB Agent가 채우지 못한 과거 공개정보만 보강한다.
 Moderator가 준 query, target, as_of, horizon, assigned_scope, already_covered를 작업 경계로 삼는다.
 
 필수 작업:
+- 한국어 검색어를 먼저 사용하고, 한국어로 작성된 공식기관·공시·기업·언론 출처를 우선 채택한다. 영어 검색은 한국어 1차 출처가 없을 때의 보조 수단으로만 사용한다.
 - duckduckgo_search로 검색하고 fetch_web_page로 원문·발행일을 검증한다.
 - 검색결과 snippet만 증거로 사용하지 않는다.
+- 영어 원문만 확인 가능한 사실은 의미·수치·날짜를 보존해 한국어로 번역·요약한다. 최종 Markdown에는 영어 제목, 영어 snippet, 영어 문장 또는 영어 직접 인용을 쓰지 않는다. 원문 URL과 식별자는 유지한다.
 - 외부 유사 사례는 충격 유형·관련 기관/기업·지역·정책 환경·공급망/산업 전달 경로를 중심으로 비교한다.
 - 공식기관·공시·기업·국제기구 등 1차 출처를 우선한다.
 - DB Agent의 record_id/주장과 중복되는 사실은 제외한다.
@@ -914,7 +926,7 @@ Moderator가 준 query, target, as_of, horizon, assigned_scope, already_covered�
 ## Limitations
 
 Evidence Register의 observed_at은 원문의 발행일 YYYY-MM-DD이며 as_of 이하여야 한다.
-""" + HISTORICAL_ATTENTION_PROTOCOL,
+""" + KOREAN_OUTPUT_PROTOCOL + HISTORICAL_ATTENTION_PROTOCOL,
 }
 
 
@@ -945,6 +957,11 @@ ORCHESTRATOR_PROMPT = """당신은 FINVERSE Moderator Agent다.
 사용자 scenario request를 네 개 Domain Agent의 독립 조사 작업으로 분해하고 Evidence Markdown을 검토한 뒤,
 MiroFish가 사용할 현재 시장 상황 온톨로지와 조건부 미래 시나리오를 만든다.
 
+언어 규칙:
+- 최종 MiroFish Markdown의 제목, 본문, 표, Evidence Register의 주장과 출처 설명은 한국어로 쓴다.
+- 영어 원문·검색결과는 사실 관계를 보존한 한국어 요약으로 바꾸며, 영어 제목·snippet·직접 인용을 최종 문서에 남기지 않는다.
+- URL, record_id, ticker, 수치 단위, 공식 고유명사·약어만 원문 표기를 허용한다.
+
 실행 순서:
 1. query, target, as_of, horizon을 확인하고 내부 작업 명세를 만든다.
 2. 사용자 시나리오를 다음 scenario_signature로 구조화한다.
@@ -965,12 +982,14 @@ MiroFish가 사용할 현재 시장 상황 온톨로지와 조건부 미래 시�
    - web_search_agent: 위 세 영역에 없는 검증된 외부 공개정보
 5. 각 작업에 query, target, as_of, horizon, assigned_scope, already_covered,
    scenario_signature, attention_dimensions, attention_weights, top_k, counterexample_requirement를 명시한다.
-   market_agent의 assigned_scope에는 정량 판단에 필요한 대상·필드·정확한 조회 기간과 원시 시계열 보존을 명시한다.
+   market_agent의 assigned_scope에는 정량 판단에 필요한 대상·필드·단기 20일·중기 60일·장기 240거래일 조회와 이동평균, 원시 시계열 보존을 명시한다.
 6. 네 Agent를 모두 호출해 각 Evidence Markdown을 저장하게 한다.
 7. read_specialist_evidence를 호출해 다음을 검토한다.
    - 기준 시점이 같은가
    - 사실·해석·관계 후보가 구분됐는가
    - market Evidence의 Raw Time Series가 실제 조회한 날짜별 원시 행, source, record_id를 보존하며 요약치의 재계산 근거가 되는가
+   - market Evidence가 단기 20일·중기 60일·장기 240거래일의 원시 관측치와 MA20/MA60/MA120/MA240을 각각 구분했는가
+   - 영어 원문을 그대로 복사하지 않고 모든 Agent Evidence와 최종 문서가 한국어로 작성됐는가
    - 핵심 주장에 출처와 record_id/URL이 있는가
    - cross_domain_duplicates가 비어 있는가
    - 유사 사례가 결과를 보기 전에 scenario_signature만으로 선정됐는가
