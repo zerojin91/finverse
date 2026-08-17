@@ -172,7 +172,8 @@ def _read_query(sql: str, params: tuple[Any, ...]) -> list[dict[str, Any]]:
             row_factory=dict_row,
             options=(
                 "-c default_transaction_read_only=on "
-                f"-c statement_timeout={timeout_ms}"
+                f"-c statement_timeout={timeout_ms} "
+                "-c max_parallel_workers_per_gather=0"
             ),
         ) as connection:
             with connection.cursor() as cursor:

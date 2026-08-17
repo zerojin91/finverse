@@ -92,6 +92,42 @@ def test_database_timeout_configuration(monkeypatch) -> None:
         mirofish_a2a._statement_timeout_ms()
 
 
+def test_database_reads_disable_parallel_gather(monkeypatch) -> None:
+    captured = {}
+
+    class Cursor:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def execute(self, _sql, _params):
+            return None
+
+        def fetchall(self):
+            return []
+
+    class Connection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def cursor(self):
+            return Cursor()
+
+    def connect(_database_url, **kwargs):
+        captured.update(kwargs)
+        return Connection()
+
+    monkeypatch.setenv("DATABASE_URL", "postgresql://example")
+    monkeypatch.setattr(mirofish_a2a.psycopg, "connect", connect)
+    assert mirofish_a2a._read_query("SELECT 1", ()) == []
+    assert "max_parallel_workers_per_gather=0" in captured["options"]
+
+
 def test_database_timeout_becomes_retryable_tool_result(monkeypatch) -> None:
     def timeout(_sql, _params):
         raise mirofish_a2a.DatabaseQueryTimeoutError("database query exceeded 60s")
