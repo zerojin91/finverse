@@ -10,9 +10,16 @@ No Python database driver is required.  The rows are streamed into a staging
 table with ``COPY`` through the ``psql`` binary inside the compose service,
 which keeps this repository on the standard library like every collector.
 
+Loads are incremental where the store supports it.  The indexed store keeps a
+``changes`` table whose ``seq`` is an INTEGER PRIMARY KEY, so "everything added
+since the last load" is a rowid seek.  ``lake.load_state`` holds the watermark.
+A full re-read stays available with ``--full`` and is what a fresh database or a
+repaired store needs.
+
     docker compose up -d db
     python3 scripts/load_postgres.py --all
     python3 scripts/load_postgres.py --collector market_ingest
+    python3 scripts/load_postgres.py --collector market_ingest --full
     python3 scripts/load_postgres.py --all --dry-run
 """
 
@@ -23,6 +30,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import sqlite3
 import subprocess
@@ -223,10 +231,18 @@ SQLITE_SOURCE = {"latest": ("record_json", "record_id"),
 
 
 def sqlite_lines(path: Path, table: str):
-    column, order = SQLITE_SOURCE[table]
+    """Every row of one store table.
+
+    Deliberately unordered. `latest`'s primary key is TEXT, so ORDER BY
+    record_id makes SQLite walk sqlite_autoindex_latest_1 and fetch each row
+    separately -- 26M random reads over a 62 GB file, measured at close to 14
+    hours. COPY into a staging table does not care what order rows arrive in,
+    and without the ORDER BY this is a sequential table scan.
+    """
+    column, _ = SQLITE_SOURCE[table]
     connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
     try:
-        cursor = connection.execute(f"SELECT {column} FROM {table} ORDER BY {order}")
+        cursor = connection.execute(f"SELECT {column} FROM {table}")
         while True:
             rows = cursor.fetchmany(10000)
             if not rows:
@@ -234,6 +250,61 @@ def sqlite_lines(path: Path, table: str):
             for (raw,) in rows:
                 if raw:
                     yield raw
+    finally:
+        connection.close()
+
+
+def sqlite_max_seq(path: Path) -> int:
+    connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    try:
+        return connection.execute("SELECT coalesce(max(seq), 0) FROM changes").fetchone()[0]
+    finally:
+        connection.close()
+
+
+def sqlite_changed_since(path: Path, since_seq: int):
+    """(record_ids, change_json lines) for everything the store logged after
+    ``since_seq``.
+
+    `changes.seq` is an INTEGER PRIMARY KEY, so this is a rowid seek straight to
+    the tail rather than a scan. record_ids come back deduplicated because one
+    record revised twice in the window only needs fetching once.
+    """
+    connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    try:
+        record_ids: dict[str, None] = {}       # dict keeps insertion order
+        change_lines: list[str] = []
+        cursor = connection.execute(
+            "SELECT record_id, change_json FROM changes WHERE seq > ? ORDER BY seq",
+            (since_seq,))
+        while True:
+            rows = cursor.fetchmany(10000)
+            if not rows:
+                break
+            for record_id, change_json in rows:
+                if record_id:
+                    record_ids[record_id] = None
+                if change_json:
+                    change_lines.append(change_json)
+        return list(record_ids), change_lines
+    finally:
+        connection.close()
+
+
+def sqlite_records_by_id(path: Path, record_ids: list[str]):
+    """The current version of each named record, looked up on the primary key.
+
+    Deleted records are skipped: the lake keeps what was collected, and a row
+    the store has tombstoned has nothing new to promote.
+    """
+    connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    try:
+        for record_id in record_ids:
+            row = connection.execute(
+                "SELECT record_json FROM latest WHERE record_id = ? AND is_deleted = 0",
+                (record_id,)).fetchone()
+            if row and row[0]:
+                yield row[0]
     finally:
         connection.close()
 
@@ -253,7 +324,47 @@ def count_lines(path: Path) -> int:
         return sum(1 for line in handle if line.strip())
 
 
-def load_collector(directory: str, collector: str, *, dry_run: bool) -> dict:
+def staging_tables(collector: str) -> tuple[str, str]:
+    """This collector's own staging pair.
+
+    Sharing lake.staging_records across collectors let one load's TRUNCATE wipe
+    another's in-flight COPY; the victim then promoted an empty table and
+    reported success. Names are derived from the collector and checked against a
+    strict pattern because they are interpolated into DDL.
+    """
+    if not re.fullmatch(r"[a-z][a-z0-9_]{0,40}", collector):
+        raise SystemExit(f"refusing to build a table name from {collector!r}")
+    return f"lake.staging_records_{collector}", f"lake.staging_changes_{collector}"
+
+
+def ensure_staging(records_table: str, changes_table: str) -> None:
+    psql(
+        f"CREATE UNLOGGED TABLE IF NOT EXISTS {records_table} "
+        f"(LIKE lake.staging_records INCLUDING ALL);"
+        f"CREATE UNLOGGED TABLE IF NOT EXISTS {changes_table} "
+        f"(LIKE lake.staging_changes INCLUDING ALL);",
+        quiet=True)
+
+
+def read_watermark(collector: str) -> int:
+    value = psql(
+        "SELECT last_seq FROM lake.load_state WHERE collector = "
+        f"{sql_literal(collector)};", quiet=True).strip()
+    return int(value) if value else 0
+
+
+def write_watermark(collector: str, seq: int, rows: int) -> None:
+    psql(
+        "INSERT INTO lake.load_state (collector, last_seq, loaded_rows, updated_at) "
+        f"VALUES ({sql_literal(collector)}, {seq}, {rows}, now()) "
+        "ON CONFLICT (collector) DO UPDATE "
+        "SET last_seq = excluded.last_seq, "
+        "    loaded_rows = lake.load_state.loaded_rows + excluded.loaded_rows, "
+        "    updated_at = now();", quiet=True)
+
+
+def load_collector(directory: str, collector: str, *, dry_run: bool,
+                   full: bool = False) -> dict:
     root = DATA_ROOT / directory
     index = root / "index.sqlite3"
     latest = root / "latest.jsonl"
@@ -265,6 +376,8 @@ def load_collector(directory: str, collector: str, *, dry_run: bool) -> dict:
         records_in = lambda: sqlite_lines(index, "latest")
         changes_in = lambda: sqlite_lines(index, "changes")
         counts = lambda: (sqlite_count(index, "latest"), sqlite_count(index, "changes"))
+        if not dry_run and not full:
+            return load_incremental(index, collector, report)
     elif latest.exists():
         report["read_from"] = "latest.jsonl"
         records_in = lambda: jsonl_lines(latest)
@@ -280,32 +393,86 @@ def load_collector(directory: str, collector: str, *, dry_run: bool) -> dict:
         report["latest_lines"], report["changes_lines"] = counts()
         return report
 
-    psql("TRUNCATE lake.staging_records; TRUNCATE lake.staging_changes;", quiet=True)
+    records_table, changes_table = staging_tables(collector)
+    ensure_staging(records_table, changes_table)
+    psql(f"TRUNCATE {records_table}; TRUNCATE {changes_table};", quiet=True)
 
     stats = {"rows": 0, "skipped": 0}
-    psql("COPY lake.staging_records (doc) FROM STDIN",
+    psql(f"COPY {records_table} (doc) FROM STDIN",
          stdin=blocks(records_in(), collector, stats), quiet=True)
     report["latest_lines"] = stats["rows"]
     if stats["skipped"]:
         report["skipped_rows"] = stats["skipped"]
     if changes_in is not None:
         change_stats = {"rows": 0, "skipped": 0}
-        psql("COPY lake.staging_changes (doc) FROM STDIN",
+        psql(f"COPY {changes_table} (doc) FROM STDIN",
              stdin=blocks(changes_in(), collector, change_stats), quiet=True)
         report["changes_lines"] = change_stats["rows"]
 
+    promote(collector, records_table, changes_table, report)
+
+    # A full read has caught up with everything the store holds, so park the
+    # watermark at its end; the next incremental run starts from there.
+    if index.exists():
+        write_watermark(collector, sqlite_max_seq(index), report.get("inserted", 0))
+
+    psql(f"TRUNCATE {records_table}; TRUNCATE {changes_table};", quiet=True)
+    return report
+
+
+def promote(collector: str, records_table: str, changes_table: str,
+            report: dict) -> None:
     promoted = psql(
-        f"SELECT inserted, updated FROM lake.promote_records({sql_literal(collector)});",
+        f"SELECT inserted, updated FROM lake.promote_records("
+        f"{sql_literal(collector)}, {sql_literal(records_table)});",
         quiet=True).strip()
     inserted, _, updated = promoted.partition("|")
     report["inserted"] = int(inserted or 0)
     report["updated"] = int(updated or 0)
 
-    audit = psql(f"SELECT lake.promote_changes({sql_literal(collector)});",
-                 quiet=True).strip()
+    audit = psql(
+        f"SELECT lake.promote_changes("
+        f"{sql_literal(collector)}, {sql_literal(changes_table)});",
+        quiet=True).strip()
     report["changes_loaded"] = int(audit or 0)
 
-    psql("TRUNCATE lake.staging_records; TRUNCATE lake.staging_changes;", quiet=True)
+
+def load_incremental(index: Path, collector: str, report: dict) -> dict:
+    """Load only what the store logged since the last successful load."""
+    since = read_watermark(collector)
+    head = sqlite_max_seq(index)
+    report["mode"] = "incremental"
+    report["from_seq"] = since
+    report["to_seq"] = head
+    if head <= since:
+        report["latest_lines"] = 0
+        report["changes_lines"] = 0
+        report["inserted"] = report["updated"] = report["changes_loaded"] = 0
+        return report
+
+    record_ids, change_lines = sqlite_changed_since(index, since)
+    records_table, changes_table = staging_tables(collector)
+    ensure_staging(records_table, changes_table)
+    psql(f"TRUNCATE {records_table}; TRUNCATE {changes_table};", quiet=True)
+
+    stats = {"rows": 0, "skipped": 0}
+    psql(f"COPY {records_table} (doc) FROM STDIN",
+         stdin=blocks(sqlite_records_by_id(index, record_ids), collector, stats),
+         quiet=True)
+    report["latest_lines"] = stats["rows"]
+    if stats["skipped"]:
+        report["skipped_rows"] = stats["skipped"]
+
+    change_stats = {"rows": 0, "skipped": 0}
+    psql(f"COPY {changes_table} (doc) FROM STDIN",
+         stdin=blocks(iter(change_lines), collector, change_stats), quiet=True)
+    report["changes_lines"] = change_stats["rows"]
+
+    promote(collector, records_table, changes_table, report)
+    # Only now, after the rows are committed. Moving the watermark first would
+    # let a failure here skip the window forever.
+    write_watermark(collector, head, report["inserted"])
+    psql(f"TRUNCATE {records_table}; TRUNCATE {changes_table};", quiet=True)
     return report
 
 
@@ -333,6 +500,9 @@ def main() -> int:
     parser.add_argument("--all", action="store_true", help="load every collector")
     parser.add_argument("--dry-run", action="store_true",
                         help="report what would be loaded without touching the database")
+    parser.add_argument("--full", action="store_true",
+                        help="re-read the whole store instead of only what is new "
+                             "(needed for an empty database or a repaired store)")
     args = parser.parse_args()
 
     if not args.all and not args.collector:
@@ -346,7 +516,8 @@ def main() -> int:
     for directory, collector in COLLECTOR_DIRS.items():
         if collector not in wanted:
             continue
-        reports.append(load_collector(directory, collector, dry_run=args.dry_run))
+        reports.append(load_collector(directory, collector,
+                                      dry_run=args.dry_run, full=args.full))
 
     print(json.dumps({"dry_run": args.dry_run, "loaded": reports}, ensure_ascii=False))
     return 0

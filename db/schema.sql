@@ -65,9 +65,36 @@ CREATE TABLE IF NOT EXISTS lake.runs (
     loaded_at    timestamptz NOT NULL DEFAULT now()
 );
 
--- Staging target for COPY. Truncated at the start of every load.
+-- Staging target for COPY.
+--
+-- One shared pair of tables used to be enough, because loads were assumed to be
+-- short and serial. They are not: the market load ran for 14 hours while the
+-- nightly economy/news load started at 20:30 and truncated the very table the
+-- market load was still filling. The market promotion then found an empty
+-- staging table, reported "inserted: 0", and exited 0 -- silently dropping five
+-- days and 585,835 rows on the floor. The two cron jobs hold separate file
+-- locks so their collectors do not block each other, but nothing guarded these.
+--
+-- load_postgres.py now gives every collector its own staging pair, derived from
+-- the collector name, and only ever truncates its own. These two remain as the
+-- template the per-collector tables are created from (LIKE), and for any older
+-- caller that still names them directly.
 CREATE UNLOGGED TABLE IF NOT EXISTS lake.staging_records (doc jsonb);
 CREATE UNLOGGED TABLE IF NOT EXISTS lake.staging_changes (doc jsonb);
+
+-- How far each collector's store has been loaded.
+--
+-- The store's `changes` table has a monotonic INTEGER PRIMARY KEY `seq`, so
+-- "everything new since last time" is a rowid seek rather than a full scan.
+-- Keeping the watermark here, next to the rows it describes, means it commits
+-- with them: a load that fails leaves the watermark where it was and the next
+-- run picks the same work up again.
+CREATE TABLE IF NOT EXISTS lake.load_state (
+    collector   text PRIMARY KEY,
+    last_seq    bigint NOT NULL DEFAULT 0,
+    loaded_rows bigint NOT NULL DEFAULT 0,
+    updated_at  timestamptz NOT NULL DEFAULT now()
+);
 
 -- ---------------------------------------------------------------------------
 -- Promotion from staging
@@ -75,66 +102,79 @@ CREATE UNLOGGED TABLE IF NOT EXISTS lake.staging_changes (doc jsonb);
 -- Idempotent: re-loading the same JSONL changes nothing. A revised value has
 -- the same record_id but a different record_hash, so it updates in place while
 -- lake.changes keeps the previous hash.
-CREATE OR REPLACE FUNCTION lake.promote_records(p_collector text)
+-- p_staging names the table to promote from, so concurrent loads of different
+-- collectors never share one. It defaults to the old shared table.
+--
+-- inserted/updated used to be derived by counting lake.records before and after
+-- -- two sequential counts over 25M rows, minutes each, to produce two numbers
+-- for a log line. `xmax = 0` is true exactly for tuples this statement inserted
+-- rather than updated, so RETURNING gives the same split for free.
+CREATE OR REPLACE FUNCTION lake.promote_records(
+    p_collector text,
+    p_staging   text DEFAULT 'lake.staging_records'
+)
 RETURNS TABLE (inserted bigint, updated bigint) AS $$
-DECLARE
-    before_count bigint;
-    affected     bigint;
 BEGIN
-    SELECT count(*) INTO before_count FROM lake.records WHERE collector = p_collector;
-
-    INSERT INTO lake.records AS r (
-        record_id, collector, record_type, source, schema_version,
-        record_hash, collected_at, payload
-    )
-    SELECT
-        doc->>'record_id',
-        p_collector,
-        coalesce(doc->>'record_type', 'unknown'),
-        doc->>'source',
-        doc->>'schema_version',
-        doc->>'record_hash',
-        nullif(doc->>'collected_at', '')::timestamptz,
-        doc
-    FROM lake.staging_records
-    WHERE doc ? 'record_id' AND doc ? 'record_hash'
-    ON CONFLICT (record_id) DO UPDATE
-        SET record_type    = excluded.record_type,
-            source         = excluded.source,
-            schema_version = excluded.schema_version,
-            record_hash    = excluded.record_hash,
-            collected_at   = excluded.collected_at,
-            payload        = excluded.payload,
-            loaded_at      = now()
-        WHERE r.record_hash IS DISTINCT FROM excluded.record_hash;
-
-    GET DIAGNOSTICS affected = ROW_COUNT;
-    inserted := (SELECT count(*) FROM lake.records WHERE collector = p_collector) - before_count;
-    updated  := affected - inserted;
-    RETURN NEXT;
+    RETURN QUERY EXECUTE format($fmt$
+        WITH promoted AS (
+            INSERT INTO lake.records AS r (
+                record_id, collector, record_type, source, schema_version,
+                record_hash, collected_at, payload
+            )
+            SELECT
+                doc->>'record_id',
+                %L,
+                coalesce(doc->>'record_type', 'unknown'),
+                doc->>'source',
+                doc->>'schema_version',
+                doc->>'record_hash',
+                nullif(doc->>'collected_at', '')::timestamptz,
+                doc
+            FROM %s
+            WHERE doc ? 'record_id' AND doc ? 'record_hash'
+            ON CONFLICT (record_id) DO UPDATE
+                SET record_type    = excluded.record_type,
+                    source         = excluded.source,
+                    schema_version = excluded.schema_version,
+                    record_hash    = excluded.record_hash,
+                    collected_at   = excluded.collected_at,
+                    payload        = excluded.payload,
+                    loaded_at      = now()
+                WHERE r.record_hash IS DISTINCT FROM excluded.record_hash
+            RETURNING (xmax = 0) AS was_insert
+        )
+        SELECT count(*) FILTER (WHERE was_insert),
+               count(*) FILTER (WHERE NOT was_insert)
+        FROM promoted
+    $fmt$, p_collector, p_staging);
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION lake.promote_changes(p_collector text)
+CREATE OR REPLACE FUNCTION lake.promote_changes(
+    p_collector text,
+    p_staging   text DEFAULT 'lake.staging_changes'
+)
 RETURNS bigint AS $$
 DECLARE
     affected bigint;
 BEGIN
-    INSERT INTO lake.changes (
-        record_id, collector, mode, change_type,
-        previous_record_hash, record_hash, observed_at
-    )
-    SELECT
-        doc->>'record_id',
-        coalesce(doc->>'collector', p_collector),
-        doc->>'mode',
-        coalesce(doc->>'change_type', 'unknown'),
-        doc->>'previous_record_hash',
-        doc->>'record_hash',
-        nullif(doc->>'observed_at', '')::timestamptz
-    FROM lake.staging_changes
-    WHERE doc ? 'record_id' AND doc ? 'record_hash'
-    ON CONFLICT (record_id, record_hash, observed_at) DO NOTHING;
+    EXECUTE format($fmt$
+        INSERT INTO lake.changes (
+            record_id, collector, mode, change_type,
+            previous_record_hash, record_hash, observed_at
+        )
+        SELECT
+            doc->>'record_id',
+            coalesce(doc->>'collector', %L),
+            doc->>'mode',
+            coalesce(doc->>'change_type', 'unknown'),
+            doc->>'previous_record_hash',
+            doc->>'record_hash',
+            nullif(doc->>'observed_at', '')::timestamptz
+        FROM %s
+        WHERE doc ? 'record_id' AND doc ? 'record_hash'
+        ON CONFLICT (record_id, record_hash, observed_at) DO NOTHING
+    $fmt$, p_collector, p_staging);
 
     GET DIAGNOSTICS affected = ROW_COUNT;
     RETURN affected;

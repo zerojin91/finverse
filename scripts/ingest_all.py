@@ -75,7 +75,11 @@ JOBS = [
         provider="krx_naver",
         requires=("KRX_AUTH_KEY",),
         backfill=("--source", "all"),
-        update=("--source", "krx"),
+        # --no-materialize: the daily update collects ~2,900 rows, and
+        # rewriting the JSONL exports for them takes five hours and 38 GB of
+        # writes that nothing reads (the loader uses index.sqlite3). The exports
+        # are refreshed on their own schedule instead.
+        update=("--source", "krx", "--no-materialize"),
         note="시장. KRX backfill takes 6-7h; Naver adds prices back to 1990."),
     Job("sector_ingest", "sector_ingest.py",
         provider="krx_naver",
