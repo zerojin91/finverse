@@ -102,6 +102,15 @@ CREATE TABLE IF NOT EXISTS lake.load_state (
 -- Idempotent: re-loading the same JSONL changes nothing. A revised value has
 -- the same record_id but a different record_hash, so it updates in place while
 -- lake.changes keeps the previous hash.
+-- The single-argument versions must go before the two-argument ones are
+-- created. CREATE OR REPLACE only replaces a function of the same signature;
+-- adding a parameter overloads instead, and since the new parameter has a
+-- default, the old one-argument call would then match both and fail as
+-- ambiguous. Dropping first keeps this file re-runnable on an existing
+-- database, which is the only way it is ever applied.
+DROP FUNCTION IF EXISTS lake.promote_records(text);
+DROP FUNCTION IF EXISTS lake.promote_changes(text);
+
 -- p_staging names the table to promote from, so concurrent loads of different
 -- collectors never share one. It defaults to the old shared table.
 --
