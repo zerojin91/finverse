@@ -254,7 +254,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .scenario-heading p { margin: 0; color: var(--muted); font-size: 11.5px; }
 .scenario-heading > span { display: flex; gap: 5px; align-items: center; color: var(--light); font-size: 8px; }
 .scenario-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)) minmax(250px,1fr); gap: 16px; }
-.scenario-card { position: relative; min-height: 182px; display: flex; flex-direction: column; padding: 10px 16px 18px; border: 1px solid var(--line); border-radius: 8px; text-align: left; background: #fff; cursor: pointer; transition: .18s ease; }
+.scenario-card { position: relative; min-height: 172px; display: flex; flex-direction: column; padding: 10px 16px 18px; border: 1px solid var(--line); border-radius: 8px; text-align: left; background: #fff; cursor: pointer; transition: .18s ease; }
 .scenario-card:hover,.scenario-card.active { border-color: var(--ink); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(24,24,27,.07); }
 .scenario-card.active::before { content: ""; position: absolute; top: -1px; right: 12px; left: 12px; height: 2px; background: var(--ink); }
 .scenario-card-main { display: flex; align-items: flex-start; gap: 14px; padding-top: 0; }
@@ -266,7 +266,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .scenario-card.chip-miss h3 { font-size: 12px; }
 .scenario-card.chip-miss .scenario-card-main { gap: 10px; }
 .scenario-card.chip-miss .scenario-icon { width: 42px; height: 42px; }
-.scenario-card.chip-miss > small { position: relative; top: -5px; }
+.scenario-card.chip-miss > small { position: relative; top: -14px; }
 .scenario-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .scenario-tags span { padding: 5px 8px; border-radius: 999px; color: var(--muted); background: var(--soft); font-size: 10px; }
 .scenario-card > small { display: block; margin-top: 5px; color: var(--light); font-size: 10px; }
