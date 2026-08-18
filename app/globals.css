@@ -254,10 +254,10 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .scenario-heading p { margin: 0; color: var(--muted); font-size: 11.5px; }
 .scenario-heading > span { display: flex; gap: 5px; align-items: center; color: var(--light); font-size: 8px; }
 .scenario-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)) minmax(250px,1fr); gap: 16px; }
-.scenario-card { position: relative; min-height: 182px; display: flex; flex-direction: column; padding: 18px 16px; border: 1px solid var(--line); border-radius: 8px; text-align: left; background: #fff; cursor: pointer; transition: .18s ease; }
+.scenario-card { position: relative; min-height: 182px; display: flex; flex-direction: column; padding: 10px 16px 18px; border: 1px solid var(--line); border-radius: 8px; text-align: left; background: #fff; cursor: pointer; transition: .18s ease; }
 .scenario-card:hover,.scenario-card.active { border-color: var(--ink); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(24,24,27,.07); }
 .scenario-card.active::before { content: ""; position: absolute; top: -1px; right: 12px; left: 12px; height: 2px; background: var(--ink); }
-.scenario-card-main { display: flex; align-items: flex-start; gap: 14px; padding-top: 20px; }
+.scenario-card-main { display: flex; align-items: flex-start; gap: 14px; padding-top: 0; }
 .scenario-icon { width: 48px; height: 48px; display: grid; flex: 0 0 auto; place-items: center; padding: 0!important; border-radius: 50%!important; color: var(--ink)!important; background: #f4f4f5!important; }
 .scenario-icon.up { color: var(--up)!important; background: #fef2f2!important; }
 .scenario-icon.down { color: var(--down)!important; background: #eff6ff!important; }
