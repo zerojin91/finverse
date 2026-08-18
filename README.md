@@ -21,6 +21,45 @@ uv run python tools/site.py build
 
 `uv`는 빌드 실행 환경과 캐시를 각각 `.venv`, `.uv-cache`로 격리하고, Node.js 패키지는 `package-lock.json`과 프로젝트 내부 `node_modules`로 분리해 관리합니다. 첫 실행 시 필요한 패키지를 자동으로 설치합니다. Node.js 22.13 이상이 필요합니다.
 
+### 로컬 실행과 KOSPI 데이터 연동
+
+로컬 서비스는 `.env`에 지정한 PEM 키로 수집 서버에 SSH 접속하고, 서버의 Docker PostgreSQL에서 KOSPI OHLC 데이터를 받아옵니다. PEM 파일 자체는 저장소에 넣지 않고, 로컬 파일 경로만 설정합니다.
+
+```bash
+copy .env.example .env
+npm install
+npm run dev
+```
+
+`.env`의 수집 서버 설정은 다음과 같습니다.
+
+```env
+FINVERSE_SSH_KEY=D:\finverse_key.pem
+FINVERSE_SSH_HOST=ubuntu@44.206.56.75
+FINVERSE_KOSPI_BRIDGE_PORT=5439
+FINVERSE_KOSPI_BRIDGE_URL=http://127.0.0.1:5439
+```
+
+`npm run dev`는 웹 앱과 SSH 데이터 브리지를 함께 실행합니다. 브리지는 `finverse-db` 컨테이너의 PostgreSQL에서 `lake.records` 중 `market_index_daily`와 KOSPI 레코드를 조회하고, 다음 OHLC 필드를 서비스에 전달합니다.
+
+| 필드 | 용도 |
+| --- | --- |
+| `bas_dd` | 거래일 및 그래프의 검은색 현재일 라벨 |
+| `open` | 캔들 시가 |
+| `high` | 캔들 고가와 윗꼬리 |
+| `low` | 캔들 저가와 아랫꼬리 |
+| `close` | 캔들 종가와 헤더의 현재 지수값 |
+
+서비스는 `/api/kospi`를 통해 최신 데이터와 최근 거래일 캔들을 받고 60초마다 다시 확인합니다. 브리지는 동일 조회 결과를 30초 동안 캐시해 불필요한 SSH 접속을 줄입니다. 따라서 수집 서버에 새 시장 데이터가 적재되면 다음 동기화 주기에 화면의 지수값, 캔들차트, 현재일 라벨이 함께 갱신됩니다.
+
+Windows에서 SSH가 PEM 권한을 거부하면 키를 현재 사용자만 읽을 수 있도록 제한합니다.
+
+```powershell
+icacls D:\finverse_key.pem /inheritance:r /grant:r "$env:USERNAME:(R)"
+```
+
+시장 데이터가 수집 서버에 아직 적재되지 않은 경우에는 PostgreSQL에서 확인 가능한 가장 최신 거래일을 표시합니다. 데이터 수집·적재 상태는 [`docs/collectors/market_ingest.md`](docs/collectors/market_ingest.md)와 [`docs/database.md`](docs/database.md)를 함께 확인하세요.
+
 경제 데이터 수집기는 [`collectors/economic_ingest.py`](collectors/economic_ingest.py)에 있고, API 키 설정과 백필·업데이트 방법은 [`docs/collectors/economic_ingest.md`](docs/collectors/economic_ingest.md)에 정리되어 있습니다.
 
 시장 데이터 수집기는 [`collectors/market_ingest.py`](collectors/market_ingest.py)에 있고, KRX Open API 키 신청·백필·업데이트 방법과 공식·보조 소스의 수정주가 차이는 [`docs/collectors/market_ingest.md`](docs/collectors/market_ingest.md)에 정리되어 있습니다.

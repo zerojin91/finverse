@@ -65,6 +65,13 @@ const marketSignalImpacts = {
   event: "뉴스 이벤트는 위험 선호와 변동성을 빠르게 바꾸지만, 영향의 방향과 지속 기간은 사건마다 다릅니다.",
   community: "투자자 관심과 심리는 단기 거래량과 수급 쏠림을 키울 수 있지만 펀더멘털 신호로 단독 사용하지 않습니다.",
 } as const;
+const marketOverview = [
+  { key: "KOSPI", name: "코스피", value: "6,023.66", change: "-732.09", rate: "-10.84%", tone: "down", badge: "시장 하락", points: [6244, 6312, 6388, 6460, 6380, 6428, 6375, 6160, 6128, 6038, 6048, 6024, 6085, 6032, 5920, 5980, 6002, 6024] },
+  { key: "KOSDAQ", name: "코스닥", value: "834.20", change: "-30.45", rate: "-3.52%", tone: "down", badge: "유가 금리 부담", points: [862, 856, 849, 852, 844, 840, 836, 834] },
+  { key: "SPX", name: "S&P 500", value: "5,982.72", change: "-54.21", rate: "-0.90%", tone: "down", badge: "위험 회피", points: [6068, 6052, 6040, 6024, 6012, 6002, 5991, 5983] },
+  { key: "NASDAQ", name: "나스닥", value: "19,546.73", change: "-187.42", rate: "-0.95%", tone: "down", badge: "기술주 조정", points: [19840, 19812, 19790, 19752, 19720, 19680, 19622, 19547] },
+] as const;
+const marketChartDates = ["7/22", "7/23", "7/24", "7/27", "7/28"];
 const actualPath = [
   5224.36, 5350, 5480, 5610, 5760, 5920, 6080, 6244.13, 6000, 5700, 5350,
   5052.46, 5450, 5900, 6300, 6598.87, 7100, 7600, 8050, 8476.15, 8420,
@@ -83,6 +90,14 @@ const makeTradingDates = (endDate: string, count: number) => {
 };
 
 const actualDates = makeTradingDates("2026-07-28", actualPath.length);
+type KospiCandle = { date: string; label: string; open: number; high: number; low: number; close: number };
+type KospiMarketData = { latestDate: string; latestLabel: string; value: number; change: number; rate: number; candles: KospiCandle[] };
+const formatIndexValue = (value: number) => value.toLocaleString("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const formatSignedIndex = (value: number) => `${value >= 0 ? "+" : ""}${formatIndexValue(value)}`;
+const fallbackKospiCandles: KospiCandle[] = actualPath.map((close, index) => {
+  const open = index === 0 ? close - 55 : actualPath[index - 1];
+  return { date: actualDates[index].replace("/", ""), label: actualDates[index], open, high: Math.max(open, close) + 28, low: Math.min(open, close) - 28, close };
+});
 const scenarioAssetBase = "https://raw.githubusercontent.com/zerojin91/finverse/main/public/scenarios";
 
 const scenarios: Scenario[] = [
@@ -729,7 +744,42 @@ function ScenarioBuildScreen({
   );
 }
 
-function ForecastChart({ scenario }: { scenario: Scenario }) {
+function MarketLineChart({ values, labels, large = false, name }: { values: readonly number[]; labels?: readonly string[]; large?: boolean; name: string }) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const width = large ? 368 : 138;
+  const height = large ? 132 : 64;
+  const plotTop = large ? 10 : 7;
+  const plotBottom = large ? 107 : 56;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const points = values.map((value, index) => {
+    const x = 2 + (index / Math.max(values.length - 1, 1)) * (width - 4);
+    const y = plotTop + ((max - value) / range) * (plotBottom - plotTop);
+    return { x, y, value };
+  });
+  const pointString = points.map((point) => `${point.x},${point.y}`).join(" ");
+  const labelIndexes = labels ? [0, Math.round((values.length - 1) * .25), Math.round((values.length - 1) * .5), Math.round((values.length - 1) * .75), values.length - 1] : [];
+  const hoveredPoint = hoveredIndex === null ? null : points[hoveredIndex];
+  const tooltipWidth = large ? 78 : 66;
+  const tooltipX = hoveredPoint ? Math.min(Math.max(hoveredPoint.x - tooltipWidth / 2, 2), width - tooltipWidth - 2) : 0;
+  const tooltipDate = hoveredIndex === null || !labels ? "최근" : labels[Math.round((hoveredIndex / Math.max(values.length - 1, 1)) * (labels.length - 1))];
+
+  return (
+    <svg className={large ? "market-overview-chart" : undefined} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${name} 데이터 포인트 흐름`}>
+      {large && <line className="market-axis-line" x1="2" y1="113" x2="366" y2="113" />}
+      <polyline points={pointString} />
+      {points.map((point, index) => <circle key={`${name}-${index}`} cx={point.x} cy={point.y} r={large ? 2.5 : 2} aria-label={`${name} ${point.value}`} onMouseEnter={() => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)} />)}
+      {labels && labelIndexes.map((pointIndex, labelIndex) => <text key={labels[labelIndex]} x={points[pointIndex].x} y="129" textAnchor={labelIndex === 0 ? "start" : labelIndex === labels.length - 1 ? "end" : "middle"}>{labels[labelIndex]}</text>)}
+      {hoveredPoint && <g className="market-chart-tooltip" pointerEvents="none">
+        <rect x={tooltipX} y={Math.max(2, hoveredPoint.y - 34)} width={tooltipWidth} height="27" rx="4" />
+        <text x={tooltipX + tooltipWidth / 2} y={Math.max(13, hoveredPoint.y - 21)} textAnchor="middle">{tooltipDate} · {hoveredPoint.value.toLocaleString("ko-KR")}</text>
+      </g>}
+    </svg>
+  );
+}
+
+function ForecastChart({ scenario, marketData }: { scenario: Scenario; marketData: KospiMarketData | null }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -752,16 +802,20 @@ function ForecastChart({ scenario }: { scenario: Scenario }) {
       const plotH = height - pad.top - pad.bottom;
       const splitX = pad.left + plotW * 0.58;
       const rightX = width - pad.right;
-      const outerUpper = scenario.path.map((value, index) => value + 80 + index * 60);
-      const outerLower = scenario.path.map((value, index) => value - 80 - index * 60);
-      const innerUpper = scenario.path.map((value, index) => value + 45 + index * 32);
-      const innerLower = scenario.path.map((value, index) => value - 45 - index * 32);
-      const all = [...actualPath, ...outerUpper, ...outerLower];
+      const candles = marketData?.candles?.length ? marketData.candles : fallbackKospiCandles;
+      const closes = candles.map((candle) => candle.close);
+      const forecastOffset = closes[closes.length - 1] - scenario.path[0];
+      const forecastPath = scenario.path.map((value) => value + forecastOffset);
+      const outerUpper = forecastPath.map((value, index) => value + 80 + index * 60);
+      const outerLower = forecastPath.map((value, index) => value - 80 - index * 60);
+      const innerUpper = forecastPath.map((value, index) => value + 45 + index * 32);
+      const innerLower = forecastPath.map((value, index) => value - 45 - index * 32);
+      const all = [...closes, ...outerUpper, ...outerLower];
       const axisStep = 500;
       const min = Math.floor((Math.min(...all) - 40) / axisStep) * axisStep;
       const max = Math.ceil((Math.max(...all) + 40) / axisStep) * axisStep;
-      const xActual = (index: number) => pad.left + (index / (actualPath.length - 1)) * (splitX - pad.left);
-      const xForecast = (index: number) => splitX + (index / (scenario.path.length - 1)) * (rightX - splitX);
+      const xActual = (index: number) => pad.left + (index / Math.max(candles.length - 1, 1)) * (splitX - pad.left);
+      const xForecast = (index: number) => splitX + (index / Math.max(forecastPath.length - 1, 1)) * (rightX - splitX);
       const y = (value: number) => pad.top + ((max - value) / (max - min)) * plotH;
 
       ctx.clearRect(0, 0, width, height);
@@ -800,26 +854,23 @@ function ForecastChart({ scenario }: { scenario: Scenario }) {
       drawBand(outerUpper, outerLower, 0.08);
       drawBand(innerUpper, innerLower, 0.12);
 
-      const candleWidth = Math.max(3, Math.min(6, (splitX - pad.left) / actualPath.length * 0.58));
-      actualPath.slice(1).forEach((value, index) => {
-        const previous = actualPath[index];
+      const candleWidth = Math.max(3, Math.min(7, (splitX - pad.left) / candles.length * 0.58));
+      candles.slice(1).forEach((candle, index) => {
         const px = xActual(index + 1);
-        const high = Math.max(previous, value) + 5 + ((index * 7) % 8);
-        const low = Math.min(previous, value) - 5 - ((index * 5) % 7);
-        const color = value >= previous ? "#ef4444" : "#2563eb";
+        const color = candle.close >= candle.open ? "#ef4444" : "#2563eb";
         ctx.strokeStyle = color;
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(px, y(high));
-        ctx.lineTo(px, y(low));
+        ctx.moveTo(px, y(candle.high));
+        ctx.lineTo(px, y(candle.low));
         ctx.stroke();
-        const bodyTop = Math.min(y(previous), y(value));
-        const bodyHeight = Math.max(2, Math.abs(y(previous) - y(value)));
+        const bodyTop = Math.min(y(candle.open), y(candle.close));
+        const bodyHeight = Math.max(2, Math.abs(y(candle.open) - y(candle.close)));
         ctx.fillStyle = color;
         ctx.fillRect(px - candleWidth / 2, bodyTop, candleWidth, bodyHeight);
       });
 
-      const currentY = y(actualPath[actualPath.length - 1]);
+      const currentY = y(closes[closes.length - 1]);
       ctx.strokeStyle = "#a1a1aa";
       ctx.setLineDash([3, 3]);
       ctx.beginPath();
@@ -829,7 +880,7 @@ function ForecastChart({ scenario }: { scenario: Scenario }) {
       ctx.setLineDash([]);
 
       ctx.beginPath();
-      scenario.path.forEach((value, index) => {
+      forecastPath.forEach((value, index) => {
         const px = xForecast(index);
         const py = y(value);
         if (index === 0) ctx.moveTo(px, py);
@@ -839,12 +890,12 @@ function ForecastChart({ scenario }: { scenario: Scenario }) {
       ctx.strokeStyle = forecastColor;
       ctx.lineWidth = 3;
       ctx.stroke();
-      scenario.path.forEach((value, index) => {
+      forecastPath.forEach((value, index) => {
         const px = xForecast(index);
         const py = y(value);
         ctx.beginPath();
         ctx.fillStyle = "#fff";
-        ctx.arc(px, py, index === scenario.path.length - 1 ? 4.5 : 3.5, 0, Math.PI * 2);
+        ctx.arc(px, py, index === forecastPath.length - 1 ? 4.5 : 3.5, 0, Math.PI * 2);
         ctx.fill();
         ctx.lineWidth = 2;
         ctx.strokeStyle = forecastColor;
@@ -861,9 +912,9 @@ function ForecastChart({ scenario }: { scenario: Scenario }) {
       ctx.textAlign = "center";
       ctx.font = '10px "Pretendard Variable", sans-serif';
       ctx.fillStyle = "#71717a";
-      const actualLabelIndexes = [0, 7, 15, 23, actualPath.length - 1];
+      const actualLabelIndexes = [0, .25, .5, .75, 1].map((ratio) => Math.round((candles.length - 1) * ratio));
       actualLabelIndexes.forEach((pathIndex) => {
-        ctx.fillText(actualDates[pathIndex], xActual(pathIndex), height - 12);
+        ctx.fillText(candles[pathIndex].label, xActual(pathIndex), height - 12);
       });
       ctx.fillStyle = "#fff";
       ctx.fillRect(splitX - 20, height - 29, 40, 24);
@@ -871,7 +922,7 @@ function ForecastChart({ scenario }: { scenario: Scenario }) {
       ctx.fillRect(splitX - 20, height - 29, 40, 24);
       ctx.fillStyle = "#fff";
       ctx.font = '700 10px "Pretendard Variable", sans-serif';
-      ctx.fillText("7/28", splitX, height - 13);
+      ctx.fillText(candles[candles.length - 1].label, splitX, height - 13);
       ctx.font = '10px "Pretendard Variable", sans-serif';
       ctx.fillStyle = "#a1a1aa";
       ["+7일", "+14일", "+21일", "+1개월"].forEach((label, index, labels) => {
@@ -883,7 +934,7 @@ function ForecastChart({ scenario }: { scenario: Scenario }) {
     const observer = new ResizeObserver(draw);
     observer.observe(canvas);
     return () => observer.disconnect();
-  }, [scenario]);
+  }, [scenario, marketData]);
 
   return <canvas ref={canvasRef} className="forecast-canvas" aria-label={`${scenario.title} 조건부 KOSPI 예상 경로`} />;
 }
@@ -935,6 +986,7 @@ function TwinPage({ selectedScenario, onSelectScenario, onOpenBuilder }: { selec
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<MainTab>("market");
+  const [kospiData, setKospiData] = useState<KospiMarketData | null>(null);
   const [selectedMarketSignal, setSelectedMarketSignal] = useState<(typeof marketSignals)[number] | null>(null);
   const [selectedScenario, setSelectedScenario] = useState(scenarios[0]);
   const [scenarioDetailOpen, setScenarioDetailOpen] = useState(false);
@@ -948,6 +1000,23 @@ export default function Home() {
   const [uploadedSeedFile, setUploadedSeedFile] = useState<UploadedSeed | null>(null);
   const scenarioScrollY = useRef<number | null>(null);
   const buildTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const loadKospi = async () => {
+      try {
+        const response = await fetch("/api/kospi", { cache: "no-store" });
+        if (!response.ok) return;
+        const nextData = await response.json() as KospiMarketData;
+        if (active) setKospiData(nextData);
+      } catch {
+        // Keep the static preview while the remote PostgreSQL bridge is unavailable.
+      }
+    };
+    loadKospi();
+    const timer = window.setInterval(loadKospi, 60_000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, []);
 
   useLayoutEffect(() => {
     if (scenarioScrollY.current === null) return;
@@ -1034,6 +1103,11 @@ export default function Home() {
     setSimulationStarted(true);
   };
 
+  const kospiValue = kospiData?.value ?? 6023.66;
+  const kospiChange = kospiData?.change ?? -732.09;
+  const kospiRate = kospiData?.rate ?? -10.84;
+  const kospiTone = kospiChange >= 0 ? "up" : "down";
+
   return (
     <div className="finverse-app">
       <header className="mobile-header">
@@ -1094,16 +1168,32 @@ export default function Home() {
                 </section>
 
                 <section className="panel chart-panel">
-                  <div className="kospi-head">
-                      <div>
-                        <span>KOSPI LIVE</span>
-                        <h2 className="down">6,023.66 <strong>-10.84%</strong></h2>
-                        <div className="today-change down">▼ 732.09 <span>(오늘)</span></div>
+                  <div className="market-overview">
+                    <article className="market-overview-primary kospi-classic-primary">
+                      <div className="kospi-head">
+                        <div>
+                          <div className="kospi-title-line"><span>코스피</span><em>기관 매도 확대</em></div>
+                          <div className="kospi-value-line"><b>{formatIndexValue(kospiValue)}</b><strong className={kospiTone}>{formatSignedIndex(kospiChange)} ({Math.abs(kospiRate).toFixed(2)}%)</strong></div>
+                        </div>
+                        <div className="scenario-preview-meta">
+                          <span>선택 시나리오</span>
+                          <button className="scenario-preview-card" type="button" onClick={() => openScenarioDetail(selectedScenario)} aria-label={`${selectedScenario.title} 상세 보기`}>
+                            <strong>{selectedScenario.title}</strong>
+                            <b className={selectedScenario.tone}>{selectedScenario.forecast}</b>
+                          </button>
+                        </div>
+                      </div>
+                      <ForecastChart scenario={selectedScenario} marketData={kospiData} />
+                    </article>
+                    <div className="market-overview-side">
+                      {marketOverview.slice(1).map((item) => (
+                        <article className="market-overview-mini" key={item.key}>
+                          <MarketLineChart values={item.points} name={item.name} />
+                          <div><header><span>{item.name}</span></header><div className="market-overview-mini-value"><b>{item.value}</b><span className={item.tone}>{item.change} ({item.rate})</span></div></div>
+                        </article>
+                      ))}
                     </div>
-                    <div><span>선택 시나리오</span><strong>{selectedScenario.title}</strong></div>
                   </div>
-                  <div className="chart-legend"><span><i className="actual" />KOSPI</span><span><i className={`forecast ${selectedScenario.tone}`} />예상({selectedScenario.duration})</span><span><i className="range" />신뢰구간(70%)</span></div>
-                  <ForecastChart scenario={selectedScenario} />
                   <div className="ai-summary"><Sparkles size={17} /><div><strong>AI 요약</strong><p>{selectedScenario.summary}</p></div></div>
                 </section>
 
