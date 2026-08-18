@@ -2,6 +2,10 @@
 
 # dependencies
 /node_modules
+web/node_modules/
+web/dist/
+api/.venv/
+.dev-logs/
 /.venv/
 /.uv-cache/
 __pycache__/

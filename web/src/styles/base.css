@@ -1,0 +1,215 @@
+:root {
+  --bg: #f7f8fb;
+  --surface: #ffffff;
+  --border: #e3e7f0;
+  --border-strong: #d5dae8;
+  --ink: #191e2e;
+  --ink-2: #4b5468;
+  --ink-3: #7b8499;
+  --ink-faint: #a3abbe;
+  --accent: #4f5df0;
+  --ok: #0e9f6e;
+  --warn: #d97706;
+  --bad: #dc2626;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif;
+  font-size: 14px;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.92em;
+}
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.app-nav {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 18px;
+  height: 48px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.app-nav .brand {
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.app-nav a {
+  color: var(--ink-2);
+  text-decoration: none;
+  padding: 4px 2px;
+  border-bottom: 2px solid transparent;
+}
+
+.app-nav a.active {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+
+.nav-spacer {
+  flex: 1;
+}
+
+.health {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.health.bad {
+  color: var(--bad);
+}
+
+.app-main {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.state {
+  padding: 16px;
+  color: var(--ink-3);
+}
+
+.state.error {
+  color: var(--bad);
+}
+
+.muted {
+  color: var(--ink-3);
+}
+
+.small {
+  font-size: 12px;
+}
+
+.warn {
+  color: var(--warn);
+}
+
+.btn {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+}
+
+/* --- 어휘 페이지 --- */
+
+.ontology-page {
+  padding: 20px 24px 48px;
+  max-width: 900px;
+}
+
+.ontology-head h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.ontology-summary {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.ontology-page section {
+  margin-top: 28px;
+}
+
+.ontology-page h3 {
+  font-size: 15px;
+  margin: 0 0 10px;
+}
+
+.ontology-layer h4 {
+  font-size: 13px;
+  margin: 16px 0 6px;
+}
+
+.ontology-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ontology-table td {
+  padding: 6px 10px;
+  border-top: 1px solid var(--border);
+}
+
+.ontology-table tr:first-child td {
+  border-top: none;
+}
+
+.ontology-table tr.is-empty {
+  color: var(--ink-faint);
+}
+
+.cell-dot {
+  width: 24px;
+}
+
+.cell-ko {
+  color: var(--ink-3);
+}
+
+.cell-count {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  width: 90px;
+}
+
+.tag {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+}
+
+.tag.derived {
+  color: #7c3aed;
+  border-color: #ddd6fe;
+  background: #f5f3ff;
+}
