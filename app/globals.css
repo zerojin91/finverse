@@ -632,6 +632,9 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 @media (min-width: 1101px) {
   .market-dashboard { align-items: start; }
   .market-dashboard > .panel { min-height: 702px; height: 702px; }
+  .chart-panel > .market-overview { flex: 0 0 487px; height: 487px; min-height: 487px; }
+  .chart-panel > .ai-summary { flex: 0 0 194px; height: 194px; min-height: 194px; max-height: 194px; box-sizing: border-box; }
+  .chart-panel > .ai-summary p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; overflow: hidden; }
 }
 
 @media (max-width: 1100px) {
