@@ -48,3 +48,7 @@ next-env.d.ts
 /work/
 /config/youtube_channels.json
 /.tools/
+
+# python
+__pycache__/
+*.pyc
