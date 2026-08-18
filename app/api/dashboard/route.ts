@@ -48,8 +48,8 @@ const bedrockSection = (value: unknown, key: string) => {
   return cleanTopics.length === 2 ? { impactSummary, topics: cleanTopics } : null;
 };
 
-const krxSource = {
-  title: "KOSPI 시장 데이터",
+const krxFlowSource = {
+  title: "KOSPI 투자자별 순매매",
   publisher: "KRX 정보데이터시스템",
   url: "https://data.krx.co.kr/contents/MDC/MAIN/main/index.cmd",
 };
@@ -351,28 +351,28 @@ export async function GET() {
         keywords: [baseRate && { label: `기준금리 ${Number(baseRate.value).toFixed(2)}%`, count: 1 }, dollar && { label: `원·달러 ${Number(dollar.value).toLocaleString("ko-KR", { maximumFractionDigits: 1 })}원`, count: 1 }].filter(Boolean),
         impactSummary: `${kospiContext} 금리·환율은 할인율, 수출주 이익과 외국인 수급을 통해 현재 지수 흐름과 연결됩니다.`,
         topics: economyTopics,
-        sources: [krxSource, ...economySources],
+        sources: economySources,
       },
       {
         key: "country", label: "국가", evidenceCount: countryCounts.size ? newsRows.filter((item) => item.country_codes?.length).length : 0, evidenceUnit: "기사", source: countryTopics.length === 2 ? "database" : "dummy",
         keywords: rankedCountryThemes.slice(0, 2).map((item) => ({ label: item.label, count: item.count })),
         impactSummary: `${kospiContext} 최근 국가별 뉴스는 ${rankedCountryThemes.slice(0, 2).map((item) => item.label).join("·")}에 집중됐고, 정책·환율·수출 경로를 함께 봐야 합니다.`,
         topics: countryTopics,
-        sources: [krxSource, ...countrySources],
+        sources: countrySources,
       },
       {
         key: "event", label: "이벤트", evidenceCount: rankedEvents.reduce((sum, item) => sum + item.count, 0), evidenceUnit: "분류", source: eventTopics.length === 2 ? "database" : "dummy",
         keywords: rankedEvents.slice(0, 2).map((item) => ({ label: item.label, count: item.count })),
         impactSummary: `${kospiContext} 최근 이벤트는 ${rankedEvents.slice(0, 2).map((item) => item.label).join("·")} 비중이 높아 변동성·할인율·이익 기대 경로를 점검해야 합니다.`,
         topics: eventTopics,
-        sources: [krxSource, ...eventSources],
+        sources: [krxFlowSource, ...eventSources],
       },
       {
         key: "community", label: "커뮤니티", evidenceCount: communityRows.reduce((sum, item) => sum + Number(item.mention_count), 0), evidenceUnit: "댓글", source: communityTopics.length === 2 ? "database" : "dummy",
         keywords: communityRows.slice(0, 2).map((item) => ({ label: communityNames[item.topic], count: Number(item.mention_count) })),
         impactSummary: `${kospiContext} 커뮤니티 언급은 반도체와 국내 증시 신뢰에 집중됐습니다. 이는 단기 심리 참고치이며 지수 움직임의 원인으로 단정하지 않습니다.`,
         topics: communityTopics,
-        sources: [krxSource, ...communitySources],
+        sources: communitySources,
       },
     ];
     const latestAnalysis = analysisRows[0];

@@ -68,12 +68,20 @@ type Scenario = {
 };
 
 type ScenarioEditorial = {
+  ui: { theme: "sunny" | "forest" | "cobalt" | "berry"; rhythm: "calm" | "bold" | "playful" };
   badge: string;
   headline: string;
   subhead: string;
-  cards: Array<{ kicker: string; title: string; body: string; stat: string; statLabel: string }>;
+  cards: Array<{
+    kicker: string;
+    title: string;
+    body: string;
+    stat: string;
+    statLabel: string;
+    layout: "hero" | "split" | "reverse" | "spotlight" | "stacked";
+    visual: "market-path" | "capital-flow" | "earnings" | "calendar" | "risk-radar";
+  }>;
   explanation: { title: string; lead: string; paragraphs: string[] };
-  checkpoints: Array<{ signal: string; meaning: string; response: string }>;
 };
 
 type EditorialState = "fallback" | "loading" | "ready";
@@ -471,9 +479,10 @@ function ScenarioDetailLearning({ scenario }: { scenario: Scenario }) {
 
 function fallbackEditorial(scenario: Scenario): ScenarioEditorial {
   return {
-    badge: "FINVERSE PREMIUM BRIEF",
+    ui: { theme: scenario.tone === "up" ? "sunny" : "cobalt", rhythm: "playful" },
+    badge: "TODAY'S MONEY STORY · 5 CUTS",
     headline: scenario.thesis,
-    subhead: `${scenario.duration}의 예측값보다, 그 경로를 만드는 조건과 반증 신호를 먼저 읽어보세요.`,
+    subhead: `숫자만 보면 어렵지만, 순서대로 넘기면 보입니다. ${scenario.duration}의 조건과 반증 신호를 5장으로 읽어보세요.`,
     cards: [
       {
         kicker: "01 · ONE-LINE THESIS",
@@ -481,6 +490,8 @@ function fallbackEditorial(scenario: Scenario): ScenarioEditorial {
         body: scenario.context,
         stat: scenario.forecast,
         statLabel: `${scenario.duration} 조건부 중심 경로`,
+        layout: "hero",
+        visual: "market-path",
       },
       ...scenario.events.slice(0, 3).map((event, index) => ({
         kicker: `0${index + 2} · ${event.category}`,
@@ -488,6 +499,8 @@ function fallbackEditorial(scenario: Scenario): ScenarioEditorial {
         body: event.body,
         stat: event.impact,
         statLabel: event.week,
+        layout: (["split", "reverse", "spotlight"] as const)[index],
+        visual: (["capital-flow", "earnings", "calendar"] as const)[index],
       })),
       {
         kicker: "05 · INVALIDATION",
@@ -495,6 +508,8 @@ function fallbackEditorial(scenario: Scenario): ScenarioEditorial {
         body: scenario.riskPoints.join(" · "),
         stat: `${scenario.riskPoints.length} SIGNALS`,
         statLabel: "예측보다 먼저 확인할 반증 조건",
+        layout: "stacked",
+        visual: "risk-radar",
       },
     ],
     explanation: {
@@ -502,12 +517,53 @@ function fallbackEditorial(scenario: Scenario): ScenarioEditorial {
       lead: scenario.thesis,
       paragraphs: [scenario.summary, scenario.context],
     },
-    checkpoints: scenario.investorGuide.slice(0, 3).map((guide) => ({
-      signal: guide.stance,
-      meaning: guide.rationale,
-      response: guide.action,
-    })),
   };
+}
+
+function EditorialIllustration({
+  card,
+  scenario,
+  index,
+}: {
+  card: ScenarioEditorial["cards"][number];
+  scenario: Scenario;
+  index: number;
+}) {
+  if (card.visual === "market-path") return (
+    <div className="story-image-visual">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={scenario.image} alt={`${scenario.title} 시나리오 일러스트`} />
+      <div className="story-image-bars" aria-hidden="true">{scenario.path.slice(0, 8).map((value, pathIndex, values) => {
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        return <i key={`${scenario.id}-story-bar-${pathIndex}`} style={{ height: `${20 + ((value - min) / Math.max(1, max - min)) * 80}%` }} />;
+      })}</div>
+    </div>
+  );
+
+  if (card.visual === "capital-flow") return (
+    <div className="story-flow-visual" aria-label="자금 흐름 그림">
+      <span>외국인</span><b>→</b><span>수급</span><b>→</b><span>KOSPI</span>
+    </div>
+  );
+
+  if (card.visual === "earnings") return (
+    <div className="story-earnings-visual" aria-label="실적 전달 경로 그림">
+      <span>HBM</span><span>실적</span><span>가이던스</span><strong>{card.stat}</strong>
+    </div>
+  );
+
+  if (card.visual === "calendar") return (
+    <div className="story-calendar-visual" aria-label="시나리오 일정 그림">
+      <span>CHECK DAY</span><strong>{card.statLabel}</strong><i>{card.stat}</i>
+    </div>
+  );
+
+  return (
+    <div className="story-radar-visual" aria-label="반증 신호 레이더 그림">
+      <i /><i /><i /><span>!</span><strong>{String(index + 1).padStart(2, "0")}</strong>
+    </div>
+  );
 }
 
 function PremiumScenarioBrief({
@@ -535,61 +591,36 @@ function PremiumScenarioBrief({
         </div>
       </header>
 
-      <section className="card-news-section" aria-label={`${scenario.title} 5장 카드뉴스`}>
-        <div className="card-news-label"><span>CARD NEWS · 5 CUTS</span><small>가로로 밀어 순서대로 읽어보세요</small></div>
-        <div className="card-news-rail">
+      <section className={`daily-story theme-${editorial.ui.theme} rhythm-${editorial.ui.rhythm}`} aria-label={`${scenario.title} 매일 카드뉴스`}>
+        <div className="card-news-label"><span>DAILY CARD STORY · 5 SCENES</span><small>오늘 시장에 맞춰 Bedrock이 레이아웃과 그림을 골랐어요</small></div>
+        <div className="daily-story-stack">
           {editorial.cards.map((card, index) => (
-            <article className={`editorial-card card-${index + 1} tone-${scenario.tone}`} key={`${scenario.id}-${card.kicker}`}>
-              {index === 0 && <span className="editorial-card-cover" style={{ backgroundImage: `url(${scenario.image})` }} />}
-              <div className="editorial-card-top"><span>{card.kicker}</span><b>0{index + 1}</b></div>
-              <div className="editorial-visual" aria-hidden="true">
-                {scenario.path.slice(index * 2, index * 2 + 5).map((value, pointIndex, values) => {
-                  const min = Math.min(...values);
-                  const max = Math.max(...values);
-                  const height = 24 + ((value - min) / Math.max(1, max - min)) * 76;
-                  return <i key={`${card.kicker}-${pointIndex}`} style={{ height: `${height}%` }} />;
-                })}
+            <article className={`daily-story-card layout-${card.layout} visual-${card.visual}`} key={`${scenario.id}-${card.kicker}`}>
+              <div className="daily-card-art">
+                <EditorialIllustration card={card} scenario={scenario} index={index} />
               </div>
-              <div className="editorial-stat"><strong>{card.stat}</strong><span>{card.statLabel}</span></div>
-              <h3>{card.title}</h3>
-              <p>{card.body}</p>
-              <footer><span>FINVERSE</span><b>{index + 1} / 5</b></footer>
+              <div className="daily-card-copy">
+                <div className="editorial-card-top"><span>{card.kicker}</span><b>0{index + 1}</b></div>
+                <div className="editorial-stat"><strong>{card.stat}</strong><span>{card.statLabel}</span></div>
+                <h3>{card.title}</h3>
+                <p>{card.body}</p>
+                <footer><span>FINVERSE DAILY</span><b>{index + 1} / 5</b></footer>
+              </div>
             </article>
           ))}
         </div>
       </section>
 
-      <section className="premium-explanation" aria-label="카드뉴스 상세 해설">
-        <aside className={`premium-scenario-score tone-${scenario.tone}`}>
-          <span>CONDITIONAL PATH</span>
-          <strong>{scenario.forecast}</strong>
-          <small>{scenario.duration} · 조건부 시나리오</small>
-          <div className="premium-path-bars" aria-hidden="true">
-            {scenario.path.map((value, index) => {
-              const min = Math.min(...scenario.path);
-              const max = Math.max(...scenario.path);
-              return <i key={`${scenario.id}-premium-path-${index}`} style={{ height: `${18 + ((value - min) / Math.max(1, max - min)) * 82}%` }} />;
-            })}
-          </div>
-          <p>이 수치는 목표가가 아니라, 명시된 조건이 유지될 때의 교육용 중심 경로입니다.</p>
-        </aside>
-        <article className="premium-explanation-copy">
+      <section className="daily-detail-report" aria-label="시나리오 상세 설명">
+        <article className="daily-editor-note">
           <span>DEEP DIVE · 상세 해설</span>
           <h3>{editorial.explanation.title}</h3>
           <strong>{editorial.explanation.lead}</strong>
           {editorial.explanation.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
         </article>
-      </section>
-
-      <section className="premium-checkpoints" aria-label="조건별 판단 가이드">
-        <header><div><span>DECISION CHECKPOINTS</span><h3>예측을 따라가지 말고, 조건이 바뀐 때 판단을 바꾸세요.</h3></div><small>투자 권유가 아닌 의사결정 보조 자료</small></header>
-        <div className="premium-checkpoint-grid">
-          {editorial.checkpoints.map((checkpoint, index) => (
-            <article key={`${scenario.id}-${checkpoint.signal}`}>
-              <span>0{index + 1}</span>
-              <div><strong>{checkpoint.signal}</strong><p>{checkpoint.meaning}</p><b>{checkpoint.response}</b></div>
-            </article>
-          ))}
+        <div className="daily-original-report">
+          <div className="daily-original-report-heading"><span>FULL REPORT</span><h3>기존 시나리오를 근거부터 판단 기준까지 이어서 읽어보세요.</h3></div>
+          <ScenarioDetailLearning scenario={scenario} />
         </div>
       </section>
 
@@ -1346,8 +1377,17 @@ export default function Home() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        asOf: kospiAsOf,
-        market: { value: kospiValue, change: kospiChange, rate: kospiRate },
+        dailyContext: {
+          asOf: kospiAsOf,
+          market: { value: kospiValue, change: kospiChange, rate: kospiRate },
+          brief: marketBrief,
+          signals: dashboardSignals.map((signal) => ({
+            category: signal.label,
+            impact: signal.impactSummary,
+            keywords: signal.keywords.slice(0, 2),
+          })),
+          globalIndices: intradayIndices.map((index) => ({ name: index.name, latest: index.points.at(-1) })),
+        },
         scenario: {
           title: scenario.title,
           duration: scenario.duration,
@@ -1744,7 +1784,7 @@ export default function Home() {
               {selectedMarketSignal.topics.slice(0, 2).map((topic, index) => <article key={topic.title}><div><span>대주제 {index + 1}</span><strong>{topic.title}</strong></div><p>{topic.summary}</p></article>)}
             </div>
             <div className="market-signal-modal-sources">
-              <span>데이터 원천</span>
+              <span>탭별 데이터 원천</span>
               {selectedMarketSignal.sources.filter((source) => source.url).map((source) => <a key={`${source.publisher}-${source.title}`} href={source.url!} target="_blank" rel="noreferrer"><span><strong>{source.title}</strong><small>{source.publisher}{source.publishedAt ? ` · ${source.publishedAt.slice(0, 10)}` : ""}</small></span><ExternalLink size={13} /></a>)}
               {!selectedMarketSignal.sources.some((source) => source.url) && <small>DB 연결 후 원천 링크가 표시됩니다.</small>}
             </div>
@@ -1760,7 +1800,7 @@ export default function Home() {
               <div>
                 <span>SCENARIO PREVIEW</span>
                 <h2 id="scenario-detail-modal-title">{selectedScenario.title}</h2>
-                <p>선택한 조건이 이어졌을 때 KOSPI가 어떻게 움직일지, 근거와 이벤트를 한 화면에서 확인하세요.</p>
+                <p>핵심 조건부터 반증 신호까지 5장으로 읽고, 아래에서 흐름을 자세히 풀어보세요.</p>
               </div>
               <button className="scenario-modal-close" type="button" onClick={() => setScenarioDetailOpen(false)} aria-label="시나리오 상세 닫기"><X size={20} /></button>
             </header>

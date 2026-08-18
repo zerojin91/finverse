@@ -35,5 +35,23 @@ class BedrockSignalValidationTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "missing analysis section"):
             signals.validate_analysis(value)
 
+    def test_scopes_each_tab_to_its_own_sources(self):
+        scoped = signals.analysis_input({
+            "asOf": "20260810",
+            "kospi": {"close": 6000},
+            "macros": [{"name": "기준금리"}],
+            "flows": [{"investor": "외국인"}],
+            "news": [
+                {"title": "국가", "countries": ["US"], "eventTypes": []},
+                {"title": "이벤트", "countries": [], "eventTypes": ["EARNINGS"]},
+            ],
+            "community": [{"topic": "반도체 투자심리"}],
+        })["sections"]
+
+        self.assertNotIn("news", scoped["economy"])
+        self.assertEqual([item["title"] for item in scoped["country"]["news"]], ["국가"])
+        self.assertEqual([item["title"] for item in scoped["event"]["news"]], ["이벤트"])
+        self.assertNotIn("flows", scoped["community"])
+
 if __name__ == "__main__":
     unittest.main()
