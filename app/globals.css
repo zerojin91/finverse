@@ -165,7 +165,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .market-overview { display: flex; flex: 1; flex-direction: column; min-height: 360px; border-bottom: 1px solid var(--line); background: #fcfdff; }
 .market-overview-primary { min-width: 0; display: grid; flex: 1; grid-template-rows: auto auto minmax(132px,1fr); padding: 18px 22px 10px; border-bottom: 1px solid var(--line); }
 .kospi-classic-primary { display: block; padding: 0; }
-.kospi-classic-primary .forecast-canvas { height: 245px; }
+.kospi-classic-primary .forecast-canvas { height: 290px; }
 .market-overview-primary > header, .market-overview-mini header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .market-overview-primary > header > div, .market-overview-mini header { min-width: 0; display: flex; align-items: center; gap: 7px; }
 .market-overview-primary header span, .market-overview-mini header span { color: var(--ink); font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
@@ -632,8 +632,8 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 @media (min-width: 1101px) {
   .market-dashboard { align-items: start; }
   .market-dashboard > .panel { min-height: 702px; height: 702px; }
-  .chart-panel > .market-overview { flex: 0 0 487px; height: 487px; min-height: 487px; }
-  .chart-panel > .ai-summary { flex: 0 0 194px; height: 194px; min-height: 194px; max-height: 194px; box-sizing: border-box; }
+  .chart-panel > .market-overview { flex: 0 0 532px; height: 532px; min-height: 532px; }
+  .chart-panel > .ai-summary { flex: 0 0 149px; height: 149px; min-height: 149px; max-height: 149px; box-sizing: border-box; }
   .chart-panel > .ai-summary p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
 }
 
