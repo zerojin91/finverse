@@ -3,8 +3,11 @@ import postgres from "postgres";
 export const dynamic = "force-dynamic";
 
 type RawIndex = { trade_date: string; index_key: string; index_name: string; close: number; change_pct: number };
-type RawCommunity = { label: string; comment_count: number };
+type RawMacro = { source: string; name: string; series_id: string; stat_code: string; value: number; unit: string; observed_at: string };
+type RawNews = { title: string; summary: string | null; published_at: string; feed: string | null; publisher: string | null; country_codes: string[] | null; event_types: string[] | null; selection_score: number; url: string | null };
+type RawCommunity = { topic: "market_trust" | "semiconductor"; mention_count: number; url: string | null; published_at: string | null; excerpt: string | null; top_likes: number };
 type RawStock = { trade_date: string; ticker: string; name: string; close: number; change_pct: number; volume: number };
+type RawAnalysis = { analysis: unknown; generated_at: string; input_as_of: string; model_id: string };
 
 let dashboardCache: { expiresAt: number; payload: unknown } | undefined;
 
@@ -18,6 +21,38 @@ const compactDate = (date: Date) => {
 };
 
 const isoDate = (value: string) => value.length === 8 ? `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6)}` : value;
+
+const safeHttpUrl = (value: string | null) => {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.href : null;
+  } catch {
+    return null;
+  }
+};
+
+const bedrockSection = (value: unknown, key: string) => {
+  if (!value || typeof value !== "object") return null;
+  const section = (value as Record<string, unknown>)[key];
+  if (!section || typeof section !== "object") return null;
+  const impactSummary = (section as Record<string, unknown>).impactSummary;
+  const topics = (section as Record<string, unknown>).topics;
+  if (typeof impactSummary !== "string" || !Array.isArray(topics) || topics.length !== 2) return null;
+  const cleanTopics = topics.flatMap((topic) => {
+    if (!topic || typeof topic !== "object") return [];
+    const title = (topic as Record<string, unknown>).title;
+    const summary = (topic as Record<string, unknown>).summary;
+    return typeof title === "string" && typeof summary === "string" ? [{ title, summary }] : [];
+  });
+  return cleanTopics.length === 2 ? { impactSummary, topics: cleanTopics } : null;
+};
+
+const krxSource = {
+  title: "KOSPI 시장 데이터",
+  publisher: "KRX 정보데이터시스템",
+  url: "https://data.krx.co.kr/contents/MDC/MAIN/main/index.cmd",
+};
 
 export async function GET() {
   if (dashboardCache && dashboardCache.expiresAt > Date.now()) {
@@ -57,7 +92,7 @@ export async function GET() {
   try {
     await sql`set statement_timeout to '25s'`;
 
-    const [indexRows, macroRows, newsRows, communityRows, stockRows] = await Promise.all([
+    const [indexRows, macroRows, newsRows, communityRows, stockRows, analysisRows] = await Promise.all([
       sql<RawIndex[]>`
         select
           payload->>'bas_dd' as trade_date,
@@ -77,9 +112,12 @@ export async function GET() {
           and nullif(payload->>'change_pct', '') is not null
         order by trade_date, index_key
       `,
-      sql`
+      sql<RawMacro[]>`
         select distinct on (series_name)
+          source,
           series_name as name,
+          series_id,
+          stat_code,
           value::double precision as value,
           unit,
           period_start::text as observed_at
@@ -87,22 +125,43 @@ export async function GET() {
         where series_name in ('한국은행 기준금리', '원달러환율', '국고채3년', '국고채10년')
         order by series_name, period_start desc
       `,
-      sql`
-        select title, published_at::text as published_at, country_codes, event_types, selection_score, url
+      sql<RawNews[]>`
+        select title, summary, published_at::text as published_at, feed, publisher,
+          country_codes, event_types, selection_score::double precision, url
         from events.news
         where title is not null
         order by collected_at desc
         limit 24
       `,
       sql<RawCommunity[]>`
-        select coalesce(payload->>'keyword', payload->>'topic', payload->>'title') as label,
-          count(*)::integer as comment_count
-        from lake.records
-        where record_type in ('community_signal', 'community_sentiment', 'community_post')
-          and coalesce(payload->>'keyword', payload->>'topic', payload->>'title') is not null
-        group by label
-        order by comment_count desc
-        limit 20
+        with recent_comments as (
+          select payload
+          from lake.records
+          where record_type = 'youtube_comment'
+          order by collected_at desc nulls last
+          limit 5000
+        ), categorized as (
+          select
+            case
+              when payload->>'text' ~* '반도체|삼성전자|하이닉스|HBM' then 'semiconductor'
+              when payload->>'text' ~* '코스피|국장|외국인|증시|주식시장' then 'market_trust'
+            end as topic,
+            payload->>'source_url' as url,
+            payload->>'published_at' as published_at,
+            left(payload->>'text', 220) as excerpt,
+            coalesce(nullif(payload->>'like_count', '')::integer, 0) as likes
+          from recent_comments
+          where payload->>'text' ~* '반도체|삼성전자|하이닉스|HBM|코스피|국장|외국인|증시|주식시장'
+        )
+        select topic, count(*)::integer as mention_count,
+          (array_agg(url order by likes desc nulls last))[1] as url,
+          (array_agg(published_at order by likes desc nulls last))[1] as published_at,
+          (array_agg(excerpt order by likes desc nulls last))[1] as excerpt,
+          max(likes)::integer as top_likes
+        from categorized
+        where topic is not null
+        group by topic
+        order by mention_count desc
       `,
       sql<RawStock[]>`
         select
@@ -120,6 +179,16 @@ export async function GET() {
           and nullif(payload->>'change_pct', '') is not null
         order by ticker, trade_date
       `,
+      sql<RawAnalysis[]>`
+        select payload->'analysis' as analysis,
+          payload->>'generated_at' as generated_at,
+          payload->>'input_as_of' as input_as_of,
+          payload->>'model_id' as model_id
+        from lake.records
+        where record_type = 'market_signal_analysis'
+        order by collected_at desc nulls last
+        limit 1
+      `,
     ]);
 
     if (!indexRows.length) throw new Error("시장 지수 데이터가 없습니다.");
@@ -133,7 +202,6 @@ export async function GET() {
         from lake.records
         where payload ? 'bas_dd'
           and payload->>'bas_dd' = ${latestDate}
-          and record_type = 'market_investor_flow_daily'
           and payload->>'target_type' = 'MARKET'
           and payload->>'target' in ('KOSPI', 'KOSDAQ')
           and nullif(payload->>'net_value_krw', '') is not null
@@ -157,73 +225,174 @@ export async function GET() {
         publishedAt: String(row.published_at),
         eventTypes: Array.isArray(row.event_types) ? row.event_types.map(String) : [],
         score: Number(row.selection_score ?? 0),
-        url: row.url ? String(row.url) : null,
+        url: safeHttpUrl(row.url),
       }));
 
     const countryCounts = new Map<string, number>();
+    const countryThemeCounts = new Map<string, { code: string; type: string; count: number }>();
     const eventCounts = new Map<string, number>();
     for (const row of newsRows) {
-      for (const code of Array.isArray(row.country_codes) ? row.country_codes : []) {
+      const countries = Array.isArray(row.country_codes) ? row.country_codes : [];
+      const events = Array.isArray(row.event_types) ? row.event_types : [];
+      for (const code of countries) {
         countryCounts.set(String(code), (countryCounts.get(String(code)) ?? 0) + 1);
       }
-      for (const type of Array.isArray(row.event_types) ? row.event_types : []) {
+      for (const type of events) {
         eventCounts.set(String(type), (eventCounts.get(String(type)) ?? 0) + 1);
+      }
+      if (countries[0] && events[0]) {
+        const key = `${countries[0]}:${events[0]}`;
+        const current = countryThemeCounts.get(key);
+        countryThemeCounts.set(key, { code: countries[0], type: events[0], count: (current?.count ?? 0) + 1 });
       }
     }
     const countryNames: Record<string, string> = {
-      KR: "한국 통화 정책", US: "미국 금리 정책", KP: "북한 지정학", CN: "중국 경기", JP: "일본 통화 정책",
+      KR: "한국", US: "미국", KP: "북한", CN: "중국", JP: "일본",
     };
     const eventNames: Record<string, string> = {
       INTEREST_RATES: "금리 인상 경계", REAL_ECONOMY: "물가·성장", GEOPOLITICAL: "지정학 리스크",
       FOREIGN_EXCHANGE: "환율 변동성", FX: "환율 변동성", EARNINGS: "기업 실적",
     };
-    const rankedCountries = [...countryCounts.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .map(([code]) => countryNames[code] ?? `${code} 정책`);
+    const rankedCountryThemes = [...countryThemeCounts.values()]
+      .sort((a, b) => b.count - a.count)
+      .map((item) => ({ ...item, label: `${countryNames[item.code] ?? item.code} · ${eventNames[item.type] ?? item.type}` }));
     const rankedEvents = [...eventCounts.entries()]
       .sort((a, b) => b[1] - a[1])
-      .map(([type]) => eventNames[type] ?? type);
-    const communityTopics = communityRows
-      .map((row) => ({
-        label: row.label.replace(/\s+/g, " ").trim(),
-        count: Number(row.comment_count),
-      }))
-      .filter((topic) => topic.label && topic.count > 0)
-      .slice(0, 2);
-    const firstCommunityShare = communityTopics.length === 2
-      ? Math.min(15, Math.max(1, Math.round(16 * communityTopics[0].count /
-          (communityTopics[0].count + communityTopics[1].count))))
-      : 9;
-    const communityKeywords = communityTopics.length === 2
-      ? communityTopics.map((topic, index) => ({
-          label: topic.label.length > 36 ? `${topic.label.slice(0, 35)}…` : topic.label,
-          share: index === 0 ? firstCommunityShare : 16 - firstCommunityShare,
-        }))
-      : [{ label: "반도체 저가매수", share: 9 }, { label: "환율 불안", share: 7 }];
+      .map(([type, count]) => ({ type, count, label: eventNames[type] ?? type }));
     const baseRate = macroRows.find((row) => String(row.name).includes("기준금리"));
     const dollar = macroRows.find((row) => String(row.name).includes("원달러"));
+    const threeYear = macroRows.find((row) => String(row.name).includes("국고채3년"));
+    const tenYear = macroRows.find((row) => String(row.name).includes("국고채10년"));
+    const latestKospi = indexRows.filter((row) => row.index_key === "KOSPI").at(-1);
+    const foreignFlow = latestFlows.find((row) => String(row.market) === "KOSPI" && String(row.investor) === "외국인");
+    const kospiContext = latestKospi
+      ? `KOSPI는 ${isoDate(latestKospi.trade_date)}에 ${Number(latestKospi.change_pct) >= 0 ? "+" : ""}${Number(latestKospi.change_pct).toFixed(2)}%로 마감했습니다.`
+      : "최근 KOSPI 등락률을 함께 확인해야 합니다.";
+    const flowContext = foreignFlow
+      ? `외국인 순매매는 ${Number(foreignFlow.net_value) >= 0 ? "순매수" : "순매도"} ${Math.abs(Number(foreignFlow.net_value) / 100_000_000).toLocaleString("ko-KR", { maximumFractionDigits: 0 })}억원입니다.`
+      : "외국인 수급은 집계 중입니다.";
+
+    const newsSource = (row: RawNews) => ({
+      title: row.title,
+      publisher: row.publisher || row.feed || "뉴스 원문",
+      url: safeHttpUrl(row.url),
+      publishedAt: row.published_at,
+    });
+    const countryCopy: Record<string, string> = {
+      US: "미국의 금리·달러·위험선호 변화는 외국인 수급과 성장주 할인율을 통해 KOSPI에 전달됩니다.",
+      KR: "한국의 통화·재정 정책은 원화, 국내 금리와 기업 이익 기대를 통해 KOSPI 평가에 반영됩니다.",
+      CN: "중국 경기 변화는 한국 수출과 소재·산업재 수요 전망을 통해 KOSPI에 영향을 줄 수 있습니다.",
+      KP: "한반도 지정학 뉴스는 위험 프리미엄과 외국인 수급 변동성을 키울 수 있습니다.",
+      JP: "일본 통화정책과 엔화 변화는 원화 및 수출 업종의 가격 경쟁력과 연결됩니다.",
+    };
+    const eventCopy: Record<string, string> = {
+      INTEREST_RATES: "금리 뉴스는 기업 할인율과 성장주 밸류에이션을 바꾸는 경로로 KOSPI에 연결됩니다.",
+      REAL_ECONOMY: "물가·성장 지표는 이익 전망과 통화정책 기대를 함께 움직이는 핵심 입력입니다.",
+      GEOPOLITICAL: "지정학 이벤트는 위험 회피, 원화 약세와 외국인 수급 변동성을 키울 수 있습니다.",
+      FOREIGN_EXCHANGE: "환율 변화는 외국인 환차손과 수출주 원화 환산 이익에 동시에 작용합니다.",
+      FX: "환율 변화는 외국인 환차손과 수출주 원화 환산 이익에 동시에 작용합니다.",
+      EARNINGS: "기업 실적 변화는 KOSPI 대형주의 이익 추정치와 지수 방향에 직접 반영됩니다.",
+    };
+
+    const economyTopics = [
+      baseRate && {
+        title: "금리와 할인율",
+        summary: `기준금리 ${Number(baseRate.value).toFixed(2)}${String(baseRate.unit).includes("%") || String(baseRate.unit).includes("연") ? "%" : ` ${baseRate.unit}`} · 국고채 3년 ${threeYear ? `${Number(threeYear.value).toFixed(3)}%` : "집계 중"}, 10년 ${tenYear ? `${Number(tenYear.value).toFixed(3)}%` : "집계 중"}. 금리가 높을수록 미래 이익의 현재가치와 성장주 평가에 부담이 됩니다.`,
+      },
+      dollar && {
+        title: "환율과 외국인 수급",
+        summary: `원·달러 ${Number(dollar.value).toLocaleString("ko-KR", { maximumFractionDigits: 1 })}원입니다. 원화 약세는 수출주 이익에 우호적일 수 있지만 외국인 환차손 부담과 시장 변동성을 함께 높일 수 있습니다. ${flowContext}`,
+      },
+    ].filter(Boolean) as Array<{ title: string; summary: string }>;
+    const economySources = [baseRate, dollar].filter(Boolean).map((row) => ({
+      title: `${row!.name} · ${row!.stat_code}`,
+      publisher: row!.source === "ECOS" ? "한국은행 ECOS" : row!.source,
+      url: row!.source === "ECOS" ? "https://ecos.bok.or.kr/" : null,
+      publishedAt: row!.observed_at,
+    }));
+
+    const countryTopics = rankedCountryThemes.slice(0, 2).map((topic) => ({
+      title: topic.label,
+      summary: `${topic.count}건의 최근 뉴스에서 확인됐습니다. ${countryCopy[topic.code] ?? "해당 국가의 정책과 경기 변화가 글로벌 위험선호를 통해 KOSPI에 연결될 수 있습니다."} ${eventCopy[topic.type] ?? ""}`,
+    }));
+    const countrySources = rankedCountryThemes.slice(0, 2).flatMap((topic) => {
+      const row = newsRows.find((item) => item.country_codes?.includes(topic.code) && item.event_types?.includes(topic.type) && safeHttpUrl(item.url));
+      return row ? [newsSource(row)] : [];
+    });
+    const eventTopics = rankedEvents.slice(0, 2).map((topic) => ({
+      title: topic.label,
+      summary: `${topic.count}건의 최근 뉴스에서 확인됐습니다. ${eventCopy[topic.type] ?? "뉴스가 위험선호와 이익 기대를 바꾸는 경로를 관찰해야 합니다."}`,
+    }));
+    const eventSources = rankedEvents.slice(0, 2).flatMap((topic) => {
+      const row = newsRows.find((item) => item.event_types?.includes(topic.type) && safeHttpUrl(item.url));
+      return row ? [newsSource(row)] : [];
+    });
+    const communityNames = {
+      market_trust: "국내 증시 신뢰·수급",
+      semiconductor: "반도체 투자심리",
+    } as const;
+    const communityTopics = communityRows.slice(0, 2).map((topic) => ({
+      title: communityNames[topic.topic],
+      summary: `${Number(topic.mention_count).toLocaleString("ko-KR")}건의 금융 관련 댓글이 탐지됐습니다. ${topic.topic === "semiconductor" ? "삼성전자·SK하이닉스 기대와 경계가 거래 집중 및 단기 변동성과 연결될 수 있습니다." : "국내 증시 신뢰와 외국인 수급에 대한 인식은 단기 위험선호를 보여주는 보조 신호입니다."}`,
+    }));
+    const communitySources = communityRows.flatMap((topic) => {
+      const url = safeHttpUrl(topic.url);
+      return url ? [{
+        title: `${communityNames[topic.topic]} 대표 댓글 원문`,
+        publisher: "YouTube Data API",
+        url,
+        publishedAt: topic.published_at,
+      }] : [];
+    });
+
     const signals = [
       {
-        key: "economy", label: "경제", share: 34, source: baseRate && dollar ? "database" : "dummy",
-        keywords: baseRate && dollar
-          ? [{ label: `기준금리 ${Number(baseRate.value).toFixed(2)}%`, share: 18 }, { label: `원·달러 ${Number(dollar.value).toLocaleString("ko-KR")}`, share: 16 }]
-          : [{ label: "기준금리 경계", share: 18 }, { label: "원화 약세", share: 16 }],
+        key: "economy", label: "경제", evidenceCount: economyTopics.length, evidenceUnit: "지표", source: economyTopics.length === 2 ? "database" : "dummy",
+        keywords: [baseRate && { label: `기준금리 ${Number(baseRate.value).toFixed(2)}%`, count: 1 }, dollar && { label: `원·달러 ${Number(dollar.value).toLocaleString("ko-KR", { maximumFractionDigits: 1 })}원`, count: 1 }].filter(Boolean),
+        impactSummary: `${kospiContext} 금리·환율은 할인율, 수출주 이익과 외국인 수급을 통해 현재 지수 흐름과 연결됩니다.`,
+        topics: economyTopics,
+        sources: [krxSource, ...economySources],
       },
       {
-        key: "country", label: "국가", share: 26, source: rankedCountries.length >= 2 ? "database" : "dummy",
-        keywords: (rankedCountries.length >= 2 ? rankedCountries : ["미국 금리 정책", "한국 통화 정책"])
-          .slice(0, 2).map((label, index) => ({ label, share: index ? 12 : 14 })),
+        key: "country", label: "국가", evidenceCount: countryCounts.size ? newsRows.filter((item) => item.country_codes?.length).length : 0, evidenceUnit: "기사", source: countryTopics.length === 2 ? "database" : "dummy",
+        keywords: rankedCountryThemes.slice(0, 2).map((item) => ({ label: item.label, count: item.count })),
+        impactSummary: `${kospiContext} 최근 국가별 뉴스는 ${rankedCountryThemes.slice(0, 2).map((item) => item.label).join("·")}에 집중됐고, 정책·환율·수출 경로를 함께 봐야 합니다.`,
+        topics: countryTopics,
+        sources: [krxSource, ...countrySources],
       },
       {
-        key: "event", label: "이벤트", share: 24, source: rankedEvents.length >= 2 ? "database" : "dummy",
-        keywords: (rankedEvents.length >= 2 ? rankedEvents : ["금리 인상 경계", "지정학 리스크"])
-          .slice(0, 2).map((label, index) => ({ label, share: index ? 11 : 13 })),
+        key: "event", label: "이벤트", evidenceCount: rankedEvents.reduce((sum, item) => sum + item.count, 0), evidenceUnit: "분류", source: eventTopics.length === 2 ? "database" : "dummy",
+        keywords: rankedEvents.slice(0, 2).map((item) => ({ label: item.label, count: item.count })),
+        impactSummary: `${kospiContext} 최근 이벤트는 ${rankedEvents.slice(0, 2).map((item) => item.label).join("·")} 비중이 높아 변동성·할인율·이익 기대 경로를 점검해야 합니다.`,
+        topics: eventTopics,
+        sources: [krxSource, ...eventSources],
       },
       {
-        key: "community", label: "커뮤니티", share: 16, source: communityTopics.length >= 2 ? "database" : "dummy",
-        keywords: communityKeywords,
+        key: "community", label: "커뮤니티", evidenceCount: communityRows.reduce((sum, item) => sum + Number(item.mention_count), 0), evidenceUnit: "댓글", source: communityTopics.length === 2 ? "database" : "dummy",
+        keywords: communityRows.slice(0, 2).map((item) => ({ label: communityNames[item.topic], count: Number(item.mention_count) })),
+        impactSummary: `${kospiContext} 커뮤니티 언급은 반도체와 국내 증시 신뢰에 집중됐습니다. 이는 단기 심리 참고치이며 지수 움직임의 원인으로 단정하지 않습니다.`,
+        topics: communityTopics,
+        sources: [krxSource, ...communitySources],
       },
     ];
+    const latestAnalysis = analysisRows[0];
+    const analyzedSignals = signals.map((signal) => {
+      const section = latestAnalysis?.input_as_of === latestDate
+        ? bedrockSection(latestAnalysis.analysis, signal.key)
+        : null;
+      return section ? {
+        ...signal,
+        ...section,
+        analysisSource: "bedrock" as const,
+        analysisGeneratedAt: latestAnalysis.generated_at,
+        analysisModel: latestAnalysis.model_id,
+      } : {
+        ...signal,
+        analysisSource: "rules" as const,
+        analysisGeneratedAt: null,
+        analysisModel: null,
+      };
+    });
 
     const payload = {
       asOf: isoDate(latestDate),
@@ -249,7 +418,7 @@ export async function GET() {
       })),
       flows: latestFlows.map((row) => ({ market: String(row.market), investor: String(row.investor), netValue: Number(row.net_value) })),
       news,
-      signals,
+      signals: analyzedSignals,
     };
     dashboardCache = { expiresAt: Date.now() + 5 * 60_000, payload };
     return Response.json(payload, {

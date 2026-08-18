@@ -3,7 +3,7 @@ name = "finverse-workspace"
 version = "0.1.0"
 description = "Isolated development runner for the FINVERSE web service"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = ["boto3>=1.40.0,<2"]
 
 [tool.uv]
 package = false

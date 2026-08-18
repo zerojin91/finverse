@@ -1,0 +1,72 @@
+# PostgreSQL for the FINVERSE data lake.
+#
+#   docker compose up -d db          start
+#   docker compose ps                health
+#   docker compose exec db psql -U finverse finverse
+#   docker compose down              stop (data survives in the named volume)
+#   docker compose down -v           stop AND DELETE the volume
+#
+# Credentials come from .env, which is gitignored. See docs/database.md.
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: finverse-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-finverse}
+      POSTGRES_USER: ${POSTGRES_USER:-finverse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      # Korean text sorts correctly and dates stay unambiguous.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C --auth-host=scram-sha-256"
+      # Password auth for every non-local connection. Without this the image
+      # trusts anything arriving over the network.
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+      TZ: Asia/Seoul
+    ports:
+      # POSTGRES_BIND controls exposure and defaults to loopback.
+      #   127.0.0.1  reachable only on this host (use an SSH tunnel)
+      #   0.0.0.0    reachable from outside -- then the port MUST be restricted
+      #              to known source IPs by the AWS security group or ufw.
+      - "${POSTGRES_BIND:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - finverse-pgdata:/var/lib/postgresql/data
+      # Applied once, on first initialisation of an empty volume.
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/10-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-finverse} -d ${POSTGRES_DB:-finverse}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    shm_size: 256mb
+    # The collector server has 4GB total and runs the collectors alongside the
+    # database, so these are sized to leave room rather than to maximise
+    # throughput. Raise them if the database moves to its own host.
+    mem_limit: 2g
+    command:
+      - postgres
+      - -c
+      - shared_buffers=512MB
+      - -c
+      - effective_cache_size=1536MB
+      # Per sort/hash node, not per connection -- a heavy analytic query can use
+      # several at once, so keep it modest with multiple people connected.
+      - -c
+      - work_mem=24MB
+      - -c
+      - maintenance_work_mem=256MB
+      # The lake is bulk-loaded, so favour long stretches between checkpoints.
+      - -c
+      - max_wal_size=2GB
+      - -c
+      - checkpoint_timeout=15min
+      - -c
+      - max_connections=50
+      # Require encrypted passwords on the wire.
+      - -c
+      - password_encryption=scram-sha-256
+
+volumes:
+  finverse-pgdata:
+    name: finverse-pgdata
