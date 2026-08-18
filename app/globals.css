@@ -266,8 +266,8 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .scenario-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .scenario-tags span { padding: 5px 8px; border-radius: 999px; color: var(--muted); background: var(--soft); font-size: 10px; }
 .scenario-card > small { display: block; margin-top: 15px; color: var(--light); font-size: 10px; }
-.scenario-card > strong { display: block; margin-top: 5px; font-size: 24px; letter-spacing: -.035em; }
-.scenario-card-detail-button { position: absolute; top: 14px; right: 14px; display: inline-flex; align-items: center; gap: 4px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: #fff; font-size: 11px; font-weight: 750; cursor: pointer; }
+.scenario-card > strong { display: block; margin-top: 5px; margin-bottom: 28px; font-size: 24px; letter-spacing: -.035em; }
+.scenario-card-detail-button { position: absolute; right: 14px; bottom: 14px; display: inline-flex; align-items: center; gap: 4px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: #fff; font-size: 11px; font-weight: 750; cursor: pointer; }
 .scenario-card-detail-button:hover { border-color: var(--ink); color: var(--ink); }
 .scenario-modal-learning { margin-top: 22px; }
 .scenario-modal-learning .scenario-narrative { margin-top: 0; }
