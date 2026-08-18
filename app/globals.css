@@ -113,7 +113,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .source-badge { padding: 3px 5px; border-radius: 3px; font-size: 7px; font-weight: 760; }
 .source-badge.database, .index-source.database { color: #16744f; background: #e1f5eb; }
 .source-badge.dummy { color: #9b651c; background: #fff0d5; }
-.signal-events { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 13px; }
+.signal-events { display: grid; grid-template-columns: repeat(auto-fit,minmax(0,1fr)); gap: 8px; margin-top: 13px; }
 .signal-events > span { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 10px; background: #fff; border: 1px solid #ececef; border-radius: 4px; }
 .signal-events > span > span { min-width: 0; overflow: hidden; }
 .signal-events strong, .signal-events small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -135,21 +135,21 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .market-signal-modal-header p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
 .market-signal-modal-keywords { display: grid; gap: 9px; padding: 20px 0; border-bottom: 1px solid var(--line); }
 .market-signal-modal-keywords > article { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px 14px; padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: #fafafa; }
-.market-signal-modal-keywords article > div > span { display: block; color: var(--light); font-size: 9px; font-weight: 750; }
-.market-signal-modal-keywords article strong { display: block; margin-top: 5px; color: var(--ink); font-size: 14px; line-height: 1.4; }
+.market-signal-topic-copy > span { display: block; color: var(--light); font-size: 9px; font-weight: 750; }
+.market-signal-topic-copy > strong { display: block; margin-top: 5px; color: var(--ink); font-size: 14px; line-height: 1.4; }
 .market-signal-modal-keywords article > b { color: #d99626; font-size: 13px; letter-spacing: 1px; white-space: nowrap; }
 .market-signal-modal-keywords article > p { grid-column: 1 / -1; margin: 2px 0 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
 .market-signal-modal-section { margin-top: 18px; padding: 15px 16px; border-radius: 8px; background: #f5f6f8; }
 .market-signal-modal-section > span { color: #24448c; font-size: 9px; font-weight: 800; letter-spacing: .08em; }
 .market-signal-modal-section p { margin: 7px 0 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
-.market-signal-modal-sources { display: grid; gap: 7px; margin-top: 18px; }
-.market-signal-modal-sources > span { color: var(--light); font-size: 9px; font-weight: 800; letter-spacing: .08em; }
-.market-signal-modal-sources > a { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 7px; color: var(--ink); text-decoration: none; }
-.market-signal-modal-sources > a:hover { border-color: #9aa8c4; background: #f7f9fd; }
-.market-signal-modal-sources > a span { min-width: 0; }
-.market-signal-modal-sources strong,.market-signal-modal-sources small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.market-signal-modal-sources strong { font-size: 11px; }
-.market-signal-modal-sources small { margin-top: 3px; color: var(--light); font-size: 8px; }
+.market-signal-topic-sources { grid-column: 1 / -1; display: grid; gap: 6px; margin-top: 4px; padding-top: 11px; border-top: 1px solid var(--line); }
+.market-signal-topic-sources > span { color: #24448c; font-size: 8px; font-weight: 800; letter-spacing: .06em; }
+.market-signal-topic-sources > a { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 7px; background: #fff; color: var(--ink); text-decoration: none; }
+.market-signal-topic-sources > a:hover { border-color: #9aa8c4; background: #f7f9fd; }
+.market-signal-topic-sources > a > span { min-width: 0; }
+.market-signal-topic-sources strong,.market-signal-topic-sources small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.market-signal-topic-sources strong { font-size: 10px; }
+.market-signal-topic-sources small { margin-top: 3px; color: var(--light); font-size: 8px; }
 .market-signal-modal-note { display: block; margin-top: 16px; color: var(--light); font-size: 9px; }
 .index-section { margin: 17px 18px 18px; padding-top: 15px; border-top: 1px solid var(--line); }
 .market-switch { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; margin-top: 9px; padding: 0; overflow: hidden; background: #fff; border: 1px solid var(--line); border-radius: 6px; }
@@ -237,6 +237,8 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .forecast-canvas { width: 100%; height: 265px; display: block; }
 .ai-summary { min-height: 0; display: flex; flex: 0 0 auto; gap: 12px; margin: 10px 16px 10px; padding: 16px 17px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
 .ai-summary svg { flex: 0 0 auto; color: var(--ink); }
+.ai-summary-copy { min-width: 0; padding: 0; border: 0; color: inherit; background: transparent; text-align: left; cursor: pointer; }
+.ai-summary-copy:focus-visible { outline: 2px solid rgba(24,24,27,.2); outline-offset: 4px; }
 .ai-summary strong { color: var(--ink); font-size: 16px; }
 .ai-summary p { margin: 7px 0 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
 .ai-summary p span { display: block; }
@@ -721,7 +723,8 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
   .event-panel > .event-timeline > article { flex: 1; min-height: 0; }
   .chart-panel > .market-overview { flex: 0 0 532px; height: 532px; min-height: 532px; }
   .chart-panel > .ai-summary { flex: 0 0 149px; height: 149px; min-height: 149px; max-height: 149px; box-sizing: border-box; }
-  .chart-panel > .ai-summary p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
+  .chart-panel > .ai-summary:not(.expanded) p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
+  .chart-panel > .ai-summary.expanded { overflow-y: auto; }
 }
 
 @media (max-width: 1100px) {

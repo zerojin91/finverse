@@ -31,6 +31,7 @@ import type { ChangeEvent, PointerEvent as ReactPointerEvent } from "react";
 type MainTab = "market" | "twin";
 
 type MarketSignalKey = "economy" | "country" | "event" | "community";
+type DashboardSource = { title: string; publisher: string; url: string | null; publishedAt?: string | null };
 type DashboardSignal = {
   key: MarketSignalKey;
   label: string;
@@ -39,8 +40,8 @@ type DashboardSignal = {
   source: "database" | "dummy";
   keywords: { label: string; count: number }[];
   impactSummary: string;
-  topics: { title: string; summary: string }[];
-  sources: { title: string; publisher: string; url: string | null; publishedAt?: string | null }[];
+  topics: { title: string; summary: string; importance?: number; sources?: DashboardSource[] }[];
+  sources: DashboardSource[];
   analysisSource?: "bedrock" | "rules";
   analysisGeneratedAt?: string | null;
   analysisModel?: string | null;
@@ -87,13 +88,14 @@ type ScenarioEditorial = {
 type EditorialState = "fallback" | "loading" | "ready";
 
 const marketSignals: DashboardSignal[] = [
-  { key: "economy", label: "경제", evidenceCount: 2, evidenceUnit: "지표", source: "dummy", keywords: [{ label: "금리 정책", count: 1 }, { label: "원화 약세", count: 1 }], impactSummary: "금리·환율 변화는 기업 조달비용과 수출주 이익 전망을 바꿔 KOSPI 적정 가치에 연결됩니다.", topics: [{ title: "금리 정책", summary: "기준금리 경로가 성장주의 할인율과 시장 밸류에이션에 영향을 줍니다." }, { title: "환율 변동성", summary: "원화 가치 변화는 수출주 이익과 외국인 자금 흐름에 함께 연결됩니다." }], sources: [] },
-  { key: "country", label: "국가", evidenceCount: 2, evidenceUnit: "기사", source: "dummy", keywords: [{ label: "미국 정책", count: 1 }, { label: "중국 경기", count: 1 }], impactSummary: "주요국 정책과 경기는 글로벌 위험선호, 환율과 한국 수출 전망을 통해 KOSPI에 연결됩니다.", topics: [{ title: "미국 금리 정책", summary: "미국의 금리 기대는 외국인 자금과 성장주 할인율에 영향을 줍니다." }, { title: "중국 경기", summary: "중국 수요 변화는 한국 수출 및 경기 민감주의 이익 전망에 반영됩니다." }], sources: [] },
-  { key: "event", label: "이벤트", evidenceCount: 2, evidenceUnit: "분류", source: "dummy", keywords: [{ label: "외국인 수급", count: 1 }, { label: "반도체 실적", count: 1 }], impactSummary: "수급과 기업 실적 이벤트는 대형주 비중이 높은 KOSPI의 단기 변동성을 빠르게 바꿀 수 있습니다.", topics: [{ title: "외국인 수급", summary: "외국인 현물·선물 수급 변화가 지수 방향과 변동성에 연결됩니다." }, { title: "반도체 실적", summary: "반도체 이익 기대는 KOSPI의 실적 전망에 큰 비중으로 반영됩니다." }], sources: [] },
-  { key: "community", label: "커뮤니티", evidenceCount: 2, evidenceUnit: "댓글", source: "dummy", keywords: [{ label: "반도체 투자심리", count: 1 }, { label: "국내 증시 신뢰", count: 1 }], impactSummary: "온라인 투자심리는 단기 거래 집중을 보여주는 보조 신호이며 지수 움직임의 원인으로 단정하지 않습니다.", topics: [{ title: "반도체 투자심리", summary: "대형 반도체주에 대한 기대와 경계가 단기 거래 집중에 연결될 수 있습니다." }, { title: "국내 증시 신뢰", summary: "국내 증시와 외국인 수급에 대한 인식은 위험선호의 보조 지표입니다." }], sources: [] },
+  { key: "economy", label: "경제", evidenceCount: 2, evidenceUnit: "지표", source: "dummy", keywords: [{ label: "금리 정책", count: 1 }, { label: "원화 약세", count: 1 }], impactSummary: "금리·환율 변화는 기업 조달비용과 수출주 이익 전망을 바꿔 KOSPI 적정 가치에 연결됩니다.", topics: [{ title: "금리 정책", summary: "기준금리 경로가 성장주의 할인율과 시장 밸류에이션에 영향을 줍니다.", importance: 3 }, { title: "환율 변동성", summary: "원화 가치 변화는 수출주 이익과 외국인 자금 흐름에 함께 연결됩니다.", importance: 2 }], sources: [] },
+  { key: "country", label: "국가", evidenceCount: 2, evidenceUnit: "기사", source: "dummy", keywords: [{ label: "미국 정책", count: 1 }, { label: "중국 경기", count: 1 }], impactSummary: "주요국 정책과 경기는 글로벌 위험선호, 환율과 한국 수출 전망을 통해 KOSPI에 연결됩니다.", topics: [{ title: "미국 금리 정책", summary: "미국의 금리 기대는 외국인 자금과 성장주 할인율에 영향을 줍니다.", importance: 3 }, { title: "중국 경기", summary: "중국 수요 변화는 한국 수출 및 경기 민감주의 이익 전망에 반영됩니다.", importance: 2 }], sources: [] },
+  { key: "event", label: "이벤트", evidenceCount: 2, evidenceUnit: "분류", source: "dummy", keywords: [{ label: "외국인 수급", count: 1 }, { label: "반도체 실적", count: 1 }], impactSummary: "수급과 기업 실적 이벤트는 대형주 비중이 높은 KOSPI의 단기 변동성을 빠르게 바꿀 수 있습니다.", topics: [{ title: "외국인 수급", summary: "외국인 현물·선물 수급 변화가 지수 방향과 변동성에 연결됩니다.", importance: 3 }, { title: "반도체 실적", summary: "반도체 이익 기대는 KOSPI의 실적 전망에 큰 비중으로 반영됩니다.", importance: 3 }], sources: [] },
+  { key: "community", label: "커뮤니티", evidenceCount: 2, evidenceUnit: "댓글", source: "dummy", keywords: [{ label: "반도체 투자심리", count: 1 }, { label: "국내 증시 신뢰", count: 1 }], impactSummary: "온라인 투자심리는 단기 거래 집중을 보여주는 보조 신호이며 지수 움직임의 원인으로 단정하지 않습니다.", topics: [{ title: "반도체 투자심리", summary: "대형 반도체주에 대한 기대와 경계가 단기 거래 집중에 연결될 수 있습니다.", importance: 2 }, { title: "국내 증시 신뢰", summary: "국내 증시와 외국인 수급에 대한 인식은 위험선호의 보조 지표입니다.", importance: 1 }], sources: [] },
 ];
 
 const marketSignalIcons = { economy: Activity, country: Globe2, event: CalendarClock, community: UsersRound };
+const importanceScore = (value?: number) => Math.max(1, Math.min(3, Math.round(value ?? 2)));
 const marketOverview = [
   { key: "KOSPI", name: "코스피", value: "6,023.66", change: "-732.09", rate: "-10.84%", tone: "down", badge: "시장 하락", points: [6244, 6312, 6388, 6460, 6380, 6428, 6375, 6160, 6128, 6038, 6048, 6024, 6085, 6032, 5920, 5980, 6002, 6024] },
   { key: "KOSDAQ", name: "코스닥", value: "834.20", change: "-30.45", rate: "-3.52%", tone: "down", badge: "유가 금리 부담", points: [862, 856, 849, 852, 844, 840, 836, 834] },
@@ -102,8 +104,8 @@ const marketOverview = [
 ] as const;
 const marketChartDates = ["7/22", "7/23", "7/24", "7/27", "7/28"];
 const defaultMarketBrief = [
-  "Bedrock에서 시장 요약을 생성하고 있습니다.",
-  "생성된 요약은 서비스가 열려 있는 동안 이 영역에 계속 표시됩니다.",
+  "장마감 후 생성된 시장 요약을 불러오고 있습니다.",
+  "최신 배치가 아직 없으면 다음 장마감 이후 자동으로 갱신됩니다.",
 ];
 const actualPath = [
   5224.36, 5350, 5480, 5610, 5760, 5920, 6080, 6244.13, 6000, 5700, 5350,
@@ -128,7 +130,7 @@ type KospiMarketData = { latestDate: string; latestLabel: string; value: number;
 type IntradayIndex = {
   key: "KOSPI" | "KOSDAQ" | "SP500" | "NASDAQ";
   name: string;
-  source: "naver";
+  source: "database";
   points: Array<{ date: string; close: number; changePct: number; open?: number; high?: number; low?: number }>;
 };
 const formatIndexValue = (value: number) => value.toLocaleString("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1199,6 +1201,7 @@ export default function Home() {
   const [intradayIndices, setIntradayIndices] = useState<IntradayIndex[]>([]);
   const [dashboardSignals, setDashboardSignals] = useState<DashboardSignal[]>(marketSignals);
   const [marketBrief, setMarketBrief] = useState<string[]>(defaultMarketBrief);
+  const [marketBriefExpanded, setMarketBriefExpanded] = useState(false);
   const [selectedMarketSignal, setSelectedMarketSignal] = useState<DashboardSignal | null>(null);
   const [selectedScenario, setSelectedScenario] = useState(scenarios[0]);
   const [scenarioDetailOpen, setScenarioDetailOpen] = useState(false);
@@ -1215,7 +1218,6 @@ export default function Home() {
   const [uploadedSeedFile, setUploadedSeedFile] = useState<UploadedSeed | null>(null);
   const scenarioScrollY = useRef<number | null>(null);
   const buildTimer = useRef<number | null>(null);
-  const briefRequested = useRef(false);
   const editorialRequest = useRef(0);
   const editorialCache = useRef(new Map<string, { editorial: ScenarioEditorial; generatedAt: string; model: string }>());
   const liveKospi = intradayIndices.find((index) => index.key === "KOSPI");
@@ -1236,8 +1238,11 @@ export default function Home() {
       try {
         const response = await fetch("/api/dashboard", { cache: "no-store" });
         if (!response.ok) return;
-        const payload = await response.json() as { signals?: DashboardSignal[] };
+        const payload = await response.json() as { signals?: DashboardSignal[]; marketBrief?: { lines?: string[] } | null };
         if (active && payload.signals?.length === 4) setDashboardSignals(payload.signals);
+        if (active && payload.marketBrief?.lines && payload.marketBrief.lines.length >= 2) {
+          setMarketBrief(payload.marketBrief.lines.slice(0, 3));
+        }
       } catch {
         // Keep the static preview while the database is unavailable.
       }
@@ -1246,36 +1251,6 @@ export default function Home() {
     const timer = window.setInterval(loadDashboardSignals, 5 * 60_000);
     return () => { active = false; window.clearInterval(timer); };
   }, []);
-
-  useEffect(() => {
-    if (briefRequested.current) return;
-    const timer = window.setTimeout(async () => {
-      if (briefRequested.current) return;
-      briefRequested.current = true;
-      try {
-        const response = await fetch("/api/market-brief", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            kospi: { date: kospiAsOf, value: kospiValue, change: kospiChange, rate: kospiRate },
-            indices: intradayIndices.map((index) => ({ name: index.name, latest: index.points.at(-1) })),
-            signals: dashboardSignals.map((signal) => ({
-              category: signal.label,
-              impact: signal.impactSummary,
-              keywords: signal.keywords.slice(0, 2),
-            })),
-          }),
-        });
-        if (!response.ok) throw new Error("market brief request failed");
-        const payload = await response.json() as { lines?: string[] };
-        if (payload.lines && payload.lines.length >= 2) setMarketBrief(payload.lines.slice(0, 3));
-      } catch {
-        briefRequested.current = false;
-        setMarketBrief(["Bedrock 시장 요약을 생성하지 못했습니다.", "~/.claude-bedrock/settings.json의 API 설정을 확인해 주세요."]);
-      }
-    }, 1_500);
-    return () => window.clearTimeout(timer);
-  }, [dashboardSignals, intradayIndices, kospiData]);
 
   useEffect(() => {
     let active = true;
@@ -1493,10 +1468,13 @@ export default function Home() {
                               <span className="signal-share"><ChevronRight className="signal-disclosure" size={12} /></span>
                             </span>
                             <span className="signal-events">
-                              {signal.keywords.slice(0, 2).map((keyword) => <span key={keyword.label}><span><strong>{keyword.label}</strong><small>{keyword.count.toLocaleString("ko-KR")}건</small></span><b>{keyword.count.toLocaleString("ko-KR")}</b></span>)}
+                              {signal.topics.slice(0, 2).map((topic) => {
+                                const importance = importanceScore(topic.importance);
+                                return <span key={topic.title}><span><strong>{topic.title}</strong><small>근거 {topic.sources?.length ?? 0}개</small></span><b aria-label={`중요도 ${importance}점`}>{"★".repeat(importance)}{"☆".repeat(3 - importance)}</b></span>;
+                              })}
                             </span>
                             <span className="signal-track" aria-hidden="true">
-                              {signal.keywords.slice(0, 2).map((keyword) => <i key={keyword.label} />)}
+                              {signal.topics.slice(0, 2).map((topic) => <i key={topic.title} />)}
                             </span>
                           </button>
                         </article>
@@ -1510,7 +1488,7 @@ export default function Home() {
                     <article className="market-overview-primary kospi-classic-primary">
                       <div className="kospi-head">
                         <div>
-                          <div className="kospi-title-line"><span>코스피</span><em>{liveKospiLatest ? "LIVE · 당일" : "최근 장마감"}</em></div>
+                          <div className="kospi-title-line"><span>코스피</span></div>
                           <div className="kospi-value-line"><b>{formatIndexValue(kospiValue)}</b><strong className={kospiTone}>{formatSignedIndex(kospiChange)} ({Math.abs(kospiRate).toFixed(2)}%)</strong></div>
                         </div>
                         <div className="scenario-preview-meta">
@@ -1536,7 +1514,7 @@ export default function Home() {
                           <article className="market-overview-mini" key={item.key}>
                             <MarketLineChart values={values} name={`${item.name} 당일`} />
                             <div>
-                              <header><span>{item.name}</span><em>{live ? "LIVE · 당일" : "당일"}</em></header>
+                              <header><span>{item.name}</span></header>
                               <div className="market-overview-mini-value">
                                 <b>{latest ? formatIndexValue(latest.close) : item.value}</b>
                                 <span className={tone}>
@@ -1551,7 +1529,13 @@ export default function Home() {
                       })}
                     </div>
                   </div>
-                  <div className="ai-summary"><Sparkles size={17} /><div><strong>AI 요약</strong><p>{marketBrief.map((line) => <span key={line}>{line}</span>)}</p></div></div>
+                  <div className={`ai-summary ${marketBriefExpanded ? "expanded" : ""}`}>
+                    <Sparkles size={17} />
+                    <button className="ai-summary-copy" type="button" aria-expanded={marketBriefExpanded} aria-label={`AI 요약 전문 ${marketBriefExpanded ? "접기" : "보기"}`} onClick={() => setMarketBriefExpanded((expanded) => !expanded)}>
+                      <strong>AI 요약</strong>
+                      <p>{marketBrief.map((line) => <span key={line}>{line}</span>)}</p>
+                    </button>
+                  </div>
                 </section>
 
                 <aside className="panel event-panel">
@@ -1781,12 +1765,23 @@ export default function Home() {
             </header>
             <div className="market-signal-modal-section"><span>현재 KOSPI 영향 요약</span><p>{selectedMarketSignal.impactSummary}</p></div>
             <div className="market-signal-modal-keywords">
-              {selectedMarketSignal.topics.slice(0, 2).map((topic, index) => <article key={topic.title}><div><span>대주제 {index + 1}</span><strong>{topic.title}</strong></div><p>{topic.summary}</p></article>)}
-            </div>
-            <div className="market-signal-modal-sources">
-              <span>탭별 데이터 원천</span>
-              {selectedMarketSignal.sources.filter((source) => source.url).map((source) => <a key={`${source.publisher}-${source.title}`} href={source.url!} target="_blank" rel="noreferrer"><span><strong>{source.title}</strong><small>{source.publisher}{source.publishedAt ? ` · ${source.publishedAt.slice(0, 10)}` : ""}</small></span><ExternalLink size={13} /></a>)}
-              {!selectedMarketSignal.sources.some((source) => source.url) && <small>DB 연결 후 원천 링크가 표시됩니다.</small>}
+              {selectedMarketSignal.topics.slice(0, 2).map((topic, index) => (
+                <article key={topic.title}>
+                  <div className="market-signal-topic-copy"><span>대주제 {index + 1}</span><strong>{topic.title}</strong></div>
+                  <b aria-label={`중요도 ${importanceScore(topic.importance)}점`}>{"★".repeat(importanceScore(topic.importance))}{"☆".repeat(3 - importanceScore(topic.importance))}</b>
+                  <p>{topic.summary}</p>
+                  <div className="market-signal-topic-sources">
+                    <span>이 대주제에 사용된 데이터</span>
+                    {topic.sources?.filter((source) => source.url).map((source) => (
+                      <a key={`${source.publisher}-${source.title}`} href={source.url!} target="_blank" rel="noreferrer">
+                        <span><strong>{source.title}</strong><small>{source.publisher}{source.publishedAt ? ` · ${source.publishedAt.slice(0, 10)}` : ""}</small></span>
+                        <ExternalLink size={13} />
+                      </a>
+                    ))}
+                    {!topic.sources?.some((source) => source.url) && <small>이 대주제의 원천 링크를 확인 중입니다.</small>}
+                  </div>
+                </article>
+              ))}
             </div>
             <small className="market-signal-modal-note">{selectedMarketSignal.analysisSource === "bedrock" ? `Amazon Bedrock 분석 · ${selectedMarketSignal.analysisGeneratedAt ? new Date(selectedMarketSignal.analysisGeneratedAt).toLocaleString("ko-KR") : "최신 배치"}` : "DB 원천을 규칙 기반으로 정리한 결과입니다."}</small>
           </section>

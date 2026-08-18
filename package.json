@@ -10,6 +10,7 @@
     "dev": "node scripts/with_bedrock_env.mjs dev",
     "build": "vinext build",
     "start": "node scripts/with_bedrock_env.mjs start",
+    "sync:indices": "node scripts/market_index_sync.mjs",
     "test": "npm run build && node --test tests/rendered-html.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
   },

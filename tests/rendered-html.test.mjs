@@ -45,7 +45,9 @@ test("server-renders the interactive FINVERSE Market Insight", async () => {
   assert.match(html, /S&amp;P 500/);
   assert.match(html, /나스닥/);
   assert.equal((html.match(/class="market-overview-mini"/g) ?? []).length, 3);
-  assert.equal((html.match(/>당일<\/em>/g) ?? []).length, 3);
+  assert.equal((html.match(/>당일<\/em>/g) ?? []).length, 0);
+  assert.match(html, /aria-label="AI 요약 전문 보기"/);
+  assert.doesNotMatch(html, /AI 요약 · 장마감 배치/);
   assert.match(html, /외국인 순매수 회복/);
   assert.match(html, /AI CapEx/);
   assert.match(html, /반도체 실적 미스·AI CapEx 둔화/);
