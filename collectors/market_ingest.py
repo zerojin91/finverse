@@ -23,6 +23,7 @@ import argparse
 from datetime import UTC, date, datetime, timedelta, timezone
 import json
 from pathlib import Path
+import os
 import re
 import sys
 import time
@@ -33,8 +34,6 @@ from urllib.error import HTTPError, URLError
 
 from _indexed_jsonl_store import IndexedJsonlStore
 from _jsonl_store import load_dotenv, sha256
-
-import os
 
 ROOT = Path(__file__).resolve().parents[1]
 STORE = IndexedJsonlStore(ROOT / "data" / "market")
@@ -51,10 +50,16 @@ NAVER_API_ROOT = "https://api.finance.naver.com"
 KRX_FIRST_DAY = date(2010, 1, 4)
 NAVER_FIRST_DAY = date(1990, 1, 1)
 
-USER_AGENT = (
+DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 )
+
+
+def user_agent() -> str:
+    """FINVERSE_COLLECTOR_USER_AGENT identifies the collector where a site
+    accepts it; Naver's HTML pages reject unfamiliar agents, so fall back."""
+    return os.environ.get("FINVERSE_COLLECTOR_USER_AGENT") or DEFAULT_USER_AGENT
 
 # Sector indices arrive inside the KOSPI/KOSDAQ index series, not as a separate
 # endpoint, so collecting indices also collects sectors.
@@ -106,7 +111,7 @@ def _request(url: str, *, headers: dict[str, str] | None = None,
     last: Exception | None = None
     for attempt in range(retries):
         time.sleep(pause)
-        request = Request(url, headers={"User-Agent": USER_AGENT, **(headers or {})})
+        request = Request(url, headers={"User-Agent": user_agent(), **(headers or {})})
         try:
             with urlopen(request, timeout=30) as response:
                 return response.read().decode(encoding, errors="replace")
@@ -299,12 +304,17 @@ def krx_stream(start: date, end: date, auth_key: str, state: dict,
     if not auth_key:
         raise AuthError("KRX_AUTH_KEY is not set; check .env")
 
-    calendar: set[str] = set(state.get("krx_trading_days", []))
+    calendar_list = state.setdefault("krx_trading_days", [])
+    calendar: set[str] = set(calendar_list)
     skipped: list[str] = []
     candidates = [ymd(day) for day in weekdays(start, end)]
 
     for name, endpoint in KRX_INDEX_ENDPOINTS.items():
-        done = set(state.setdefault("krx_done", {}).get(name, []))
+        # Bind the list stored in state and append as we go. Assigning only
+        # after the loop means an interruption loses the whole endpoint, no
+        # matter how often the caller persists state.
+        done_list = state.setdefault("krx_done", {}).setdefault(name, [])
+        done = set(done_list)
         targets = [day for day in candidates if day not in done]
         # Once the calendar is known, holidays can be skipped outright.
         if calendar and name != "kospi_dd_trd":
@@ -321,11 +331,10 @@ def krx_stream(start: date, end: date, auth_key: str, state: dict,
             records = krx_index_records(rows, day)
             if records and name == "kospi_dd_trd":
                 calendar.add(day)
+                calendar_list.append(day)
             done.add(day)
+            done_list.append(day)
             yield from records
-        state["krx_done"][name] = sorted(done)
-        if name == "kospi_dd_trd":
-            state["krx_trading_days"] = sorted(calendar)
 
     probe = max(calendar) if calendar else ymd(end)
     for name, (endpoint, market) in KRX_BASE_INFO_ENDPOINTS.items():
@@ -340,7 +349,8 @@ def krx_stream(start: date, end: date, auth_key: str, state: dict,
         yield from krx_security_records(rows, market)
 
     for name, (endpoint, market) in KRX_STOCK_ENDPOINTS.items():
-        done = set(state.setdefault("krx_done", {}).get(name, []))
+        done_list = state.setdefault("krx_done", {}).setdefault(name, [])
+        done = set(done_list)
         targets = [day for day in candidates if day not in done]
         if calendar:
             targets = [day for day in targets if day in calendar]
@@ -354,8 +364,8 @@ def krx_stream(start: date, end: date, auth_key: str, state: dict,
                 report.setdefault("failures", []).append(f"{name} {day}: {exc}")
                 continue
             done.add(day)
+            done_list.append(day)
             yield from krx_price_records(rows, day, market)
-        state["krx_done"][name] = sorted(done)
 
     if skipped:
         unique = sorted(set(skipped))
@@ -555,7 +565,8 @@ def naver_stream(start: date, end: date, state: dict, report: dict, *,
             universe += [[code, name, market] for code, name in naver_listed(market)]
         state["naver_universe"] = universe
 
-    done = set(state.setdefault("naver_done", {}).get("prices", []))
+    done_list = state.setdefault("naver_done", {}).setdefault("prices", [])
+    done = set(done_list)
     streak = 0
     for ticker, name, market in universe:
         if ticker in done:
@@ -587,7 +598,7 @@ def naver_stream(start: date, end: date, state: dict, report: dict, *,
                 "listed_shares": None, "prev_diff": None, "change_pct": None,
             }
         done.add(ticker)
-    state["naver_done"]["prices"] = sorted(done)
+        done_list.append(ticker)
 
     if not with_flows:
         return
@@ -598,7 +609,8 @@ def naver_stream(start: date, end: date, state: dict, report: dict, *,
         except RuntimeError as exc:
             report.setdefault("failures", []).append(f"flow {market}: {exc}")
 
-    flow_done = set(state.setdefault("naver_done", {}).get("flows", []))
+    flow_list = state.setdefault("naver_done", {}).setdefault("flows", [])
+    flow_done = set(flow_list)
     streak = 0
     for ticker, _, _ in universe[:flow_universe]:
         if ticker in flow_done:
@@ -614,7 +626,7 @@ def naver_stream(start: date, end: date, state: dict, report: dict, *,
                 break
             continue
         flow_done.add(ticker)
-    state["naver_done"]["flows"] = sorted(flow_done)
+        flow_list.append(ticker)
 
 
 # --------------------------------------------------------------------------
@@ -643,6 +655,45 @@ def write_state(state: dict) -> None:
 # CLI
 
 
+# A full backfill streams tens of millions of records over several hours.
+# Merging the whole stream in one call would hold a single SQLite transaction
+# open for that entire time -- no concurrent reads, and a crash near the end
+# would roll back everything. Committing in batches keeps progress durable.
+MERGE_BATCH = 50_000
+# Index endpoints yield about 50 records a day, so waiting for a full batch
+# would mean a thousand days of fetching between saves. Commit on elapsed time
+# too, otherwise an interruption re-fetches hours of work.
+MERGE_INTERVAL_SECONDS = 60
+
+
+def merge_batched(stream: Iterable[dict], *, mode: str, state: dict) -> dict[str, int]:
+    totals = {"inserted": 0, "changed": 0, "unchanged": 0}
+    batch: list[dict] = []
+    last_flush = time.monotonic()
+
+    def flush(final: bool) -> None:
+        nonlocal last_flush
+        last_flush = time.monotonic()
+        if not batch and not final:
+            return
+        summary = STORE.merge(batch, collector="market_ingest", mode=mode,
+                              log_run=final, materialize=final)
+        for key in totals:
+            totals[key] += summary.get(key, 0)
+        batch.clear()
+        # The stream mutates state as it advances, so persist it alongside the
+        # data it produced; a resumed run then skips exactly what was committed.
+        write_state(state)
+
+    for record in stream:
+        batch.append(record)
+        if (len(batch) >= MERGE_BATCH
+                or time.monotonic() - last_flush >= MERGE_INTERVAL_SECONDS):
+            flush(False)
+    flush(True)
+    return totals
+
+
 def collect(mode: str, sources: list[str], start: date, end: date, *,
             with_flows: bool, flow_universe: int, resume: bool) -> int:
     state = read_state() if resume else {}
@@ -654,13 +705,16 @@ def collect(mode: str, sources: list[str], start: date, end: date, *,
     for source in sources:
         try:
             if source == "krx":
-                stream = krx_stream(start, end, os.environ.get("KRX_AUTH_KEY", ""),
+                # KRX publishes nothing before 2010. Starting earlier spends
+                # about 5,200 requests per endpoint on days that return nothing.
+                krx_start = max(start, KRX_FIRST_DAY)
+                stream = krx_stream(krx_start, end, os.environ.get("KRX_AUTH_KEY", ""),
                                     state, report)
             else:
                 stream = naver_stream(start, end, state, report,
                                       with_flows=with_flows,
                                       flow_universe=flow_universe)
-            summary = STORE.merge(stream, collector="market_ingest", mode=mode)
+            summary = merge_batched(stream, mode=mode, state=state)
             for key in totals:
                 totals[key] += summary.get(key, 0)
         except AuthError as exc:
@@ -702,7 +756,8 @@ def main() -> int:
     if args.start:
         start = args.start
     elif args.command == "backfill":
-        start = KRX_FIRST_DAY if sources == ["krx"] else NAVER_FIRST_DAY
+        # Widest window; each source clamps to what it actually offers below.
+        start = NAVER_FIRST_DAY
     else:
         start = args.end - timedelta(days=args.revision_lookback_days)
 
