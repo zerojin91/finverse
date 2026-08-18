@@ -36,7 +36,7 @@ const start = (command, args, label) => {
 console.log(`KOSPI SSH bridge: ${process.env.FINVERSE_SSH_HOST || "ubuntu@44.206.56.75"}`);
 console.log(`KOSPI PEM path: ${process.env.FINVERSE_SSH_KEY || "(미설정)"}`);
 start(process.platform === "win32" ? "node" : process.execPath, [resolve(root, "scripts/kospi_bridge.mjs")], "KOSPI bridge");
-start(npmCommand, ["run", "dev:app"], "web app");
+start(process.platform === "win32" ? "node" : process.execPath, [resolve(root, "scripts/with_bedrock_env.mjs"), "dev"], "web app");
 
 function shutdown() {
   for (const child of children) if (!child.killed) child.kill("SIGTERM");

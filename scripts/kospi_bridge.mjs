@@ -4,6 +4,8 @@ import { createServer } from "node:http";
 const port = Number(process.env.FINVERSE_KOSPI_BRIDGE_PORT || 5439);
 const keyPath = process.env.FINVERSE_SSH_KEY || "D:\\finverse_key.pem";
 const host = process.env.FINVERSE_SSH_HOST || "ubuntu@44.206.56.75";
+const database = process.env.FINVERSE_DB_NAME || "finverse";
+const container = process.env.FINVERSE_DB_CONTAINER || "finverse-db";
 
 const sql = `SELECT DISTINCT ON (payload->>'bas_dd')
   payload->>'bas_dd', payload->>'open', payload->>'high', payload->>'low', payload->>'close'
@@ -17,7 +19,7 @@ let cache = null;
 let cacheTime = 0;
 let inFlight = null;
 
-function queryRemote() {
+function queryRemote(query) {
   return new Promise((resolve, reject) => {
     const child = spawn("ssh", [
       "-o", "BatchMode=yes",
@@ -25,7 +27,7 @@ function queryRemote() {
       "-o", "ConnectTimeout=8",
       "-i", keyPath,
       host,
-      "docker exec -i finverse-db psql -U finverse -d finverse -At -F '|'",
+      "docker", "exec", "-i", container, "psql", "-X", "-qAt", "-v", "ON_ERROR_STOP=1", "-U", "finverse", "-d", database, "-f", "-",
     ], { windowsHide: true });
     let stdout = "";
     let stderr = "";
@@ -38,8 +40,22 @@ function queryRemote() {
       if (code === 0) resolve(stdout);
       else reject(new Error(stderr.trim() || `ssh exited with code ${code}`));
     });
-    child.stdin.end(sql);
+    child.stdin.end(query, "utf8");
   });
+}
+
+async function queryRemoteJson(query) {
+  const script = [
+    "SET statement_timeout = 60000;",
+    "SET default_transaction_read_only = on;",
+    "SET max_parallel_workers_per_gather = 0;",
+    "SELECT COALESCE(json_agg(row_to_json(result)), '[]'::json)",
+    `FROM (${query}) AS result;`,
+  ].join("\n");
+  const stdout = await queryRemote(script);
+  const line = stdout.trim().split(/\r?\n/).filter(Boolean).at(-1) || "[]";
+  const rows = JSON.parse(line);
+  return Array.isArray(rows) ? rows : [];
 }
 
 const formatDate = (raw) => `${Number(raw.slice(4, 6))}/${Number(raw.slice(6, 8))}`;
@@ -48,7 +64,7 @@ async function loadKospi() {
   if (cache && Date.now() - cacheTime < 30_000) return cache;
   if (inFlight) return inFlight;
   inFlight = (async () => {
-    const stdout = await queryRemote();
+    const stdout = await queryRemote(sql);
     const rows = stdout.trim().split(/\r?\n/).filter(Boolean).map((line) => {
       const [date, open, high, low, close] = line.split("|");
       return { date, label: formatDate(date), open: Number(open), high: Number(high), low: Number(low), close: Number(close) };
@@ -67,6 +83,25 @@ async function loadKospi() {
 }
 
 const server = createServer(async (request, response) => {
+  if (request.method === "POST" && request.url === "/query") {
+    let body = "";
+    request.setEncoding("utf8");
+    request.on("data", (chunk) => { body += chunk; });
+    request.on("end", async () => {
+      try {
+        const parsed = JSON.parse(body);
+        if (typeof parsed.sql !== "string" || !parsed.sql.trim()) throw new Error("sql is required");
+        const rows = await queryRemoteJson(parsed.sql);
+        response.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+        response.end(JSON.stringify(rows));
+      } catch (error) {
+        console.error("Dashboard bridge query failed:", error instanceof Error ? error.message : error);
+        response.writeHead(503, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ error: "Unable to read remote PostgreSQL" }));
+      }
+    });
+    return;
+  }
   if (request.url !== "/kospi") {
     response.writeHead(404, { "Content-Type": "application/json" });
     response.end(JSON.stringify({ error: "Not found" }));

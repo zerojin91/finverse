@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS lake.records (
 
 CREATE INDEX IF NOT EXISTS records_type_idx   ON lake.records (record_type);
 CREATE INDEX IF NOT EXISTS records_source_idx ON lake.records (source);
+CREATE INDEX IF NOT EXISTS records_type_collected_idx
+    ON lake.records (record_type, collected_at DESC NULLS LAST);
 -- Most queries filter by business date, which lives inside the payload.
 CREATE INDEX IF NOT EXISTS records_basdd_idx
     ON lake.records ((payload->>'bas_dd')) WHERE payload ? 'bas_dd';

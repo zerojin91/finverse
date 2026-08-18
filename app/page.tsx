@@ -13,6 +13,7 @@ import {
   CircleHelp,
   CheckCircle2,
   Database,
+  ExternalLink,
   FileUp,
   GitBranch,
   Globe2,
@@ -28,6 +29,23 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ChangeEvent, PointerEvent as ReactPointerEvent } from "react";
 
 type MainTab = "market" | "twin";
+
+type MarketSignalKey = "economy" | "country" | "event" | "community";
+type DashboardSource = { title: string; publisher: string; url: string | null; publishedAt?: string | null };
+type DashboardSignal = {
+  key: MarketSignalKey;
+  label: string;
+  evidenceCount: number;
+  evidenceUnit: string;
+  source: "database" | "dummy";
+  keywords: { label: string; count: number }[];
+  impactSummary: string;
+  topics: { title: string; summary: string; importance?: number; sources?: DashboardSource[] }[];
+  sources: DashboardSource[];
+  analysisSource?: "bedrock" | "rules";
+  analysisGeneratedAt?: string | null;
+  analysisModel?: string | null;
+};
 
 type Scenario = {
   id: string;
@@ -50,20 +68,34 @@ type Scenario = {
   riskPoints: string[];
 };
 
-const marketSignals = [
-  { key: "economy", label: "경제", events: [{ title: "금리 정책", detailTitle: "한국은행 추가 금리 인상 경계", source: "금리·정책", importance: 3, summary: "물가 압력이 이어지며 기준금리 경로가 다시 주목받고 있습니다. 할인율 상승 우려가 성장주와 KOSPI 밸류에이션에 부담을 줍니다." }, { title: "원화 약세", detailTitle: "원화 약세와 환율 변동성 확대", source: "환율 시장", importance: 2, summary: "원·달러 환율 상승으로 외국인 자금의 환차손 부담이 커졌습니다. 수출주에는 일부 우호적이지만 시장 전체에는 위험 회피 신호로 작용합니다." }] },
-  { key: "country", label: "국가", events: [{ title: "미국 금리 정책", detailTitle: "미국 금리 인하 기대 약화", source: "미국 정책", importance: 3, summary: "미국 금리 인하 기대가 약해지며 글로벌 위험자산의 할인율 부담이 커졌습니다. 외국인 투자자의 한국 주식 비중에도 영향을 줍니다." }, { title: "중국 경기", detailTitle: "중국 경기 둔화와 수요 우려", source: "중국 경기", importance: 2, summary: "중국 수요 둔화 우려가 한국 수출과 소재·산업재 전망에 부담을 줍니다. 경기 민감주의 회복을 늦추는 요인입니다." }] },
-  { key: "event", label: "이벤트", events: [{ title: "외국인 순매도", detailTitle: "외국인 KOSPI 순매도 확대", source: "수급 데이터", importance: 3, summary: "외국인이 KOSPI 현물과 선물에서 순매도를 확대하며 지수 하락 압력이 커졌습니다. 대형 반도체주가 낙폭을 키운 핵심 경로입니다." }, { title: "반도체 실적", detailTitle: "반도체 실적 기대 하향 조정", source: "기업 실적", importance: 3, summary: "메모리 가격과 AI 투자 지속성에 대한 의문이 커지며 반도체 이익 추정치가 낮아졌습니다. KOSPI에 직접적인 영향을 주는 사건입니다." }] },
-  { key: "community", label: "커뮤니티", events: [{ title: "반도체 저가매수", detailTitle: "반도체 대형주 저가매수 심리", source: "투자자 반응", importance: 2, summary: "급락 이후 반도체 대형주를 저가 매수하려는 의견이 늘었습니다. 실제 수급 전환 전까지는 반등 기대를 보여주는 보조 신호입니다." }, { title: "환율 불안", detailTitle: "환율 불안과 외국인 이탈 우려 확산", source: "투자자 반응", importance: 1, summary: "환율 상승과 외국인 이탈을 연결하는 우려가 커졌습니다. 단기 매도 쏠림을 키울 수 있지만 펀더멘털 신호로 단독 사용하지 않습니다." }] },
-] as const;
+type ScenarioEditorial = {
+  ui: { theme: "sunny" | "forest" | "cobalt" | "berry"; rhythm: "calm" | "bold" | "playful" };
+  badge: string;
+  headline: string;
+  subhead: string;
+  cards: Array<{
+    kicker: string;
+    title: string;
+    body: string;
+    stat: string;
+    statLabel: string;
+    layout: "hero" | "split" | "reverse" | "spotlight" | "stacked";
+    visual: "market-path" | "capital-flow" | "earnings" | "calendar" | "risk-radar";
+  }>;
+  explanation: { title: string; lead: string; paragraphs: string[] };
+};
+
+type EditorialState = "fallback" | "loading" | "ready";
+
+const marketSignals: DashboardSignal[] = [
+  { key: "economy", label: "경제", evidenceCount: 2, evidenceUnit: "지표", source: "dummy", keywords: [{ label: "금리 정책", count: 1 }, { label: "원화 약세", count: 1 }], impactSummary: "금리·환율 변화는 기업 조달비용과 수출주 이익 전망을 바꿔 KOSPI 적정 가치에 연결됩니다.", topics: [{ title: "금리 정책", summary: "기준금리 경로가 성장주의 할인율과 시장 밸류에이션에 영향을 줍니다.", importance: 3 }, { title: "환율 변동성", summary: "원화 가치 변화는 수출주 이익과 외국인 자금 흐름에 함께 연결됩니다.", importance: 2 }], sources: [] },
+  { key: "country", label: "국가", evidenceCount: 2, evidenceUnit: "기사", source: "dummy", keywords: [{ label: "미국 정책", count: 1 }, { label: "중국 경기", count: 1 }], impactSummary: "주요국 정책과 경기는 글로벌 위험선호, 환율과 한국 수출 전망을 통해 KOSPI에 연결됩니다.", topics: [{ title: "미국 금리 정책", summary: "미국의 금리 기대는 외국인 자금과 성장주 할인율에 영향을 줍니다.", importance: 3 }, { title: "중국 경기", summary: "중국 수요 변화는 한국 수출 및 경기 민감주의 이익 전망에 반영됩니다.", importance: 2 }], sources: [] },
+  { key: "event", label: "이벤트", evidenceCount: 2, evidenceUnit: "분류", source: "dummy", keywords: [{ label: "외국인 수급", count: 1 }, { label: "반도체 실적", count: 1 }], impactSummary: "수급과 기업 실적 이벤트는 대형주 비중이 높은 KOSPI의 단기 변동성을 빠르게 바꿀 수 있습니다.", topics: [{ title: "외국인 수급", summary: "외국인 현물·선물 수급 변화가 지수 방향과 변동성에 연결됩니다.", importance: 3 }, { title: "반도체 실적", summary: "반도체 이익 기대는 KOSPI의 실적 전망에 큰 비중으로 반영됩니다.", importance: 3 }], sources: [] },
+  { key: "community", label: "커뮤니티", evidenceCount: 2, evidenceUnit: "댓글", source: "dummy", keywords: [{ label: "반도체 투자심리", count: 1 }, { label: "국내 증시 신뢰", count: 1 }], impactSummary: "온라인 투자심리는 단기 거래 집중을 보여주는 보조 신호이며 지수 움직임의 원인으로 단정하지 않습니다.", topics: [{ title: "반도체 투자심리", summary: "대형 반도체주에 대한 기대와 경계가 단기 거래 집중에 연결될 수 있습니다.", importance: 2 }, { title: "국내 증시 신뢰", summary: "국내 증시와 외국인 수급에 대한 인식은 위험선호의 보조 지표입니다.", importance: 1 }], sources: [] },
+];
 
 const marketSignalIcons = { economy: Activity, country: Globe2, event: CalendarClock, community: UsersRound };
-const marketSignalImpacts = {
-  economy: "금리·환율 변화는 기업 조달비용과 수출주 이익 전망을 바꿔 지수의 적정 가치에 직접 반영됩니다.",
-  country: "미국·한국의 정책 방향은 외국인 자금 흐름, 원화 가치와 성장주 밸류에이션에 영향을 줍니다.",
-  event: "뉴스 이벤트는 위험 선호와 변동성을 빠르게 바꾸지만, 영향의 방향과 지속 기간은 사건마다 다릅니다.",
-  community: "투자자 관심과 심리는 단기 거래량과 수급 쏠림을 키울 수 있지만 펀더멘털 신호로 단독 사용하지 않습니다.",
-} as const;
+const importanceScore = (value?: number) => Math.max(1, Math.min(3, Math.round(value ?? 2)));
 const marketOverview = [
   { key: "KOSPI", name: "코스피", value: "6,023.66", change: "-732.09", rate: "-10.84%", tone: "down", badge: "시장 하락", points: [6244, 6312, 6388, 6460, 6380, 6428, 6375, 6160, 6128, 6038, 6048, 6024, 6085, 6032, 5920, 5980, 6002, 6024] },
   { key: "KOSDAQ", name: "코스닥", value: "834.20", change: "-30.45", rate: "-3.52%", tone: "down", badge: "유가 금리 부담", points: [862, 856, 849, 852, 844, 840, 836, 834] },
@@ -71,6 +103,10 @@ const marketOverview = [
   { key: "NASDAQ", name: "나스닥", value: "19,546.73", change: "-187.42", rate: "-0.95%", tone: "down", badge: "기술주 조정", points: [19840, 19812, 19790, 19752, 19720, 19680, 19622, 19547] },
 ] as const;
 const marketChartDates = ["7/22", "7/23", "7/24", "7/27", "7/28"];
+const defaultMarketBrief = [
+  "장마감 후 생성된 시장 요약을 불러오고 있습니다.",
+  "최신 배치가 아직 없으면 다음 장마감 이후 자동으로 갱신됩니다.",
+];
 const actualPath = [
   5224.36, 5350, 5480, 5610, 5760, 5920, 6080, 6244.13, 6000, 5700, 5350,
   5052.46, 5450, 5900, 6300, 6598.87, 7100, 7600, 8050, 8476.15, 8420,
@@ -91,6 +127,12 @@ const makeTradingDates = (endDate: string, count: number) => {
 const actualDates = makeTradingDates("2026-07-28", actualPath.length);
 type KospiCandle = { date: string; label: string; open: number; high: number; low: number; close: number };
 type KospiMarketData = { latestDate: string; latestLabel: string; value: number; change: number; rate: number; candles: KospiCandle[] };
+type IntradayIndex = {
+  key: "KOSPI" | "KOSDAQ" | "SP500" | "NASDAQ";
+  name: string;
+  source: "database";
+  points: Array<{ date: string; close: number; changePct: number; open?: number; high?: number; low?: number }>;
+};
 const formatIndexValue = (value: number) => value.toLocaleString("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const formatSignedIndex = (value: number) => `${value >= 0 ? "+" : ""}${formatIndexValue(value)}`;
 const fallbackKospiCandles: KospiCandle[] = actualPath.map((close, index) => {
@@ -437,6 +479,161 @@ function ScenarioDetailLearning({ scenario }: { scenario: Scenario }) {
   );
 }
 
+function fallbackEditorial(scenario: Scenario): ScenarioEditorial {
+  return {
+    ui: { theme: scenario.tone === "up" ? "sunny" : "cobalt", rhythm: "playful" },
+    badge: "TODAY'S MONEY STORY · 5 CUTS",
+    headline: scenario.thesis,
+    subhead: `숫자만 보면 어렵지만, 순서대로 넘기면 보입니다. ${scenario.duration}의 조건과 반증 신호를 5장으로 읽어보세요.`,
+    cards: [
+      {
+        kicker: "01 · ONE-LINE THESIS",
+        title: scenario.title,
+        body: scenario.context,
+        stat: scenario.forecast,
+        statLabel: `${scenario.duration} 조건부 중심 경로`,
+        layout: "hero",
+        visual: "market-path",
+      },
+      ...scenario.events.slice(0, 3).map((event, index) => ({
+        kicker: `0${index + 2} · ${event.category}`,
+        title: event.title,
+        body: event.body,
+        stat: event.impact,
+        statLabel: event.week,
+        layout: (["split", "reverse", "spotlight"] as const)[index],
+        visual: (["capital-flow", "earnings", "calendar"] as const)[index],
+      })),
+      {
+        kicker: "05 · INVALIDATION",
+        title: "이 세 신호가 깨지면 시나리오를 다시 쓸 때입니다",
+        body: scenario.riskPoints.join(" · "),
+        stat: `${scenario.riskPoints.length} SIGNALS`,
+        statLabel: "예측보다 먼저 확인할 반증 조건",
+        layout: "stacked",
+        visual: "risk-radar",
+      },
+    ],
+    explanation: {
+      title: `${scenario.title}을 판단의 순서로 읽는 법`,
+      lead: scenario.thesis,
+      paragraphs: [scenario.summary, scenario.context],
+    },
+  };
+}
+
+function EditorialIllustration({
+  card,
+  scenario,
+  index,
+}: {
+  card: ScenarioEditorial["cards"][number];
+  scenario: Scenario;
+  index: number;
+}) {
+  if (card.visual === "market-path") return (
+    <div className="story-image-visual">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={scenario.image} alt={`${scenario.title} 시나리오 일러스트`} />
+      <div className="story-image-bars" aria-hidden="true">{scenario.path.slice(0, 8).map((value, pathIndex, values) => {
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        return <i key={`${scenario.id}-story-bar-${pathIndex}`} style={{ height: `${20 + ((value - min) / Math.max(1, max - min)) * 80}%` }} />;
+      })}</div>
+    </div>
+  );
+
+  if (card.visual === "capital-flow") return (
+    <div className="story-flow-visual" aria-label="자금 흐름 그림">
+      <span>외국인</span><b>→</b><span>수급</span><b>→</b><span>KOSPI</span>
+    </div>
+  );
+
+  if (card.visual === "earnings") return (
+    <div className="story-earnings-visual" aria-label="실적 전달 경로 그림">
+      <span>HBM</span><span>실적</span><span>가이던스</span><strong>{card.stat}</strong>
+    </div>
+  );
+
+  if (card.visual === "calendar") return (
+    <div className="story-calendar-visual" aria-label="시나리오 일정 그림">
+      <span>CHECK DAY</span><strong>{card.statLabel}</strong><i>{card.stat}</i>
+    </div>
+  );
+
+  return (
+    <div className="story-radar-visual" aria-label="반증 신호 레이더 그림">
+      <i /><i /><i /><span>!</span><strong>{String(index + 1).padStart(2, "0")}</strong>
+    </div>
+  );
+}
+
+function PremiumScenarioBrief({
+  scenario,
+  editorial,
+  state,
+  meta,
+}: {
+  scenario: Scenario;
+  editorial: ScenarioEditorial;
+  state: EditorialState;
+  meta: { generatedAt: string; model: string } | null;
+}) {
+  return (
+    <div className="premium-brief">
+      <header className="premium-brief-intro">
+        <div>
+          <span>{editorial.badge}</span>
+          <h2>{editorial.headline}</h2>
+          <p>{editorial.subhead}</p>
+        </div>
+        <div className={`premium-ai-status ${state}`} aria-live="polite">
+          <Sparkles size={14} />
+          <span>{state === "loading" ? "Bedrock 편집 중" : state === "ready" ? "Bedrock 에디토리얼" : "안전 프리뷰"}</span>
+        </div>
+      </header>
+
+      <section className={`daily-story theme-${editorial.ui.theme} rhythm-${editorial.ui.rhythm}`} aria-label={`${scenario.title} 매일 카드뉴스`}>
+        <div className="card-news-label"><span>DAILY CARD STORY · 5 SCENES</span><small>오늘 시장에 맞춰 Bedrock이 레이아웃과 그림을 골랐어요</small></div>
+        <div className="daily-story-stack">
+          {editorial.cards.map((card, index) => (
+            <article className={`daily-story-card layout-${card.layout} visual-${card.visual}`} key={`${scenario.id}-${card.kicker}`}>
+              <div className="daily-card-art">
+                <EditorialIllustration card={card} scenario={scenario} index={index} />
+              </div>
+              <div className="daily-card-copy">
+                <div className="editorial-card-top"><span>{card.kicker}</span><b>0{index + 1}</b></div>
+                <div className="editorial-stat"><strong>{card.stat}</strong><span>{card.statLabel}</span></div>
+                <h3>{card.title}</h3>
+                <p>{card.body}</p>
+                <footer><span>FINVERSE DAILY</span><b>{index + 1} / 5</b></footer>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="daily-detail-report" aria-label="시나리오 상세 설명">
+        <article className="daily-editor-note">
+          <span>DEEP DIVE · 상세 해설</span>
+          <h3>{editorial.explanation.title}</h3>
+          <strong>{editorial.explanation.lead}</strong>
+          {editorial.explanation.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+        </article>
+        <div className="daily-original-report">
+          <div className="daily-original-report-heading"><span>FULL REPORT</span><h3>기존 시나리오를 근거부터 판단 기준까지 이어서 읽어보세요.</h3></div>
+          <ScenarioDetailLearning scenario={scenario} />
+        </div>
+      </section>
+
+      <footer className="premium-brief-footer">
+        <span>{state === "ready" && meta ? `Amazon Bedrock · ${meta.model} · ${new Date(meta.generatedAt).toLocaleString("ko-KR")}` : "Amazon Bedrock 연결 전에는 검증된 시나리오 프리뷰를 표시합니다."}</span>
+        <span>실제 시장 흐름과 전제가 달라지면 결론도 함께 바뀌어야 합니다.</span>
+      </footer>
+    </div>
+  );
+}
+
 type EnvironmentSeed = {
   id: string;
   label: string;
@@ -778,7 +975,7 @@ function MarketLineChart({ values, labels, large = false, name }: { values: read
   );
 }
 
-function ForecastChart({ scenario, marketData }: { scenario: Scenario; marketData: KospiMarketData | null }) {
+function ForecastChart({ scenario, marketData, liveSeries }: { scenario: Scenario; marketData: KospiMarketData | null; liveSeries?: IntradayIndex }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -801,7 +998,22 @@ function ForecastChart({ scenario, marketData }: { scenario: Scenario; marketDat
       const plotH = height - pad.top - pad.bottom;
       const splitX = pad.left + plotW * 0.58;
       const rightX = width - pad.right;
-      const candles = marketData?.candles?.length ? marketData.candles : fallbackKospiCandles;
+      const candles = [...(marketData?.candles?.length ? marketData.candles : fallbackKospiCandles)];
+      const liveLatest = liveSeries?.points.at(-1);
+      if (liveLatest && liveSeries?.points.length) {
+        const prices = liveSeries.points;
+        const isoDate = liveLatest.date.slice(0, 10);
+        const label = `${Number(isoDate.slice(5, 7))}/${Number(isoDate.slice(8, 10))}`;
+        const liveCandle = {
+          date: isoDate.replaceAll("-", ""), label,
+          open: prices[0].open || prices[0].close,
+          high: Math.max(...prices.map((point) => point.high || point.close)),
+          low: Math.min(...prices.map((point) => point.low || point.close)),
+          close: liveLatest.close,
+        };
+        if (candles.at(-1)?.label === label) candles[candles.length - 1] = liveCandle;
+        else candles.push(liveCandle);
+      }
       const closes = candles.map((candle) => candle.close);
       const forecastOffset = closes[closes.length - 1] - scenario.path[0];
       const forecastPath = scenario.path.map((value) => value + forecastOffset);
@@ -933,7 +1145,7 @@ function ForecastChart({ scenario, marketData }: { scenario: Scenario; marketDat
     const observer = new ResizeObserver(draw);
     observer.observe(canvas);
     return () => observer.disconnect();
-  }, [scenario, marketData]);
+  }, [scenario, marketData, liveSeries]);
 
   return <canvas ref={canvasRef} className="forecast-canvas" aria-label={`${scenario.title} 조건부 KOSPI 예상 경로`} />;
 }
@@ -986,9 +1198,16 @@ function TwinPage({ selectedScenario, onSelectScenario, onOpenBuilder }: { selec
 export default function Home() {
   const [activeTab, setActiveTab] = useState<MainTab>("market");
   const [kospiData, setKospiData] = useState<KospiMarketData | null>(null);
-  const [selectedMarketSignal, setSelectedMarketSignal] = useState<(typeof marketSignals)[number] | null>(null);
+  const [intradayIndices, setIntradayIndices] = useState<IntradayIndex[]>([]);
+  const [dashboardSignals, setDashboardSignals] = useState<DashboardSignal[]>(marketSignals);
+  const [marketBrief, setMarketBrief] = useState<string[]>(defaultMarketBrief);
+  const [marketBriefExpanded, setMarketBriefExpanded] = useState(false);
+  const [selectedMarketSignal, setSelectedMarketSignal] = useState<DashboardSignal | null>(null);
   const [selectedScenario, setSelectedScenario] = useState(scenarios[0]);
   const [scenarioDetailOpen, setScenarioDetailOpen] = useState(false);
+  const [scenarioEditorial, setScenarioEditorial] = useState<ScenarioEditorial>(() => fallbackEditorial(scenarios[0]));
+  const [editorialState, setEditorialState] = useState<EditorialState>("fallback");
+  const [editorialMeta, setEditorialMeta] = useState<{ generatedAt: string; model: string } | null>(null);
   const [builderOpen, setBuilderOpen] = useState(false);
   const [builderMode, setBuilderMode] = useState<"form" | "build">("form");
   const [buildStage, setBuildStage] = useState<BuildStage>(1);
@@ -999,6 +1218,39 @@ export default function Home() {
   const [uploadedSeedFile, setUploadedSeedFile] = useState<UploadedSeed | null>(null);
   const scenarioScrollY = useRef<number | null>(null);
   const buildTimer = useRef<number | null>(null);
+  const editorialRequest = useRef(0);
+  const editorialCache = useRef(new Map<string, { editorial: ScenarioEditorial; generatedAt: string; model: string }>());
+  const liveKospi = intradayIndices.find((index) => index.key === "KOSPI");
+  const liveKospiLatest = liveKospi?.points.at(-1);
+  const liveKospiPreviousClose = liveKospiLatest ? liveKospiLatest.close / (1 + liveKospiLatest.changePct / 100) : undefined;
+  const kospiValue = liveKospiLatest?.close ?? kospiData?.value ?? 6023.66;
+  const kospiChange = liveKospiLatest && liveKospiPreviousClose !== undefined
+    ? liveKospiLatest.close - liveKospiPreviousClose
+    : kospiData?.change ?? -732.09;
+  const kospiRate = liveKospiLatest?.changePct ?? kospiData?.rate ?? -10.84;
+  const kospiTone = kospiChange >= 0 ? "up" : "down";
+  const kospiAsOf = liveKospiLatest?.date.slice(0, 10) ?? kospiData?.latestDate ?? "2026-07-28";
+  const kospiAsOfLabel = `${kospiAsOf.slice(0, 4)}.${Number(kospiAsOf.slice(5, 7))}.${Number(kospiAsOf.slice(8, 10))}`;
+
+  useEffect(() => {
+    let active = true;
+    const loadDashboardSignals = async () => {
+      try {
+        const response = await fetch("/api/dashboard", { cache: "no-store" });
+        if (!response.ok) return;
+        const payload = await response.json() as { signals?: DashboardSignal[]; marketBrief?: { lines?: string[] } | null };
+        if (active && payload.signals?.length === 4) setDashboardSignals(payload.signals);
+        if (active && payload.marketBrief?.lines && payload.marketBrief.lines.length >= 2) {
+          setMarketBrief(payload.marketBrief.lines.slice(0, 3));
+        }
+      } catch {
+        // Keep the static preview while the database is unavailable.
+      }
+    };
+    loadDashboardSignals();
+    const timer = window.setInterval(loadDashboardSignals, 5 * 60_000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -1014,6 +1266,23 @@ export default function Home() {
     };
     loadKospi();
     const timer = window.setInterval(loadKospi, 60_000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const loadIntradayIndices = async () => {
+      try {
+        const response = await fetch("/api/market-indices", { cache: "no-store" });
+        if (!response.ok) return;
+        const payload = await response.json() as { indices: IntradayIndex[] };
+        if (active) setIntradayIndices(payload.indices);
+      } catch {
+        // Keep the main-branch preview values while the live source is unavailable.
+      }
+    };
+    loadIntradayIndices();
+    const timer = window.setInterval(loadIntradayIndices, 60_000);
     return () => { active = false; window.clearInterval(timer); };
   }, []);
 
@@ -1070,7 +1339,58 @@ export default function Home() {
   const openScenarioDetail = (scenario: Scenario) => {
     scenarioScrollY.current = window.scrollY;
     setSelectedScenario(scenario);
+    const cacheKey = `${scenario.id}:${kospiAsOf}`;
+    const cached = editorialCache.current.get(cacheKey);
+    setScenarioEditorial(cached?.editorial ?? fallbackEditorial(scenario));
+    setEditorialMeta(cached ? { generatedAt: cached.generatedAt, model: cached.model } : null);
+    setEditorialState(cached ? "ready" : "loading");
     setScenarioDetailOpen(true);
+    if (cached) return;
+
+    const requestId = ++editorialRequest.current;
+    fetch("/api/scenario-brief", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        dailyContext: {
+          asOf: kospiAsOf,
+          market: { value: kospiValue, change: kospiChange, rate: kospiRate },
+          brief: marketBrief,
+          signals: dashboardSignals.map((signal) => ({
+            category: signal.label,
+            impact: signal.impactSummary,
+            keywords: signal.keywords.slice(0, 2),
+          })),
+          globalIndices: intradayIndices.map((index) => ({ name: index.name, latest: index.points.at(-1) })),
+        },
+        scenario: {
+          title: scenario.title,
+          duration: scenario.duration,
+          forecast: scenario.forecast,
+          thesis: scenario.thesis,
+          context: scenario.context,
+          summary: scenario.summary,
+          tags: scenario.tags,
+          events: scenario.events,
+          investorGuide: scenario.investorGuide,
+          riskPoints: scenario.riskPoints,
+        },
+      }),
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("scenario brief request failed");
+        return response.json() as Promise<{ editorial: ScenarioEditorial; generatedAt: string; model: string }>;
+      })
+      .then((brief) => {
+        editorialCache.current.set(cacheKey, brief);
+        if (editorialRequest.current !== requestId) return;
+        setScenarioEditorial(brief.editorial);
+        setEditorialMeta({ generatedAt: brief.generatedAt, model: brief.model });
+        setEditorialState("ready");
+      })
+      .catch(() => {
+        if (editorialRequest.current === requestId) setEditorialState("fallback");
+      });
   };
 
   const runCustomScenario = () => {
@@ -1102,11 +1422,6 @@ export default function Home() {
     setSimulationStarted(true);
   };
 
-  const kospiValue = kospiData?.value ?? 6023.66;
-  const kospiChange = kospiData?.change ?? -732.09;
-  const kospiRate = kospiData?.rate ?? -10.84;
-  const kospiTone = kospiChange >= 0 ? "up" : "down";
-
   return (
     <div className="finverse-app">
       <header className="mobile-header">
@@ -1133,7 +1448,7 @@ export default function Home() {
             <div className="market-page">
               <header className="page-heading">
                 <div><span>MARKET INSIGHT</span><h1>오늘의 시장을 이해하고, 다음 움직임을 미리 살펴보세요.</h1></div>
-                <div className="market-stamp"><CalendarDays size={15} />2026.07.28 KRX 장마감 기준</div>
+                <div className="market-stamp"><CalendarDays size={15} />{kospiAsOfLabel} 최신 기준</div>
               </header>
 
               <section className="market-dashboard">
@@ -1142,7 +1457,7 @@ export default function Home() {
                     <div><span>MARKET PULSE</span><h2>시장 연결</h2></div>
                   </div>
                   <div className="signal-stack">
-                    {marketSignals.map((signal) => {
+                    {dashboardSignals.map((signal) => {
                       const Icon = marketSignalIcons[signal.key];
                       return (
                         <article className={`signal-group ${signal.key}`} key={signal.key}>
@@ -1153,10 +1468,13 @@ export default function Home() {
                               <span className="signal-share"><ChevronRight className="signal-disclosure" size={12} /></span>
                             </span>
                             <span className="signal-events">
-                              {signal.events.map((event) => <span key={event.title}><span><strong>{event.title}</strong><small>{event.source}</small></span><b aria-label={`중요도 ${event.importance}점`}>{"★".repeat(event.importance)}{"☆".repeat(3 - event.importance)}</b></span>)}
+                              {signal.topics.slice(0, 2).map((topic) => {
+                                const importance = importanceScore(topic.importance);
+                                return <span key={topic.title}><span><strong>{topic.title}</strong><small>근거 {topic.sources?.length ?? 0}개</small></span><b aria-label={`중요도 ${importance}점`}>{"★".repeat(importance)}{"☆".repeat(3 - importance)}</b></span>;
+                              })}
                             </span>
                             <span className="signal-track" aria-hidden="true">
-                              {signal.events.map((event) => <i key={event.title} className={`importance-${event.importance}`} />)}
+                              {signal.topics.slice(0, 2).map((topic) => <i key={topic.title} />)}
                             </span>
                           </button>
                         </article>
@@ -1170,7 +1488,7 @@ export default function Home() {
                     <article className="market-overview-primary kospi-classic-primary">
                       <div className="kospi-head">
                         <div>
-                          <div className="kospi-title-line"><span>코스피</span><em>기관 매도 확대</em></div>
+                          <div className="kospi-title-line"><span>코스피</span></div>
                           <div className="kospi-value-line"><b>{formatIndexValue(kospiValue)}</b><strong className={kospiTone}>{formatSignedIndex(kospiChange)} ({Math.abs(kospiRate).toFixed(2)}%)</strong></div>
                         </div>
                         <div className="scenario-preview-meta">
@@ -1181,18 +1499,43 @@ export default function Home() {
                           </button>
                         </div>
                       </div>
-                      <ForecastChart scenario={selectedScenario} marketData={kospiData} />
+                      <ForecastChart scenario={selectedScenario} marketData={kospiData} liveSeries={liveKospi} />
                     </article>
                     <div className="market-overview-side">
-                      {marketOverview.slice(1).map((item) => (
-                        <article className="market-overview-mini" key={item.key}>
-                          <MarketLineChart values={item.points} name={item.name} />
-                          <div><header><span>{item.name}</span></header><div className="market-overview-mini-value"><b>{item.value}</b><span className={item.tone}>{item.change} ({item.rate})</span></div></div>
-                        </article>
-                      ))}
+                      {marketOverview.slice(1).map((item) => {
+                        const live = intradayIndices.find((index) => index.name === item.name);
+                        const latest = live?.points.at(-1);
+                        const values = live?.points.map((point) => point.close) ?? item.points;
+                        const rate = latest?.changePct;
+                        const previousClose = latest && rate !== -100 ? latest.close / (1 + rate / 100) : latest?.close;
+                        const change = latest && previousClose !== undefined ? latest.close - previousClose : undefined;
+                        const tone = rate === undefined ? item.tone : rate >= 0 ? "up" : "down";
+                        return (
+                          <article className="market-overview-mini" key={item.key}>
+                            <MarketLineChart values={values} name={`${item.name} 당일`} />
+                            <div>
+                              <header><span>{item.name}</span></header>
+                              <div className="market-overview-mini-value">
+                                <b>{latest ? formatIndexValue(latest.close) : item.value}</b>
+                                <span className={tone}>
+                                  {change === undefined || rate === undefined
+                                    ? `${item.change} (${item.rate})`
+                                    : `${formatSignedIndex(change)} (${Math.abs(rate).toFixed(2)}%)`}
+                                </span>
+                              </div>
+                            </div>
+                          </article>
+                        );
+                      })}
                     </div>
                   </div>
-                  <div className="ai-summary"><Sparkles size={17} /><div><strong>AI 요약</strong><p>{selectedScenario.summary}</p></div></div>
+                  <div className={`ai-summary ${marketBriefExpanded ? "expanded" : ""}`}>
+                    <Sparkles size={17} />
+                    <button className="ai-summary-copy" type="button" aria-expanded={marketBriefExpanded} aria-label={`AI 요약 전문 ${marketBriefExpanded ? "접기" : "보기"}`} onClick={() => setMarketBriefExpanded((expanded) => !expanded)}>
+                      <strong>AI 요약</strong>
+                      <p>{marketBrief.map((line) => <span key={line}>{line}</span>)}</p>
+                    </button>
+                  </div>
                 </section>
 
                 <aside className="panel event-panel">
@@ -1420,11 +1763,27 @@ export default function Home() {
               </div>
               <button className="scenario-modal-close" type="button" onClick={() => setSelectedMarketSignal(null)} aria-label="시장 연결 상세 닫기"><X size={20} /></button>
             </header>
+            <div className="market-signal-modal-section"><span>현재 KOSPI 영향 요약</span><p>{selectedMarketSignal.impactSummary}</p></div>
             <div className="market-signal-modal-keywords">
-              {selectedMarketSignal.events.map((event) => <article key={event.title}><div><span>{event.source}</span><strong>{event.detailTitle}</strong></div><b aria-label={`중요도 ${event.importance}점`}>{"★".repeat(event.importance)}{"☆".repeat(3 - event.importance)}</b><p>{event.summary}</p></article>)}
+              {selectedMarketSignal.topics.slice(0, 2).map((topic, index) => (
+                <article key={topic.title}>
+                  <div className="market-signal-topic-copy"><span>대주제 {index + 1}</span><strong>{topic.title}</strong></div>
+                  <b aria-label={`중요도 ${importanceScore(topic.importance)}점`}>{"★".repeat(importanceScore(topic.importance))}{"☆".repeat(3 - importanceScore(topic.importance))}</b>
+                  <p>{topic.summary}</p>
+                  <div className="market-signal-topic-sources">
+                    <span>이 대주제에 사용된 데이터</span>
+                    {topic.sources?.filter((source) => source.url).map((source) => (
+                      <a key={`${source.publisher}-${source.title}`} href={source.url!} target="_blank" rel="noreferrer">
+                        <span><strong>{source.title}</strong><small>{source.publisher}{source.publishedAt ? ` · ${source.publishedAt.slice(0, 10)}` : ""}</small></span>
+                        <ExternalLink size={13} />
+                      </a>
+                    ))}
+                    {!topic.sources?.some((source) => source.url) && <small>이 대주제의 원천 링크를 확인 중입니다.</small>}
+                  </div>
+                </article>
+              ))}
             </div>
-            <div className="market-signal-modal-section"><span>시장 영향</span><p>{marketSignalImpacts[selectedMarketSignal.key]}</p></div>
-            <small className="market-signal-modal-note">카테고리별 주요 사건을 바탕으로 정리한 중요도입니다.</small>
+            <small className="market-signal-modal-note">{selectedMarketSignal.analysisSource === "bedrock" ? `Amazon Bedrock 분석 · ${selectedMarketSignal.analysisGeneratedAt ? new Date(selectedMarketSignal.analysisGeneratedAt).toLocaleString("ko-KR") : "최신 배치"}` : "DB 원천을 규칙 기반으로 정리한 결과입니다."}</small>
           </section>
         </div>
       )}
@@ -1436,74 +1795,12 @@ export default function Home() {
               <div>
                 <span>SCENARIO PREVIEW</span>
                 <h2 id="scenario-detail-modal-title">{selectedScenario.title}</h2>
-                <p>선택한 조건이 이어졌을 때 KOSPI가 어떻게 움직일지, 근거와 이벤트를 한 화면에서 확인하세요.</p>
+                <p>핵심 조건부터 반증 신호까지 5장으로 읽고, 아래에서 흐름을 자세히 풀어보세요.</p>
               </div>
               <button className="scenario-modal-close" type="button" onClick={() => setScenarioDetailOpen(false)} aria-label="시나리오 상세 닫기"><X size={20} /></button>
             </header>
 
-            <div className="scenario-detail-modal-cover">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={selectedScenario.image} alt={`${selectedScenario.title} 시나리오를 설명하는 시장 일러스트`} />
-              <span>CONDITIONAL MARKET PATH</span>
-            </div>
-
-            <div className="scenario-detail-modal-summary">
-              <div className={`scenario-detail-modal-forecast ${selectedScenario.tone}`}>
-                <small>{selectedScenario.duration} 예상</small>
-                <strong>{selectedScenario.forecast}</strong>
-              </div>
-              <div className="scenario-detail-modal-tags">
-                <span>핵심 조건</span>
-                {selectedScenario.tags.map((tag) => <em key={tag}>{tag}</em>)}
-              </div>
-            </div>
-
-            <div className="scenario-detail-modal-grid">
-              <article className="scenario-detail-modal-story">
-                <div className="scenario-detail-modal-label">시나리오 전제</div>
-                <p>{selectedScenario.summary}</p>
-                <div className="scenario-modal-note"><Sparkles size={16} /><span>전제와 실제 시장 흐름이 달라지면 전망값도 함께 달라질 수 있습니다.</span></div>
-              </article>
-
-              <section className="scenario-detail-modal-events" aria-label="시나리오 예상 이벤트">
-                <div className="scenario-detail-modal-label">예상 전개 이벤트</div>
-                <div className="scenario-detail-modal-event-list">
-                  {selectedScenario.events.map((event, index) => (
-                    <article key={`modal-${selectedScenario.id}-${event.title}`} className="scenario-detail-modal-event">
-                      <div className="scenario-detail-modal-event-index">0{index + 1}</div>
-                      <div>
-                        <div className="scenario-detail-modal-event-meta"><span>{event.week}</span><em>{event.category}</em></div>
-                        <h3>{event.title}</h3>
-                        <p>{event.body}</p>
-                      </div>
-                      <strong className={event.impact.startsWith("+") ? "up" : "down"}>{event.impact}</strong>
-                    </article>
-                  ))}
-                </div>
-              </section>
-            </div>
-
-            <ScenarioDetailLearning scenario={selectedScenario} />
-
-            <section className="scenario-detail-modal-intelligence" aria-label="멀티 에이전트 해석">
-              <div className="scenario-detail-modal-label">멀티 에이전트 해석</div>
-              <div className="scenario-agent-grid">
-                {selectedScenario.agentInsights.map((insight) => (
-                  <article key={`${selectedScenario.id}-${insight.role}`} className="scenario-agent-card">
-                    <span>{insight.role}</span>
-                    <h3>{insight.title}</h3>
-                    <p>{insight.body}</p>
-                  </article>
-                ))}
-              </div>
-            </section>
-
-            <section className="scenario-detail-modal-risks" aria-label="핵심 리스크">
-              <div className="scenario-detail-modal-label">이 시나리오가 빗나갈 수 있는 지점</div>
-              <div className="scenario-risk-list">
-                {selectedScenario.riskPoints.map((risk) => <span key={risk}>{risk}</span>)}
-              </div>
-            </section>
+            <PremiumScenarioBrief scenario={selectedScenario} editorial={scenarioEditorial} state={editorialState} meta={editorialMeta} />
           </section>
         </div>
       )}
