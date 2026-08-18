@@ -121,7 +121,6 @@ async function generateBrief(key: string, scenario: unknown): Promise<Brief> {
       model,
       anthropic_version: "bedrock-2023-05-31",
       max_tokens: 2600,
-      temperature: 0.2,
       system: systemPrompt,
       messages: [{ role: "user", content: JSON.stringify(scenario) }],
     }),
