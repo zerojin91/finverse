@@ -22,7 +22,6 @@ import {
   Sparkles,
   UserRound,
   UsersRound,
-  Wifi,
   X,
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -1141,7 +1140,6 @@ export default function Home() {
                 <section className="panel connection-panel market-signal-panel">
                   <div className="panel-title">
                     <div><span>MARKET PULSE</span><h2>시장 연결</h2></div>
-                    <Wifi size={17} className="market-signal-wifi" />
                   </div>
                   <div className="signal-stack">
                     {marketSignals.map((signal) => {

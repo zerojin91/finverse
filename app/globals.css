@@ -68,7 +68,6 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .up { color: var(--up)!important; }.down { color: var(--down)!important; }
 .data-note { margin: 12px 18px 14px; color: var(--light); font-size: 9px; line-height: 1.5; }
 .market-signal-panel .panel-title { min-height: 59px; }
-.market-signal-wifi { color: var(--light); }
 .signal-summary { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin: 15px 18px 11px; }
 .signal-summary h3, .index-section h3 { margin: 0; font-size: 12px; }
 .signal-summary h3 { font-size: 12px; }
@@ -633,6 +632,9 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 @media (min-width: 1101px) {
   .market-dashboard { align-items: start; }
   .market-dashboard > .panel { min-height: 702px; height: 702px; }
+  .event-panel { display: flex; flex-direction: column; }
+  .event-panel > .event-timeline { flex: 1; display: flex; flex-direction: column; justify-content: space-between; min-height: 0; }
+  .event-panel > .event-timeline > article { flex: 1; min-height: 0; }
   .chart-panel > .market-overview { flex: 0 0 532px; height: 532px; min-height: 532px; }
   .chart-panel > .ai-summary { flex: 0 0 149px; height: 149px; min-height: 149px; max-height: 149px; box-sizing: border-box; }
   .chart-panel > .ai-summary p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
