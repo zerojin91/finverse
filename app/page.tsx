@@ -1225,7 +1225,7 @@ export default function Home() {
                 <div className="scenario-heading"><div><span>SCENARIO LIBRARY</span><h2>시나리오별 KOSPI 경로를 비교하세요</h2><p>준비된 시장 환경을 선택하면 발생 가능 이벤트와 조건부 예상 경로가 열립니다.</p></div><span><CircleDollarSign size={15} />가상 시뮬레이션</span></div>
                 <div className="scenario-grid">
                   {scenarios.map((scenario) => (
-                    <article key={scenario.id} className={`scenario-card ${selectedScenario.id === scenario.id ? "active" : ""}`} onMouseDown={(event) => event.preventDefault()} onClick={() => selectScenario(scenario)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") selectScenario(scenario); }} role="button" tabIndex={0} aria-pressed={selectedScenario.id === scenario.id}>
+                    <article key={scenario.id} className={`scenario-card ${scenario.id} ${selectedScenario.id === scenario.id ? "active" : ""}`} onMouseDown={(event) => event.preventDefault()} onClick={() => selectScenario(scenario)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") selectScenario(scenario); }} role="button" tabIndex={0} aria-pressed={selectedScenario.id === scenario.id}>
                       <div className="scenario-card-main">
                         <span className={`scenario-icon ${scenario.tone}`}>
                           {scenario.id === "kospi-rebound" ? <BarChart3 size={22} /> : scenario.id === "chip-miss" ? <BrainCircuit size={22} /> : scenario.id === "risk-off" ? <CircleDollarSign size={22} /> : <UserRound size={22} />}
