@@ -254,20 +254,20 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .scenario-heading p { margin: 0; color: var(--muted); font-size: 11.5px; }
 .scenario-heading > span { display: flex; gap: 5px; align-items: center; color: var(--light); font-size: 8px; }
 .scenario-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)) minmax(250px,1fr); gap: 16px; }
-.scenario-card { position: relative; min-height: 154px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 8px; text-align: left; background: #fff; cursor: pointer; transition: .18s ease; }
+.scenario-card { position: relative; min-height: 182px; display: flex; flex-direction: column; padding: 18px 20px; border: 1px solid var(--line); border-radius: 8px; text-align: left; background: #fff; cursor: pointer; transition: .18s ease; }
 .scenario-card:hover,.scenario-card.active { border-color: var(--ink); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(24,24,27,.07); }
 .scenario-card.active::before { content: ""; position: absolute; top: -1px; right: 12px; left: 12px; height: 2px; background: var(--ink); }
-.scenario-card-main { display: flex; align-items: flex-start; gap: 12px; }
-.scenario-icon { width: 42px; height: 42px; display: grid; flex: 0 0 auto; place-items: center; padding: 0!important; border-radius: 50%!important; color: var(--ink)!important; background: #f4f4f5!important; }
+.scenario-card-main { display: flex; align-items: flex-start; gap: 14px; padding-top: 28px; }
+.scenario-icon { width: 48px; height: 48px; display: grid; flex: 0 0 auto; place-items: center; padding: 0!important; border-radius: 50%!important; color: var(--ink)!important; background: #f4f4f5!important; }
 .scenario-icon.up { color: var(--up)!important; background: #fef2f2!important; }
 .scenario-icon.down { color: var(--down)!important; background: #eff6ff!important; }
 .scenario-card-main > div { min-width: 0; }
-.scenario-card h3 { margin: 2px 0 7px; color: var(--ink); font-size: 15px; }
-.scenario-tags { display: flex; flex-wrap: wrap; gap: 5px; }
-.scenario-tags span { padding: 4px 7px; border-radius: 999px; color: var(--muted); background: var(--soft); font-size: 9px; }
-.scenario-card > small { display: block; color: var(--light); font-size: 9px; }
-.scenario-card > strong { display: block; margin-top: 4px; font-size: 20px; }
-.scenario-card-detail-button { position: absolute; right: 12px; bottom: 12px; display: inline-flex; align-items: center; gap: 3px; padding: 5px 7px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: #fff; font-size: 10px; font-weight: 750; cursor: pointer; }
+.scenario-card h3 { margin: 2px 0 9px; color: var(--ink); font-size: 17px; line-height: 1.3; }
+.scenario-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.scenario-tags span { padding: 5px 8px; border-radius: 999px; color: var(--muted); background: var(--soft); font-size: 10px; }
+.scenario-card > small { display: block; margin-top: 15px; color: var(--light); font-size: 10px; }
+.scenario-card > strong { display: block; margin-top: 5px; font-size: 24px; letter-spacing: -.035em; }
+.scenario-card-detail-button { position: absolute; top: 14px; right: 14px; display: inline-flex; align-items: center; gap: 4px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: #fff; font-size: 11px; font-weight: 750; cursor: pointer; }
 .scenario-card-detail-button:hover { border-color: var(--ink); color: var(--ink); }
 .scenario-modal-learning { margin-top: 22px; }
 .scenario-modal-learning .scenario-narrative { margin-top: 0; }
