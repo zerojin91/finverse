@@ -75,7 +75,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .signal-summary p { margin: 4px 0 0; color: var(--light); font-size: 8px; line-height: 1.35; }
 .signal-summary > span { flex: 0 0 auto; padding: 4px 6px; color: #176c4c; background: #edf7f2; border: 1px solid #dbece4; border-radius: 4px; font-size: 8px; font-weight: 720; }
 .signal-stack { display: flex; flex: 1; flex-direction: column; gap: 7px; margin: 14px 18px 16px; }
-.signal-group { display: flex; flex: 1; flex-direction: column; min-height: 0; padding: 10px; background: #fafafa; border: 1px solid var(--line); border-radius: 6px; transition: background 140ms ease, border-color 140ms ease; }
+.signal-group { display: flex; flex: 1; flex-direction: column; min-height: 0; padding: 12px; background: #fafafa; border: 1px solid var(--line); border-radius: 6px; transition: background 140ms ease, border-color 140ms ease; }
 .signal-group[open] { background: #fff; border-color: #aebbd7; }
 .market-event-list { display: grid; grid-template-columns: 1fr; gap: 5px; margin-top: 9px; }
 .market-event { overflow: hidden; background: #fff; border: 1px solid #ececef; border-radius: 5px; }
@@ -104,9 +104,9 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .signal-group summary:focus-visible { outline: 3px solid rgba(37,99,235,.25); outline-offset: 4px; }
 .signal-group-button { width: 100%; padding: 0; border: 0; color: inherit; background: transparent; text-align: left; cursor: pointer; }
 .signal-group-button:focus-visible { outline: 3px solid rgba(37,99,235,.25); outline-offset: 4px; border-radius: 6px; }
-.signal-group-head { display: grid; grid-template-columns: 24px auto auto 1fr; align-items: center; gap: 6px; }
-.signal-icon { width: 24px; height: 24px; display: grid; place-items: center; color: #24448c; background: #edf2fc; border-radius: 4px; }
-.signal-group-head > strong { font-size: 15px; }
+.signal-group-head { display: grid; grid-template-columns: 28px auto auto 1fr; align-items: center; gap: 7px; }
+.signal-icon { width: 28px; height: 28px; display: grid; place-items: center; color: #24448c; background: #edf2fc; border-radius: 4px; }
+.signal-group-head > strong { font-size: 17px; }
 .signal-share { justify-self: end; display: inline-flex; align-items: center; gap: 2px; }
 .signal-share b { font-size: 15px; letter-spacing: -.035em; }
 .signal-disclosure { color: var(--light); transition: transform 160ms ease; }
@@ -114,14 +114,14 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .source-badge { padding: 3px 5px; border-radius: 3px; font-size: 7px; font-weight: 760; }
 .source-badge.database, .index-source.database { color: #16744f; background: #e1f5eb; }
 .source-badge.dummy { color: #9b651c; background: #fff0d5; }
-.signal-events { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 11px; }
-.signal-events > span { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 8px; background: #fff; border: 1px solid #ececef; border-radius: 4px; }
+.signal-events { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 13px; }
+.signal-events > span { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 10px; background: #fff; border: 1px solid #ececef; border-radius: 4px; }
 .signal-events > span > span { min-width: 0; overflow: hidden; }
 .signal-events strong, .signal-events small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.signal-events strong { color: var(--muted); font-size: 10px; font-weight: 650; }
-.signal-events small { margin-top: 3px; color: var(--light); font-size: 7px; }
-.signal-events b { flex: 0 0 auto; color: #d99626; font-size: 10px; letter-spacing: 1px; white-space: nowrap; }
-.signal-track { height: 4px; display: flex; gap: 2px; margin-top: 8px; overflow: hidden; background: #e8e9ec; border-radius: 1px; }
+.signal-events strong { color: var(--muted); font-size: 12px; font-weight: 650; }
+.signal-events small { margin-top: 3px; color: var(--light); font-size: 8px; }
+.signal-events b { flex: 0 0 auto; color: #d99626; font-size: 11px; letter-spacing: 1px; white-space: nowrap; }
+.signal-track { height: 5px; display: flex; gap: 2px; margin-top: 10px; overflow: hidden; background: #e8e9ec; border-radius: 1px; }
 .signal-track i { display: block; flex: 1; min-width: 5px; width: auto !important; background: #3157ad; border-radius: 0; }
 .signal-explainer { display: grid; gap: 6px; margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--line); }
 .signal-explainer div { padding: 8px; background: #f3f5f8; border-radius: 4px; }
