@@ -47,13 +47,31 @@ $$ LANGUAGE sql STABLE;
 -- 창은 현재 행을 포함한다 -- pandas rolling 과 같은 정의라야 임계값이 그대로
 -- 옮겨진다. 창이 덜 찬 구간은 n_obs 로 걸러낸다(min_periods).
 
+-- 비율 지표는 제외한다. 백분율 변화는 0에서 멀리 떨어진 양수 수열에서만 뜻이 있는데,
+-- KRX 지수 시리즈에는 가격이 아닌 것이 섞여 있다. K-샤프지수는 위험조정 수익률이라
+-- -2.27~3.54 를 오가며 0 을 지나가고, 0.02 -> 0.24 가 "+1100%" 로 잡힌다. 실제로
+-- 그렇게 잡혔다: 상위 급등 8건이 전부 K-샤프지수였다.
+--
+-- 이름으로 거르지 않는다. 분류(`kind`)는 이름 패턴 규칙이라 K-샤프지수와 KRX TMI
+-- 를 똑같이 `factor` 로 묶어놨는데, TMI 는 887~5,763 짜리 멀쩡한 가격지수다.
+-- 수열이 한 번이라도 0 이하로 내려갔는지로 판단하면 둘이 정확히 갈리고, 앞으로
+-- 새 비율 지표가 들어와도 자동으로 걸러진다.
 CREATE OR REPLACE VIEW derive.index_metrics AS
-WITH base AS (
-    SELECT bas_dd, idx_class, idx_name, source, price_basis, close, record_id,
-           (close / nullif(lag(close) OVER w, 0) - 1) * 100 AS ret_1d
+WITH price_like AS (
+    SELECT idx_class, idx_name, source
     FROM core.index_daily
-    WHERE close IS NOT NULL AND close > 0
-    WINDOW w AS (PARTITION BY idx_class, idx_name, source ORDER BY bas_dd)
+    GROUP BY 1, 2, 3
+    HAVING min(close) > 0
+),
+base AS (
+    SELECT d.bas_dd, d.idx_class, d.idx_name, d.source, d.price_basis, d.close,
+           d.record_id,
+           (d.close / nullif(lag(d.close) OVER w, 0) - 1) * 100 AS ret_1d
+    FROM core.index_daily d
+    JOIN price_like p
+      ON p.idx_class = d.idx_class AND p.idx_name = d.idx_name AND p.source = d.source
+    WHERE d.close IS NOT NULL AND d.close > 0
+    WINDOW w AS (PARTITION BY d.idx_class, d.idx_name, d.source ORDER BY d.bas_dd)
 )
 SELECT base.*,
        (ret_1d - avg(ret_1d) OVER w250)
