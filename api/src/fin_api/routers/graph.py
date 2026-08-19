@@ -5,7 +5,7 @@ import psycopg
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..deps import get_conn
-from ..schemas.graph import GraphPayload, NodeDetail
+from ..schemas.graph import GraphPayload, NodeDetail, SeriesResponse
 from ..services import graph_service
 
 router = APIRouter(prefix="/api/graph", tags=["graph"])
@@ -40,9 +40,31 @@ def neighbors(
     )
 
 
+@router.get("/series", response_model=SeriesResponse)
+def series(
+    node_id: str,
+    source: str | None = None,
+    start: str | None = Query(default=None, description="YYYYMMDD 이상"),
+    end: str | None = Query(default=None, description="YYYYMMDD 이하"),
+    limit: int = Query(default=500, ge=1, le=20000),
+    conn: psycopg.Connection = Depends(get_conn),
+):
+    """한 노드의 시계열. 그래프에는 없고, 물어볼 때 lake 에서 읽는다.
+
+    쿼리 파라미터로 받는다(경로가 아니라) -- uid 에 슬래시·물음표가 들어가는 노드가
+    있어서 경로에 넣으면 인코딩이 계속 문제가 된다.
+    """
+    result = graph_service.series(conn, node_id, source=source, start=start,
+                                  end=end, limit=limit)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"unknown uid: {node_id}")
+    return result
+
+
 @router.get("/node/{node_id:path}", response_model=NodeDetail)
 def node(node_id: str, conn: psycopg.Connection = Depends(get_conn)):
     # uid에 슬래시가 들어간다(Event uid = 기사 URL) — :path 컨버터가 필요한 이유.
+    # 이 라우트는 마지막에 둔다: :path 가 /series 까지 삼켜버리기 때문이다.
     detail = graph_service.node_detail(conn, node_id)
     if detail is None:
         raise HTTPException(status_code=404, detail=f"unknown uid: {node_id}")

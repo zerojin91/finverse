@@ -76,7 +76,13 @@ export default function GraphCanvas({ elements, onSelect, onExpand, focusId }: P
       if (evt.target === cy) handlers.current.onSelect(null);
     });
 
+    // 사이드 패널이 열리면 이 컨테이너가 좁아진다. cytoscape는 자기 캔버스 크기를
+    // 스스로 다시 재지 않아서, 알려주지 않으면 예전 너비 그대로 그려 패널 위를 덮는다.
+    const observer = new ResizeObserver(() => cy.resize());
+    observer.observe(containerRef.current);
+
     return () => {
+      observer.disconnect();
       cy.destroy();
       cyRef.current = null;
     };

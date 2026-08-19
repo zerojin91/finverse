@@ -6,6 +6,7 @@ hi-universe는 AGE(Cypher)로 traverse하지만 finverse의 그래프는 평범�
 """
 from __future__ import annotations
 
+import json
 import re
 from typing import Any
 
@@ -21,6 +22,8 @@ from ..schemas.graph import (
     NodeDetail,
     SearchHit,
     SearchResponse,
+    SeriesPoint,
+    SeriesResponse,
 )
 from ..schemas.ontology import EdgeTypeEntry, LabelEntry, VocabularyResponse
 
@@ -264,6 +267,120 @@ def search(
         for r in rows[:limit]
     ]
     return SearchResponse(query=query, hits=hits, truncated=truncated)
+
+
+# --- 시계열 (lazy) -----------------------------------------------------------
+
+# 라벨 -> (kind, lake record_type, 그 노드를 시계열에 잇는 payload 키)
+#
+# 값은 그래프에 없다. 노드는 어떤 대상인지만 들고 있고, 실제 수치는 필요할 때
+# lake 에서 읽는다. 조회는 payload GIN 인덱스를 탄다 -- @> 로 써야 인덱스가 걸리고,
+# payload->>'ticker' = ... 로 쓰면 2,590만 행 순차 스캔이 된다.
+SERIES_KINDS: dict[str, tuple[str, str, tuple[str, ...]]] = {
+    "Security": ("price", "market_price_daily", ("ticker",)),
+    "Index": ("index", "market_index_daily", ("idx_class", "idx_name")),
+    "Indicator": ("indicator", "economic_observation", ("external_series_id",)),
+}
+
+
+def series(
+    conn: psycopg.Connection,
+    node_id: str,
+    *,
+    source: str | None,
+    start: str | None,
+    end: str | None,
+    limit: int,
+) -> SeriesResponse | None:
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute("SELECT label, props FROM graph.node WHERE uid = %s", (node_id,))
+        node = cur.fetchone()
+        if node is None:
+            return None
+        spec = SERIES_KINDS.get(node["label"])
+        if spec is None:
+            # 시계열을 갖지 않는 라벨(Market·Sector·Event 등)은 빈 응답이 정답이다.
+            return SeriesResponse(id=node_id, label=node["label"], kind="none",
+                                  source=None, sources=[], points=[], truncated=False)
+
+        kind, record_type, keys = spec
+        props = node["props"] or {}
+        match: dict[str, Any] = {"record_type": record_type}
+        for key in keys:
+            value = props.get(key)
+            if value is None:
+                return SeriesResponse(id=node_id, label=node["label"], kind=kind,
+                                      source=None, sources=[], points=[], truncated=False)
+            match[key] = value
+
+        # 이 대상에 어떤 소스가 있는지. KRX 는 원주가, Naver 는 수정주가라 섞으면 안 된다.
+        cur.execute(
+            "SELECT DISTINCT payload->>'source' AS source FROM lake.records "
+            "WHERE payload @> %s::jsonb AND payload->>'source' IS NOT NULL",
+            (json.dumps(match),))
+        sources = sorted(r["source"] for r in cur.fetchall())
+        chosen = source or _preferred_source(sources)
+        if chosen is None:
+            return SeriesResponse(id=node_id, label=node["label"], kind=kind,
+                                  source=None, sources=sources, points=[], truncated=False)
+
+        query = dict(match, source=chosen)
+        # 기간 열은 record_type 마다 다르다: 시장은 bas_dd, 경제지표는 period.
+        day = "period" if kind == "indicator" else "bas_dd"
+        cur.execute(
+            f"""
+            SELECT payload->>'{day}'   AS bas_dd,
+                   payload->>'close'   AS close,
+                   payload->>'open'    AS open,
+                   payload->>'high'    AS high,
+                   payload->>'low'     AS low,
+                   payload->>'volume'  AS volume,
+                   payload->>'value'   AS value
+            FROM lake.records
+            WHERE payload @> %(match)s::jsonb
+              AND (%(start)s::text IS NULL OR payload->>'{day}' >= %(start)s)
+              AND (%(end)s::text   IS NULL OR payload->>'{day}' <= %(end)s)
+            ORDER BY payload->>'{day}' DESC
+            LIMIT %(limit)s
+            """,
+            {"match": json.dumps(query), "start": start, "end": end, "limit": limit + 1})
+        rows = cur.fetchall()
+
+    truncated = len(rows) > limit
+    points = [
+        SeriesPoint(
+            bas_dd=r["bas_dd"],
+            # 경제지표는 close 가 없고 value 를 쓴다.
+            close=_number(r["close"] if r["close"] is not None else r["value"]),
+            open=_number(r["open"]), high=_number(r["high"]),
+            low=_number(r["low"]), volume=_number(r["volume"]),
+        )
+        for r in rows[:limit] if r["bas_dd"]
+    ]
+    points.reverse()   # 화면에서 쓰기 좋게 오래된 것부터
+    return SeriesResponse(id=node_id, label=node["label"], kind=kind, source=chosen,
+                          sources=sources, points=points, truncated=truncated)
+
+
+def _preferred_source(sources: list[str]) -> str | None:
+    """수익률·변동성을 보려면 수정주가라야 한다.
+
+    KRX 는 원주가여서 액면분할일에 가짜 폭락이 생긴다(삼성전자 2018-05-04, 50:1).
+    README 가 같은 이유로 분석에는 naver 를 쓰라고 적어두고 있다.
+    """
+    for candidate in ("naver_finance", "naver", "krx_open_api"):
+        if candidate in sources:
+            return candidate
+    return sources[0] if sources else None
+
+
+def _number(value: Any) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 # --- 어휘 -------------------------------------------------------------------

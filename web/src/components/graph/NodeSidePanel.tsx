@@ -1,6 +1,10 @@
 import { useNodeDetail } from "../../api/hooks";
+import SeriesPanel from "../series/SeriesPanel";
 import type { SelectedNode } from "./GraphCanvas";
 import { labelText, nodeStyleOf } from "./graphStyles";
+
+/** 시계열을 갖는 라벨 — API의 SERIES_KINDS와 같은 집합. */
+const SERIES_LABELS = new Set(["Security", "Index", "Indicator"]);
 
 type Props = {
   node: SelectedNode;
@@ -48,6 +52,8 @@ export default function NodeSidePanel({ node, onClose, onExpand }: Props) {
 
       {isLoading && <p className="state">불러오는 중…</p>}
       {error && <p className="state error">{(error as Error).message}</p>}
+
+      <SeriesPanel uid={node.id} hasSeries={SERIES_LABELS.has(node.label)} />
 
       {data && (
         <>

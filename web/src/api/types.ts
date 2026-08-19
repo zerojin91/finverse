@@ -59,6 +59,26 @@ export type SearchResponse = {
   truncated: boolean;
 };
 
+export type SeriesPoint = {
+  bas_dd: string;
+  close: number | null;
+  open: number | null;
+  high: number | null;
+  low: number | null;
+  volume: number | null;
+};
+
+export type SeriesResponse = {
+  id: string;
+  label: string;
+  /** price | index | indicator | none */
+  kind: string;
+  source: string | null;
+  sources: string[];
+  points: SeriesPoint[];
+  truncated: boolean;
+};
+
 export type LabelEntry = { label: string; count: number };
 export type EdgeTypeEntry = { type: string; count: number; derived: boolean };
 

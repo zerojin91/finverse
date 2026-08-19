@@ -67,3 +67,30 @@ class SearchResponse(BaseModel):
     query: str
     hits: list[SearchHit]
     truncated: bool
+
+
+class SeriesPoint(BaseModel):
+    bas_dd: str
+    close: float | None = None
+    open: float | None = None
+    high: float | None = None
+    low: float | None = None
+    volume: float | None = None
+
+
+class SeriesResponse(BaseModel):
+    """One node's time series, fetched on demand.
+
+    The series is not in the graph and not copied into a projection table. The
+    ontology keeps values out of the graph (§0: a single price table is already
+    22.8M rows), so a node carries the identity and this reads the lake when
+    something actually asks. Warm, that is about 350 ms per security.
+    """
+
+    id: str
+    label: str
+    kind: str                 # price | index | indicator
+    source: str | None        # which source these points came from
+    sources: list[str]        # every source holding a series for this node
+    points: list[SeriesPoint]
+    truncated: bool
