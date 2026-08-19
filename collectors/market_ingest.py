@@ -758,9 +758,23 @@ def main() -> int:
                                 "loader reads index.sqlite3, so a daily update "
                                 "does not need them, and rewriting 38 GB to add "
                                 "a few thousand rows costs about five hours")
+        child.add_argument("--exclude-today", action="store_true",
+                           help="stop at yesterday's session. A day still being "
+                                "traded gives provisional numbers that would be "
+                                "stored as if final")
     args = parser.parse_args()
 
     sources = ["krx", "naver"] if args.source == "all" else [args.source]
+
+    # bas_dd is a Korean market date, and this server runs on UTC. "Yesterday"
+    # has to be computed in KST or the answer is wrong for part of every day:
+    # at 20:30 UTC it is already tomorrow morning in Seoul, so UTC's yesterday
+    # is two sessions back. The crontab carries a comment about the same trap
+    # biting the schedule itself.
+    if args.exclude_today:
+        seoul_today = datetime.now(timezone(timedelta(hours=9))).date()
+        args.end = min(args.end, seoul_today - timedelta(days=1))
+
     if args.start:
         start = args.start
     elif args.command == "backfill":

@@ -75,11 +75,26 @@ JOBS = [
         provider="krx_naver",
         requires=("KRX_AUTH_KEY",),
         backfill=("--source", "all"),
+        # --source all: KRX Open API publishes late. On 2026-08-19 it still
+        # returned nothing for the 18th, a session Naver already had, so a
+        # KRX-only daily update leaves the lake days behind the market. The two
+        # sources carry different `source` values and never overwrite each
+        # other, so running both daily just fills the gap sooner. Costs roughly
+        # 3,900 extra requests -- one per ticker -- and about half an hour.
+        #
+        # --no-flows: per-stock investor flows are paginated at 20 sessions a
+        # page and take far longer than everything else here combined.
+        #
         # --no-materialize: the daily update collects ~2,900 rows, and
         # rewriting the JSONL exports for them takes five hours and 38 GB of
         # writes that nothing reads (the loader uses index.sqlite3). The exports
         # are refreshed on their own schedule instead.
-        update=("--source", "krx", "--no-materialize"),
+        #
+        # --exclude-today: this runs at 19:00 KST, after the close but while
+        # the exchange is still settling. Yesterday is the last session that can
+        # be stored as final.
+        update=("--source", "all", "--no-flows", "--no-materialize",
+                "--exclude-today"),
         note="시장. KRX backfill takes 6-7h; Naver adds prices back to 1990."),
     Job("sector_ingest", "sector_ingest.py",
         provider="krx_naver",
