@@ -29,3 +29,14 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # 19:00 UTC = 04:00 KST, 매일 -- 로그 정리. 30일 지난 것은 지운다.
 0 19 * * * find /home/ubuntu/finverse/logs -name '*.log' -mtime +30 -delete
+
+# 11:00 UTC = 20:00 KST, 매일 — Bedrock 시장 요약 후 DB 저장.
+0 11 * * * cd /home/ubuntu/finverse && scripts/run_bedrock_signal_update.sh >> logs/cron.log 2>&1
+
+# 22:00 UTC = 07:00 KST, 매일 — lake -> core -> graph 동기화.
+# graph 는 lake 에서 계산해 만드는 파생물이라 다시 계산하지 않으면 낡는다. 이 줄이
+# 없어서 8/19~8/24 닷새간 그래프가 8/18 에 멈춰 있었고 뉴스 184건이 반영되지 않았다.
+# 두 수집 잡(10:00 시장, 20:30 경제·뉴스)이 모두 끝난 뒤로 잡았다. 시장 잡은
+# 10:00 에 시작해 한 시간 남짓 걸리고, 야간 잡은 21:07 경 끝난다.
+# 락을 못 잡으면 건너뛰고 다음 회차에 따라잡는다. 약 2분.
+0 22 * * * cd /home/ubuntu/finverse && scripts/sync_ontology.sh
