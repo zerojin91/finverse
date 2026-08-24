@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime
+import hashlib
 import json
 import logging
 import os
@@ -35,6 +36,9 @@ DOMAIN_FILES = {
     "events": "external-event-evidence.md",
     "psychology": "psychology-evidence.md",
 }
+EVIDENCE_MANIFEST_FILE = "evidence-manifest.json"
+EVIDENCE_MANIFEST_VERSION = 1
+STATIC_GAP_DOMAINS: set[str] = set()
 
 DOMAIN_VIEWS = {
     "market": (
@@ -45,8 +49,6 @@ DOMAIN_VIEWS = {
     ),
     "economy": ("economy.observation", "economy.series"),
     "events": ("events.news", "events.news_daily"),
-    # These views are the planned interface. The tool returns a useful gap
-    # message until the YouTube collector is loaded into PostgreSQL.
     "psychology": (
         "psychology.sentiment_daily",
         "psychology.narratives",
@@ -65,6 +67,8 @@ VIEW_DATE_COLUMNS = {
     "economy.series": "last_period",
     "events.news": "published_at",
     "events.news_daily": "publish_date",
+    "psychology.sentiment_daily": "sentiment_date",
+    "psychology.narratives": "narrative_date",
 }
 DEFAULT_FRESHNESS_DAYS = 730
 
@@ -238,11 +242,20 @@ def _query_views(domain: str, limit: int = 25) -> dict[str, Any]:
 
 
 def _make_query_tool(domain: str):
+    cached_result: str | None = None
+
     @tool(f"query_{domain}_data")
     def query_data(limit: int = 25) -> str:
-        """Query approved PostgreSQL views for this ontology domain."""
+        """Query approved PostgreSQL views once; use unavailable results as evidence gaps."""
+        nonlocal cached_result
+        if cached_result is not None:
+            _log("tool_query_cached", domain=domain)
+            return cached_result
         _log("tool_query_start", domain=domain, limit=limit)
-        return json.dumps(_query_views(domain, limit), ensure_ascii=False, default=str)
+        cached_result = json.dumps(
+            _query_views(domain, limit), ensure_ascii=False, default=str
+        )
+        return cached_result
 
     return query_data
 
@@ -291,7 +304,8 @@ def _subagent(domain: str, output_dir: Path) -> dict[str, Any]:
     system_prompt = f"""
 너는 FINVERSE의 {labels[domain]} Agent다.
 사용자 질문에 답을 예측하지 말고, PostgreSQL의 승인된 view만 조회해 Evidence 문서를 만든다.
-먼저 query_{domain}_data 도구를 사용한다.
+먼저 query_{domain}_data 도구를 정확히 한 번 사용한다.
+도구 결과에 unavailable이 있으면 해당 view는 없는 것으로 확정하고 재조회하지 않는다.
 관측된 사실, 해석, 후보 관계, 불확실성, 부족한 데이터를 분리한다.
 아래 형식의 Markdown 문서를 작성한 뒤 save_{domain}_evidence 도구로 저장한다.
 
@@ -313,24 +327,26 @@ def _subagent(domain: str, output_dir: Path) -> dict[str, Any]:
     }
 
 
-def build_agent(output_dir: Path | None = None):
+def build_agent(output_dir: Path | None = None, model_id: str | None = None):
     """Build the Moderator Deep Agent and its four domain subagents."""
     output_dir = output_dir or DEFAULT_OUTPUT_DIR
-    model_setting = os.environ.get("FINVERSE_AGENT_MODEL", "anthropic:claude-sonnet-4-6")
-    model = (
-        _create_chat_model(model_setting)
-        if model_setting.startswith(("bedrock:", "openai:"))
-        else model_setting
-    )
+    model_setting = model_id or "openrouter:" + os.environ.get(
+        "OPENROUTER_MODEL", "google/gemma-4-31b-it:free"
+    ).removeprefix("openrouter:")
+    model = _create_chat_model(model_setting)
     _log("agent_build_start", output_dir=str(output_dir), model=model_setting, domains=list(DOMAIN_FILES))
-    subagents = [_subagent(domain, output_dir) for domain in DOMAIN_FILES]
+    subagents = [
+        _subagent(domain, output_dir)
+        for domain in DOMAIN_FILES
+        if domain not in STATIC_GAP_DOMAINS
+    ]
     moderator_prompt = """
 너는 FINVERSE Moderator Agent다.
-사용자 질문을 분석하고 네 개의 Domain Agent에 작업을 위임한다.
-각 Agent가 자기 Evidence Markdown 파일을 저장했는지 확인한다.
-네 문서를 읽고 기준 시각, 대상, 사실/해석 구분, 출처, 누락을 검토한다.
-부족한 내용이 있으면 같은 Agent에 구체적인 재수집 요청을 보내 최대 1회 보완한다.
-최종적으로 네 개의 Evidence 문서가 준비되었다는 짧은 실행 요약만 반환한다.
+사용자 질문을 분석하고 시장·경제·이벤트 Domain Agent에 작업을 위임한다.
+심리 Evidence를 포함해 네 도메인 문서를 모두 읽고, 커뮤니티 심리는 보조 신호로만 해석한다.
+네 Evidence 문서를 읽고 기준 시각, 대상, 사실/해석 구분, 출처, 누락을 검토한다.
+부족한 내용이 있으면 시장·경제·이벤트 Agent에 구체적인 재수집 요청을 보내 최대 1회 보완한다.
+최종적으로 네 Evidence 문서가 준비되었다는 짧은 실행 요약만 반환한다.
 확정적인 시장 예측이나 투자 추천을 만들지 않는다.
 """.strip()
     _log("prompt_moderator", prompt=moderator_prompt)
@@ -344,29 +360,65 @@ def build_agent(output_dir: Path | None = None):
     return agent
 
 
-def run(query: str, output_dir: Path | None = None) -> dict[str, Any]:
+def run(query: str, output_dir: Path | None = None, session_id: str | None = None) -> dict[str, Any]:
     """Run one ontology collection request and return the agent result."""
     _load_dotenv()
-    base_output_dir = output_dir or DEFAULT_OUTPUT_DIR / _slug(query)
-    run_id = datetime.now().strftime("run-%Y%m%d-%H%M%S-%f")
-    output_dir = base_output_dir / run_id
+    output_root = output_dir or DEFAULT_OUTPUT_DIR
+    run_time = datetime.now()
+    base_output_dir, output_dir, run_id = _build_run_output_dir(
+        output_root, query, session_id, run_time
+    )
+    run_date = run_time.strftime("%Y-%m-%d")
+    query_name = _slug(query)
     _configure_logging(output_dir)
+    print(
+        json.dumps(
+            {"event": "started", "output_dir": str(output_dir), "run_id": run_id},
+            ensure_ascii=False,
+        ),
+        flush=True,
+    )
     started = time.perf_counter()
     _log(
         "run_start",
         query=query,
+        run_date=run_date,
+        query_name=query_name,
         base_output_dir=str(base_output_dir),
         output_dir=str(output_dir),
         run_id=run_id,
+        session_id=session_id,
     )
     try:
-        agent = build_agent(output_dir)
         user_prompt = query
         _log("prompt_user", prompt=user_prompt)
         _log("agent_invoke_start", prompt=user_prompt)
-        result = agent.invoke({"messages": [{"role": "user", "content": user_prompt}]})
+        primary_model_id = "openrouter:" + os.environ.get(
+            "OPENROUTER_MODEL", "google/gemma-4-31b-it:free"
+        ).removeprefix("openrouter:")
+        request = {"messages": [{"role": "user", "content": user_prompt}]}
+        _log("openrouter_model_fallbacks_enabled", primary_model=primary_model_id)
+        result = build_agent(output_dir, primary_model_id).invoke(request)
         _log("agent_invoke_complete", elapsed_seconds=round(time.perf_counter() - started, 2))
-        return {"output_dir": str(output_dir), "result": result}
+        manifest = _write_evidence_manifest(
+            output_dir=output_dir,
+            query=query,
+            run_id=run_id,
+            session_id=session_id,
+        )
+        print(
+            json.dumps(
+                {
+                    "event": "evidence_ready",
+                    "output_dir": str(output_dir),
+                    "run_id": run_id,
+                    "manifest": manifest,
+                },
+                ensure_ascii=False,
+            ),
+            flush=True,
+        )
+        return {"output_dir": str(output_dir), "result": result, "manifest": manifest}
     except Exception as exc:  # noqa: BLE001 - log the exact stage before propagating.
         _log(
             "run_error",
@@ -384,12 +436,89 @@ def _slug(value: str) -> str:
     return value[:80] or "ontology-run"
 
 
+def _build_run_output_dir(
+    output_root: Path,
+    query: str,
+    session_id: str | None,
+    run_time: datetime,
+) -> tuple[Path, Path, str]:
+    """Return session root and an isolated per-click collection directory."""
+    run_date = run_time.strftime("%Y-%m-%d")
+    run_id = run_time.strftime("run-%H%M%S-%f")
+    session_name = f"session-{session_id}" if session_id else "session-local"
+    base_output_dir = output_root / run_date / session_name
+    # A browser session groups related work, but every real collection attempt
+    # gets its own directory. Reusing the session/query directory directly left
+    # old Evidence files in place and mixed them with newly generated documents.
+    return base_output_dir, base_output_dir / run_id / _slug(query), run_id
+
+
+def _write_evidence_manifest(
+    output_dir: Path,
+    query: str,
+    run_id: str,
+    session_id: str | None,
+) -> dict[str, Any]:
+    """Atomically mark one run's four Evidence documents as complete.
+
+    The bridge validates these hashes before starting MiroFish.  The manifest
+    is deliberately written only after the collection agent exits normally,
+    matching MiroFish's original multipart upload boundary: all documents are
+    complete before ontology generation begins.
+    """
+    documents: list[dict[str, Any]] = []
+    missing: list[str] = []
+    for filename in DOMAIN_FILES.values():
+        path = output_dir / filename
+        if not path.exists() or not path.read_text(encoding="utf-8").strip():
+            missing.append(filename)
+            continue
+        content = path.read_bytes()
+        documents.append(
+            {
+                "name": filename,
+                "bytes": len(content),
+                "sha256": hashlib.sha256(content).hexdigest(),
+            }
+        )
+    if missing:
+        raise RuntimeError(
+            "Evidence collection finished without all required documents: "
+            + ", ".join(missing)
+        )
+
+    manifest: dict[str, Any] = {
+        "version": EVIDENCE_MANIFEST_VERSION,
+        "status": "complete",
+        "run_id": run_id,
+        "session_id": session_id,
+        "query": query,
+        "completed_at": datetime.now().astimezone().isoformat(),
+        "documents": documents,
+    }
+    target = output_dir / EVIDENCE_MANIFEST_FILE
+    temporary = output_dir / f".{EVIDENCE_MANIFEST_FILE}.tmp"
+    temporary.write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    temporary.replace(target)
+    _log(
+        "evidence_bundle_ready",
+        manifest=str(target),
+        run_id=run_id,
+        documents=[item["name"] for item in documents],
+    )
+    return manifest
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run FINVERSE ontology A2A agents")
     parser.add_argument("query", help="User scenario query")
     parser.add_argument("--output-dir", type=Path, default=None)
+    parser.add_argument("--session-id", default=None, help="Browser session identifier used for durable output grouping")
     args = parser.parse_args()
-    result = run(args.query, args.output_dir)
+    result = run(args.query, args.output_dir, args.session_id)
     print(json.dumps({"output_dir": result["output_dir"]}, ensure_ascii=False))
 
 

@@ -31,6 +31,12 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+*.log
+
+# local runtime artifacts
+/output/
+/log/
+/tsconfig.tsbuildinfo
 
 # env files (can opt-in for committing if needed)
 .env*

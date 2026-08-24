@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create the daily KOSPI signal brief with Amazon Bedrock and store it in PostgreSQL."""
+"""Create the daily KOSPI signal brief with OpenRouter and store it in PostgreSQL."""
 
 from __future__ import annotations
 
@@ -10,11 +10,19 @@ import json
 import os
 from pathlib import Path
 import sys
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 import load_postgres as pg
 
 ROOT = Path(__file__).resolve().parents[1]
 SIGNAL_KEYS = ("economy", "country", "event", "community")
-DEFAULT_MODEL = "global.anthropic.claude-opus-4-6-v1"
+DEFAULT_MODEL = "google/gemma-4-31b-it:free"
+DEFAULT_FALLBACK_MODELS = (
+    "google/gemma-4-26b-a4b-it:free",
+    "dots-studio/dots-3-note-preview:free",
+    "poolside/laguna-s-2.1:free",
+)
+OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
 SOURCE_SCOPES = {
     "economy": ["economy.observation"],
     "country": ["events.news.country_codes"],
@@ -297,6 +305,7 @@ def already_generated(as_of: str) -> bool:
         SELECT EXISTS (
           SELECT 1 FROM lake.records
           WHERE record_type = 'market_signal_analysis'
+            AND source = 'openrouter'
             AND payload->>'input_as_of' = {literal}
             AND jsonb_typeof(payload->'analysis'->'marketBrief'->'lines') = 'array'
         );
@@ -305,37 +314,65 @@ def already_generated(as_of: str) -> bool:
     ).strip() == "t"
 
 
-def invoke_bedrock(data: dict, model_id: str, region: str) -> tuple[dict, dict]:
-    import boto3
-    from botocore.config import Config
+def _fallback_models(primary_model_id: str, configured: str) -> list[str]:
+    candidates = configured.split(",") if configured.strip() else list(DEFAULT_FALLBACK_MODELS)
+    return [
+        candidate.strip()
+        for candidate in candidates
+        if candidate.strip() and candidate.strip() != primary_model_id
+    ]
 
-    client = boto3.client(
-        "bedrock-runtime",
-        region_name=region,
-        config=Config(connect_timeout=10, read_timeout=300, retries={"max_attempts": 2, "mode": "standard"}),
-    )
+
+def invoke_openrouter(
+    data: dict, model_id: str, api_key: str, fallback_models: str
+) -> tuple[dict, dict, str]:
     prompt_input = analysis_input(data)
     allowed_ids = {
         key: {item["id"] for item in prompt_input["sections"][key]["evidence"]}
         for key in SIGNAL_KEYS
     }
-    response = client.converse(
-        modelId=model_id,
-        system=[{"text": SYSTEM_PROMPT}],
-        messages=[{
-            "role": "user",
-            "content": [{"text": json.dumps(prompt_input, ensure_ascii=False, separators=(",", ":"))}],
-        }],
-        inferenceConfig={"maxTokens": 5500, "temperature": 0.1},
+    payload = {
+        "model": model_id,
+        "models": _fallback_models(model_id, fallback_models),
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": json.dumps(prompt_input, ensure_ascii=False, separators=(",", ":")),
+            },
+        ],
+        "max_tokens": 5500,
+        "temperature": 0.1,
+        "response_format": {"type": "json_object"},
+    }
+    request = Request(
+        OPENROUTER_ENDPOINT,
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": os.getenv("OPENROUTER_HTTP_REFERER", "http://localhost:3000"),
+            "X-OpenRouter-Title": os.getenv("OPENROUTER_APP_NAME", "FINVERSE"),
+        },
     )
-    text = next(
-        block["text"] for block in response["output"]["message"]["content"]
-        if "text" in block
-    )
-    return parse_response(text, allowed_ids), dict(response.get("usage") or {})
+    try:
+        with urlopen(request, timeout=300) as response:
+            result = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")[:500]
+        raise RuntimeError(f"OpenRouter response {exc.code}: {detail}") from exc
+    except URLError as exc:
+        raise RuntimeError(f"OpenRouter request failed: {exc.reason}") from exc
+    resolved_model_id = str(result.get("model") or model_id)
+    try:
+        text = result["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError) as exc:
+        raise RuntimeError("OpenRouter returned no text") from exc
+    return parse_response(text, allowed_ids), dict(result.get("usage") or {}), resolved_model_id
 
 
-def store(data: dict, analysis: dict, model_id: str, region: str, usage: dict) -> dict:
+def store(data: dict, analysis: dict, model_id: str, usage: dict) -> dict:
     generated_at = datetime.now(UTC).isoformat()
     raw_date = str(data["asOf"])
     analysis_date = f"{raw_date[:4]}-{raw_date[4:6]}-{raw_date[6:8]}" if len(raw_date) == 8 else raw_date
@@ -346,15 +383,15 @@ def store(data: dict, analysis: dict, model_id: str, region: str, usage: dict) -
         "input_as_of": data["asOf"],
         "generated_at": generated_at,
         "model_id": model_id,
-        "region": region,
+        "provider": "openrouter",
         "usage": usage,
         "source_scope": SOURCE_SCOPES,
         "evidence": {key: prompt_input["sections"][key]["evidence"] for key in SIGNAL_KEYS},
     }
     record = {
-        "record_id": f"bedrock:market-signal-analysis:{analysis_date}",
+        "record_id": f"openrouter:market-signal-analysis:{analysis_date}",
         "record_type": "market_signal_analysis",
-        "source": "aws_bedrock",
+        "source": "openrouter",
         "schema_version": "1.4",
         "record_hash": hashlib.sha256(
             json.dumps(body, ensure_ascii=False, sort_keys=True).encode()
@@ -380,7 +417,7 @@ def store(data: dict, analysis: dict, model_id: str, region: str, usage: dict) -
             record_id, collector, record_type, source, schema_version,
             record_hash, collected_at, payload
           )
-          SELECT doc->>'record_id', 'bedrock_signal_update',
+          SELECT doc->>'record_id', 'openrouter_signal_update',
             doc->>'record_type', doc->>'source', doc->>'schema_version',
             doc->>'record_hash', (doc->>'collected_at')::timestamptz, doc
           FROM state
@@ -410,10 +447,13 @@ def store(data: dict, analysis: dict, model_id: str, region: str, usage: dict) -
 def main() -> int:
     pg.load_dotenv(ROOT)
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dry-run", action="store_true", help="read DB inputs without calling Bedrock or writing")
+    parser.add_argument("--dry-run", action="store_true", help="read DB inputs without calling OpenRouter or writing")
     parser.add_argument("--force", action="store_true", help="regenerate even when this market date is already stored")
-    parser.add_argument("--model-id", default=os.getenv("BEDROCK_MODEL_ID", DEFAULT_MODEL))
-    parser.add_argument("--region", default=os.getenv("AWS_REGION", "us-east-1"))
+    parser.add_argument("--model-id", default=os.getenv("OPENROUTER_MODEL", DEFAULT_MODEL))
+    parser.add_argument(
+        "--fallback-models",
+        default=os.getenv("OPENROUTER_FALLBACK_MODELS", ",".join(DEFAULT_FALLBACK_MODELS)),
+    )
     args = parser.parse_args()
 
     data = snapshot()
@@ -422,7 +462,6 @@ def main() -> int:
             "dry_run": True,
             "as_of": data["asOf"],
             "model_id": args.model_id,
-            "region": args.region,
             "news": len(data["news"]),
             "community_topics": len(data["community"]),
         }, ensure_ascii=False))
@@ -432,12 +471,17 @@ def main() -> int:
         print(json.dumps({"as_of": data["asOf"], "skipped": "already_generated"}, ensure_ascii=False))
         return 0
 
-    analysis, usage = invoke_bedrock(data, args.model_id, args.region)
-    loaded = store(data, analysis, args.model_id, args.region, usage)
+    api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+    if not api_key:
+        parser.error("OPENROUTER_API_KEY is required")
+    analysis, usage, resolved_model_id = invoke_openrouter(
+        data, args.model_id, api_key, args.fallback_models
+    )
+    loaded = store(data, analysis, resolved_model_id, usage)
     print(json.dumps({
-        "as_of": data["asOf"], "model_id": args.model_id,
-        "input_tokens": usage.get("inputTokens"),
-        "output_tokens": usage.get("outputTokens"), **loaded,
+        "as_of": data["asOf"], "model_id": resolved_model_id,
+        "input_tokens": usage.get("prompt_tokens"),
+        "output_tokens": usage.get("completion_tokens"), **loaded,
     }, ensure_ascii=False))
     return 0
 

@@ -34,9 +34,9 @@ REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 
 -- --- read: analysts and the web app ----------------------------------------
 GRANT CONNECT ON DATABASE finverse TO finverse_read;
-GRANT USAGE ON SCHEMA lake, market, events, economy TO finverse_read;
-GRANT SELECT ON ALL TABLES IN SCHEMA lake, market, events, economy TO finverse_read;
-ALTER DEFAULT PRIVILEGES IN SCHEMA lake, market, events, economy
+GRANT USAGE ON SCHEMA lake, market, events, economy, psychology TO finverse_read;
+GRANT SELECT ON ALL TABLES IN SCHEMA lake, market, events, economy, psychology TO finverse_read;
+ALTER DEFAULT PRIVILEGES IN SCHEMA lake, market, events, economy, psychology
     GRANT SELECT ON TABLES TO finverse_read;
 
 -- Staging tables are load scratch space; keep them out of the read surface.
@@ -74,7 +74,7 @@ ALTER ROLE finverse_read SET idle_in_transaction_session_timeout = '5min';
 -- people. Deliberately not a superuser: it cannot disable auditing, read
 -- other databases, or write to the server filesystem.
 GRANT finverse_loader TO finverse_admin;
-GRANT ALL ON SCHEMA lake, market, events, economy TO finverse_admin;
-GRANT ALL ON ALL TABLES IN SCHEMA lake, market, events, economy TO finverse_admin;
+GRANT ALL ON SCHEMA lake, market, events, economy, psychology TO finverse_admin;
+GRANT ALL ON ALL TABLES IN SCHEMA lake, market, events, economy, psychology TO finverse_admin;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA lake TO finverse_admin;
-ALTER DEFAULT PRIVILEGES IN SCHEMA lake, market, events, economy GRANT ALL ON TABLES TO finverse_admin;
+ALTER DEFAULT PRIVILEGES IN SCHEMA lake, market, events, economy, psychology GRANT ALL ON TABLES TO finverse_admin;

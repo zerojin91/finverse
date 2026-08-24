@@ -7,7 +7,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import bedrock_signal_update as signals
 
 
-class BedrockSignalValidationTest(unittest.TestCase):
+class OpenRouterSignalValidationTest(unittest.TestCase):
     def valid_analysis(self):
         return {"marketBrief": {"lines": ["장마감 첫 문장", "다음 거래일 확인 문장"]}, **{
             key: {

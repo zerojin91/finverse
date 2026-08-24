@@ -16,7 +16,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # 18:00 UTC 토요일 = 03:00 KST 일요일 — Naver 시세 정정분.
 0 18 * * 6 cd /home/ubuntu/finverse && flock -n data/.ingest_all.lock python3 collectors/market_ingest.py update --source naver --lookback-days 30 --no-flows >> logs/cron.log 2>&1
 
-# 11:00 UTC = 20:00 KST, 평일 장마감 후 1회 — 최신 적재 데이터로 Bedrock 요약 후 DB 저장.
+# 11:00 UTC = 20:00 KST, 평일 장마감 후 1회 — 최신 적재 데이터로 OpenRouter Gemma 4 요약 후 DB 저장.
 0 11 * * 1-5 cd /home/ubuntu/finverse && scripts/run_bedrock_signal_update.sh >> logs/cron.log 2>&1
 
 # 19:00 UTC = 04:00 KST, 매일 — 30일 지난 로그 정리.

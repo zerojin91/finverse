@@ -1,8 +1,12 @@
-import { readFile } from "node:fs/promises";
-import { homedir } from "node:os";
-import { join } from "node:path";
-
 export const dynamic = "force-dynamic";
+
+const DEFAULT_OPENROUTER_MODEL = "google/gemma-4-31b-it:free";
+const DEFAULT_OPENROUTER_FALLBACK_MODELS = [
+  "google/gemma-4-26b-a4b-it:free",
+  "dots-studio/dots-3-note-preview:free",
+  "poolside/laguna-s-2.1:free",
+];
+const OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 
 type Card = {
   kicker: string;
@@ -46,36 +50,17 @@ const systemPrompt = `당신은 FINVERSE의 프리미엄 한국 증시 에디터
   "explanation":{"title":"...","lead":"...","paragraphs":["...","..."]}
 }`;
 
-async function bedrockSettings() {
-  const runtimeToken = process.env.AWS_BEARER_TOKEN_BEDROCK;
-  if (runtimeToken) return {
-    token: runtimeToken,
-    region: process.env.AWS_REGION || "us-east-1",
-    model: process.env.ANTHROPIC_DEFAULT_SONNET_MODEL || "anthropic.claude-sonnet-5",
-  };
-  const projectHome = process.cwd().match(/^\/Users\/[^/]+/)?.[0];
-  const candidates = [
-    process.env.CLAUDE_BEDROCK_SETTINGS_PATH,
-    join(homedir(), ".claude-bedrock", "settings.json"),
-    projectHome && join(projectHome, ".claude-bedrock", "settings.json"),
-  ].filter((path): path is string => Boolean(path));
-  let raw = "";
-  for (const path of new Set(candidates)) {
-    try {
-      raw = await readFile(path, "utf8");
-      break;
-    } catch {
-      // Try the next configured runtime home.
-    }
-  }
-  if (!raw) throw new Error("Bedrock settings file is missing");
-  const env = (JSON.parse(raw) as { env?: Record<string, string> }).env ?? {};
-  const token = env.AWS_BEARER_TOKEN_BEDROCK;
-  if (!token) throw new Error("Bedrock bearer token is missing");
+function openRouterSettings() {
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim();
+  if (!apiKey) throw new Error("OPENROUTER_API_KEY is missing");
   return {
-    token,
-    region: env.AWS_REGION || "us-east-1",
-    model: env.ANTHROPIC_DEFAULT_SONNET_MODEL || "anthropic.claude-sonnet-5",
+    apiKey,
+    model: process.env.OPENROUTER_MODEL?.trim() || DEFAULT_OPENROUTER_MODEL,
+    fallbackModels: (process.env.OPENROUTER_FALLBACK_MODELS?.split(",") || DEFAULT_OPENROUTER_FALLBACK_MODELS)
+      .map((item) => item.trim())
+      .filter(Boolean),
+    referer: process.env.OPENROUTER_HTTP_REFERER?.trim() || "http://localhost:3000",
+    appName: process.env.OPENROUTER_APP_NAME?.trim() || "FINVERSE",
   };
 }
 
@@ -94,7 +79,7 @@ function parseEditorial(text: string): Editorial {
   const theme = themes.find((item) => item === value.ui?.theme);
   const rhythm = rhythms.find((item) => item === value.ui?.rhythm);
   if (!theme || !rhythm || !badge || !headline || !subhead || !Array.isArray(value.cards) || value.cards.length !== 5) {
-    throw new Error("Bedrock returned an invalid editorial header");
+    throw new Error("OpenRouter returned an invalid editorial header");
   }
   const cards = value.cards.map((card) => {
     const kicker = clean(card?.kicker, 40);
@@ -106,7 +91,7 @@ function parseEditorial(text: string): Editorial {
     const visuals = ["market-path", "capital-flow", "earnings", "calendar", "risk-radar"] as const;
     const layout = layouts.find((item) => item === card?.layout);
     const visual = visuals.find((item) => item === card?.visual);
-    if (!kicker || !title || !body || !stat || !statLabel || !layout || !visual) throw new Error("Bedrock returned an invalid card");
+    if (!kicker || !title || !body || !stat || !statLabel || !layout || !visual) throw new Error("OpenRouter returned an invalid card");
     return { kicker, title, body, stat, statLabel, layout, visual };
   });
   const explanation = value.explanation;
@@ -115,29 +100,38 @@ function parseEditorial(text: string): Editorial {
   const paragraphs = Array.isArray(explanation?.paragraphs)
     ? explanation.paragraphs.map((paragraph) => clean(paragraph, 1200)).filter((paragraph): paragraph is string => Boolean(paragraph)).slice(0, 3)
     : [];
-  if (!explanationTitle || !lead || paragraphs.length < 2) throw new Error("Bedrock returned an invalid explanation");
+  if (!explanationTitle || !lead || paragraphs.length < 2) throw new Error("OpenRouter returned an invalid explanation");
   return { ui: { theme, rhythm }, badge, headline, subhead, cards, explanation: { title: explanationTitle, lead, paragraphs } };
 }
 
 async function generateBrief(key: string, scenario: unknown): Promise<Brief> {
-  const { token, region, model } = await bedrockSettings();
-  const response = await fetch(`https://bedrock-mantle.${region}.api.aws/anthropic/v1/messages`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({
-      model,
-      anthropic_version: "bedrock-2023-05-31",
-      max_tokens: 7000,
-      system: systemPrompt,
-      messages: [{ role: "user", content: JSON.stringify(scenario) }],
-    }),
-    signal: AbortSignal.timeout(90_000),
-  });
-  if (!response.ok) throw new Error(`Bedrock response ${response.status}: ${(await response.text()).slice(0, 300)}`);
-  const payload = await response.json() as { content?: Array<{ type?: string; text?: string }> };
-  const text = payload.content?.find((block) => block.type === "text")?.text;
-  if (!text) throw new Error("Bedrock returned no text");
-  return { key, editorial: parseEditorial(text), generatedAt: new Date().toISOString(), model };
+  const { apiKey, model, fallbackModels, referer, appName } = openRouterSettings();
+  const response = await fetch(OPENROUTER_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+        "HTTP-Referer": referer,
+        "X-OpenRouter-Title": appName,
+      },
+      body: JSON.stringify({
+        model,
+        models: fallbackModels.filter((candidate) => candidate !== model),
+        max_tokens: 7000,
+        temperature: 0.1,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: JSON.stringify(scenario) },
+        ],
+      }),
+      signal: AbortSignal.timeout(90_000),
+    });
+  if (!response.ok) throw new Error(`OpenRouter response ${response.status}: ${(await response.text()).slice(0, 300)}`);
+  const payload = await response.json() as { model?: string; choices?: Array<{ message?: { content?: string } }> };
+  const text = payload.choices?.[0]?.message?.content;
+  if (!text) throw new Error("OpenRouter returned no text");
+  return { key, editorial: parseEditorial(text), generatedAt: new Date().toISOString(), model: payload.model || model };
 }
 
 export async function POST(request: Request) {
@@ -149,7 +143,7 @@ export async function POST(request: Request) {
     cache = await generateBrief(key, scenario);
     return Response.json(cache, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    console.error("FINVERSE Bedrock scenario brief failed", error instanceof Error ? error.message : error);
-    return Response.json({ error: "Bedrock 시나리오 브리핑 생성에 실패했습니다." }, { status: 502 });
+    console.error("FINVERSE OpenRouter scenario brief failed", error instanceof Error ? error.message : error);
+    return Response.json({ error: "OpenRouter 시나리오 브리핑 생성에 실패했습니다." }, { status: 502 });
   }
 }

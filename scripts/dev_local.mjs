@@ -22,7 +22,6 @@ function loadEnv() {
 
 loadEnv();
 
-const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const children = [];
 const start = (command, args, label) => {
   const child = spawn(command, args, { cwd: root, env: { ...process.env }, stdio: "inherit", shell: process.platform === "win32" });
@@ -36,7 +35,13 @@ const start = (command, args, label) => {
 console.log(`KOSPI SSH bridge: ${process.env.FINVERSE_SSH_HOST || "ubuntu@44.206.56.75"}`);
 console.log(`KOSPI PEM path: ${process.env.FINVERSE_SSH_KEY || "(미설정)"}`);
 start(process.platform === "win32" ? "node" : process.execPath, [resolve(root, "scripts/kospi_bridge.mjs")], "KOSPI bridge");
-start(process.platform === "win32" ? "node" : process.execPath, [resolve(root, "scripts/with_bedrock_env.mjs"), "dev"], "web app");
+if (process.env.FINVERSE_SIMULATION_TUNNEL_ENABLED === "1") {
+  start(process.platform === "win32" ? "node" : process.execPath, [resolve(root, "scripts/simulation_api_tunnel.mjs")], "simulation API tunnel");
+}
+// vinext dev currently fails while scanning the lazily loaded AI chat bundle,
+// while the same Next application builds and runs normally.  Use Next's own
+// development server so `npm run dev` remains the single reliable local entry.
+start(process.platform === "win32" ? "node" : process.execPath, [resolve(root, "node_modules/next/dist/bin/next"), "dev", "-p", "3000"], "web app");
 
 function shutdown() {
   for (const child of children) if (!child.killed) child.kill("SIGTERM");

@@ -1,0 +1,51 @@
+services:
+  finverse-simulation-api:
+    build:
+      context: ..
+      dockerfile: deploy/finverse-simulation.Dockerfile
+      additional_contexts:
+        mirofish_source: ../../MiroFish-Offline
+    container_name: finverse-simulation-api
+    env_file:
+      - path: ./finverse-simulation.env
+        required: false
+    environment:
+      FINVERSE_SIMULATION_RUNS_DIR: /var/lib/finverse-simulation/runs
+      FINVERSE_SIMULATION_LLM_CONCURRENCY: ${FINVERSE_SIMULATION_LLM_CONCURRENCY:-1}
+      FINVERSE_SIMULATION_GLOBAL_LLM_BATCHES: ${FINVERSE_SIMULATION_GLOBAL_LLM_BATCHES:-1}
+      FINVERSE_SIMULATION_GLOBAL_LOCK_FILE: /tmp/finverse-mirofish-simulation.lock
+      MIROFISH_OFFLINE_PATH: /opt/mirofish
+      NEO4J_URI: bolt://finverse-neo4j:7687
+    ports:
+      - "127.0.0.1:8010:8010"
+    volumes:
+      - finverse_simulation_runs:/var/lib/finverse-simulation
+    depends_on:
+      finverse-neo4j:
+        condition: service_healthy
+    restart: unless-stopped
+
+  finverse-neo4j:
+    image: neo4j:5.18-community
+    container_name: finverse-neo4j
+    environment:
+      NEO4J_AUTH: ${NEO4J_USER:?set NEO4J_USER}/${NEO4J_PASSWORD:?set NEO4J_PASSWORD}
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_server_memory_heap_initial__size: 256m
+      NEO4J_server_memory_heap_max__size: 768m
+      NEO4J_server_memory_pagecache_size: 256m
+    volumes:
+      - finverse_neo4j_data:/data
+      - finverse_neo4j_logs:/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  finverse_simulation_runs:
+  finverse_neo4j_data:
+  finverse_neo4j_logs:

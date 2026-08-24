@@ -12,21 +12,32 @@ import {
   CircleDollarSign,
   CircleHelp,
   CheckCircle2,
+  Clock3,
   Database,
   ExternalLink,
   FileUp,
   GitBranch,
   Globe2,
   LoaderCircle,
+  MessageCircle,
   Network,
   Plus,
+  Radio,
+  Send,
   Sparkles,
   UserRound,
   UsersRound,
   X,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { ChangeEvent, PointerEvent as ReactPointerEvent } from "react";
+import type { ChangeEvent, FormEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
+import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation";
+
+const SimulationMessageResponse = dynamic(
+  () => import("@/components/ai-elements/message").then((module) => module.MessageResponse),
+  { ssr: false },
+);
 
 type MainTab = "market" | "twin";
 
@@ -42,7 +53,7 @@ type DashboardSignal = {
   impactSummary: string;
   topics: { title: string; summary: string; importance?: number; sources?: DashboardSource[] }[];
   sources: DashboardSource[];
-  analysisSource?: "bedrock" | "rules";
+  analysisSource?: "openrouter" | "rules";
   analysisGeneratedAt?: string | null;
   analysisModel?: string | null;
 };
@@ -589,12 +600,12 @@ function PremiumScenarioBrief({
         </div>
         <div className={`premium-ai-status ${state}`} aria-live="polite">
           <Sparkles size={14} />
-          <span>{state === "loading" ? "Bedrock 편집 중" : state === "ready" ? "Bedrock 에디토리얼" : "안전 프리뷰"}</span>
+          <span>{state === "loading" ? "DeepSeek 편집 중" : state === "ready" ? "DeepSeek 에디토리얼" : "안전 프리뷰"}</span>
         </div>
       </header>
 
       <section className={`daily-story theme-${editorial.ui.theme} rhythm-${editorial.ui.rhythm}`} aria-label={`${scenario.title} 매일 카드뉴스`}>
-        <div className="card-news-label"><span>DAILY CARD STORY · 5 SCENES</span><small>오늘 시장에 맞춰 Bedrock이 레이아웃과 그림을 골랐어요</small></div>
+        <div className="card-news-label"><span>DAILY CARD STORY · 5 SCENES</span><small>오늘 시장에 맞춰 DeepSeek가 레이아웃과 그림을 골랐어요</small></div>
         <div className="daily-story-stack">
           {editorial.cards.map((card, index) => (
             <article className={`daily-story-card layout-${card.layout} visual-${card.visual}`} key={`${scenario.id}-${card.kicker}`}>
@@ -627,7 +638,7 @@ function PremiumScenarioBrief({
       </section>
 
       <footer className="premium-brief-footer">
-        <span>{state === "ready" && meta ? `Amazon Bedrock · ${meta.model} · ${new Date(meta.generatedAt).toLocaleString("ko-KR")}` : "Amazon Bedrock 연결 전에는 검증된 시나리오 프리뷰를 표시합니다."}</span>
+        <span>{state === "ready" && meta ? `OpenRouter · ${meta.model} · ${new Date(meta.generatedAt).toLocaleString("ko-KR")}` : "OpenRouter 연결 전에는 검증된 시나리오 프리뷰를 표시합니다."}</span>
         <span>실제 시장 흐름과 전제가 달라지면 결론도 함께 바뀌어야 합니다.</span>
       </footer>
     </div>
@@ -653,6 +664,76 @@ const environmentSeeds: EnvironmentSeed[] = [
 ];
 
 type UploadedSeed = { name: string; size: number; preview?: string };
+type OntologyRunState = "idle" | "running" | "complete" | "error";
+type OntologyLog = { source: "system" | "stdout" | "stderr"; line: string };
+type OntologyDocument = { name: string; content: string };
+type MirofishRun = { simulationId: string; profileCount?: number; entityCount?: number; nodeCount?: number; edgeCount?: number; initialPostsCount?: number };
+type MirofishProgress = { stage: BuildStage; percent: number; message?: string };
+type OntologySchema = { entityTypes: string[]; relationTypes: string[] };
+type LiveGraphSnapshot = {
+  nodes: { id: string; label: string; type: string }[];
+  edges: { source: string; target: string; label: string }[];
+  nodeCount: number;
+  edgeCount: number;
+};
+
+type SimulationAction = {
+  round_num: number;
+  timestamp?: string;
+  platform: string;
+  agent_id: number;
+  agent_name: string;
+  action_type: string;
+  action_args: Record<string, unknown>;
+  result?: unknown;
+  success: boolean;
+};
+
+type SimulationRuntime = {
+  simulation_id: string;
+  runner_status: string;
+  current_round: number;
+  total_rounds: number;
+  progress_percent: number;
+  twitter_current_round?: number;
+  reddit_current_round?: number;
+  twitter_actions_count?: number;
+  reddit_actions_count?: number;
+  total_actions_count: number;
+  env_alive?: boolean;
+  recent_actions: SimulationAction[];
+  active_batch?: {
+    status?: "running" | "completed" | "failed";
+    label?: string;
+    actions_count?: number;
+    completed_actions?: number;
+    started_at?: string;
+    elapsed_seconds?: number;
+  } | null;
+  started_at?: string;
+  completed_at?: string;
+};
+
+type SimulationChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  sources?: string[];
+  model?: string;
+  at?: string;
+};
+
+type SimulationSession = {
+  job_id: string;
+  status: string;
+  query: string;
+  period: string;
+  simulation_id: string;
+  runtime: SimulationRuntime | null;
+  chat_ready: boolean;
+  chat_messages: SimulationChatMessage[];
+  error?: string | null;
+};
 
 type GraphPreviewNode = {
   id: string;
@@ -715,9 +796,30 @@ const graphPreviewEdges = [
 
 type BuildStage = 1 | 2 | 3 | 4 | 5 | 6;
 
-function KnowledgeGraphPreview({ seeds, prompt, stage }: { seeds: string[]; prompt: string; stage: BuildStage }) {
+function GraphGenerationPlaceholder({ stage }: { stage: BuildStage }) {
+  const waitingForGraph = stage === 3;
+  return <div className="graph-generation-placeholder" aria-label="시나리오 지식그래프 생성 대기 중">
+    <div className="ontology-wait-icon" aria-hidden="true"><i /><i /><i /><i /></div>
+    <strong>{waitingForGraph ? "Building knowledge graph..." : "Waiting for ontology generation..."}</strong>
+  </div>;
+}
+
+function KnowledgeGraphPreview({ seeds, prompt, stage, progress, graphSnapshot }: { seeds: string[]; prompt: string; stage: BuildStage; progress: MirofishProgress | null; graphSnapshot: LiveGraphSnapshot | null }) {
+  const graphProgress = stage === 3 ? Math.max(5, Math.min(100, progress?.stage === 3 ? progress.percent : 5)) : 100;
+  const hasGraphSnapshot = Boolean(graphSnapshot?.nodes.length);
+  const graphNodes = hasGraphSnapshot ? graphSnapshot!.nodes.map((node, index) => ({
+    ...node,
+    x: 50 + ((index * 137) % 545),
+    y: 55 + ((Math.floor(index * 137 / 545) * 93 + index * 41) % 465),
+    color: ["#2563eb", "#0f766e", "#7c3aed", "#dc2626", "#d97706", "#0891b2"][index % 6],
+  })) : [];
+  const graphEdges = hasGraphSnapshot ? graphSnapshot!.edges.map((edge) => [edge.source, edge.target, edge.label] as const) : [];
+  const visibleNodeCount = graphNodes.length;
+  const visibleNodes = graphNodes.slice(0, visibleNodeCount);
+  const visibleNodeIds = new Set(visibleNodes.map((node) => node.id));
+  const visibleEdges = graphEdges.filter(([source, target]) => visibleNodeIds.has(source) && visibleNodeIds.has(target));
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>(() =>
-    Object.fromEntries(graphPreviewNodes.map((node) => [node.id, { x: node.x, y: node.y }])),
+    Object.fromEntries(graphNodes.map((node) => [node.id, { x: node.x, y: node.y }])),
   );
   const [selectedNode, setSelectedNode] = useState("kospi");
   const [zoom, setZoom] = useState(1);
@@ -726,7 +828,7 @@ function KnowledgeGraphPreview({ seeds, prompt, stage }: { seeds: string[]; prom
   const panRef = useRef<{ active: boolean; x: number; y: number; startX: number; startY: number } | null>(null);
 
   useEffect(() => {
-    const velocity = Object.fromEntries(graphPreviewNodes.map((node) => [node.id, { x: 0, y: 0 }])) as Record<string, { x: number; y: number }>;
+    const velocity = Object.fromEntries(visibleNodes.map((node) => [node.id, { x: 0, y: 0 }])) as Record<string, { x: number; y: number }>;
     let frame = 0;
     let last = performance.now();
     let cancelled = false;
@@ -734,10 +836,10 @@ function KnowledgeGraphPreview({ seeds, prompt, stage }: { seeds: string[]; prom
       if (cancelled) return;
       const dt = Math.min(2.5, Math.max(.3, (now - last) / 16.67));
       last = now;
-      const next = Object.fromEntries(graphPreviewNodes.map((node) => [node.id, { ...(positions[node.id] ?? { x: node.x, y: node.y }) }])) as Record<string, { x: number; y: number }>;
-      graphPreviewNodes.forEach((node, index) => {
+      const next = Object.fromEntries(visibleNodes.map((node) => [node.id, { ...(positions[node.id] ?? { x: node.x, y: node.y }) }])) as Record<string, { x: number; y: number }>;
+      visibleNodes.forEach((node, index) => {
         const current = next[node.id];
-        graphPreviewNodes.slice(index + 1).forEach((other) => {
+        visibleNodes.slice(index + 1).forEach((other) => {
           const otherPosition = next[other.id];
           const dx = current.x - otherPosition.x;
           const dy = current.y - otherPosition.y;
@@ -751,7 +853,7 @@ function KnowledgeGraphPreview({ seeds, prompt, stage }: { seeds: string[]; prom
           velocity[other.id].y -= ny;
         });
       });
-      graphPreviewEdges.forEach(([source, target]) => {
+      visibleEdges.forEach(([source, target]) => {
         const from = next[source];
         const to = next[target];
         const dx = to.x - from.x;
@@ -765,7 +867,7 @@ function KnowledgeGraphPreview({ seeds, prompt, stage }: { seeds: string[]; prom
         velocity[target].x -= nx;
         velocity[target].y -= ny;
       });
-      graphPreviewNodes.forEach((node) => {
+      visibleNodes.forEach((node) => {
         const p = next[node.id];
         const v = velocity[node.id];
         v.x *= .88;
@@ -781,7 +883,7 @@ function KnowledgeGraphPreview({ seeds, prompt, stage }: { seeds: string[]; prom
     return () => { cancelled = true; cancelAnimationFrame(raf); };
     // The graph gets one deterministic settling pass when a new build stage appears.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage]);
+  }, [stage, visibleNodeCount]);
 
   const handlePointerDown = (id: string) => {
     dragRef.current = { id, moved: false };
@@ -822,7 +924,7 @@ function KnowledgeGraphPreview({ seeds, prompt, stage }: { seeds: string[]; prom
     <div className="knowledge-graph-wrap">
       <div className="knowledge-graph-toolbar">
         <span><Network size={14} /> 지식그래프 구성요소</span>
-        <span>{seeds.length} seeds · {prompt ? "prompt linked" : "prompt empty"}</span>
+        <span>{stage === 3 ? `GraphRAG ${graphProgress}% · ${visibleNodeCount} nodes` : `${seeds.length} seeds · ${prompt ? "prompt linked" : "prompt empty"}`}</span>
       </div>
       <svg className="knowledge-graph-svg" viewBox="0 0 640 570" role="img" aria-label="환경 시드 기반 KOSPI 지식그래프" onPointerDown={handleCanvasPointerDown} onPointerMove={handleCanvasPointerMove} onPointerUp={() => { panRef.current = null; }} onWheel={(event) => { event.preventDefault(); setZoom((current) => Math.max(.72, Math.min(1.55, current + (event.deltaY > 0 ? -.06 : .06)))); }}>
         <defs>
@@ -830,12 +932,13 @@ function KnowledgeGraphPreview({ seeds, prompt, stage }: { seeds: string[]; prom
         </defs>
         <rect width="640" height="570" fill="url(#graph-grid)" />
         <g transform={`translate(${pan.x + 320} ${pan.y + 250}) scale(${zoom}) translate(-320 -250)`}>
-          {graphPreviewEdges.map(([source, target, label]) => {
+          {!hasGraphSnapshot && <text x="320" y="285" textAnchor="middle" className="knowledge-node-type">Neo4j 첫 그래프 배치를 기다리는 중…</text>}
+          {visibleEdges.map(([source, target, label], edgeIndex) => {
             const from = positions[source] ?? { x: 320, y: 250 };
             const to = positions[target] ?? { x: 320, y: 250 };
-            return <g key={`${source}-${target}`}><line x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke="#c7c7cc" strokeWidth="1.35" /><text x={(from.x + to.x) / 2} y={(from.y + to.y) / 2 - 4} className="knowledge-edge-label">{label}</text></g>;
+            return <g key={`${source}-${target}-${label}-${edgeIndex}`}><line x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke="#c7c7cc" strokeWidth="1.35" /><text x={(from.x + to.x) / 2} y={(from.y + to.y) / 2 - 4} className="knowledge-edge-label">{label}</text></g>;
           })}
-          {graphPreviewNodes.map((node) => {
+          {visibleNodes.map((node) => {
             const position = positions[node.id] ?? { x: 320, y: 250 };
             const active = selectedNode === node.id;
             return <g key={node.id} className="knowledge-node" transform={`translate(${position.x} ${position.y})`} onPointerDown={() => handlePointerDown(node.id)} onPointerMove={handlePointerMove} onPointerUp={() => handlePointerUp(node.id)} onPointerCancel={() => { dragRef.current = null; }}>
@@ -846,9 +949,70 @@ function KnowledgeGraphPreview({ seeds, prompt, stage }: { seeds: string[]; prom
           })}
         </g>
       </svg>
-      <div className="knowledge-graph-footer"><span>노드를 드래그하거나 빈 공간을 끌어 이동하세요</span><span>휠 확대·축소 · 선택: {graphPreviewNodes.find((node) => node.id === selectedNode)?.label}</span></div>
+      <div className="knowledge-graph-footer"><span>{hasGraphSnapshot ? "Neo4j에 적재된 실제 노드·관계" : "실제 그래프 데이터가 도착하면 여기서 바로 갱신됩니다."}</span><span>휠 확대·축소 · 선택: {graphNodes.find((node) => node.id === selectedNode)?.label ?? "—"}</span></div>
     </div>
   );
+}
+
+function EvidenceMarkdown({ content }: { content: string }) {
+  const inline = (value: string): ReactNode => value.split(/(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g).filter(Boolean).map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) return <strong key={index}>{part.slice(2, -2)}</strong>;
+    if (part.startsWith("`") && part.endsWith("`")) return <code key={index}>{part.slice(1, -1)}</code>;
+    const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+    if (link) return <a key={index} href={link[2]} target="_blank" rel="noreferrer">{link[1]}</a>;
+    return part;
+  });
+
+  const lines = content.replace(/\r\n/g, "\n").split("\n");
+  const blocks: ReactNode[] = [];
+  let index = 0;
+  const isTableDivider = (value: string) => /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(value);
+  const tableCells = (value: string) => value.trim().replace(/^\||\|$/g, "").split("|").map((cell) => cell.trim());
+
+  while (index < lines.length) {
+    const line = lines[index].trim();
+    if (!line) { index += 1; continue; }
+    const heading = line.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      const Tag = `h${heading[1].length}` as "h1" | "h2" | "h3";
+      blocks.push(<Tag key={`heading-${index}`}>{inline(heading[2])}</Tag>);
+      index += 1;
+      continue;
+    }
+    if (/^(-{3,}|\*{3,}|_{3,})$/.test(line)) {
+      blocks.push(<hr key={`rule-${index}`} />);
+      index += 1;
+      continue;
+    }
+    if (line.includes("|") && index + 1 < lines.length && isTableDivider(lines[index + 1])) {
+      const headers = tableCells(line);
+      index += 2;
+      const rows: string[][] = [];
+      while (index < lines.length && lines[index].trim().includes("|")) { rows.push(tableCells(lines[index])); index += 1; }
+      blocks.push(<div className="evidence-markdown-table-wrap" key={`table-${index}`}><table><thead><tr>{headers.map((cell, cellIndex) => <th key={cellIndex}>{inline(cell)}</th>)}</tr></thead><tbody>{rows.map((row, rowIndex) => <tr key={rowIndex}>{headers.map((_, cellIndex) => <td key={cellIndex}>{inline(row[cellIndex] ?? "")}</td>)}</tr>)}</tbody></table></div>);
+      continue;
+    }
+    const listMatch = line.match(/^([-*]|\d+\.)\s+(.+)$/);
+    if (listMatch) {
+      const ordered = /\d+\./.test(listMatch[1]);
+      const items: string[] = [];
+      while (index < lines.length) {
+        const item = lines[index].trim().match(ordered ? /^\d+\.\s+(.+)$/ : /^[-*]\s+(.+)$/);
+        if (!item) break;
+        items.push(item[1]);
+        index += 1;
+      }
+      const List = ordered ? "ol" : "ul";
+      blocks.push(<List key={`list-${index}`}>{items.map((item, itemIndex) => <li key={itemIndex}>{inline(item)}</li>)}</List>);
+      continue;
+    }
+    const paragraph: string[] = [line];
+    index += 1;
+    while (index < lines.length && lines[index].trim() && !/^(#{1,3})\s+|^([-*]|\d+\.)\s+|^(-{3,}|\*{3,}|_{3,})$/.test(lines[index].trim())) { paragraph.push(lines[index].trim()); index += 1; }
+    blocks.push(<p key={`paragraph-${index}`}>{inline(paragraph.join(" "))}</p>);
+  }
+
+  return <div className="evidence-markdown">{blocks}</div>;
 }
 
 function ScenarioBuildScreen({
@@ -857,8 +1021,17 @@ function ScenarioBuildScreen({
   uploadedFile,
   stage,
   period,
-  onStartSimulation,
+  runState,
+  logs,
+  documents,
+  outputDir,
+  mirofishRun,
+  mirofishProgress,
+  ontologySchema,
+  graphSnapshot,
+  simulationStarting,
   simulationStarted,
+  onStartSimulation,
   onClose,
 }: {
   seeds: string[];
@@ -866,15 +1039,64 @@ function ScenarioBuildScreen({
   uploadedFile: UploadedSeed | null;
   stage: BuildStage;
   period: string;
-  onStartSimulation: () => void;
+  runState: OntologyRunState;
+  logs: OntologyLog[];
+  documents: OntologyDocument[];
+  outputDir: string | null;
+  mirofishRun: MirofishRun | null;
+  mirofishProgress: MirofishProgress | null;
+  ontologySchema: OntologySchema | null;
+  graphSnapshot: LiveGraphSnapshot | null;
+  simulationStarting: boolean;
   simulationStarted: boolean;
+  onStartSimulation: () => void;
   onClose: () => void;
 }) {
-  const complete = stage === 6;
-  const entityTypes = ["지수", "종목", "섹터", "이벤트", "환율", "수급", "금리"];
-  const relationTypes = ["DRIVES", "IMPACTS", "TRACKS", "CORRELATES_WITH", "CONSTRAINS", "TRIGGERS"];
-  const statusFor = (step: number) => stage > step ? "COMPLETED" : stage === step ? "IN PROGRESS" : "WAITING";
-  const cardClass = (step: number) => `build-step-card ${stage > step ? "done" : stage === step ? "active" : "waiting"}`;
+  const complete = runState === "complete";
+  const [selectedEvidence, setSelectedEvidence] = useState<OntologyDocument | null>(null);
+  // Ontology types are intentionally blank until the running pipeline returns
+  // the schema generated from this session's evidence documents.
+  const entityTypes = ontologySchema?.entityTypes ?? [];
+  const relationTypes = ontologySchema?.relationTypes ?? [];
+  const sourceDocuments = [
+    { name: "market-evidence.md", label: "Market" },
+    { name: "economic-evidence.md", label: "Economy" },
+    { name: "external-event-evidence.md", label: "Events" },
+    { name: "psychology-evidence.md", label: "Community" },
+  ];
+  const evidenceDocumentByName = new Map(documents.map((document) => [document.name, document]));
+  const allEvidenceReady = sourceDocuments.every((source) => Boolean(evidenceDocumentByName.get(source.name)?.content.trim()));
+  const pendingEvidenceSources = sourceDocuments.filter((source) => !evidenceDocumentByName.get(source.name)?.content.trim());
+  const importantLog = (line: string) => {
+    const detail = line.includes(" | ") ? line.split(" | ").at(-1) ?? "" : "";
+    let fields: Record<string, unknown> = {};
+    try { fields = JSON.parse(detail) as Record<string, unknown>; } catch { /* plain process line */ }
+    if (line.includes("run_start")) return "데이터 수집을 위한 작업을 시작했습니다.";
+    if (line.includes("agent_build_start")) return "시장 분석 에이전트를 준비하고 있습니다.";
+    if (line.includes("agent_build_complete")) return "데이터 수집 에이전트 준비가 완료되었습니다.";
+    if (line.includes("tool_query_start")) {
+      const domain = { market: "시장", economy: "경제", events: "이벤트", psychology: "커뮤니티" }[String(fields.domain)] ?? "데이터";
+      return `${domain} 데이터를 수집하고 있습니다.`;
+    }
+    if (line.includes("database_view_complete")) return `${String(fields.view ?? "데이터 view")}에서 ${Number(fields.rows ?? 0).toLocaleString("ko-KR")}건을 읽었습니다.`;
+    if (line.includes("evidence_saved")) {
+      const domain = { market: "시장", economy: "경제", events: "이벤트", psychology: "커뮤니티" }[String(fields.domain)] ?? "데이터";
+      return `${domain} Evidence 문서를 생성했습니다.`;
+    }
+    if (line.includes("evidence_gap_saved")) return "커뮤니티 데이터 공백 문서를 기록했습니다.";
+    if (line.includes("agent_invoke_complete")) return "온톨로지 Evidence 문서 생성이 완료되었습니다.";
+    if (line.includes("free-models-per-day")) return "OpenRouter 무료 모델의 일일 요청 한도가 소진되었습니다.";
+    if (line.includes("run_error")) return "실행 중 오류가 발생했습니다. 아래 상태를 확인해주세요.";
+    return null;
+  };
+  const activityLogs = logs.map((log) => importantLog(log.line)).filter((line): line is string => Boolean(line)).filter((line, index, items) => items.indexOf(line) === index).slice(-4);
+  const latestActivity = allEvidenceReady ? "시장·경제·이벤트·커뮤니티 Evidence 문서 수집이 완료되었습니다." : pendingEvidenceSources.length === 1 ? `${pendingEvidenceSources[0].label} Evidence 문서를 생성하고 있습니다.` : activityLogs.at(-1) ?? "데이터 수집을 위한 작업을 시작했습니다.";
+  const documentPreview = (content: string) => content.replace(/^#{1,6}\s+.*$/gm, "").replace(/\*\*([^*]+)\*\*/g, "$1").replace(/`([^`]+)`/g, "$1").replace(/^\s*[-*]\s+/gm, "").replace(/\n{2,}/g, " ").replace(/\s+/g, " ").trim().slice(0, 170);
+  const stepCompleted = (step: number) => stage > step || (complete && stage === step);
+  const statusFor = (step: number) => stepCompleted(step) ? "COMPLETED" : stage === step ? "IN PROGRESS" : "WAITING";
+  const cardClass = (step: number) => `build-step-card ${stepCompleted(step) ? "done" : stage === step ? "active" : "waiting"}`;
+  const ontologyGraphStatus = stage < 2 ? "WAITING" : stage >= 4 ? "COMPLETED" : "IN PROGRESS";
+  const ontologyGraphCardClass = `build-step-card ${stage < 2 ? "waiting" : stage >= 4 ? "done" : "active"}`;
   const profileCards = [
     { name: "외국인 수급 에이전트", handle: "@foreign_flow_01", type: "Flow Analyst", stance: "SUPPORTIVE", body: "글로벌 자금 흐름과 원·달러 변화를 추적해 순매수 전환의 지속성을 판단합니다." },
     { name: "반도체 실적 에이전트", handle: "@semiconductor_02", type: "Earnings Analyst", stance: "BULLISH", body: "삼성전자·SK하이닉스의 실적, HBM 수요, 메모리 가격을 연결해 섹터 반응을 계산합니다." },
@@ -884,58 +1106,229 @@ function ScenarioBuildScreen({
   return (
     <div className="scenario-build-screen">
       <header className="scenario-build-header">
-        <div><span>FINVERSE · SCENARIO LAB</span><h2>온톨로지와 지식그래프를 준비합니다</h2><p>환경 시드와 사용자 프롬프트에서 KOSPI에 영향을 주는 엔터티와 관계를 추출했습니다.</p></div>
+        <div><span>FINVERSE · ONTOLOGY RUN</span><h2>{complete ? "시뮬레이션 준비가 완료되었습니다" : "온톨로지 문서를 생성하고 있습니다"}</h2><p>{complete ? "생성된 지식그래프와 에이전트 설정을 확인하고 시나리오를 시작할 수 있습니다." : "시장·경제·이벤트 근거를 수집해 MiroFish 실행에 사용할 문서를 만듭니다."}</p></div>
         <button className="scenario-modal-close" type="button" onClick={onClose} aria-label="시나리오 빌더 닫기"><X size={20} /></button>
       </header>
-      <div className="scenario-build-meta"><span><Database size={14} /> {seeds.length}개 환경 시드</span><span><FileUp size={14} /> {uploadedFile ? uploadedFile.name : "추가 데이터 없음"}</span><span><GitBranch size={14} /> KOSPI · 2026.08.01</span></div>
+      <div className="scenario-build-meta"><span><Database size={14} /> 원격 시장 데이터</span><span><GitBranch size={14} /> {period} 예측 구간</span><span><Sparkles size={14} /> OpenRouter 분석</span></div>
       <div className="scenario-build-grid">
         <section className="knowledge-graph-panel" aria-label="시나리오 지식그래프">
           <div className="build-panel-heading"><div><span>GRAPH RELATIONSHIP VISUALIZATION</span><h3>시나리오 지식그래프</h3></div><span className="build-live-badge">{complete ? "BUILD COMPLETE" : "BUILDING"}</span></div>
-          <KnowledgeGraphPreview seeds={seeds} prompt={prompt} stage={stage} />
+          {stage < 3 ? <GraphGenerationPlaceholder stage={stage} /> : <KnowledgeGraphPreview seeds={seeds} prompt={prompt} stage={stage} progress={mirofishProgress} graphSnapshot={graphSnapshot} />}
         </section>
         <section className="build-process-panel" aria-label="온톨로지 빌드 진행 상태">
           <article className={cardClass(1)}>
-            <div className="build-step-header"><span className="build-step-number">01</span><div><h3>Ontology Generation</h3><small>POST /api/graph/ontology/generate</small></div><strong>{statusFor(1)}</strong></div>
-            <p>환경 시드와 예측 요구사항을 분석해 시장에 맞는 엔터티·관계 타입을 구성합니다.</p>
+            <div className="build-step-header"><span className="build-step-number">01</span><div><h3>Data Collection</h3><small>REMOTE DATABASE · WEB EVIDENCE</small></div><strong>{statusFor(1)}</strong></div>
+            <div className={`data-collection-activity ${allEvidenceReady ? "complete" : ""}`}><div>{allEvidenceReady ? <CheckCircle2 size={15} /> : <LoaderCircle size={15} className={runState === "running" ? "spin" : ""} />}<strong>{latestActivity}</strong></div></div>
+            <p>시뮬레이션을 진행하기 위한 시장·경제·이벤트·커뮤니티 데이터를 수집합니다.</p>
+            <div className="evidence-source-grid">{sourceDocuments.map((source) => {
+              const document = evidenceDocumentByName.get(source.name);
+              const preview = document?.content ? documentPreview(document.content) : "";
+              return <button key={source.name} type="button" className={`evidence-source-card ${preview ? "ready" : runState === "running" ? "collecting" : ""}`} disabled={!preview} onClick={() => document?.content && setSelectedEvidence(document)} aria-label={preview ? `${source.label} Evidence 문서 전체 보기` : `${source.label} Evidence 문서 준비 중`}><div><span>{source.label}</span><em>{preview ? "READY" : runState === "running" ? "COLLECTING" : "WAITING"}</em></div><p>{preview || "문서 생성 전"}</p>{preview && <span className="evidence-detail-link" aria-hidden="true">상세 보기 <ChevronRight size={12} /></span>}</button>;
+            })}</div>
+          </article>
+          <article className={ontologyGraphCardClass}>
+            <div className="build-step-header"><span className="build-step-number">02</span><div><h3>Ontology &amp; GraphRAG Build</h3><small>POST /api/graph/ontology/generate → /api/graph/build</small></div><strong>{ontologyGraphStatus}</strong></div>
+            <p>{stage < 3 ? "수집한 근거를 엔터티·관계 타입으로 구성한 뒤, Neo4j 지식그래프로 순차 적재합니다." : "생성된 온톨로지를 바탕으로 문서 청크에서 엔터티·관계를 추출하고 Neo4j 지식그래프를 실시간 구축합니다."}</p>
+            {stage === 2 && <div className="build-progress-line"><LoaderCircle size={15} className="spin" /> 시나리오 문맥에서 구성요소를 추출하는 중</div>}
+            {stage === 3 && <div className="build-progress-line"><LoaderCircle size={15} className="spin" /> {mirofishProgress?.message ?? "Neo4j 지식그래프에 문서 청크를 적재하는 중"}</div>}
             <div className="build-chip-group"><small>GENERATED ENTITY TYPES</small><div>{entityTypes.map((item) => <span key={item}>{item}</span>)}</div></div>
-            {stage === 1 && <div className="build-progress-line"><LoaderCircle size={15} className="spin" /> 시나리오 문맥에서 구성요소를 추출하는 중</div>}
-          </article>
-          <article className={cardClass(2)}>
-            <div className="build-step-header"><span className="build-step-number">02</span><div><h3>GraphRAG Build</h3><small>POST /api/graph/build</small></div><strong>{statusFor(2)}</strong></div>
-            <p>추출된 온톨로지를 바탕으로 KOSPI 지수·종목·환율·이벤트 사이의 연결을 그래프로 묶습니다.</p>
-            <div className="build-result-grid"><div><b>{stage > 1 ? "42" : "—"}</b><small>ENTITY NODES</small></div><div><b>{stage > 1 ? "68" : "—"}</b><small>RELATION EDGES</small></div><div><b>{stage > 1 ? "7" : "—"}</b><small>SCHEMA TYPES</small></div></div>
             <div className="build-chip-group"><small>GENERATED RELATION TYPES</small><div>{relationTypes.map((item) => <span key={item}>{item}</span>)}</div></div>
-          </article>
-          <article className={cardClass(3)}>
-            <div className="build-step-header"><span className="build-step-number">03</span><div><h3>Generate Agent Profiles</h3><small>POST /api/simulation/prepare</small></div><strong>{statusFor(3)}</strong></div>
-            <p>환경 시드와 연결된 엔터티를 역할별 에이전트로 바꾸고, 각자의 관점·활동량·편향을 설정합니다.</p>
-            <div className="build-result-grid"><div><b>{stage > 3 ? "24" : "—"}</b><small>CURRENT AGENTS</small></div><div><b>{stage > 3 ? "24" : "—"}</b><small>EXPECTED TOTAL</small></div><div><b>{stage > 3 ? "96" : "—"}</b><small>RELATED TOPICS</small></div></div>
-            {stage >= 3 && <div className="agent-profile-grid">{profileCards.map((profile) => <article key={profile.handle} className="agent-profile-card"><div className="agent-profile-top"><span className="agent-avatar"><UserRound size={16} /></span><div><strong>{profile.name}</strong><small>{profile.handle}</small></div><em>{profile.stance}</em></div><span className="agent-profile-type">{profile.type}</span><p>{profile.body}</p><div className="agent-topic-row"><span>반도체</span><span>수급</span><span>변동성</span></div></article>)}</div>}
-            {stage === 3 && <div className="build-progress-line"><LoaderCircle size={15} className="spin" /> 에이전트 프로필과 관련 토픽을 생성하는 중</div>}
+            <div className="build-result-grid"><div><b>{graphSnapshot?.nodeCount ?? mirofishRun?.nodeCount ?? "—"}</b><small>ENTITY NODES</small></div><div><b>{graphSnapshot?.edgeCount ?? mirofishRun?.edgeCount ?? "—"}</b><small>RELATION EDGES</small></div><div><b>{entityTypes.length || "—"}</b><small>SCHEMA TYPES</small></div></div>
           </article>
           <article className={cardClass(4)}>
-            <div className="build-step-header"><span className="build-step-number">04</span><div><h3>Generate Config</h3><small>POST /api/simulation/prepare</small></div><strong>{statusFor(4)}</strong></div>
+            <div className="build-step-header"><span className="build-step-number">03</span><div><h3>Generate Agent Profiles</h3><small>POST /api/simulation/prepare</small></div><strong>{statusFor(4)}</strong></div>
+            <p>환경 시드와 연결된 엔터티를 역할별 에이전트로 바꾸고, 각자의 관점·활동량·편향을 설정합니다.</p>
+            <div className="build-result-grid"><div><b>{mirofishRun?.profileCount ?? "—"}</b><small>CURRENT AGENTS</small></div><div><b>{mirofishRun?.entityCount ?? "—"}</b><small>EXPECTED TOTAL</small></div><div><b>{mirofishRun ? "READY" : "—"}</b><small>PROFILE OUTPUT</small></div></div>
+            {stage >= 4 && <div className="agent-profile-grid">{profileCards.map((profile) => <article key={profile.handle} className="agent-profile-card"><div className="agent-profile-top"><span className="agent-avatar"><UserRound size={16} /></span><div><strong>{profile.name}</strong><small>{profile.handle}</small></div><em>{profile.stance}</em></div><span className="agent-profile-type">{profile.type}</span><p>{profile.body}</p><div className="agent-topic-row"><span>반도체</span><span>수급</span><span>변동성</span></div></article>)}</div>}
+            {stage === 4 && <div className="build-progress-line"><LoaderCircle size={15} className="spin" /> 에이전트 프로필과 관련 토픽을 생성하는 중</div>}
+          </article>
+          <article className={cardClass(5)}>
+            <div className="build-step-header"><span className="build-step-number">04</span><div><h3>Generate Config</h3><small>POST /api/simulation/prepare</small></div><strong>{statusFor(5)}</strong></div>
             <p>시나리오 요구사항과 에이전트 프로필을 바탕으로 시장 환경값, 라운드, 활동 시간과 모델 설정을 계산합니다.</p>
             <div className="config-metric-grid"><div><span>Duration</span><b>{period === "7일" ? "7 days" : period === "3개월" ? "90 days" : "30 days"}</b></div><div><span>Round Duration</span><b>60 min</b></div><div><span>Total Rounds</span><b>{period === "7일" ? "168" : period === "3개월" ? "2160" : "720"} rounds</b></div><div><span>Active / Hour</span><b>12–34</b></div></div>
             <div className="config-row-list"><div><strong>Peak Hours</strong><span>19:00, 20:00, 21:00, 22:00</span><em>×1.5</em></div><div><strong>Work Hours</strong><span>09:00–18:00</span><em>×0.7</em></div><div><strong>Morning Hours</strong><span>06:00–08:00</span><em>×0.4</em></div><div><strong>Off-Peak Hours</strong><span>00:00–05:00</span><em>×0.05</em></div></div>
-            {stage === 4 && <div className="build-progress-line"><LoaderCircle size={15} className="spin" /> 시뮬레이션 환경값을 계산하는 중</div>}
-            {stage >= 4 && <div className="llm-reasoning"><small>LLM CONFIG REASONING</small><p><strong>Time config:</strong> KOSPI 시나리오는 장중 수급과 미국 시장 반응이 겹치는 30일을 기준으로 설정했습니다. 저녁 피크에는 미국 금리·AI CapEx 뉴스가 집중되고, 장 시작 전에는 환율과 외국인 선물 수급이 반영되도록 활동량을 조정합니다.</p><p><strong>Event config:</strong> SK하이닉스 실적과 외국인 순매수 회복을 초기 이벤트로 두고, 원·달러와 CXMT 경쟁 심화가 반대 방향의 변동성을 만들도록 구성했습니다.</p></div>}
+            {stage === 5 && <div className="build-progress-line"><LoaderCircle size={15} className="spin" /> 시뮬레이션 환경값을 계산하는 중</div>}
+            {stage >= 5 && <div className="llm-reasoning"><small>LLM CONFIG REASONING</small><p><strong>Time config:</strong> KOSPI 시나리오는 장중 수급과 미국 시장 반응이 겹치는 30일을 기준으로 설정했습니다. 저녁 피크에는 미국 금리·AI CapEx 뉴스가 집중되고, 장 시작 전에는 환율과 외국인 선물 수급이 반영되도록 활동량을 조정합니다.</p><p><strong>Event config:</strong> SK하이닉스 실적과 외국인 순매수 회복을 초기 이벤트로 두고, 원·달러와 CXMT 경쟁 심화가 반대 방향의 변동성을 만들도록 구성했습니다.</p></div>}
           </article>
-          <article className={cardClass(5)}>
-            <div className="build-step-header"><span className="build-step-number">04</span><div><h3>Initial Activation Orchestration</h3><small>POST /api/simulation/prepare</small></div><strong>{statusFor(5)}</strong></div>
+          <article className={cardClass(6)}>
+            <div className="build-step-header"><span className="build-step-number">05</span><div><h3>Initial Activation Orchestration</h3><small>POST /api/simulation/prepare</small></div><strong>{statusFor(6)}</strong></div>
             <p>에이전트의 첫 행동과 시장 내러티브 방향을 정해 시뮬레이션의 출발점을 고정합니다.</p>
             <div className="narrative-guide"><span><Sparkles size={14} /> NARRATIVE GUIDE DIRECTION</span><p>외국인 수급이 돌아오고 반도체 실적이 기대를 웃돌면서 KOSPI가 기술적 반등을 시도합니다. 다만 환율과 금리 변수에 따라 반등의 폭은 달라집니다.</p></div>
-            <div className="hot-topic-row"><small>INITIAL HOT TOPICS</small><div><span># KOSPI</span><span># 외국인 순매수</span><span># SK하이닉스</span><span># AI CapEx</span><span># 원·달러</span></div></div>
-            {stage >= 5 && <div className="activation-sequence"><small>INITIAL ACTIVATION SEQUENCE (4)</small>{["SK하이닉스 실적 발표가 컨센서스를 웃돌았습니다.","외국인 현물·선물 순매수가 동시에 포착됩니다.","미국 빅테크가 AI CapEx 유지 계획을 발표합니다.","원·달러 환율이 안정되며 위험 선호가 회복됩니다."].map((item,index)=><div key={item}><b>0{index+1}</b><span>{item}</span></div>)}</div>}
-          </article>
-          <article className={`build-step-card build-ready-card ${stage > 6 ? "done" : stage === 6 ? "active" : "waiting"}`}>
-            <div className="build-step-header"><span className="build-step-number">05</span><div><h3>Ready</h3><small>POST /api/simulation/start</small></div><strong>{simulationStarted ? "RUNNING" : stage >= 6 ? "READY" : statusFor(6)}</strong></div>
-            <p>{simulationStarted ? "시뮬레이션이 시작되었습니다. 에이전트들이 초기 환경에서 상호작용을 생성하고 있습니다." : "시뮬레이션 환경이 준비되었습니다. 설정을 확인한 뒤 실행할 수 있습니다."}</p>
-            <div className="ready-rounds"><b>{period === "7일" ? "168" : period === "3개월" ? "2160" : "720"}</b><span>rounds</span><em>Est. {period === "7일" ? "~6 min" : period === "3개월" ? "~72 min" : "~24 min"}</em></div>
-            <button className="build-continue-button" type="button" onClick={onStartSimulation} disabled={stage < 6 || simulationStarted}>{simulationStarted ? <>시뮬레이션 실행 중 <LoaderCircle size={17} className="spin" /></> : stage >= 6 ? <>Start KOSPI Scenario Simulation <ArrowRight size={17} /></> : <><LoaderCircle size={17} className="spin" /> 이전 단계 처리 중</>}</button>
+            <div className="hot-topic-row"><small>INITIAL HOT TOPICS</small><div><span>{mirofishRun ? `${mirofishRun.initialPostsCount ?? 0} INITIAL POSTS` : "시뮬레이션 설정 생성 후 표시"}</span></div></div>
+            {stage >= 6 && <div className="activation-sequence"><small>INITIAL ACTIVATION SEQUENCE (4)</small>{["SK하이닉스 실적 발표가 컨센서스를 웃돌았습니다.","외국인 현물·선물 순매수가 동시에 포착됩니다.","미국 빅테크가 AI CapEx 유지 계획을 발표합니다.","원·달러 환율이 안정되며 위험 선호가 회복됩니다."].map((item,index)=><div key={item}><b>0{index+1}</b><span>{item}</span></div>)}</div>}
+            <div className={`simulation-ready-summary ${complete && mirofishRun ? "ready" : ""}`}><div><span>SIMULATION READY</span><strong>{runState === "complete" && mirofishRun ? "시나리오 실행 준비가 완료되었습니다" : runState === "error" ? "준비 작업을 완료하지 못했습니다" : "시뮬레이션 준비 작업 진행 중"}</strong><p>{mirofishRun ? `지식그래프 ${mirofishRun.nodeCount ?? 0}개 노드 · ${mirofishRun.edgeCount ?? 0}개 관계 · 에이전트 ${mirofishRun.profileCount ?? 0}명` : "온톨로지, 그래프, 에이전트, 초기 활성화 결과를 정리하고 있습니다."}</p></div><div className="simulation-ready-action"><div className="ready-rounds"><b>{period === "7일" ? "168" : period === "3개월" ? "2160" : "720"}</b><span>rounds</span><em>Est. {period === "7일" ? "~6 min" : period === "3개월" ? "~72 min" : "~24 min"}</em></div>{runState === "complete" && mirofishRun ? <button className="build-continue-button" type="button" onClick={onStartSimulation} disabled={simulationStarting || simulationStarted}>{simulationStarting ? <><LoaderCircle size={17} className="spin" /> 시나리오를 시작하고 있습니다</> : simulationStarted ? <><CheckCircle2 size={17} /> 시나리오 실행을 시작했습니다</> : <><Network size={17} /> 시나리오 시작하기</>}</button> : <div className="build-continue-button build-result-status">{runState === "running" ? <><LoaderCircle size={17} className="spin" /> 준비 작업 진행 중</> : runState === "error" ? <>실행 오류 · 로그 확인 필요</> : <>실행 준비 중</>}</div>}</div></div>
           </article>
         </section>
       </div>
+      {selectedEvidence && <div className="evidence-document-backdrop" role="presentation" onMouseDown={() => setSelectedEvidence(null)}><section className="evidence-document-modal" role="dialog" aria-modal="true" aria-labelledby="evidence-document-title" onMouseDown={(event) => event.stopPropagation()}><header><div><span>EVIDENCE DOCUMENT</span><h3 id="evidence-document-title">{selectedEvidence.name}</h3><p>수집이 완료된 원문 전체를 확인합니다.</p></div><button className="scenario-modal-close" type="button" onClick={() => setSelectedEvidence(null)} aria-label="Evidence 문서 닫기"><X size={18} /></button></header><EvidenceMarkdown content={selectedEvidence.content} /></section></div>}
+    </div>
+  );
+}
+
+const simulationActionLabels: Record<string, string> = {
+  CREATE_POST: "게시물 작성",
+  CREATE_COMMENT: "댓글 작성",
+  LIKE_POST: "게시물 반응",
+  LIKE_COMMENT: "댓글 반응",
+  REPOST: "게시물 공유",
+  QUOTE_POST: "인용 게시물",
+  FOLLOW: "에이전트 팔로우",
+  SEARCH: "정보 탐색",
+  DO_NOTHING: "관망",
+};
+
+function simulationActionContent(action: SimulationAction) {
+  for (const key of ["content", "text", "body", "query", "comment", "reason"]) {
+    const value = action.action_args?.[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  const target = action.action_args?.target_user_id ?? action.action_args?.post_id ?? action.action_args?.comment_id;
+  if (target !== undefined && target !== null) return `대상 ${String(target)}`;
+  return action.success ? "시뮬레이션 행동이 반영되었습니다." : "행동 처리 결과를 확인하고 있습니다.";
+}
+
+function simulationTimeLabel(timestamp?: string) {
+  if (!timestamp) return "방금";
+  const parsed = new Date(timestamp);
+  if (Number.isNaN(parsed.getTime())) return "방금";
+  return parsed.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+function ScenarioRunScreen({
+  prompt,
+  period,
+  mirofishRun,
+  session,
+  chatMessages,
+  chatSending,
+  chatError,
+  simulationStarting,
+  onSendMessage,
+  onRetry,
+  onClose,
+}: {
+  prompt: string;
+  period: string;
+  mirofishRun: MirofishRun | null;
+  session: SimulationSession | null;
+  chatMessages: SimulationChatMessage[];
+  chatSending: boolean;
+  chatError: string | null;
+  simulationStarting: boolean;
+  onSendMessage: (message: string) => Promise<void>;
+  onRetry: () => void;
+  onClose: () => void;
+}) {
+  const [draft, setDraft] = useState("");
+  const runtime = session?.runtime;
+  const status = session?.status ?? "starting";
+  const completed = status === "completed" || runtime?.runner_status === "completed";
+  const failed = status === "failed" || runtime?.runner_status === "failed";
+  const running = !completed && !failed;
+  const progress = completed ? 100 : Math.max(0, Math.min(100, runtime?.progress_percent ?? 0));
+  const currentRound = runtime?.current_round ?? 0;
+  const totalRounds = runtime?.total_rounds ?? (period === "7일" ? 168 : period === "3개월" ? 2160 : 720);
+  const actions = runtime?.recent_actions ?? [];
+  const activeBatch = runtime?.active_batch;
+  const activeBatchMatch = activeBatch?.label?.match(/^(twitter|reddit)-round-(\d+)$/);
+  const activePlatform = activeBatchMatch?.[1] === "twitter" ? "Twitter" : activeBatchMatch?.[1] === "reddit" ? "Reddit" : null;
+  const batchTotal = activeBatch?.actions_count ?? 0;
+  const batchCompleted = activeBatch?.completed_actions ?? 0;
+  const batchActionCopy = batchCompleted > 0
+    ? `${batchTotal.toLocaleString("ko-KR")}명 중 ${batchCompleted.toLocaleString("ko-KR")}명 처리 중`
+    : `${batchTotal.toLocaleString("ko-KR")}개 에이전트 행동을 계산하고 있습니다`;
+  const progressCopy = running && activeBatch?.status === "running"
+    ? `${activePlatform ? `${activePlatform} · ` : ""}${activeBatchMatch?.[2] ? `${activeBatchMatch[2]}라운드 · ` : ""}${batchActionCopy}`
+    : running ? "에이전트 행동을 계산하고 있습니다" : completed ? "모든 라운드 계산이 끝났습니다" : "실행 상태를 확인할 수 없습니다";
+  const intro = completed
+    ? "시뮬레이션이 완료되었습니다. 수집 근거, 지식그래프, 전체 에이전트 행동을 함께 살펴보며 질문에 답해드릴게요."
+    : "시뮬레이션이 진행 중입니다. 현재까지 누적된 실제 Evidence와 가상 에이전트 행동을 구분해 답해드릴게요.";
+  const suggestions = completed
+    ? ["시뮬레이션의 핵심 결론을 요약해줘", "상승·하락을 가른 핵심 관계는 뭐야?", "실제 확인해야 할 지표를 정리해줘"]
+    : ["현재까지 어떤 흐름이 나타났어?", "에이전트 반응이 가장 큰 이슈는 뭐야?", "실제 근거와 가상 행동을 구분해줘"];
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const message = draft.trim();
+    if (!message || chatSending || !session?.chat_ready) return;
+    setDraft("");
+    await onSendMessage(message);
+  };
+
+  return (
+    <div className="scenario-run-screen">
+      <header className="scenario-run-header">
+        <div>
+          <span>FINVERSE · LIVE SIMULATION</span>
+          <h2 id="scenario-run-title">{completed ? "시나리오 실행이 완료되었습니다" : failed ? "시나리오 실행을 확인해주세요" : "시나리오가 실행되고 있습니다"}</h2>
+          <p>{prompt}</p>
+        </div>
+        <div className="scenario-run-header-actions">
+          <span className={`scenario-run-status ${completed ? "complete" : failed ? "failed" : "live"}`}>{running && <i />} {completed ? "COMPLETED" : failed ? "ERROR" : "LIVE"}</span>
+          <button className="scenario-modal-close" type="button" onClick={onClose} aria-label="시뮬레이션 화면 닫기"><X size={20} /></button>
+        </div>
+      </header>
+
+      <section className="scenario-run-overview" aria-label="시뮬레이션 실행 현황">
+        <div className="scenario-run-progress-copy"><span>{progressCopy}</span><strong>{progress.toFixed(progress % 1 ? 1 : 0)}%</strong></div>
+        <div className="scenario-run-progress"><i style={{ width: `${progress}%` }} /></div>
+        <div className="scenario-run-metrics">
+          <div><Clock3 size={17} /><span>ROUND</span><strong>{currentRound.toLocaleString("ko-KR")} <em>/ {totalRounds.toLocaleString("ko-KR")}</em></strong></div>
+          <div><UsersRound size={17} /><span>AGENTS</span><strong>{(mirofishRun?.profileCount ?? 0).toLocaleString("ko-KR")}</strong></div>
+          <div><Activity size={17} /><span>ACTIONS</span><strong>{(runtime?.total_actions_count ?? 0).toLocaleString("ko-KR")}</strong></div>
+          <div><Network size={17} /><span>KNOWLEDGE</span><strong>{(mirofishRun?.nodeCount ?? 0).toLocaleString("ko-KR")} <em>nodes</em></strong></div>
+        </div>
+        {failed && <div className="scenario-run-error"><span>{session?.error ?? "시뮬레이션 실행 중 오류가 발생했습니다."}</span><button type="button" onClick={onRetry} disabled={simulationStarting}>{simulationStarting ? <><LoaderCircle size={13} className="spin" /> 다시 시작하는 중</> : <>시뮬레이션 다시 시작</>}</button></div>}
+      </section>
+
+      <div className="scenario-run-grid">
+        <section className="scenario-action-panel" aria-label="실시간 에이전트 행동">
+          <div className="scenario-run-panel-heading"><div><Radio size={16} /><span>LIVE AGENT ACTIVITY</span></div><em>{actions.length ? `최근 ${actions.length}개` : "연결 중"}</em></div>
+          <div className="scenario-action-stream">
+            {actions.length ? [...actions].reverse().map((action, index) => (
+              <article className="scenario-action-item" key={`${action.platform}-${action.round_num}-${action.agent_id}-${action.timestamp ?? index}-${index}`}>
+                <div className={`scenario-action-avatar ${action.platform}`}><UserRound size={15} /></div>
+                <div className="scenario-action-body">
+                  <div><strong>{action.agent_name || `Agent ${action.agent_id}`}</strong><span>{action.platform === "twitter" ? "X / Twitter" : action.platform === "reddit" ? "Reddit" : action.platform}</span><time>{simulationTimeLabel(action.timestamp)}</time></div>
+                  <p>{simulationActionContent(action)}</p>
+                  <footer><span>{simulationActionLabels[action.action_type] ?? action.action_type.replaceAll("_", " ")}</span><em>Round {action.round_num}</em></footer>
+                </div>
+              </article>
+            )) : (
+              <div className="scenario-action-empty"><span><LoaderCircle size={22} className={running ? "spin" : ""} /></span><strong>{running ? "첫 에이전트 행동을 기다리고 있습니다" : "기록된 에이전트 행동이 없습니다"}</strong><p>실행 환경이 준비되면 게시물, 댓글, 반응이 이곳에 실시간으로 나타납니다.</p></div>
+            )}
+          </div>
+        </section>
+
+        <section className="scenario-chat-panel" aria-label="시뮬레이션 AI 채팅">
+          <div className="scenario-run-panel-heading"><div><MessageCircle size={16} /><span>SCENARIO CHAT</span></div><em>{session?.chat_ready ? "EVIDENCE CONNECTED" : "연결 준비 중"}</em></div>
+          <Conversation className="scenario-chat-conversation">
+            <ConversationContent className="scenario-chat-content">
+              <div className="scenario-chat-message assistant">
+                <div className="scenario-chat-assistant"><SimulationMessageResponse>{intro}</SimulationMessageResponse></div>
+              </div>
+              {chatMessages.map((message) => (
+                <div className={`scenario-chat-message ${message.role}`} key={message.id}>
+                  <div className={message.role === "assistant" ? "scenario-chat-assistant" : "scenario-chat-user"}>
+                    {message.role === "assistant" ? <SimulationMessageResponse>{message.content}</SimulationMessageResponse> : <p>{message.content}</p>}
+                    {message.role === "assistant" && Boolean(message.sources?.length) && <div className="scenario-chat-sources">{message.sources?.map((source) => <span key={`${message.id}-${source}`}>{source}</span>)}</div>}
+                  </div>
+                </div>
+              ))}
+              {chatSending && <div className="scenario-chat-message assistant"><div className="scenario-chat-thinking"><LoaderCircle size={15} className="spin" /> 근거와 시뮬레이션 행동을 함께 확인하고 있습니다.</div></div>}
+            </ConversationContent>
+            <ConversationScrollButton className="scenario-chat-scroll" />
+          </Conversation>
+          {!chatMessages.length && <div className="scenario-chat-suggestions">{suggestions.map((suggestion) => <button key={suggestion} type="button" disabled={!session?.chat_ready || chatSending} onClick={() => void onSendMessage(suggestion)}>{suggestion}</button>)}</div>}
+          {chatError && <p className="scenario-chat-error">{chatError}</p>}
+          <form className="scenario-chat-form" onSubmit={submit}>
+            <textarea value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} disabled={!session?.chat_ready || chatSending} placeholder={session?.chat_ready ? "현재 시뮬레이션에 대해 질문해보세요" : "실행 환경이 연결되면 채팅할 수 있습니다"} rows={2} />
+            <button type="submit" disabled={!draft.trim() || !session?.chat_ready || chatSending} aria-label="질문 보내기">{chatSending ? <LoaderCircle size={17} className="spin" /> : <Send size={17} />}</button>
+          </form>
+          <p className="scenario-chat-note">실제 Evidence와 Neo4j 관계, 가상 에이전트 행동을 구분해 답변합니다.</p>
+        </section>
+      </div>
+      <footer className="scenario-run-footer"><span>SESSION {session?.job_id ? session.job_id.slice(0, 18) : "연결 중"}</span><span>{period} 예측 · 실제 투자 결과를 보장하지 않는 조건부 시뮬레이션입니다.</span></footer>
     </div>
   );
 }
@@ -1209,12 +1602,25 @@ export default function Home() {
   const [editorialState, setEditorialState] = useState<EditorialState>("fallback");
   const [editorialMeta, setEditorialMeta] = useState<{ generatedAt: string; model: string } | null>(null);
   const [builderOpen, setBuilderOpen] = useState(false);
-  const [builderMode, setBuilderMode] = useState<"form" | "build">("form");
+  const [builderMode, setBuilderMode] = useState<"form" | "build" | "run">("form");
   const [buildStage, setBuildStage] = useState<BuildStage>(1);
+  const [ontologyRunState, setOntologyRunState] = useState<OntologyRunState>("idle");
+  const [ontologyLogs, setOntologyLogs] = useState<OntologyLog[]>([]);
+  const [ontologyDocuments, setOntologyDocuments] = useState<OntologyDocument[]>([]);
+  const [ontologyOutputDir, setOntologyOutputDir] = useState<string | null>(null);
+  const [mirofishRun, setMirofishRun] = useState<MirofishRun | null>(null);
+  const [mirofishProgress, setMirofishProgress] = useState<MirofishProgress | null>(null);
+  const [ontologySchema, setOntologySchema] = useState<OntologySchema | null>(null);
+  const [graphSnapshot, setGraphSnapshot] = useState<LiveGraphSnapshot | null>(null);
+  const [simulationStarting, setSimulationStarting] = useState(false);
   const [simulationStarted, setSimulationStarted] = useState(false);
+  const [simulationSession, setSimulationSession] = useState<SimulationSession | null>(null);
+  const [simulationChatMessages, setSimulationChatMessages] = useState<SimulationChatMessage[]>([]);
+  const [simulationChatSending, setSimulationChatSending] = useState(false);
+  const [simulationRuntimeError, setSimulationRuntimeError] = useState<string | null>(null);
   const [selectedSeeds, setSelectedSeeds] = useState<string[]>(["외국인 순매수 회복", "SK하이닉스 실적 서프라이즈"]);
   const [period, setPeriod] = useState("30일");
-  const [scenarioPrompt, setScenarioPrompt] = useState("8월 말까지 외국인 수급과 반도체 실적이 KOSPI에 미치는 영향을 비교해줘.");
+  const [scenarioPrompt, setScenarioPrompt] = useState("현재 코스피 시장에서 반도체 실적과 외국인 수급 변화가 향후 1개월 코스피에 미칠 영향은 무엇인가");
   const [uploadedSeedFile, setUploadedSeedFile] = useState<UploadedSeed | null>(null);
   const scenarioScrollY = useRef<number | null>(null);
   const buildTimer = useRef<number | null>(null);
@@ -1309,7 +1715,17 @@ export default function Home() {
     if (buildTimer.current) window.clearTimeout(buildTimer.current);
     setBuilderMode("form");
     setBuildStage(1);
+    setOntologyRunState("idle");
+    setOntologyLogs([]);
+    setOntologyDocuments([]);
+    setOntologyOutputDir(null);
+    setMirofishRun(null);
+    setSimulationStarting(false);
     setSimulationStarted(false);
+    setSimulationSession(null);
+    setSimulationChatMessages([]);
+    setSimulationChatSending(false);
+    setSimulationRuntimeError(null);
     setBuilderOpen(true);
   };
 
@@ -1394,32 +1810,247 @@ export default function Home() {
   };
 
   const runCustomScenario = () => {
-    const activeSeeds = selectedSeeds.length ? selectedSeeds : ["KOSPI 기본 환경"];
+    const question = scenarioPrompt.trim();
+    if (question.length < 8) {
+      setOntologyLogs([{ source: "system", line: "예측 시나리오 질문을 8자 이상 입력해주세요." }]);
+      return;
+    }
     setSelectedScenario({
       ...scenarios[0],
       id: "custom",
-      title: activeSeeds.slice(0, 2).join(" · "),
+      title: "사용자 예측 시나리오",
       duration: period,
-      tags: activeSeeds.slice(0, 2),
-      summary: `${activeSeeds.join(", ")} 조건을 바탕으로 ${period} 동안 KOSPI와 연결된 종목·환율·수급·이벤트의 상호작용을 분석하는 사용자 지정 시나리오입니다. ${scenarioPrompt}`,
+      tags: ["사용자 질문", period],
+      summary: `${period} 동안 KOSPI와 연결된 시장·경제·이벤트 근거를 수집하는 사용자 지정 시나리오입니다. ${question}`,
       forecast: "조건부 경로 계산",
     });
     setBuilderMode("build");
     setBuildStage(1);
+    setOntologyRunState("running");
+    setOntologyOutputDir(null);
+    setOntologyDocuments([]);
+    setOntologyLogs([{ source: "system", line: "데이터 수집을 위한 작업을 시작했습니다." }]);
+    setMirofishRun(null);
+    setMirofishProgress(null);
+    setOntologySchema(null);
+    setGraphSnapshot(null);
+    setSimulationStarting(false);
     setSimulationStarted(false);
+    setSimulationSession(null);
+    setSimulationChatMessages([]);
+    setSimulationChatSending(false);
+    setSimulationRuntimeError(null);
     setScenarioDetailOpen(false);
-    let nextStage: BuildStage = 1;
-    const advanceBuild = () => {
-      if (nextStage >= 6) return;
-      nextStage = (nextStage + 1) as BuildStage;
-      setBuildStage(nextStage);
-      if (nextStage < 6) buildTimer.current = window.setTimeout(advanceBuild, 5000);
-    };
-    buildTimer.current = window.setTimeout(advanceBuild, 5000);
+    const sessionStorageKey = "finverse.ontology-session-id";
+    let sessionId = window.localStorage.getItem(sessionStorageKey);
+    if (!sessionId) {
+      sessionId = window.crypto.randomUUID();
+      window.localStorage.setItem(sessionStorageKey, sessionId);
+    }
+    fetch("/api/ontology/run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: question, period, sessionId }),
+    }).then(async (response) => {
+      if (!response.ok || !response.body) throw new Error((await response.json().catch(() => null) as { error?: string } | null)?.error ?? "온톨로지 실행을 시작하지 못했습니다.");
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let reachedTerminalEvent = false;
+      type GraphEventPayload = { nodes?: unknown; edges?: unknown; node_count?: unknown; edge_count?: unknown; progress?: unknown; message?: string };
+      const applyGraphEvent = (payload: GraphEventPayload) => {
+        if (!Array.isArray(payload.nodes) || !Array.isArray(payload.edges)) return;
+        const nodes = payload.nodes.flatMap((node) => {
+          if (!node || typeof node !== "object") return [];
+          const item = node as { id?: unknown; label?: unknown; type?: unknown };
+          return typeof item.id === "string" && typeof item.label === "string" ? [{ id: item.id, label: item.label, type: typeof item.type === "string" ? item.type : "Entity" }] : [];
+        });
+        const edges = payload.edges.flatMap((edge) => {
+          if (!edge || typeof edge !== "object") return [];
+          const item = edge as { source?: unknown; target?: unknown; label?: unknown };
+          return typeof item.source === "string" && typeof item.target === "string" ? [{ source: item.source, target: item.target, label: typeof item.label === "string" ? item.label : "RELATED_TO" }] : [];
+        });
+        setGraphSnapshot({
+          nodes,
+          edges,
+          nodeCount: typeof payload.node_count === "number" ? payload.node_count : nodes.length,
+          edgeCount: typeof payload.edge_count === "number" ? payload.edge_count : edges.length,
+        });
+      };
+      while (true) {
+        const { value, done } = await reader.read();
+        buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const raw of lines) {
+          if (!raw.trim()) continue;
+          const event = JSON.parse(raw) as { type?: string; source?: OntologyLog["source"]; line?: string; message?: string; outputDir?: string; items?: OntologyDocument[]; stage?: number; progress?: number; entity_types?: unknown; relation_types?: unknown; nodes?: unknown; edges?: unknown; graph_snapshot?: unknown; simulation_id?: string; profile_count?: number; entity_count?: number; node_count?: number; edge_count?: number; initial_posts_count?: number };
+          const line = event.line ?? event.message;
+          if (line) {
+            setOntologyLogs((current) => [...current.slice(-159), { source: event.source ?? "system", line }]);
+            if (line.includes("free-models-per-day")) {
+              setOntologyLogs((current) => [...current.slice(-159), { source: "system", line: "OpenRouter 무료 모델의 일일 요청 한도가 소진되었습니다. 일일 초기화 후 다시 실행하거나 OpenRouter 크레딧을 추가해주세요." }]);
+            }
+            try {
+              const result = JSON.parse(line) as { output_dir?: string };
+              if (result.output_dir) setOntologyOutputDir(result.output_dir);
+            } catch { /* regular text log */ }
+          }
+          if (event.type === "complete") {
+            reachedTerminalEvent = true;
+            setBuildStage(6);
+            setOntologyRunState("complete");
+          }
+          if (event.type === "error") {
+            reachedTerminalEvent = true;
+            setOntologyRunState("error");
+          }
+          if (event.type === "mirofish_stage" && event.stage && event.stage >= 2 && event.stage <= 6) {
+            setBuildStage(event.stage as BuildStage);
+            if (typeof event.progress === "number") setMirofishProgress({ stage: event.stage as BuildStage, percent: event.progress, message: event.message });
+            if (event.stage === 2 && Array.isArray(event.entity_types)) {
+              setOntologySchema({
+                entityTypes: event.entity_types.filter((item): item is string => typeof item === "string" && Boolean(item.trim())),
+                relationTypes: Array.isArray(event.relation_types) ? event.relation_types.filter((item): item is string => typeof item === "string" && Boolean(item.trim())) : [],
+              });
+            }
+            if (event.message) setOntologyLogs((current) => [...current.slice(-159), { source: "system", line: event.message! }]);
+          }
+          if (event.type === "mirofish_ready") {
+            reachedTerminalEvent = true;
+            setBuildStage(6);
+            setOntologyRunState("complete");
+            setMirofishRun({ simulationId: event.simulation_id ?? "", profileCount: event.profile_count, entityCount: event.entity_count, nodeCount: event.node_count, edgeCount: event.edge_count, initialPostsCount: event.initial_posts_count });
+            if (Array.isArray(event.entity_types)) {
+              setOntologySchema({
+                entityTypes: event.entity_types.filter((item): item is string => typeof item === "string" && Boolean(item.trim())),
+                relationTypes: Array.isArray(event.relation_types) ? event.relation_types.filter((item): item is string => typeof item === "string" && Boolean(item.trim())) : [],
+              });
+            }
+            if (event.graph_snapshot && typeof event.graph_snapshot === "object") {
+              applyGraphEvent(event.graph_snapshot as GraphEventPayload);
+            }
+          }
+          if (event.type === "mirofish_graph_snapshot" && Array.isArray(event.nodes) && Array.isArray(event.edges)) {
+            setBuildStage((current) => Math.max(current, 3) as BuildStage);
+            if (typeof event.progress === "number") {
+              setMirofishProgress({ stage: 3, percent: event.progress, message: event.message });
+            }
+            applyGraphEvent(event);
+          }
+          if (event.type === "mirofish_error") {
+            reachedTerminalEvent = true;
+            setOntologyRunState("error");
+          }
+          if (event.type === "documents") {
+            if (event.outputDir) setOntologyOutputDir(event.outputDir);
+            if (Array.isArray(event.items)) setOntologyDocuments(event.items);
+          }
+        }
+        if (done) {
+          if (!reachedTerminalEvent) {
+            setOntologyRunState("error");
+            setOntologyLogs((current) => [...current.slice(-159), {
+              source: "system",
+              line: "작업 연결이 예기치 않게 종료되었습니다. 진행 중이던 작업은 중단됐을 수 있으니 시뮬레이션을 다시 시작해주세요.",
+            }]);
+          }
+          break;
+        }
+      }
+    }).catch((error: unknown) => {
+      setOntologyRunState("error");
+      setOntologyLogs((current) => [...current, { source: "system", line: error instanceof Error ? error.message : "온톨로지 실행 중 알 수 없는 오류가 발생했습니다." }]);
+    });
   };
 
-  const startSimulation = () => {
-    setSimulationStarted(true);
+  const startPreparedSimulation = () => {
+    if (!ontologyOutputDir || !mirofishRun?.simulationId) return;
+    setSimulationStarting(true);
+    setSimulationRuntimeError(null);
+    fetch("/api/mirofish/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ outputDir: ontologyOutputDir, period }),
+    }).then(async (response) => {
+      const payload = await response.json().catch(() => null) as { job_id?: string; status?: string; error?: string } | null;
+      if (!response.ok) throw new Error(payload?.error ?? "시나리오를 시작하지 못했습니다.");
+      if (!payload?.job_id) throw new Error("시나리오 실행 작업 ID를 확인하지 못했습니다.");
+      setSimulationStarted(true);
+      setSimulationSession({
+        job_id: payload.job_id,
+        status: payload.status ?? "starting",
+        query: scenarioPrompt,
+        period,
+        simulation_id: mirofishRun.simulationId,
+        runtime: null,
+        chat_ready: payload.status === "running" || payload.status === "completed",
+        chat_messages: [],
+        error: null,
+      });
+      setSimulationChatMessages([]);
+      setBuilderMode("run");
+      setOntologyLogs((current) => [...current, { source: "system", line: "MiroFish 시나리오 실행을 시작했습니다." }]);
+    }).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : "시나리오 실행 중 오류가 발생했습니다.";
+      setSimulationRuntimeError(message);
+      setOntologyLogs((current) => [...current, { source: "system", line: message }]);
+    }).finally(() => setSimulationStarting(false));
+  };
+
+  useEffect(() => {
+    if (!builderOpen || builderMode !== "run" || !ontologyOutputDir) return;
+    let active = true;
+    let timer: number | null = null;
+    const poll = async () => {
+      try {
+        const response = await fetch("/api/mirofish/runtime", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ outputDir: ontologyOutputDir }),
+          cache: "no-store",
+        });
+        const payload = await response.json().catch(() => null) as SimulationSession | { error?: string } | null;
+        if (!response.ok) throw new Error(payload && "error" in payload ? payload.error ?? "실행 상태를 불러오지 못했습니다." : "실행 상태를 불러오지 못했습니다.");
+        if (!active || !payload || !("job_id" in payload)) return;
+        setSimulationSession(payload);
+        setSimulationChatMessages(Array.isArray(payload.chat_messages) ? payload.chat_messages : []);
+        setSimulationRuntimeError(payload.error ?? null);
+        if (payload.status === "starting" || payload.status === "running") timer = window.setTimeout(poll, 1_500);
+      } catch (error) {
+        if (!active) return;
+        setSimulationRuntimeError(error instanceof Error ? error.message : "실행 상태 연결이 잠시 끊겼습니다.");
+        timer = window.setTimeout(poll, 3_000);
+      }
+    };
+    void poll();
+    return () => {
+      active = false;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [builderMode, builderOpen, ontologyOutputDir]);
+
+  const sendSimulationMessage = async (message: string) => {
+    const content = message.trim();
+    if (!content || !ontologyOutputDir || simulationChatSending) return;
+    const optimistic: SimulationChatMessage = { id: `local-${Date.now()}`, role: "user", content };
+    setSimulationChatSending(true);
+    setSimulationRuntimeError(null);
+    setSimulationChatMessages((current) => [...current, optimistic]);
+    try {
+      const response = await fetch("/api/mirofish/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ outputDir: ontologyOutputDir, message: content }),
+      });
+      const payload = await response.json().catch(() => null) as { message?: SimulationChatMessage; error?: string } | null;
+      if (!response.ok || !payload?.message) throw new Error(payload?.error ?? "시뮬레이션 답변을 생성하지 못했습니다.");
+      setSimulationChatMessages((current) => [...current, payload.message!]);
+    } catch (error) {
+      setSimulationRuntimeError(error instanceof Error ? error.message : "시뮬레이션 채팅 연결에 실패했습니다.");
+    } finally {
+      setSimulationChatSending(false);
+    }
   };
 
   return (
@@ -1507,7 +2138,7 @@ export default function Home() {
                         const latest = live?.points.at(-1);
                         const values = live?.points.map((point) => point.close) ?? item.points;
                         const rate = latest?.changePct;
-                        const previousClose = latest && rate !== -100 ? latest.close / (1 + rate / 100) : latest?.close;
+                        const previousClose = latest && typeof rate === "number" && rate !== -100 ? latest.close / (1 + rate / 100) : latest?.close;
                         const change = latest && previousClose !== undefined ? latest.close - previousClose : undefined;
                         const tone = rate === undefined ? item.tone : rate >= 0 ? "up" : "down";
                         return (
@@ -1732,21 +2363,18 @@ export default function Home() {
         <div className="modal-backdrop scenario-builder-backdrop" onMouseDown={closeBuilder}>
           {builderMode === "form" ? (
             <section className="scenario-modal scenario-builder-modal" role="dialog" aria-modal="true" aria-labelledby="scenario-modal-title" onMouseDown={(event) => event.stopPropagation()}>
-              <header className="scenario-builder-header"><div><span>MY SCENARIO LAB · 2026.08.01</span><h2 id="scenario-modal-title">내 시나리오를 설계해보세요</h2><p>환경 시드와 나만의 질문을 입력하면 KOSPI 지식그래프를 만들고 미래 경로를 비교합니다.</p></div><button className="scenario-modal-close" type="button" onClick={closeBuilder} aria-label="시나리오 빌더 닫기"><X size={20} /></button></header>
-              <div className="builder-section-heading"><div><span>01 · ENVIRONMENT SEEDS</span><h3>시장의 출발 조건을 골라주세요</h3></div><small>26년 8월 1일 기준 준비된 변수</small></div>
-              <div className="builder-seed-grid">
-                {environmentSeeds.map((seed) => <button key={seed.id} type="button" className={selectedSeeds.includes(seed.label) ? "active" : ""} onClick={() => toggleSeed(seed.label)}><span className="builder-seed-top"><em>{seed.category}</em>{selectedSeeds.includes(seed.label) ? <CheckCircle2 size={15} /> : <Plus size={15} />}</span><strong>{seed.label}</strong><small>{seed.detail}</small></button>)}
-              </div>
-              <div className="builder-input-grid">
-                <div className="builder-group builder-upload-group"><div className="builder-section-heading compact"><div><span>02 · SOURCE DATA</span><h3>나만의 데이터 추가</h3></div></div><label className="upload-dropzone" htmlFor="scenario-seed-upload"><FileUp size={18} /><span>{uploadedSeedFile ? uploadedSeedFile.name : "파일을 끌어오거나 눌러 업로드"}</span><small>{uploadedSeedFile ? `${Math.max(1, Math.round(uploadedSeedFile.size / 1024))}KB · 그래프 시드로 사용` : "TXT · MD · CSV · JSON · PDF"}</small></label><input id="scenario-seed-upload" className="visually-hidden" type="file" accept=".txt,.md,.csv,.json,.pdf,text/*,application/pdf" onChange={handleSeedUpload} />{uploadedSeedFile?.preview && <p className="upload-preview">{uploadedSeedFile.preview}</p>}</div>
-                <div className="builder-group"><div className="builder-section-heading compact"><div><span>03 · SIMULATION PROMPT</span><h3>예측 시나리오 질문</h3></div></div><textarea className="scenario-prompt" value={scenarioPrompt} onChange={(event) => setScenarioPrompt(event.target.value)} placeholder="예: 외국인 수급이 회복되고 반도체 수출이 늘면 8월 말 KOSPI는 어떻게 움직일까?" rows={5} /><div className="builder-prompt-hint"><Sparkles size={14} /> 선택한 시드와 함께 에이전트 분석에 전달됩니다.</div></div>
-              </div>
+              <header className="scenario-builder-header"><div><span>MY SCENARIO LAB</span><h2 id="scenario-modal-title">내 시나리오를 예측해보세요</h2><p>질문과 예측 기간을 입력하면 최신 시장 근거로 온톨로지 문서를 생성합니다.</p></div><button className="scenario-modal-close" type="button" onClick={closeBuilder} aria-label="시나리오 빌더 닫기"><X size={20} /></button></header>
+              <div className="builder-question-section"><div className="builder-section-heading"><div><span>01 · FORECAST QUESTION</span><h3>예측 시나리오 질문</h3></div></div><textarea className="scenario-prompt" value={scenarioPrompt} onChange={(event) => setScenarioPrompt(event.target.value)} placeholder="예: 외국인 수급과 반도체 실적 변화가 향후 30일 코스피에 미칠 영향은 무엇일까?" rows={6} /><div className="builder-prompt-hint"><Sparkles size={14} /> 질문은 시장·경제·이벤트 Evidence 문서 생성에 사용됩니다.</div></div>
               <div className="builder-period-row"><div><span>예측 기간</span><small>지식그래프에서 경로를 계산할 구간</small></div><div className="builder-period-options">{["7일", "30일", "3개월"].map((item) => <button key={item} type="button" className={period === item ? "active" : ""} onClick={() => setPeriod(item)}>{item}</button>)}</div></div>
-              <button className="run-custom-button" type="button" onClick={runCustomScenario}><Network size={18} /> 시나리오 시작하기 <ArrowRight size={17} /></button>
+              <button className="run-custom-button" type="button" onClick={runCustomScenario}><Network size={18} /> 시뮬레이션 시작하기 <ArrowRight size={17} /></button>
+            </section>
+          ) : builderMode === "build" ? (
+            <section className="scenario-modal scenario-build-modal" role="dialog" aria-modal="true" aria-labelledby="scenario-build-title" onMouseDown={(event) => event.stopPropagation()}>
+              <ScenarioBuildScreen seeds={["사용자 질문"]} prompt={scenarioPrompt} uploadedFile={null} stage={buildStage} period={period} runState={ontologyRunState} logs={ontologyLogs} documents={ontologyDocuments} outputDir={ontologyOutputDir} mirofishRun={mirofishRun} mirofishProgress={mirofishProgress} ontologySchema={ontologySchema} graphSnapshot={graphSnapshot} simulationStarting={simulationStarting} simulationStarted={simulationStarted} onStartSimulation={startPreparedSimulation} onClose={closeBuilder} />
             </section>
           ) : (
-            <section className="scenario-modal scenario-build-modal" role="dialog" aria-modal="true" aria-labelledby="scenario-build-title" onMouseDown={(event) => event.stopPropagation()}>
-              <ScenarioBuildScreen seeds={selectedSeeds.length ? selectedSeeds : ["KOSPI 기본 환경"]} prompt={scenarioPrompt} uploadedFile={uploadedSeedFile} stage={buildStage} period={period} simulationStarted={simulationStarted} onStartSimulation={startSimulation} onClose={closeBuilder} />
+            <section className="scenario-modal scenario-run-modal" role="dialog" aria-modal="true" aria-labelledby="scenario-run-title" onMouseDown={(event) => event.stopPropagation()}>
+              <ScenarioRunScreen prompt={scenarioPrompt} period={period} mirofishRun={mirofishRun} session={simulationSession} chatMessages={simulationChatMessages} chatSending={simulationChatSending} chatError={simulationRuntimeError} simulationStarting={simulationStarting} onSendMessage={sendSimulationMessage} onRetry={startPreparedSimulation} onClose={closeBuilder} />
             </section>
           )}
         </div>
@@ -1783,7 +2411,7 @@ export default function Home() {
                 </article>
               ))}
             </div>
-            <small className="market-signal-modal-note">{selectedMarketSignal.analysisSource === "bedrock" ? `Amazon Bedrock 분석 · ${selectedMarketSignal.analysisGeneratedAt ? new Date(selectedMarketSignal.analysisGeneratedAt).toLocaleString("ko-KR") : "최신 배치"}` : "DB 원천을 규칙 기반으로 정리한 결과입니다."}</small>
+            <small className="market-signal-modal-note">{selectedMarketSignal.analysisSource === "openrouter" ? `OpenRouter Gemma 4 분석 · ${selectedMarketSignal.analysisGeneratedAt ? new Date(selectedMarketSignal.analysisGeneratedAt).toLocaleString("ko-KR") : "최신 배치"}` : "DB 원천을 규칙 기반으로 정리한 결과입니다."}</small>
           </section>
         </div>
       )}

@@ -40,7 +40,38 @@ FINVERSE_KOSPI_BRIDGE_PORT=5439
 FINVERSE_KOSPI_BRIDGE_URL=http://127.0.0.1:5439
 ```
 
+웹 시나리오 브리핑, 일일 시장 연결 분석, MiroFish와 온톨로지 Agent의 LLM 호출은 모두 OpenRouter의 `google/gemma-4-31b-it:free`를 기본으로 사용합니다. `.env`에는 다음 키 하나만 추가하면 됩니다.
+
+```env
+OPENROUTER_API_KEY=발급받은_키
+```
+
+AWS 리전, Bedrock 토큰, Anthropic 모델 설정은 필요하지 않습니다. 기본 모델이 429 제한을 반환하면 `google/gemma-4-26b-a4b-it:free`로 한 번 자동 재시도합니다. 모델 구성을 바꿔야 할 때만 선택적으로 `OPENROUTER_MODEL`과 `OPENROUTER_FALLBACK_MODEL`을 추가할 수 있습니다.
+
 `npm run dev`는 웹 앱과 SSH 데이터 브리지를 함께 실행합니다. 브리지는 `finverse-db` 컨테이너의 PostgreSQL에서 `lake.records` 중 `market_index_daily`와 KOSPI 레코드를 조회하고, 다음 OHLC 필드를 서비스에 전달합니다.
+
+### MiroFish 직접 실행 파이프라인
+
+시나리오 화면은 Evidence 문서 수집이 끝난 뒤 `agents/mirofish_pipeline.py`를 `uv`로 직접 실행합니다. MiroFish의 Flask API를 거치지 않고, 로컬 `MiroFish-Offline` 소스의 Python 서비스 클래스로 온톨로지 생성, Neo4j GraphRAG 구축, 에이전트 프로필, 시뮬레이션 설정과 초기 활성화 계획을 차례로 만듭니다. 결과는 각 실행의 Evidence 폴더 아래 `mirofish/`에 저장됩니다.
+
+```text
+Evidence .md 수집
+  → agents/mirofish_pipeline.py
+  → ontology.json · graph.json · agent profiles · simulation_config.json · initial-activation.json
+  → 사용자가 “시나리오 시작하기”를 누를 때 agents/mirofish_start.py 실행
+```
+
+`.env`에는 MiroFish 소스 위치와 로컬 그래프·임베딩 환경을 설정합니다. LLM 키를 별도로 비워두면 기존 `OPENROUTER_API_KEY`를 사용합니다.
+
+```env
+MIROFISH_OFFLINE_PATH=C:\Users\user\Documents\MiroFish-Offline
+MIROFISH_NEO4J_URI=bolt://localhost:7687
+MIROFISH_NEO4J_USER=neo4j
+MIROFISH_NEO4J_PASSWORD=mirofish
+MIROFISH_EMBEDDING_BASE_URL=http://localhost:11434
+```
+
+이 직접 실행 경로는 Neo4j와 Ollama 임베딩 모델(`nomic-embed-text`)이 필요합니다. MiroFish의 LLM은 OpenRouter처럼 OpenAI 호환 주소를 사용할 수 있지만, 그래프 임베딩은 별도 로컬 엔드포인트가 필요합니다.
 
 | 필드 | 용도 |
 | --- | --- |

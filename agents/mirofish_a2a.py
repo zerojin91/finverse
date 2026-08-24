@@ -17,10 +17,8 @@ from urllib.parse import urlparse
 from ddgs import DDGS
 from deepagents import CompiledSubAgent, create_deep_agent
 from langchain.agents import create_agent
-from langchain.chat_models import init_chat_model
 from langchain.tools import tool
 from langchain_core.tools import ToolException
-from langchain_aws import ChatBedrockConverse
 from langchain_openai import ChatOpenAI
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -37,11 +35,15 @@ MAX_ROWS = 100
 DEFAULT_DB_STATEMENT_TIMEOUT_MS = 60_000
 MAX_DB_STATEMENT_TIMEOUT_MS = 300_000
 DEFAULT_HORIZON = "365d"
-DEFAULT_BEDROCK_MODEL_ID = "amazon.nova-lite-v1:0"
-DEFAULT_BEDROCK_MAX_TOKENS = 4096
-DEFAULT_BEDROCK_TIMEOUT_SECONDS = 3600
-DEFAULT_MODEL = f"bedrock:{DEFAULT_BEDROCK_MODEL_ID}"
-DEFAULT_REASONING_EFFORT = "medium"
+DEFAULT_OPENROUTER_MODEL_ID = "google/gemma-4-31b-it:free"
+DEFAULT_OPENROUTER_FALLBACK_MODEL_IDS = (
+    "google/gemma-4-26b-a4b-it:free",
+    "dots-studio/dots-3-note-preview:free",
+    "poolside/laguna-s-2.1:free",
+)
+DEFAULT_OPENROUTER_MAX_TOKENS = 4096
+DEFAULT_OPENROUTER_TIMEOUT_SECONDS = 3600
+DEFAULT_MODEL = f"openrouter:{DEFAULT_OPENROUTER_MODEL_ID}"
 
 REQUIRED_EVIDENCE_HEADINGS = {
     "market": ("# Market Evidence", "## Scenario-Aligned Retrieval Plan", "## Current State", "## Raw Time Series", "## Investor Flow", "## Similar Historical Cases", "## Feedback and Scope Gaps", "## Relation Candidates", "## Evidence Register", "## Limitations"),
@@ -112,7 +114,7 @@ def _environment_int(name: str, default: int, *, minimum: int = 1) -> int:
 
 
 def _environment_float(name: str, default: float) -> float:
-    """Read a model temperature in the Bedrock-supported 0-1 range."""
+    """Read a model temperature in the provider-supported 0-1 range."""
     try:
         value = float(os.environ.get(name, str(default)))
     except ValueError as exc:
@@ -122,41 +124,71 @@ def _environment_float(name: str, default: float) -> float:
     return value
 
 
+def _openrouter_fallback_models(primary_model_id: str) -> list[str]:
+    """Return ordered OpenRouter model fallbacks, excluding the primary model."""
+    configured = os.environ.get("OPENROUTER_FALLBACK_MODELS", "").strip()
+    if configured:
+        candidates = configured.split(",")
+    else:
+        # Keep the old single-model setting working for existing .env files.
+        legacy = os.environ.get("OPENROUTER_FALLBACK_MODEL", "").strip()
+        candidates = [legacy] if legacy else list(DEFAULT_OPENROUTER_FALLBACK_MODEL_IDS)
+        if legacy == "google/gemma-4-26b-a4b-it:free":
+            candidates = list(DEFAULT_OPENROUTER_FALLBACK_MODEL_IDS)
+
+    primary = primary_model_id.removeprefix("openrouter:").strip()
+    fallbacks: list[str] = []
+    for candidate in candidates:
+        normalized = candidate.removeprefix("openrouter:").strip()
+        if normalized and normalized != primary and normalized not in fallbacks:
+            fallbacks.append(normalized)
+    return fallbacks
+
+
+def _openrouter_chat_model(model_id: str, api_key: str) -> ChatOpenAI:
+    """Create one OpenRouter-compatible LangChain chat model."""
+    return ChatOpenAI(
+        model=model_id,
+        api_key=api_key,
+        base_url="https://openrouter.ai/api/v1",
+        max_tokens=_environment_int(
+            "FINVERSE_OPENROUTER_MAX_TOKENS", DEFAULT_OPENROUTER_MAX_TOKENS
+        ),
+        temperature=_environment_float("FINVERSE_OPENROUTER_TEMPERATURE", 0.0),
+        timeout=_environment_int(
+            "FINVERSE_OPENROUTER_TIMEOUT_SECONDS", DEFAULT_OPENROUTER_TIMEOUT_SECONDS
+        ),
+        max_retries=_environment_int("FINVERSE_OPENROUTER_MAX_RETRIES", 3),
+        default_headers={
+            "HTTP-Referer": os.environ.get(
+                "OPENROUTER_HTTP_REFERER", "http://localhost:3000"
+            ),
+            "X-OpenRouter-Title": os.environ.get("OPENROUTER_APP_NAME", "FINVERSE"),
+        },
+        # Evidence collection is a tool-calling workflow, not a long-form
+        # reasoning task. Use the same explicit switch as the MiroFish
+        # ontology pipeline so a provider default cannot consume the whole
+        # request timeout before the agent writes its Evidence document.
+        # OpenRouter still performs model-level failover before returning an
+        # error through the ordered `models` list.
+        extra_body={
+            "models": _openrouter_fallback_models(model_id),
+            "reasoning": {"enabled": False},
+        },
+    )
+
+
 def _create_chat_model(model_id: str):
-    """Create an AWS Bedrock Converse or OpenAI Responses chat model."""
-    if model_id.startswith("bedrock:"):
-        bedrock_model_id = model_id.split(":", 1)[1] or os.environ.get(
-            "BEDROCK_MODEL_ID", DEFAULT_BEDROCK_MODEL_ID
+    """Create one shared OpenRouter model for a DeepAgents graph."""
+    api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("OPENROUTER_API_KEY is required for OpenRouter")
+    openrouter_model_id = model_id.removeprefix("openrouter:").strip()
+    if not openrouter_model_id:
+        openrouter_model_id = os.environ.get(
+            "OPENROUTER_MODEL", DEFAULT_OPENROUTER_MODEL_ID
         )
-        region_name = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION")
-        if not region_name:
-            raise RuntimeError("AWS_REGION or AWS_DEFAULT_REGION is required for Bedrock")
-        kwargs: dict[str, Any] = {
-            "model": bedrock_model_id,
-            "region_name": region_name,
-            "max_tokens": _environment_int(
-                "FINVERSE_BEDROCK_MAX_TOKENS", DEFAULT_BEDROCK_MAX_TOKENS
-            ),
-            "temperature": _environment_float("FINVERSE_BEDROCK_TEMPERATURE", 0.0),
-            "timeout": _environment_int(
-                "FINVERSE_BEDROCK_TIMEOUT_SECONDS", DEFAULT_BEDROCK_TIMEOUT_SECONDS
-            ),
-            "max_retries": _environment_int("FINVERSE_BEDROCK_MAX_RETRIES", 3),
-        }
-        if profile_name := os.environ.get("AWS_PROFILE"):
-            kwargs["credentials_profile_name"] = profile_name
-        return ChatBedrockConverse(**kwargs)
-    if model_id.startswith("openai:"):
-        reasoning_effort = os.environ.get(
-            "FINVERSE_AGENT_REASONING_EFFORT",
-            DEFAULT_REASONING_EFFORT,
-        )
-        return ChatOpenAI(
-            model=model_id.split(":", 1)[1],
-            use_responses_api=True,
-            reasoning_effort=reasoning_effort,
-        )
-    return init_chat_model(model_id)
+    return _openrouter_chat_model(openrouter_model_id, api_key)
 
 
 def _sql_literal(value: Any) -> str:
@@ -1151,9 +1183,13 @@ MiroFish가 사용할 현재 시장 상황 온톨로지와 조건부 미래 시�
 """
 
 
-def build_agent(output_dir: Path, as_of_date: date):
+def build_agent(
+    output_dir: Path, as_of_date: date, model_id: str | None = None
+):
     """Build the Moderator from four independently compiled domain agents."""
-    model_id = os.environ.get("FINVERSE_AGENT_MODEL", DEFAULT_MODEL)
+    model_id = model_id or "openrouter:" + os.environ.get(
+        "OPENROUTER_MODEL", DEFAULT_OPENROUTER_MODEL_ID
+    ).removeprefix("openrouter:")
     model = _create_chat_model(model_id)
     subagents = [_specialist(name, output_dir, as_of_date, model) for name in SPECIALISTS]
     return create_deep_agent(
@@ -1185,7 +1221,13 @@ def run(query: str, as_of_date: date, horizon: str, target: str, output_dir: Pat
         "already_covered": [],
         "output_language": "ko",
     }
-    build_agent(path, as_of_date).invoke({"messages": [{"role": "user", "content": "다음 컨텍스트로 시나리오 입력 문서를 생성해줘.\n" + _json(context)}]})
+    primary_model_id = "openrouter:" + os.environ.get(
+        "OPENROUTER_MODEL", DEFAULT_OPENROUTER_MODEL_ID
+    ).removeprefix("openrouter:")
+    request = {
+        "messages": [{"role": "user", "content": "다음 컨텍스트로 시나리오 입력 문서를 생성해줘.\n" + _json(context)}]
+    }
+    build_agent(path, as_of_date, primary_model_id).invoke(request)
     return path
 
 

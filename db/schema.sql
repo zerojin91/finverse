@@ -12,6 +12,7 @@ CREATE SCHEMA IF NOT EXISTS lake;
 CREATE SCHEMA IF NOT EXISTS market;
 CREATE SCHEMA IF NOT EXISTS events;
 CREATE SCHEMA IF NOT EXISTS economy;
+CREATE SCHEMA IF NOT EXISTS psychology;
 
 -- ---------------------------------------------------------------------------
 -- Landing tables
@@ -297,6 +298,84 @@ SELECT
     max(period_start) AS last_period
 FROM economy.observation
 GROUP BY source, series_name, series_id, cycle, unit;
+
+-- ---------------------------------------------------------------------------
+-- Community psychology views (온톨로지 4. 사람들의 심리)
+--
+-- YouTube comments are stored as source records.  These views expose a
+-- read-only, date-indexed analysis surface without copying or modifying the
+-- original comment payloads.  Sentiment is a transparent keyword proxy, not
+-- an LLM-generated label; consumers must use it as an auxiliary signal only.
+
+CREATE OR REPLACE VIEW psychology.youtube_comment AS
+SELECT
+    nullif(payload->>'published_at', '')::timestamptz AS published_at,
+    nullif(payload->>'updated_at', '')::timestamptz   AS updated_at,
+    payload->>'channel_id'                            AS channel_id,
+    payload->>'video_id'                              AS video_id,
+    payload->>'text'                                  AS comment_text,
+    coalesce(nullif(payload->>'like_count', '')::integer, 0) AS like_count,
+    coalesce(nullif(payload->>'reply_count', '')::integer, 0) AS reply_count,
+    payload->>'source_url'                            AS source_url,
+    collected_at,
+    record_id
+FROM lake.records
+WHERE record_type = 'youtube_comment'
+  AND coalesce(nullif(payload->>'is_deleted', '')::boolean, false) = false
+  AND nullif(payload->>'published_at', '') IS NOT NULL
+  AND nullif(payload->>'text', '') IS NOT NULL;
+
+CREATE OR REPLACE VIEW psychology.sentiment_daily AS
+WITH classified AS (
+    SELECT
+        published_at::date AS sentiment_date,
+        comment_text,
+        like_count,
+        reply_count,
+        CASE
+            WHEN comment_text ~* '상승|반등|매수|매집|호재|돌파|신고가|강세|오르' THEN 1
+            WHEN comment_text ~* '하락|폭락|매도|손절|악재|붕괴|공포|약세|떨어' THEN -1
+            ELSE 0
+        END AS sentiment_proxy
+    FROM psychology.youtube_comment
+)
+SELECT
+    sentiment_date,
+    count(*) AS comment_count,
+    count(*) FILTER (WHERE sentiment_proxy = 1) AS bullish_count,
+    count(*) FILTER (WHERE sentiment_proxy = -1) AS bearish_count,
+    count(*) FILTER (WHERE sentiment_proxy = 0) AS neutral_count,
+    round(avg(sentiment_proxy)::numeric, 4) AS sentiment_score,
+    sum(like_count + reply_count) AS engagement_count
+FROM classified
+GROUP BY sentiment_date;
+
+CREATE OR REPLACE VIEW psychology.narratives AS
+WITH classified AS (
+    SELECT
+        published_at::date AS narrative_date,
+        CASE
+            WHEN comment_text ~* '반도체|삼성전자|삼성|하이닉스|HBM|메모리' THEN '반도체 투자심리'
+            WHEN comment_text ~* '코스피|국장|외국인|증시|주식시장|수급|환율' THEN '국내 증시 신뢰·수급'
+            WHEN comment_text ~* '매수|매도|손절|물타기|풀매수|현금|포트폴리오' THEN '개인 투자 행동'
+        END AS narrative_topic,
+        comment_text,
+        like_count,
+        reply_count,
+        source_url,
+        published_at
+    FROM psychology.youtube_comment
+)
+SELECT
+    narrative_date,
+    narrative_topic,
+    count(*) AS mention_count,
+    sum(like_count + reply_count) AS engagement_count,
+    (array_agg(comment_text ORDER BY like_count DESC, reply_count DESC, published_at DESC))[1] AS representative_comment,
+    (array_agg(source_url ORDER BY like_count DESC, reply_count DESC, published_at DESC))[1] AS representative_source_url
+FROM classified
+WHERE narrative_topic IS NOT NULL
+GROUP BY narrative_date, narrative_topic;
 
 -- ---------------------------------------------------------------------------
 -- Coverage summary, for checking what actually landed.

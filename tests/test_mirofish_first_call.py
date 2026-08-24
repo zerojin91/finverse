@@ -1,4 +1,4 @@
-"""Diagnostic checks for the first Bedrock call used by MiroFish.
+"""Diagnostic checks for the first OpenRouter call used by MiroFish.
 
 This is an opt-in live diagnostic. It uses the local .env and limits each
 request to 60 seconds so a provider/network issue cannot leave a process
@@ -20,10 +20,12 @@ from agents import mirofish_a2a
 
 def main() -> int:
     mirofish_a2a._load_dotenv()
-    os.environ["FINVERSE_BEDROCK_TIMEOUT_SECONDS"] = "60"
-    model_id = os.environ.get("FINVERSE_AGENT_MODEL", mirofish_a2a.DEFAULT_MODEL)
+    os.environ["FINVERSE_OPENROUTER_TIMEOUT_SECONDS"] = "60"
+    model_id = "openrouter:" + os.environ.get(
+        "OPENROUTER_MODEL", mirofish_a2a.DEFAULT_OPENROUTER_MODEL_ID
+    ).removeprefix("openrouter:")
     print(f"MODEL {model_id}")
-    print(f"REGION {os.environ.get('AWS_REGION') or os.environ.get('AWS_DEFAULT_REGION')}")
+    print("PROVIDER OpenRouter")
 
     model = mirofish_a2a._create_chat_model(model_id)
     started = time.perf_counter()

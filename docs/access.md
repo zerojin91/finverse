@@ -33,7 +33,7 @@ ACL 정책에 따라 **데이터베이스 포트(5432)만** 열려 있습니다.
 관리자에게 계정을 발급받습니다. 비밀번호는 발급 시 한 번만 표시되므로 비밀번호 관리자에 보관하세요.
 
 ```bash
-psql "postgresql://<사용자>:<비밀번호>@100.89.226.42:5432/finverse"
+psql "postgresql://<DB_USER>:<DB_PASSWORD>@<DB_HOST>:5432/<DB_NAME>"
 ```
 
 GUI 도구(DBeaver, TablePlus, DataGrip 등)도 같은 정보로 붙습니다.
@@ -82,6 +82,9 @@ CREATE ROLE hacker LOGIN;                  -> ERROR: permission denied to create
 | `market.foreign_holding_daily` | 외국인 보유주수·보유율 |
 | `events.news` | 매크로·지정학 뉴스 (Fed·한국은행·기재부 보도자료, 연합뉴스, BBC, MarketWatch, Google 뉴스) |
 | `events.news_daily` | 날짜·피드·이벤트유형별 기사 건수 |
+| `psychology.youtube_comment` | 공개 YouTube 투자 댓글 원천 데이터 |
+| `psychology.sentiment_daily` | 댓글 키워드 기반 일별 상승·하락 심리 보조지표 |
+| `psychology.narratives` | 반도체·국내증시·개인투자 행동별 일별 커뮤니티 내러티브 |
 | `lake.coverage` | 수집기·유형·소스별 적재 현황과 기간 |
 
 ```sql

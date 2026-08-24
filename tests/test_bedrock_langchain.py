@@ -1,7 +1,7 @@
-"""Minimal LangChain -> Amazon Bedrock connectivity check.
+"""Minimal LangChain -> OpenRouter connectivity check.
 
 Run with: python tests/test_bedrock_langchain.py
-The script reads the local .env without printing the bearer token.
+The script reads the local .env without printing the API key.
 """
 
 from __future__ import annotations
@@ -26,26 +26,24 @@ def main() -> int:
     load_local_env()
 
     try:
-        from langchain_aws import ChatBedrockConverse
+        from langchain_openai import ChatOpenAI
     except ImportError as exc:
-        print("FAILED: install langchain-aws first")
+        print("FAILED: install langchain-openai first")
         print(exc)
         return 2
 
-    region = os.environ.get("AWS_REGION", "ap-northeast-2")
-    configured_model = os.environ.get(
-        "FINVERSE_AGENT_MODEL", "bedrock:global.anthropic.claude-sonnet-5"
-    )
-    model = configured_model.removeprefix("bedrock:")
+    model = os.environ.get("OPENROUTER_MODEL", "google/gemma-4-31b-it:free")
 
-    if not os.environ.get("AWS_BEARER_TOKEN_BEDROCK"):
-        print("FAILED: AWS_BEARER_TOKEN_BEDROCK is empty")
+    api_key = os.environ.get("OPENROUTER_API_KEY")
+    if not api_key:
+        print("FAILED: OPENROUTER_API_KEY is empty")
         return 2
 
     try:
-        chat = ChatBedrockConverse(
+        chat = ChatOpenAI(
             model=model,
-            region_name=region,
+            api_key=api_key,
+            base_url="https://openrouter.ai/api/v1",
             max_tokens=32,
         )
         response = chat.invoke("Reply with exactly OK.")
@@ -58,10 +56,10 @@ def main() -> int:
             ).strip()
         else:
             text = str(content).strip()
-        print(f"SUCCEEDED: region={region}; model={model}; response={text}")
+        print(f"SUCCEEDED: provider=OpenRouter; model={model}; response={text}")
         return 0
     except Exception as exc:  # noqa: BLE001 - diagnostic script reports provider errors.
-        print(f"FAILED: region={region}; model={model}; {type(exc).__name__}: {exc}")
+        print(f"FAILED: provider=OpenRouter; model={model}; {type(exc).__name__}: {exc}")
         return 1
 
 

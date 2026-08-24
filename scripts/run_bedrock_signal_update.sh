@@ -14,7 +14,7 @@ else
   RUNNER=(python3 scripts/bedrock_signal_update.py)
 fi
 
-LOCK=data/.bedrock_signal_update.lock
+LOCK=data/.openrouter_signal_update.lock
 if command -v flock >/dev/null 2>&1; then
   exec flock -n "$LOCK" "${RUNNER[@]}" "$@"
 fi
