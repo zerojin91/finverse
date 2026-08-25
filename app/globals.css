@@ -422,8 +422,6 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .twin-page { width: min(calc(100% - 72px), 1480px); margin: 0 auto; padding: 33px 0 48px; }
 .twin-heading { margin-bottom: 19px; }
 .twin-heading h1 { font-size: clamp(31px,2.6vw,40px); }
-.twin-profile-chip { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 0; }
-.twin-profile-chip::after { content: "신민수님"; font-size: 10px; }
 .twin-assets-panel { min-height: 0; overflow: visible; }
 .twin-assets-grid { display: grid; grid-template-columns: 1.25fr .75fr .75fr 1.6fr; min-height: 165px; }
 .twin-metric { min-width: 0; padding: 23px 20px 19px; border-right: 1px solid var(--line); }
@@ -441,7 +439,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .twin-net-chart svg line { stroke: #ededf0; stroke-width: 1; }
 .twin-net-chart svg path { fill: none; stroke: var(--ink); stroke-width: 2.2; }
 .twin-chart-labels { display: flex; justify-content: space-between; color: var(--light); font-size: 9px; }
-.twin-main-grid { display: grid; grid-template-columns: minmax(430px,.9fr) minmax(560px,1.5fr); gap: 16px; margin-top: 16px; }
+.twin-main-grid { display: grid; align-items: start; grid-template-columns: minmax(430px,.9fr) minmax(560px,1.5fr); gap: 16px; margin-top: 16px; }
 .twin-main-grid .panel { min-height: 0; }
 .twin-text-button { display: inline-flex; align-items: center; gap: 3px; border: 0; color: var(--muted); background: transparent; font-size: 11px; cursor: pointer; }
 .twin-table-wrap { overflow-x: auto; }
@@ -459,37 +457,110 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .twin-holding-name small { margin-top: 3px; color: var(--light); font-size: 9px; }
 .twin-table-note { margin: 13px 16px 15px; color: var(--light); font-size: 9px; line-height: 1.5; }
 .twin-path-caption { color: var(--light); font-size: 10px; }
-.twin-scenario-cards { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; padding: 14px 16px 0; }
-.twin-scenario-card { position: relative; min-height: 108px; display: flex; align-items: flex-start; gap: 8px; padding: 12px 10px; border: 1px solid var(--line); border-radius: 8px; text-align: left; background: #fff; cursor: pointer; }
-.twin-scenario-card:hover,.twin-scenario-card.active { border-color: var(--ink); box-shadow: 0 5px 14px rgba(17,17,19,.06); }
-.twin-radio { width: 15px; height: 15px; flex: 0 0 auto; border: 1.5px solid var(--light); border-radius: 50%; }
-.twin-scenario-card.active .twin-radio { border: 4px solid var(--ink); }
-.twin-scenario-card > span:not(.twin-radio) { min-width: 0; }
-.twin-scenario-card small,.twin-scenario-card strong,.twin-scenario-card em { display: block; }
-.twin-scenario-card small { color: var(--light); font-size: 9px; }
-.twin-scenario-card strong { margin-top: 8px; color: var(--ink); font-size: 13px; line-height: 1.35; }
-.twin-scenario-card em { margin-top: 9px; color: var(--muted); font-size: 10px; font-style: normal; }
-.twin-scenario-card > i { position: absolute; right: 9px; bottom: 10px; color: var(--muted); font-size: 9px; font-style: normal; }
-.twin-add-scenario { align-items: center; justify-content: center; border-style: dashed; color: var(--muted); }
-.twin-add-scenario > svg { flex: 0 0 auto; color: var(--ink); }
-.twin-selected-path { margin: 17px 16px 16px; padding-top: 14px; border-top: 1px solid var(--line); }
-.twin-selected-path-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 15px; }
-.twin-selected-path-head span { display: block; color: var(--light); font-size: 9px; }
-.twin-selected-path-head strong { display: block; margin-top: 5px; color: var(--ink); font-size: 16px; }
-.twin-selected-path-head b { font-size: 15px; }
-.twin-path-chart { width: 100%; height: 180px; margin-top: 7px; }
-.twin-selected-path > p { margin: 0; color: var(--light); font-size: 9px; }
+/* 트윈 셋업 마법사 */
+.twin-setup { min-height: 0; }
+.twin-setup-step { color: var(--light); font-size: 10px; font-weight: 800; letter-spacing: .08em; }
+.twin-setup-body { padding: 18px 20px 20px; }
+.twin-setup-lead { margin: 0 0 15px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.twin-setup-lead b { color: var(--ink); }
+.twin-demo-row { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin-bottom: 16px; }
+.twin-demo-row button { padding: 12px 13px; border: 1px solid var(--line); border-radius: 8px; text-align: left; background: var(--soft); cursor: pointer; }
+.twin-demo-row button:hover { border-color: var(--ink); background: #fff; }
+.twin-demo-row strong { display: block; color: var(--ink); font-size: 12.5px; }
+.twin-demo-row small { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; }
+.twin-asset-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
+.twin-asset-grid label { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; }
+.twin-asset-grid label.active { border-color: var(--ink); background: var(--soft); }
+.twin-asset-grid strong { display: block; color: var(--ink); font-size: 12px; }
+.twin-asset-grid small { display: block; margin-top: 3px; color: var(--light); font-size: 9px; }
+.twin-amount-input { display: inline-flex; align-items: center; gap: 3px; flex: 0 0 auto; }
+.twin-amount-input input { width: 62px; padding: 5px 6px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); font-size: 11px; text-align: right; }
+.twin-amount-input input:focus { border-color: var(--ink); outline: none; }
+.twin-amount-input em { color: var(--light); font-size: 9px; font-style: normal; }
+.twin-setup-footer { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 18px; padding-top: 15px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+.twin-setup-footer > button:last-child { display: inline-flex; align-items: center; gap: 6px; padding: 10px 16px; border: 0; border-radius: 8px; color: #fff; background: var(--ink); font-size: 12px; font-weight: 700; cursor: pointer; }
+.twin-setup-footer > button:last-child:disabled { color: var(--light); background: #e4e4e7; cursor: not-allowed; }
+.twin-ghost-button { display: inline-flex; align-items: center; gap: 5px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); background: #fff; font-size: 11px; cursor: pointer; }
+.twin-ghost-button:hover { border-color: var(--ink); color: var(--ink); }
+.twin-question-list { display: grid; gap: 14px; }
+.twin-question-list fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.twin-question-list legend { display: block; margin-bottom: 8px; }
+.twin-question-list legend span { margin-right: 7px; color: var(--light); font-size: 10px; font-weight: 800; }
+.twin-question-list legend strong { color: var(--ink); font-size: 13.5px; }
+.twin-question-list legend em { display: block; margin-top: 4px; color: var(--light); font-size: 10px; font-style: normal; }
+.twin-option-row { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; }
+.twin-option-row:has(> :nth-child(3):last-child) { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.twin-option-row button { min-height: 62px; padding: 10px 11px; border: 1px solid var(--line); border-radius: 8px; text-align: left; background: #fff; cursor: pointer; }
+.twin-option-row button:hover { border-color: var(--ink); }
+.twin-option-row button.active { border-color: var(--ink); background: var(--ink); }
+.twin-option-row button.active strong,.twin-option-row button.active small { color: #fff; }
+.twin-option-row strong { display: block; color: var(--ink); font-size: 12.5px; }
+.twin-option-row small { display: block; margin-top: 5px; color: var(--muted); font-size: 10px; line-height: 1.45; }
+
+/* 트윈 대시보드 */
+.twin-heading-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.twin-character-chip { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border: 1px solid var(--ink); border-radius: 999px; color: var(--ink); font-size: 10.5px; font-weight: 700; }
+.twin-assets-grid .twin-metric strong { font-size: clamp(19px,1.6vw,25px); }
+.twin-net-chart > div:first-child strong { font-size: 15px; }
+.twin-gap-copy { margin: 12px 0 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.twin-gap-copy b { color: var(--ink); }
+.twin-gap-amount { margin: 7px 0 0; color: var(--ink); font-size: 17px; font-weight: 750; letter-spacing: -.03em; }
+.twin-gap-amount em { margin-left: 6px; color: var(--light); font-size: 10px; font-style: normal; font-weight: 400; }
+.twin-loading { display: grid; place-items: center; gap: 10px; min-height: 220px; padding: 30px; color: var(--muted); font-size: 12px; text-align: center; }
+.twin-shock-row { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 7px; padding: 14px 16px 0; }
+.twin-shock-row button { padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; text-align: left; background: #fff; cursor: pointer; }
+.twin-shock-row button:hover { border-color: var(--ink); }
+.twin-shock-row button.active { border-color: var(--ink); background: var(--ink); }
+.twin-shock-row button.active strong,.twin-shock-row button.active small { color: #fff; }
+.twin-shock-row strong { display: block; color: var(--ink); font-size: 11.5px; }
+.twin-shock-row small { display: block; margin-top: 3px; color: var(--light); font-size: 9px; }
+.twin-shock-summary { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; margin: 15px 16px 0; padding: 13px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.twin-shock-summary span { display: block; color: var(--muted); font-size: 10px; }
+.twin-shock-summary strong { display: block; margin-top: 6px; color: var(--ink); font-size: 17px; letter-spacing: -.03em; }
+.twin-shock-summary .down-text { color: var(--down); }
+.twin-time-chart { width: calc(100% - 24px); height: 250px; margin: 8px 12px 0; }
+.twin-chart-legend { display: flex; flex-wrap: wrap; gap: 14px; padding: 0 16px; color: var(--muted); font-size: 10px; }
+.twin-chart-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.twin-chart-legend i { width: 14px; height: 2.5px; border-radius: 2px; background: var(--ink); }
+.twin-chart-legend i.twin { background: var(--down); }
+.twin-chart-legend i.index { background: #d4d4d8; }
+.twin-chart-legend i.sell { width: 8px; height: 8px; border-radius: 50%; background: var(--up); }
+.twin-shock-note { margin: 12px 16px 0; color: var(--muted); font-size: 10.5px; line-height: 1.6; }
+.twin-event-list { margin: 12px 16px 16px; padding: 12px 0 0; border-top: 1px solid var(--line); list-style: none; }
+.twin-event-list li { display: grid; grid-template-columns: 76px minmax(0,1fr); gap: 10px; padding: 5px 0; color: var(--muted); font-size: 10.5px; line-height: 1.5; }
+.twin-event-list time { color: var(--light); font-size: 10px; }
+.twin-event-list li.panic-sell span { color: var(--up); }
+.twin-event-list li.reentry span { color: var(--down); }
+.twin-event-more { display: block!important; color: var(--light)!important; font-size: 10px; }
+
+/* 편향 리포트 */
+.twin-character-card { display: grid; grid-template-columns: 54px minmax(0,1fr); gap: 13px; margin: 16px 16px 0; padding: 14px; border: 1px solid var(--ink); border-radius: 9px; background: var(--soft); }
+.twin-character-card span { color: var(--muted); font-size: 10px; }
+.twin-character-card h3 { margin: 4px 0 6px; color: var(--ink); font-size: 17px; }
+.twin-character-card p { margin: 0; color: var(--text); font-size: 12px; line-height: 1.55; }
+.twin-character-watch { display: inline-flex; align-items: center; gap: 5px; margin-top: 7px!important; color: var(--muted)!important; font-size: 11px!important; }
+.twin-bias-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; padding: 14px 16px 0; }
+.twin-bias-grid article { padding: 14px; border: 1px solid var(--line); border-radius: 8px; }
+.twin-bias-grid article.warn { border-left: 3px solid var(--up); }
+.twin-bias-grid article.good { border-left: 3px solid var(--down); }
+.twin-bias-grid span { color: var(--light); font-size: 10px; font-weight: 700; letter-spacing: .02em; }
+.twin-bias-grid h3 { margin: 6px 0 7px; color: var(--ink); font-size: 14px; line-height: 1.4; }
+.twin-bias-grid p { margin: 0; color: var(--muted); font-size: 11.5px; line-height: 1.6; }
+.twin-next-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; padding: 15px 16px; }
+.twin-applied { display: inline-flex; align-items: center; gap: 6px; margin: 0; color: var(--muted); font-size: 11px; }
+.twin-applied b { color: var(--ink); }
+
+/* 시장 인사이트 -> 트윈 전환 */
+.scenario-apply-twin { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 16px; padding: 20px 22px; border: 1px solid var(--ink); border-radius: 10px; background: var(--soft); }
+.scenario-apply-twin span { color: var(--light); font-size: 9px; font-weight: 800; letter-spacing: .1em; }
+.scenario-apply-twin h3 { margin: 7px 0 6px; color: var(--ink); font-size: 18px; letter-spacing: -.03em; }
+.scenario-apply-twin p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.scenario-apply-twin button { display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto; padding: 12px 18px; border: 0; border-radius: 8px; color: #fff; background: var(--ink); font-size: 13px; font-weight: 700; cursor: pointer; }
+.scenario-apply-twin button:hover { background: #000; }
 .twin-experts-panel { min-height: 0; margin-top: 16px; }
 .twin-experts-panel > .panel-title { min-height: 58px; }
 .twin-experts-panel > .panel-title > span { color: var(--light); font-size: 10px; }
-.twin-expert-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; padding: 14px 16px 16px; }
-.twin-expert-grid article { display: grid; grid-template-columns: 54px minmax(0,1fr); gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 8px; }
 .twin-expert-avatar { width: 54px; height: 54px; display: grid; place-items: center; border: 1px solid var(--ink); border-radius: 50%; color: var(--ink); font-size: 13px; font-weight: 800; }
-.twin-expert-grid article span { color: var(--muted); font-size: 10px; }
-.twin-expert-grid h3 { margin: 5px 0 6px; color: var(--ink); font-size: 14px; line-height: 1.45; }
-.twin-expert-grid p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
-.twin-expert-grid button { display: inline-flex; align-items: center; gap: 4px; margin-top: 11px; padding: 7px 10px; border: 1px solid var(--ink); border-radius: 6px; color: var(--ink); background: #fff; font-size: 10px; cursor: pointer; }
-.twin-expert-grid button:hover { color: #fff; background: var(--ink); }
 .twin-disclaimer { padding: 10px 16px; border-top: 1px solid var(--line); color: var(--light); font-size: 9px; }
 
 .mobile-tabs { display: none; }
@@ -967,8 +1038,12 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
   .twin-metric { padding: 17px 14px; }
   .twin-metric strong { font-size: 21px; }
   .twin-net-chart { grid-column: 1 / -1; }
-  .twin-scenario-cards { grid-template-columns: repeat(2,minmax(0,1fr)); }
-  .twin-expert-grid { grid-template-columns: 1fr; }
+  .twin-shock-row { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .twin-bias-grid { grid-template-columns: 1fr; }
+  .twin-asset-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .twin-option-row { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .scenario-apply-twin { display: block; }
+  .scenario-apply-twin button { margin-top: 14px; }
   .panel { height: auto; }
   .panel + .panel { margin-top: 12px; }
   .connection-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
@@ -1019,10 +1094,11 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
   .twin-metric { border-right: 0; border-bottom: 1px solid var(--line); }
   .twin-metric:last-of-type { border-bottom: 0; }
   .twin-net-chart { border-top: 0; }
-  .twin-scenario-cards { grid-template-columns: 1fr 1fr; padding-right: 10px; padding-left: 10px; }
+  .twin-shock-row { grid-template-columns: 1fr 1fr; padding-right: 10px; padding-left: 10px; }
   .twin-scenario-card { min-height: 116px; }
   .twin-table th,.twin-table td { padding-right: 8px; padding-left: 8px; }
-  .twin-expert-grid { padding-right: 10px; padding-left: 10px; }
+  .twin-bias-grid,.twin-demo-row,.twin-asset-grid { grid-template-columns: 1fr; }
+  .twin-setup-body { padding: 14px; }
   .market-overview { grid-template-columns: 1fr; }
   .market-overview-primary { border-right: 0; border-bottom: 1px solid var(--line); }
   .market-overview-side { flex: 0 0 auto; grid-template-columns: 1fr; padding-top: 8px; }

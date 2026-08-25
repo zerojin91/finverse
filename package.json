@@ -11,7 +11,8 @@
     "build": "vinext build",
     "start": "node scripts/with_openrouter_env.mjs start",
     "sync:indices": "node scripts/market_index_sync.mjs",
-    "test": "npm run build && node --test tests/rendered-html.test.mjs",
+    "twin:prices": "node scripts/twin_price_snapshot.mjs",
+    "test": "npm run build && node --test tests/rendered-html.test.mjs tests/twin-backtest.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
   },
   "dependencies": {

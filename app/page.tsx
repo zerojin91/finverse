@@ -33,6 +33,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation";
+import TwinPage from "@/components/twin/twin-page";
 
 const SimulationMessageResponse = dynamic(
   () => import("@/components/ai-elements/message").then((module) => module.MessageResponse),
@@ -1543,53 +1544,9 @@ function ForecastChart({ scenario, marketData, liveSeries }: { scenario: Scenari
   return <canvas ref={canvasRef} className="forecast-canvas" aria-label={`${scenario.title} 조건부 KOSPI 예상 경로`} />;
 }
 
-function TwinPathChart({ scenario }: { scenario: Scenario }) {
-  const targets = [140.2, 121.6, 107.8];
-  const colors = ["#111113", "#ef4444", "#2563eb"];
-  const selectedIndex = scenario.id === "kospi-rebound" ? 0 : scenario.id === "chip-miss" ? 1 : 2;
-  const x = (index: number) => 24 + (index / 11) * 496;
-  const y = (value: number) => 142 - ((value - 94) / 54) * 110;
-  const makeLine = (target: number) => Array.from({ length: 12 }, (_, index) => 128.5 + ((target - 128.5) * index) / 11 + Math.sin(index * 1.25) * .65);
-  const lines = targets.map(makeLine);
-  const selectedLine = lines[selectedIndex];
-  const forecastColor = colors[selectedIndex];
-  const selectedPath = selectedLine.map((value, index) => `${index === 0 ? "M" : "L"} ${x(index).toFixed(1)} ${y(value).toFixed(1)}`).join(" ");
-  const upper = selectedLine.map((value, index) => `${x(index).toFixed(1)},${y(value + 4 + index * .45).toFixed(1)}`).join(" ");
-  const lower = [...selectedLine].reverse().map((value, reverseIndex) => { const index = 11 - reverseIndex; return `${x(index).toFixed(1)},${y(value - 4 - index * .45).toFixed(1)}`; }).join(" ");
-  return (
-    <svg className="twin-path-chart" viewBox="0 0 540 170" role="img" aria-label="나의 자산 예상 경로">
-      {[28, 60, 92, 124].map((line) => <line key={line} x1="24" y1={line} x2="520" y2={line} stroke="#ededf0" strokeWidth="1" />)}
-      <polygon points={`${upper} ${lower}`} fill={forecastColor === "#111113" ? "rgba(17,17,19,.08)" : `${forecastColor}18`} />
-      {lines.map((line, index) => <path key={index} d={line.map((value, pointIndex) => `${pointIndex === 0 ? "M" : "L"} ${x(pointIndex).toFixed(1)} ${y(value).toFixed(1)}`).join(" ")} fill="none" stroke={colors[index]} strokeWidth={index === selectedIndex ? "2.8" : "1.6"} strokeDasharray={index === selectedIndex ? undefined : "5 4"} strokeLinecap="round" opacity={index === selectedIndex ? 1 : .72} />)}
-      <circle cx="24" cy={y(128.5)} r="4" fill="#111113" />
-      {targets.map((target, index) => <text key={target} x="468" y={y(target) - (index === 0 ? 7 : index === 1 ? 0 : -9)} fill={colors[index]} fontSize="11" fontWeight="700">{target.toFixed(1)} ({target > 128.5 ? "+9.1%" : target === 121.6 ? "-5.4%" : "-16.1%"})</text>)}
-      <text x="18" y="154" fill="#a1a1aa" fontSize="10">현재</text><text x="180" y="154" fill="#a1a1aa" fontSize="10">7일 후</text><text x="342" y="154" fill="#a1a1aa" fontSize="10">14일 후</text><text x="486" y="154" fill="#a1a1aa" fontSize="10">1개월 후</text>
-      <text x="32" y={y(128.5) - 9} fill="#27272a" fontSize="11" fontWeight="700">128.5</text>
-    </svg>
-  );
-}
-
-function TwinPage({ selectedScenario, onSelectScenario, onOpenBuilder }: { selectedScenario: Scenario; onSelectScenario: (scenario: Scenario) => void; onOpenBuilder: () => void }) {
-  const [twinScenarioId, setTwinScenarioId] = useState(selectedScenario.id);
-  const twinScenario = scenarios.find((scenario) => scenario.id === twinScenarioId) ?? selectedScenario;
-  const holdings = [
-    { symbol: "S", name: "삼성전자", code: "005930", value: "220,000원", weight: "28.6%", change: "+1.03%", contribution: "+286,500원", tone: "up" },
-    { symbol: "H", name: "SK하이닉스", code: "000660", value: "1,555,000원", weight: "24.3%", change: "-0.74%", contribution: "-182,400원", tone: "down" },
-    { symbol: "E", name: "KODEX 200", code: "069500", value: "34,210원", weight: "18.7%", change: "+0.42%", contribution: "+90,800원", tone: "up" },
-    { symbol: "$", name: "USD 현금", code: "KRW 환산", value: "23,600,000원", weight: "18.4%", change: "0.00%", contribution: "0원", tone: "flat" },
-  ];
-  return (
-    <div className="twin-page">
-      <header className="page-heading twin-heading"><div><span>MY FINANCIAL TWIN</span><h1>내 금융 상태를 이해하고, 다음 선택을 미리 확인하세요.</h1></div><div className="market-stamp"><CalendarDays size={15} />2026.07.28 KRX 장마감 기준</div></header>
-      <section className="panel twin-assets-panel"><div className="panel-title"><h2>나의 자산 현황</h2><span className="twin-profile-chip"><UserRound size={13} /> 김민서님</span></div><div className="twin-assets-grid"><div className="twin-metric"><span>총 자산(평가금액)</span><strong>128,450,000원</strong><small>전일 대비 <b className="up">+1,250,000원 (+0.98%)</b></small></div><div className="twin-metric"><span>현금 비중</span><strong>18.4<em>%</em></strong><small>23,600,000원</small></div><div className="twin-metric"><span>목표 달성률</span><strong>62<em>%</em></strong><div className="twin-progress"><i style={{ width: "62%" }} /></div><small>목표 금액 200,000,000원</small></div><div className="twin-net-chart"><div><span>순자산 추이 (최근 6개월)</span><strong>+18.4%</strong></div><svg viewBox="0 0 280 92" aria-label="최근 6개월 순자산 추이"><line x1="0" y1="22" x2="280" y2="22" /><line x1="0" y1="48" x2="280" y2="48" /><line x1="0" y1="74" x2="280" y2="74" /><path d="M4 71 C19 65 28 69 40 58 S62 62 74 50 S93 46 104 48 S124 38 137 41 S152 29 166 34 S183 22 196 28 S212 21 222 24 S237 11 248 17 S262 8 276 4" /></svg><div className="twin-chart-labels"><span>2월</span><span>3월</span><span>4월</span><span>5월</span><span>6월</span><span>7월</span></div></div></div></section>
-      <section className="twin-main-grid"><section className="panel twin-portfolio-panel"><div className="panel-title"><h2>포트폴리오 보유 현황</h2><button className="twin-text-button" type="button">전체 보기 <ChevronRight size={15} /></button></div><div className="twin-table-wrap"><table className="twin-table"><thead><tr><th>종목</th><th>현재가</th><th>비중</th><th>등락률(1D)</th><th>기여도(1D)</th></tr></thead><tbody>{holdings.map((holding) => <tr key={holding.name}><td><div className="twin-holding-name"><span className={`twin-holding-symbol ${holding.tone}`}>{holding.symbol}</span><div><strong>{holding.name}</strong><small>{holding.code} · KOSPI</small></div></div></td><td>{holding.value}</td><td>{holding.weight}</td><td className={holding.tone}>{holding.change}</td><td className={holding.tone}>{holding.contribution}</td></tr>)}</tbody></table></div><p className="twin-table-note">* 가격과 수익률은 2026.07.28 KRX 장마감 기준이며, 실제 계좌와 다를 수 있습니다.</p></section><section className="panel twin-path-panel"><div className="panel-title"><h2>시나리오별 내 자산 경로</h2><span className="twin-path-caption">조건에 따른 가상 경로</span></div><div className="twin-scenario-cards">{scenarios.map((scenario, index) => <button key={scenario.id} className={`twin-scenario-card ${twinScenario.id === scenario.id ? "active" : ""}`} type="button" onClick={() => { setTwinScenarioId(scenario.id); onSelectScenario(scenario); }}><span className="twin-radio" /><span><small>시나리오 {index + 1}</small><strong>{scenario.title}</strong><em>{scenario.forecast}</em></span><i>{scenario.tone === "up" ? "상승" : "하락"}</i></button>)}<button className="twin-scenario-card twin-add-scenario" type="button" onClick={onOpenBuilder}><Plus size={20} /><span><small>내 시나리오</small><strong>직접 만들기</strong></span></button></div><div className="twin-selected-path"><div className="twin-selected-path-head"><div><span>선택 시나리오</span><strong>{twinScenario.title}</strong></div><b className={twinScenario.tone}>{twinScenario.forecast}</b></div><TwinPathChart scenario={twinScenario} /><p>선택한 시나리오에 따라 보유 자산의 예상 경로가 다시 계산됩니다.</p></div></section></section>
-      <section className="panel twin-experts-panel"><div className="panel-title"><h2>금융 대가의 한마디</h2><span>시나리오에 대한 서로 다른 관점</span></div><div className="twin-expert-grid"><article><div className="twin-expert-avatar">WB</div><div><span>워런 버핏 관점</span><h3>좋은 기업도 가격보다 이익의 지속성을 먼저 확인하세요.</h3><p>반등을 따라가기보다 HBM 수요와 외국인 수급이 함께 돌아오는지 확인합니다.</p><button type="button">직접 이야기해보기 <ArrowRight size={14} /></button></div></article><article><div className="twin-expert-avatar">HM</div><div><span>하워드 막스 관점</span><h3>낙폭보다 먼저, 기대가 얼마나 낮아졌는지 계산하세요.</h3><p>실적 리스크와 AI CapEx 둔화가 일시적 충격인지 추세 변화인지 구분합니다.</p><button type="button">직접 이야기해보기 <ArrowRight size={14} /></button></div></article><article><div className="twin-expert-avatar">TR</div><div><span>트럼프식 시장 관점</span><h3>정책과 자금 흐름이 바뀌기 전에는 현금을 협상 카드로 두세요.</h3><p>환율·외국인 수급·정책 뉴스가 같은 방향인지 확인하고 행동합니다.</p><button type="button">직접 이야기해보기 <ArrowRight size={14} /></button></div></article></div><div className="twin-disclaimer">상기 정보는 AI 분석 기반 참고 자료이며, 투자 판단의 최종 책임은 본인에게 있습니다.</div></section>
-    </div>
-  );
-}
-
 export default function Home() {
   const [activeTab, setActiveTab] = useState<MainTab>("market");
+  const [appliedScenario, setAppliedScenario] = useState<{ title: string; forecast: string } | null>(null);
   const [kospiData, setKospiData] = useState<KospiMarketData | null>(null);
   const [intradayIndices, setIntradayIndices] = useState<IntradayIndex[]>([]);
   const [dashboardSignals, setDashboardSignals] = useState<DashboardSignal[]>(marketSignals);
@@ -1703,6 +1660,12 @@ export default function Home() {
   const activateTab = (tab: MainTab) => {
     setActiveTab(tab);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // 시장 인사이트에서 본 시나리오를 그대로 들고 트윈으로 넘어가는 전환점.
+  const applyToTwin = (scenario: Scenario) => {
+    setAppliedScenario({ title: scenario.title, forecast: scenario.forecast });
+    activateTab("twin");
   };
 
   const toggleSeed = (seed: string) => {
@@ -2219,6 +2182,14 @@ export default function Home() {
                   </button>
                 </div>
                 <span className="visually-hidden">SELECTED SCENARIO · 시나리오 전제 · 예상 전개</span>
+                <section className="scenario-apply-twin" aria-label="마이 금융 트윈에 적용">
+                  <div>
+                    <span>NEXT · MY FINANCIAL TWIN</span>
+                    <h3>이 시장을 내 포트폴리오와 내 행동에 넣어보세요</h3>
+                    <p>같은 충격에서 버텼을 때와, 당신의 성향이 실제로 했을 매매를 실제 종가로 비교합니다.</p>
+                  </div>
+                  <button type="button" onClick={() => applyToTwin(selectedScenario)}>내 트윈에 적용하기 <ArrowRight size={16} /></button>
+                </section>
 
                 {false && <section className="scenario-detail" id="scenario-detail" aria-live="polite" aria-label="선택한 시나리오 상세 내용">
                   <header className="scenario-detail-header">
@@ -2350,7 +2321,7 @@ export default function Home() {
                 </section>}
               </section>
             </div>
-          ) : <TwinPage selectedScenario={selectedScenario} onSelectScenario={setSelectedScenario} onOpenBuilder={openBuilder} />}
+          ) : <TwinPage appliedScenario={appliedScenario} onOpenBuilder={openBuilder} />}
         </main>
       </div>
 
