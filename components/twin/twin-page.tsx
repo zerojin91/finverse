@@ -9,7 +9,7 @@
 // 가격은 public/twin/shock-prices.json 의 실제 종가이고, 매매 판단은 결정적인
 // 규칙이다.  화면에 나오는 수익률·낙폭·회복일은 모두 여기서 계산된 값이다.
 
-import { ArrowRight, ChevronRight, LoaderCircle, RotateCcw, ShieldCheck, TrendingDown, UserRound, Wallet } from "lucide-react";
+import { ArrowRight, ChevronRight, Gauge, LoaderCircle, Quote, RotateCcw, ShieldCheck, Target, TrendingDown, UserRound, Wallet } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CASH,
@@ -21,10 +21,15 @@ import {
   type Holding,
   type PriceSnapshot,
 } from "@/lib/twin/backtest";
+import { simulateGoal, type Goal, type GoalResult } from "@/lib/twin/goal";
+import { marketMood, type MarketMood } from "@/lib/twin/market-mood";
+import { behaviorNote, harshest, mentorVerdicts, type MentorInput, type MentorVerdict } from "@/lib/twin/mentor";
 import { buildReport, characterFor, demoPortfolios, deriveProfile, questions } from "@/lib/twin/profile";
 
 const STORAGE_KEY = "finverse.twin.v1";
-type Saved = { holdings: Holding[]; answers: Record<string, string> };
+type Saved = { holdings: Holding[]; answers: Record<string, string>; goal?: Goal };
+
+const defaultGoal: Goal = { amount: 1_000_000_000, years: 10, monthly: 1_000_000 };
 
 const won = (value: number) => `${Math.round(value).toLocaleString("ko-KR")}원`;
 const korean = (value: number) => {
@@ -158,12 +163,156 @@ function SetupWizard({ snapshot, onDone }: { snapshot: PriceSnapshot; onDone: (s
   );
 }
 
+const GAUGE_COLORS = ["#2563eb", "#60a5fa", "#d4d4d8", "#fca5a5", "#ef4444"];
+
+function MoodGauge({ score }: { score: number }) {
+  const center = { x: 120, y: 112 };
+  const point = (angle: number, radius: number) => [
+    (center.x + radius * Math.cos(angle)).toFixed(1),
+    (center.y - radius * Math.sin(angle)).toFixed(1),
+  ];
+  // 왼쪽(공포)에서 오른쪽(탐욕)으로 가는 반원. 점수가 높을수록 각도가 작아진다.
+  const angleFor = (value: number) => Math.PI * (1 - Math.max(0, Math.min(100, value)) / 100);
+  const arc = (from: number, to: number, radius: number) => {
+    const [startX, startY] = point(angleFor(from), radius);
+    const [endX, endY] = point(angleFor(to), radius);
+    return `M ${startX} ${startY} A ${radius} ${radius} 0 0 1 ${endX} ${endY}`;
+  };
+  const [needleX, needleY] = point(angleFor(score), 74);
+
+  return (
+    <svg className="twin-gauge" viewBox="0 0 240 132" role="img" aria-label={`시장 온도 ${score}점`}>
+      {GAUGE_COLORS.map((color, index) => (
+        <path key={color} d={arc(index * 20, (index + 1) * 20, 92)} fill="none" stroke={color} strokeWidth="13" strokeLinecap="butt" />
+      ))}
+      <line x1={center.x} y1={center.y} x2={needleX} y2={needleY} stroke="#111113" strokeWidth="3" strokeLinecap="round" />
+      <circle cx={center.x} cy={center.y} r="6" fill="#111113" />
+      <text x="24" y="128" fill="#a1a1aa" fontSize="9">공포</text>
+      <text x="216" y="128" textAnchor="end" fill="#a1a1aa" fontSize="9">탐욕</text>
+    </svg>
+  );
+}
+
+function MoodPanel({ mood, hasSellRule }: { mood: MarketMood; hasSellRule: boolean }) {
+  const gap = Math.abs(mood.distance) * 100;
+  return (
+    <section className="panel twin-side-panel">
+      <div className="panel-title"><div><span>MARKET MOOD</span><h2>지금 시장의 온도</h2></div><Gauge size={16} /></div>
+      <div className="twin-side-body">
+        <MoodGauge score={mood.score} />
+        <p className="twin-mood-score"><strong>{mood.score}</strong><em>{mood.label}</em></p>
+        <ul className="twin-mood-parts">
+          {mood.components.map((component) => (
+            <li key={component.key}>
+              <span>{component.label}</span>
+              <i><b style={{ width: `${component.score}%` }} /></i>
+              <em>{component.detail}</em>
+            </li>
+          ))}
+        </ul>
+        <div className={`twin-trigger ${!hasSellRule ? "calm" : mood.triggered ? "hot" : ""}`}>
+          <strong>
+            {!hasSellRule
+              ? "이 성향에는 매도 규칙이 없습니다"
+              : mood.triggered
+                ? "당신의 트윈은 이미 매도 버튼을 눌렀습니다"
+                : `트윈의 매도 버튼까지 ${gap.toFixed(1)}%p`}
+          </strong>
+          <p>
+            내 포트폴리오는 1년 고점 대비 <b>{pct(mood.drawdown)}</b>이고, 트윈이 실제로 파는 지점은 <b>{pct(mood.trigger)}</b>입니다.
+            {hasSellRule && !mood.triggered ? " 여기서 그만큼만 더 빠지면 같은 선택이 반복됩니다." : ""}
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function GoalPanel({ goal, onChange, result }: { goal: Goal; onChange: (goal: Goal) => void; result: GoalResult | null }) {
+  const holdRate = result ? result.hold.successRate : 0;
+  const twinRate = result ? result.twin.successRate : 0;
+  const shift = (twinRate - holdRate) * 100;
+  const upsideCut = result ? result.twin.high - result.hold.high : 0;
+
+  return (
+    <section className="panel twin-side-panel">
+      <div className="panel-title"><div><span>GOAL SIMULATION</span><h2>1,000번의 미래</h2></div><Target size={16} /></div>
+      <div className="twin-side-body">
+        <div className="twin-goal-inputs">
+          <label><span>목표 금액</span><input type="number" min={0} step={0.5} value={goal.amount / 100_000_000} onChange={(event) => onChange({ ...goal, amount: Math.max(0, Number(event.target.value) || 0) * 100_000_000 })} /><em>억원</em></label>
+          <label><span>기간</span><input type="number" min={1} max={40} step={1} value={goal.years} onChange={(event) => onChange({ ...goal, years: Math.max(1, Math.min(40, Number(event.target.value) || 1)) })} /><em>년</em></label>
+          <label><span>월 저축</span><input type="number" min={0} step={10} value={goal.monthly / 10_000} onChange={(event) => onChange({ ...goal, monthly: Math.max(0, Number(event.target.value) || 0) * 10_000 })} /><em>만원</em></label>
+        </div>
+        {result ? (
+          <>
+            <div className="twin-goal-bars">
+              <div>
+                <span>끝까지 버텼다면</span>
+                <i><b style={{ width: `${holdRate * 100}%` }} /></i>
+                <strong>{(holdRate * 100).toFixed(0)}<em>%</em></strong>
+              </div>
+              <div className="twin">
+                <span>내 트윈의 행동으로는</span>
+                <i><b style={{ width: `${twinRate * 100}%` }} /></i>
+                <strong>{(twinRate * 100).toFixed(0)}<em>%</em></strong>
+              </div>
+            </div>
+            <p className="twin-goal-copy">
+              같은 1,000개의 미래에서 당신의 규칙은 달성 확률을 <b>{shift >= 0 ? "+" : ""}{shift.toFixed(0)}%p</b> 바꿉니다.
+              {upsideCut < 0
+                ? ` 대신 잘 풀린 경우의 상단이 ${korean(result.hold.high)}에서 ${korean(result.twin.high)}으로 잘립니다.`
+                : " 상단도 함께 커졌습니다."}
+            </p>
+            <ul className="twin-goal-detail">
+              <li><span>버티기 중앙값</span><strong>{korean(result.hold.median)}</strong><em>{korean(result.hold.low)} ~ {korean(result.hold.high)}</em></li>
+              <li><span>트윈 중앙값</span><strong>{korean(result.twin.median)}</strong><em>{korean(result.twin.low)} ~ {korean(result.twin.high)}</em></li>
+            </ul>
+            <p className="twin-side-note">{result.months}개월 × {result.paths.toLocaleString("ko-KR")}회. 이 포트폴리오가 실제로 겪은 {result.sampleMonths}개월의 수익률을 3개월 단위로 다시 뽑아 이었습니다. 수익률 전망이 아니라 과거의 재배열입니다.</p>
+          </>
+        ) : <p className="twin-side-note">목표 금액과 기간을 입력하면 계산합니다.</p>}
+      </div>
+    </section>
+  );
+}
+
+function MentorPanel({ verdicts, note, source, loading }: { verdicts: MentorVerdict[]; note: string; source: string; loading: boolean }) {
+  const worst = verdicts.length ? harshest(verdicts) : null;
+  return (
+    <section className="panel twin-side-panel">
+      <div className="panel-title">
+        <div><span>MENTOR REVIEW</span><h2>세 사람의 다른 채점표</h2></div>
+        {loading ? <LoaderCircle size={15} className="spin" /> : <Quote size={16} />}
+      </div>
+      <div className="twin-side-body">
+        {worst && <p className="twin-mentor-worst"><span>가장 낮은 점수</span><strong>{worst.name} {worst.score}점</strong></p>}
+        <div className="twin-mentor-list">
+          {verdicts.map((verdict) => (
+            <article key={verdict.key} className={worst && verdict.key === worst.key ? "worst" : ""}>
+              <header>
+                <div><strong>{verdict.name}</strong><small>{verdict.principle}</small></div>
+                <span className="twin-mentor-score">{verdict.score}</span>
+              </header>
+              <h3>{verdict.headline}</h3>
+              <p>{verdict.body}</p>
+            </article>
+          ))}
+        </div>
+        <p className="twin-side-note">{note}</p>
+        <p className="twin-side-note">
+          공개된 투자 원칙을 이 포트폴리오에 적용한 해석이며 본인의 발언이 아닙니다. 점수는 집중도·현금·업종 수·시장 온도로 계산합니다{source === "openrouter" ? "(문장만 AI가 다시 씀)" : "(모델 미연결 · 규칙 기반 문장)"}.
+        </p>
+      </div>
+    </section>
+  );
+}
+
 export default function TwinPage({ appliedScenario, onOpenBuilder }: { appliedScenario?: { title: string; forecast: string } | null; onOpenBuilder: () => void }) {
   const [snapshot, setSnapshot] = useState<PriceSnapshot | null>(null);
   const [saved, setSaved] = useState<Saved | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [windowId, setWindowId] = useState("covid-2020");
   const [editing, setEditing] = useState(false);
+  const [mentor, setMentor] = useState<{ key: string; verdicts: MentorVerdict[]; note: string; source: string }>({ key: "", verdicts: [], note: "", source: "rules" });
 
   useEffect(() => {
     let active = true;
@@ -201,6 +350,64 @@ export default function TwinPage({ appliedScenario, onOpenBuilder }: { appliedSc
   );
   const report = useMemo(() => (result && profile ? buildReport(result, profile) : []), [result, profile]);
   const character = useMemo(() => (profile ? characterFor(profile) : null), [profile]);
+  const goal = saved?.goal ?? defaultGoal;
+  const mood = useMemo(
+    () => (snapshot && saved && profile ? marketMood(snapshot, saved.holdings, profile) : null),
+    [snapshot, saved, profile],
+  );
+  const goalResult = useMemo(
+    () => (snapshot && saved && profile && valuation ? simulateGoal(snapshot, saved.holdings, profile, goal, valuation.total) : null),
+    [snapshot, saved, profile, goal, valuation],
+  );
+  const mentorInput = useMemo<MentorInput | null>(() => {
+    if (!valuation || !mood || !result || !character) return null;
+    const top = valuation.rows.reduce((widest, row) => (row.weight > widest.weight ? row : widest), valuation.rows[0]);
+    return {
+      cashWeight: valuation.cashWeight,
+      topWeight: top.weight,
+      topName: top.name,
+      herfindahl: valuation.rows.reduce((sum, row) => sum + row.weight * row.weight, 0),
+      assetCount: valuation.rows.length,
+      sectorCount: new Set(valuation.rows.map((row) => row.sector)).size,
+      moodScore: mood.score,
+      moodLabel: mood.label,
+      drawdown: mood.drawdown,
+      behaviorGap: result.behaviorGap,
+      windowLabel: result.window.label,
+      tradeCount: result.events.length,
+      character: character.name,
+    };
+  }, [valuation, mood, result, character]);
+  const mentorKey = mentorInput ? JSON.stringify(mentorInput) : "";
+
+  useEffect(() => {
+    if (!mentorKey) return;
+    const input = JSON.parse(mentorKey) as MentorInput;
+    let active = true;
+    const load = async () => {
+      // 모델이 없거나 실패해도 규칙 기반 문장으로 화면을 채운다.
+      let next = { verdicts: mentorVerdicts(input), note: behaviorNote(input), source: "rules" };
+      try {
+        const response = await fetch("/api/twin/mentor", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: mentorKey,
+        });
+        if (response.ok) {
+          const payload = await response.json() as { verdicts?: MentorVerdict[]; note?: string; source?: string };
+          if (payload.verdicts?.length) next = { verdicts: payload.verdicts, note: payload.note ?? next.note, source: payload.source ?? "rules" };
+        }
+      } catch { /* 오프라인이면 규칙 기반 문장을 그대로 쓴다 */ }
+      if (!active) return;
+      setMentor({ key: mentorKey, ...next });
+    };
+    void load();
+    return () => { active = false; };
+  }, [mentorKey]);
+
+  const mentorReady = mentor.key === mentorKey && mentor.verdicts.length > 0;
+  const shownVerdicts = mentorReady ? mentor.verdicts : mentorInput ? mentorVerdicts(mentorInput) : [];
+  const shownNote = mentorReady ? mentor.note : mentorInput ? behaviorNote(mentorInput) : "";
   const shocks = useMemo(() => Object.values(snapshot?.windows ?? {}), [snapshot]);
 
   if (!loaded || !snapshot) {
@@ -335,6 +542,8 @@ export default function TwinPage({ appliedScenario, onOpenBuilder }: { appliedSc
         </section>
       </section>
 
+      <div className="twin-lower-grid">
+      <div className="twin-report-column">
       <section className="panel twin-experts-panel">
         <div className="panel-title">
           <div><span>BEHAVIOR REPORT</span><h2>트윈이 드러낸 내 판단 습관</h2></div>
@@ -367,6 +576,14 @@ export default function TwinPage({ appliedScenario, onOpenBuilder }: { appliedSc
           과거 실제 종가와 응답한 행동 규칙으로 계산한 교육용 결과입니다. 미래 수익을 예측하지 않으며 특정 종목의 매매를 권유하지 않습니다.
         </div>
       </section>
+      {shownVerdicts.length > 0 && <MentorPanel verdicts={shownVerdicts} note={shownNote} source={mentor.source} loading={!mentorReady} />}
+      </div>
+
+      <aside className="twin-side-rail" aria-label="트윈 부가 진단">
+        {mood && <MoodPanel mood={mood} hasSellRule={(profile?.panicAction ?? 0) > 0} />}
+        <GoalPanel goal={goal} onChange={(next) => saved && persist({ ...saved, goal: next })} result={goalResult} />
+      </aside>
+      </div>
     </div>
   );
 }

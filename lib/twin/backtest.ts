@@ -74,6 +74,9 @@ export type BacktestResult = {
 
 const seriesFor = (window: SnapshotWindow, symbol: string) => window.closes[symbol] ?? null;
 
+/** 실제로 매도가 걸리는 낙폭.  외부 의견에 민감할수록 스스로 정한 기준보다 앞당겨진다. */
+export const effectivePanicThreshold = (profile: BehaviorProfile) => profile.panicDrawdown * (1 - profile.herding * 0.35);
+
 /** 결측을 직전 값으로 메운 정규화 시계열. 첫 값이 비어 있으면 null 을 돌려준다. */
 function normalized(closes: (number | null)[] | null): number[] | null {
   if (!closes || closes[0] === null || closes[0] === undefined) return null;
@@ -125,7 +128,7 @@ function replayBehavior(dates: string[], buyHold: number[], profile: BehaviorPro
   let exitPosition = 1;
   let lowAfterExit = Infinity;
   let profitSteps = 0;
-  const threshold = profile.panicDrawdown * (1 - profile.herding * 0.35);
+  const threshold = effectivePanicThreshold(profile);
 
   for (let day = 1; day < buyHold.length; day += 1) {
     const marketReturn = buyHold[day] / buyHold[day - 1] - 1;

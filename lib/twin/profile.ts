@@ -4,7 +4,7 @@
 // 지식 점수가 아니라 매매 규칙을 만들어야 시뮬레이션에 넣을 수 있기 때문이다.
 
 import type { BacktestResult, BehaviorProfile, Holding, TradeEvent } from "./backtest";
-import { CASH } from "./backtest";
+import { CASH, effectivePanicThreshold } from "./backtest";
 
 export type ProfileQuestion = {
   id: string;
@@ -146,7 +146,7 @@ export function buildReport(result: BacktestResult, profile: BehaviorProfile): B
 
   if (profile.herding >= 0.6 && first) {
     const raw = profile.panicDrawdown;
-    const effective = raw * (1 - profile.herding * 0.35);
+    const effective = effectivePanicThreshold(profile);
     cards.push({
       bias: "군집행동",
       headline: `기준보다 ${((Math.abs(raw) - Math.abs(effective)) * 100).toFixed(1)}%p 먼저 팔았습니다`,

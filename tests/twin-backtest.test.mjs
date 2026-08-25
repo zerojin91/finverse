@@ -72,3 +72,64 @@ test("현재 평가금액은 최근 종가 기준으로 계산된다", () => {
   assert.ok(valuation.total > 0);
   assert.ok(Math.abs(valuation.rows.reduce((sum, row) => sum + row.weight, 0) - 1) < 1e-9);
 });
+
+const { marketMood } = await import("../lib/twin/market-mood.ts");
+const { simulateGoal, monthlyReturns } = await import("../lib/twin/goal.ts");
+const { mentorVerdicts, harshest } = await import("../lib/twin/mentor.ts");
+
+test("시장 온도계는 0~100 범위와 네 개 구성요소를 낸다", () => {
+  const mood = marketMood(snapshot, holdings, panicky);
+  assert.ok(mood, "온도를 계산하지 못했다");
+  assert.equal(mood.asOf, snapshot.windows.recent.dates.at(-1));
+  assert.ok(mood.score >= 0 && mood.score <= 100);
+  assert.equal(mood.components.length, 4);
+  for (const component of mood.components) assert.ok(component.score >= 0 && component.score <= 100, `${component.key} 범위 초과`);
+  assert.ok(mood.drawdown <= 0, "낙폭은 0 이하여야 한다");
+  assert.ok(Math.abs(mood.distance - (mood.drawdown - mood.trigger)) < 1e-12);
+});
+
+test("매도 규칙이 없는 성향은 온도계에서 트리거되지 않는다", () => {
+  const mood = marketMood(snapshot, holdings, steady);
+  assert.equal(mood.triggered, false);
+});
+
+test("목표 시뮬레이션은 같은 입력에 같은 결과를 준다", () => {
+  const goal = { amount: 1_000_000_000, years: 10, monthly: 1_000_000 };
+  const first = simulateGoal(snapshot, holdings, panicky, goal, 500_000_000);
+  const second = simulateGoal(snapshot, holdings, panicky, goal, 500_000_000);
+  assert.ok(first, "시뮬레이션 실패");
+  assert.deepEqual(first, second, "같은 입력인데 결과가 흔들린다");
+  assert.equal(first.months, 120);
+  assert.equal(first.paths, 1000);
+  assert.ok(first.sampleMonths > 100, `표본 ${first.sampleMonths}개월`);
+  for (const outcome of [first.hold, first.twin]) {
+    assert.ok(outcome.successRate >= 0 && outcome.successRate <= 1);
+    assert.ok(outcome.low <= outcome.median && outcome.median <= outcome.high);
+  }
+});
+
+test("월간 수익률 표본은 실제 구간에서 나온다", () => {
+  const samples = monthlyReturns(snapshot, holdings);
+  assert.ok(samples.length > 100);
+  assert.ok(samples.every((value) => Number.isFinite(value) && value > -1));
+});
+
+test("대가 진단은 세 개의 서로 다른 점수를 낸다", () => {
+  const input = { cashWeight: 0.02, topWeight: 0.63, topName: "SK하이닉스", herfindahl: 0.49, assetCount: 4, sectorCount: 3, moodScore: 22, moodLabel: "극단적 공포", drawdown: -0.18, behaviorGap: -0.4, windowLabel: "2020 코로나 급락", tradeCount: 11, character: "공포 이탈형" };
+  const verdicts = mentorVerdicts(input);
+  assert.equal(verdicts.length, 3);
+  for (const verdict of verdicts) assert.ok(verdict.score >= 5 && verdict.score <= 95, `${verdict.key} ${verdict.score}`);
+  assert.equal(harshest(verdicts).score, Math.min(...verdicts.map((verdict) => verdict.score)));
+  // 집중도가 높으면 분산 원칙 점수가 집중을 허용하는 원칙보다 낮게 나와야 한다.
+  const spread = mentorVerdicts({ ...input, topWeight: 0.25, herfindahl: 0.2, sectorCount: 5 });
+  assert.ok(spread.find((v) => v.key === "dalio").score > verdicts.find((v) => v.key === "dalio").score);
+});
+
+test("목표 금액만 바꾸면 분포는 그대로고 달성률만 움직인다", () => {
+  const base = { years: 10, monthly: 1_000_000 };
+  const low = simulateGoal(snapshot, holdings, panicky, { ...base, amount: 1_000_000_000 }, 500_000_000);
+  const high = simulateGoal(snapshot, holdings, panicky, { ...base, amount: 3_000_000_000 }, 500_000_000);
+  assert.equal(low.hold.median, high.hold.median, "목표만 바꿨는데 경로가 달라졌다");
+  assert.equal(low.twin.high, high.twin.high);
+  assert.ok(low.hold.successRate > high.hold.successRate, "목표가 커졌는데 달성률이 안 떨어졌다");
+});
