@@ -13,6 +13,15 @@ uv sync
 uv run python tools/site.py dev
 ```
 
+## Scenario Card Agent (설계·impact 모듈)
+
+시나리오 카드 JSON 생성 파이프라인 설계와 JSON Schema, impact 계산 모듈은 [`docs/agents/scenario-card/README.md`](docs/agents/scenario-card/README.md)에 정리되어 있습니다.
+
+```bash
+uv sync --group dev
+uv run pytest tests/test_impact_model.py -v
+```
+
 프로덕션 빌드는 다음 명령으로 실행합니다.
 
 ```bash

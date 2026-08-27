@@ -1,5 +1,7 @@
 """Tests for scenario card impact_model."""
 
+import pytest
+
 from agents.scenario_card.impact_model import (
     EventChannelInput,
     EventMeta,
@@ -30,10 +32,10 @@ def test_volume_regime_hot_market():
 def test_weights_from_activity_bounds():
     quiet = weights_from_activity(0.0)
     hot = weights_from_activity(1.0)
-    assert quiet.quant == 0.18
-    assert hot.quant == 0.50
-    assert quiet.news == 0.42
-    assert hot.news == 0.20
+    assert quiet.quant == pytest.approx(0.18)
+    assert hot.quant == pytest.approx(0.50)
+    assert quiet.news == pytest.approx(0.42)
+    assert hot.news == pytest.approx(0.20)
 
 
 def test_build_impact_model_up_monotonic():
