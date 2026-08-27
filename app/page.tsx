@@ -17,6 +17,7 @@ import {
   ExternalLink,
   FileUp,
   GitBranch,
+  Gamepad2,
   Globe2,
   LoaderCircle,
   MessageCircle,
@@ -33,6 +34,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation";
+import GameLab from "@/components/twin/game-lab";
 import TwinPage from "@/components/twin/twin-page";
 
 const SimulationMessageResponse = dynamic(
@@ -40,7 +42,7 @@ const SimulationMessageResponse = dynamic(
   { ssr: false },
 );
 
-type MainTab = "market" | "twin";
+type MainTab = "market" | "twin" | "lab";
 
 type MarketSignalKey = "economy" | "country" | "event" | "community";
 type DashboardSource = { title: string; publisher: string; url: string | null; publishedAt?: string | null };
@@ -2032,6 +2034,7 @@ export default function Home() {
           <div className="sidebar-label"><BrainCircuit size={19} /><div><span>AI DECISION LAB</span><strong>금융 판단 실험실</strong></div></div>
           <nav className="side-tabs">
             <button className={activeTab === "market" ? "active" : ""} onClick={() => activateTab("market")}><BarChart3 size={18} />시장 인사이트</button>
+            <button className={activeTab === "lab" ? "active" : ""} onClick={() => activateTab("lab")}><Gamepad2 size={18} />행동 실험실</button>
             <button className={activeTab === "twin" ? "active" : ""} onClick={() => activateTab("twin")}><UserRound size={18} />마이 금융 트윈</button>
           </nav>
           <button className="sidebar-help" type="button"><CircleHelp size={20} /><span>도움말</span><ChevronRight size={17} /></button>
@@ -2321,12 +2324,15 @@ export default function Home() {
                 </section>}
               </section>
             </div>
+          ) : activeTab === "lab" ? (
+            <GameLab onGoToTwin={() => activateTab("twin")} />
           ) : <TwinPage appliedScenario={appliedScenario} onOpenBuilder={openBuilder} />}
         </main>
       </div>
 
       <nav className="mobile-tabs" aria-label="모바일 주요 메뉴">
         <button className={activeTab === "market" ? "active" : ""} onClick={() => activateTab("market")}><BarChart3 size={18} /><span>시장 인사이트</span></button>
+        <button className={activeTab === "lab" ? "active" : ""} onClick={() => activateTab("lab")}><Gamepad2 size={18} /><span>행동 실험실</span></button>
         <button className={activeTab === "twin" ? "active" : ""} onClick={() => activateTab("twin")}><UserRound size={18} /><span>마이 금융 트윈</span></button>
       </nav>
 

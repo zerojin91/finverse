@@ -133,3 +133,63 @@ test("목표 금액만 바꾸면 분포는 그대로고 달성률만 움직인�
   assert.equal(low.twin.high, high.twin.high);
   assert.ok(low.hold.successRate > high.hold.successRate, "목표가 커졌는데 달성률이 안 떨어졌다");
 });
+
+const { loadSlice, replayGames, summarizeReplay, deriveProfileFromGames, scoreLottery, lotteryPairs, playedCount } = await import("../lib/twin/games.ts");
+
+test("게임 구간은 실제 거래일로 잘리고 턴이 끝까지 덮는다", () => {
+  for (const config of replayGames) {
+    const slice = loadSlice(snapshot, config);
+    assert.ok(slice, `${config.id} 슬라이스 실패`);
+    assert.ok(slice.closes.length > config.turns, `${config.id} 거래일 부족`);
+    assert.equal(slice.closes.length, slice.dates.length);
+    assert.ok(slice.closes.every((value) => value > 0), `${config.id} 결측 종가`);
+    assert.equal(slice.stops.length, config.turns);
+    assert.equal(slice.stops.at(-1), slice.closes.length - 1, `${config.id} 마지막 턴이 끝을 못 덮는다`);
+    for (let turn = 1; turn < slice.stops.length; turn += 1) assert.ok(slice.stops[turn] > slice.stops[turn - 1]);
+    if (config.feed) assert.ok(config.feed.length >= config.turns, `${config.id} 피드가 턴보다 적다`);
+  }
+});
+
+test("누른 기록에서 매도 낙폭과 재진입 간격을 뽑아낸다", () => {
+  const config = replayGames[0];
+  const slice = loadSlice(snapshot, config);
+  const records = [
+    { turn: 0, action: "hold", drawdown: 0, session: slice.stops[0], position: 1 },
+    { turn: 1, action: "sell-all", drawdown: -0.18, session: slice.stops[1], position: 0 },
+    { turn: 4, action: "buy", drawdown: -0.18, session: slice.stops[4], position: 1 },
+  ];
+  const result = summarizeReplay(config, slice, records, 92);
+  assert.equal(result.sellDrawdown, -0.18);
+  assert.equal(result.sellFraction, 1);
+  assert.equal(result.reentryGap, slice.stops[4] - slice.stops[1]);
+  assert.ok(Math.abs(result.finalReturn - -0.08) < 1e-9);
+  assert.ok(Math.abs(result.buyHoldReturn - (slice.closes.at(-1) / slice.closes[0] - 1)) < 1e-12);
+});
+
+test("관측 결과가 설문과 같은 프로필로 환산된다", () => {
+  const hold = { id: "hold", sellDrawdown: -0.2, sellFraction: 1, reentryGap: 40, trimmed: 0, chased: 0, finalReturn: 0, buyHoldReturn: 0, records: [] };
+  const only = deriveProfileFromGames({ hold });
+  assert.equal(only.panicDrawdown, -0.2);
+  assert.equal(only.panicAction, 1);
+  assert.equal(only.reentryDelay, 40);
+  // 군중 피드에서 15%p 더 일찍 팔면 군집성이 최대가 된다.
+  const crowd = { ...hold, id: "crowd", sellDrawdown: -0.05 };
+  assert.equal(deriveProfileFromGames({ hold, crowd }).herding, 1);
+  // 늦게 팔았으면 군집성은 0.
+  assert.equal(deriveProfileFromGames({ hold, crowd: { ...crowd, sellDrawdown: -0.3 } }).herding, 0);
+  // 끝까지 안 팔면 가장 깊은 임계로 둔다.
+  assert.equal(deriveProfileFromGames({ hold: { ...hold, sellDrawdown: null, reentryGap: null } }).panicDrawdown, -0.45);
+  // 아무 게임도 안 하면 중립값.
+  assert.deepEqual(deriveProfileFromGames({}), { panicDrawdown: -0.45, panicAction: 0.5, herding: 0.45, reentryDelay: 20, disposition: 0.5, chase: 0.4 });
+});
+
+test("복권 선택에서 손실 민감도와 반사효과를 잡아낸다", () => {
+  assert.equal(lotteryPairs.length, 6);
+  const reflex = scoreLottery(["risky", "risky", "risky", "certain", "certain", "certain"]);
+  assert.equal(reflex.lambda, 5.5);
+  assert.equal(reflex.consistent, false);
+  const steadyHand = scoreLottery(["certain", "certain", "certain", "certain", "certain", "certain"]);
+  assert.equal(steadyHand.lambda, 1);
+  assert.equal(steadyHand.consistent, true);
+  assert.equal(playedCount({ hold: {}, lottery: reflex }), 2);
+});

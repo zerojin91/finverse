@@ -27,7 +27,7 @@ import { behaviorNote, harshest, mentorVerdicts, type MentorInput, type MentorVe
 import { buildReport, characterFor, demoPortfolios, deriveProfile, questions } from "@/lib/twin/profile";
 
 const STORAGE_KEY = "finverse.twin.v1";
-type Saved = { holdings: Holding[]; answers: Record<string, string>; goal?: Goal };
+type Saved = { holdings: Holding[]; answers: Record<string, string>; goal?: Goal; gameProfile?: BehaviorProfile };
 
 const defaultGoal: Goal = { amount: 1_000_000_000, years: 10, monthly: 1_000_000 };
 
@@ -342,7 +342,12 @@ export default function TwinPage({ appliedScenario, onOpenBuilder }: { appliedSc
     try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch { /* 시크릿 모드 등 */ }
   }, []);
 
-  const profile: BehaviorProfile | null = useMemo(() => (saved ? deriveProfile(saved.answers) : null), [saved]);
+  // 행동 실험실에서 관측한 프로필이 있으면 설문보다 우선한다.  말한 것보다 한 것이
+  // 실제 판단에 가깝기 때문이다.
+  const profile: BehaviorProfile | null = useMemo(
+    () => (saved ? saved.gameProfile ?? deriveProfile(saved.answers) : null),
+    [saved],
+  );
   const valuation = useMemo(() => (snapshot && saved ? valuate(snapshot, saved.holdings) : null), [snapshot, saved]);
   const result = useMemo(
     () => (snapshot && saved && profile ? runBacktest(snapshot, windowId, saved.holdings, profile) : null),
