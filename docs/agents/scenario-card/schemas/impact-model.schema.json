@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "finverse/scenario-card/impact_model/v1",
+  "title": "ImpactModel",
+  "type": "object",
+  "required": ["scenario_id", "base_index", "weights", "events", "path", "forecast", "forecast_pct"],
+  "additionalProperties": false,
+  "properties": {
+    "scenario_id": { "type": "string" },
+    "base_index": { "type": "number", "exclusiveMinimum": 0 },
+    "tone": { "type": "string", "enum": ["up", "down", "neutral"] },
+    "weights": {
+      "type": "object",
+      "required": ["quant", "news", "analyst"],
+      "properties": {
+        "quant": { "type": "number" },
+        "news": { "type": "number" },
+        "analyst": { "type": "number" }
+      }
+    },
+    "weight_source": { "type": "string", "enum": ["volume_regime", "override"] },
+    "events": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": ["event_key", "week", "category", "title", "body", "channels", "impact_pct", "cumulative_impact_pct", "index_level"],
+        "properties": {
+          "event_key": { "type": "string" },
+          "week": { "type": "string" },
+          "category": { "type": "string" },
+          "title": { "type": "string" },
+          "body": { "type": "string" },
+          "channels": {
+            "type": "object",
+            "required": ["quant_pct", "analyst_pct", "news_pct", "news_fallback_used"],
+            "properties": {
+              "quant_pct": { "type": "number" },
+              "analyst_pct": { "type": "number" },
+              "news_pct": { "type": "number" },
+              "news_fallback_used": { "type": "boolean" }
+            }
+          },
+          "impact_pct": { "type": "number" },
+          "impact_formula": { "type": "string" },
+          "cumulative_impact_pct": { "type": "number" },
+          "index_level": { "type": "number" }
+        }
+      }
+    },
+    "path": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "items": { "type": "number" }
+    },
+    "forecast": { "type": "string", "pattern": "^KOSPI [+-]" },
+    "forecast_pct": { "type": "number" },
+    "band": {
+      "type": "object",
+      "properties": {
+        "low_pct": { "type": "number" },
+        "high_pct": { "type": "number" },
+        "low_index": { "type": "number" },
+        "high_index": { "type": "number" }
+      }
+    },
+    "limitations": { "type": "array", "items": { "type": "string" } },
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "historical_evidence": { "type": "string" },
+        "web_evidence": { "type": "string" }
+      }
+    }
+  }
+}

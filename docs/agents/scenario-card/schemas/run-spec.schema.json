@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "finverse/scenario-card/run_spec/v1",
+  "title": "ScenarioCardRunSpec",
+  "type": "object",
+  "required": ["target", "as_of", "horizon", "horizon_trading_days", "path_points", "scenario_mix", "info_cutoff", "language"],
+  "additionalProperties": false,
+  "properties": {
+    "target": { "type": "string", "minLength": 1 },
+    "target_index_name": { "type": "string" },
+    "as_of": { "type": "string", "format": "date" },
+    "horizon": { "type": "string", "pattern": "^\\d+[dwmy]$" },
+    "horizon_trading_days": { "type": "integer", "minimum": 5, "maximum": 252 },
+    "path_points": { "type": "integer", "const": 12 },
+    "scenario_mix": {
+      "type": "object",
+      "required": ["up_min", "up_max", "neutral_min", "neutral_max", "down_min", "down_max"],
+      "additionalProperties": false,
+      "properties": {
+        "up_min": { "type": "integer", "minimum": 0 },
+        "up_max": { "type": "integer", "minimum": 0 },
+        "neutral_min": { "type": "integer", "minimum": 0 },
+        "neutral_max": { "type": "integer", "minimum": 0 },
+        "down_min": { "type": "integer", "minimum": 0 },
+        "down_max": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "neutral_forecast_abs_cap_pct": { "type": "number", "minimum": 0, "maximum": 20, "default": 5.0 },
+    "info_cutoff": { "type": "string", "format": "date-time" },
+    "language": { "type": "string", "enum": ["ko"] }
+  }
+}

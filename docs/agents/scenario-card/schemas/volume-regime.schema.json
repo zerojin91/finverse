@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "finverse/scenario-card/volume_regime/v1",
+  "title": "VolumeRegime",
+  "type": "object",
+  "required": ["as_of", "target", "tv_ratio", "activity_score", "regime_label", "weights", "weight_rationale"],
+  "additionalProperties": false,
+  "properties": {
+    "as_of": { "type": "string", "format": "date" },
+    "target": { "type": "string" },
+    "trading_value_20d_avg": { "type": ["number", "null"] },
+    "trading_value_240d_median": { "type": ["number", "null"] },
+    "tv_ratio": { "type": "number", "minimum": 0 },
+    "activity_score": { "type": "number", "minimum": 0, "maximum": 1 },
+    "regime_label": { "type": "string", "enum": ["quiet", "normal", "elevated", "hot"] },
+    "weights": {
+      "type": "object",
+      "required": ["quant", "news", "analyst"],
+      "additionalProperties": false,
+      "properties": {
+        "quant": { "type": "number", "minimum": 0, "maximum": 1 },
+        "news": { "type": "number", "minimum": 0, "maximum": 1 },
+        "analyst": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "weight_rationale": { "type": "string" },
+    "backfill_applied": { "type": "boolean", "default": false },
+    "limitations": { "type": "array", "items": { "type": "string" } },
+    "source": {
+      "type": "object",
+      "properties": {
+        "view": { "type": "string" },
+        "field": { "type": "string" },
+        "record_ids": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

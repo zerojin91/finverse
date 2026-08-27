@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "finverse/scenario-card/set_plan/v1",
+  "title": "ScenarioSetPlan",
+  "type": "object",
+  "required": ["as_of", "scenarios"],
+  "additionalProperties": false,
+  "properties": {
+    "as_of": { "type": "string", "format": "date" },
+    "scenarios": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 4,
+      "items": { "$ref": "#/$defs/scenarioPlan" }
+    }
+  },
+  "$defs": {
+    "scenarioPlan": {
+      "type": "object",
+      "required": ["id", "title", "tone", "duration", "tags", "core_trigger", "confirmation_chain", "falsification", "event_templates"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "title": { "type": "string", "minLength": 1 },
+        "tone": { "type": "string", "enum": ["up", "down", "neutral"] },
+        "duration": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" }, "minItems": 1, "maxItems": 4 },
+        "forecast_direction": { "type": "string", "enum": ["up", "down", "neutral"] },
+        "core_trigger": { "type": "string" },
+        "confirmation_chain": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "falsification": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "event_templates": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "required": ["key", "week_offset", "category", "analog_event_type"],
+            "additionalProperties": false,
+            "properties": {
+              "key": { "type": "string" },
+              "week_offset": { "type": "integer", "minimum": 1, "maximum": 4 },
+              "category": { "type": "string" },
+              "analog_event_type": { "type": "string" }
+            }
+          }
+        },
+        "historical_retrieval": {
+          "type": "object",
+          "properties": {
+            "analog_min_candidates": { "type": "integer", "minimum": 5 },
+            "pre_window_trading_days": { "type": "integer", "default": 240 },
+            "post_window_trading_days": { "type": "integer" },
+            "must_include_counterexample": { "type": "boolean", "default": true }
+          }
+        }
+      }
+    }
+  }
+}
