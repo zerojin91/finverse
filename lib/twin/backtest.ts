@@ -22,6 +22,8 @@ export type SnapshotWindow = {
 export type PriceSnapshot = { generatedAt: string; source: string; assets: SnapshotAsset[]; windows: Record<string, SnapshotWindow> };
 
 export const CASH = "CASH";
+/** 국내주식 한 덩어리.  개별 종목 대신 코스피 지수 경로로 평가한다. */
+export const STOCK = "KOSPI";
 
 /** 사용자가 담은 자산 한 줄. amount 는 투입 금액(원). */
 export type Holding = { symbol: string; amount: number };
@@ -117,7 +119,13 @@ export function buyHoldPath(snapshot: PriceSnapshot, window: SnapshotWindow, hol
   return { path: path.map((value) => value * 100), index: indexPath.map((value) => value * 100), proxied };
 }
 
-/** 버티기 경로 위에서 행동 성향이 했을 매매를 하루 단위로 재생한다. */
+// 사람은 계좌를 매일 뒤집지 않는다.  판단은 한 달에 한 번쯤 내리고, 한 번 손대면
+// 한동안 다시 손대지 않는다.  이 세 상수가 트윈의 매매를 실제 사람의 리듬에 맞춘다.
+const DECISION_STEP = 21;      // 판단 주기(거래일). 대략 한 달에 한 번 계좌를 본다
+const SELL_COOLDOWN = 63;      // 한 번 팔면 최소 3개월은 다시 팔지 않는다
+const REENTRY_REBOUND = 0.1;   // 저점 대비 이만큼은 올라야 "돌아섰다"고 본다
+
+/** 버티기 경로 위에서 행동 성향이 했을 매매를 재생한다. */
 function replayBehavior(dates: string[], buyHold: number[], profile: BehaviorProfile) {
   const events: TradeEvent[] = [];
   const twin = [100];
@@ -125,52 +133,57 @@ function replayBehavior(dates: string[], buyHold: number[], profile: BehaviorPro
   let peak = 100;
   let value = 100;
   let exitIndex: number | null = null;
-  let exitPosition = 1;
+  // 되돌아갈 비중.  연속 매도로 깎이지 않도록 이번 이탈의 첫 매도 직전 값을 기억한다.
+  let positionBeforeExit = 1;
   let lowAfterExit = Infinity;
+  let lastSellIndex = -SELL_COOLDOWN;
   let profitSteps = 0;
   const threshold = effectivePanicThreshold(profile);
+  // 익절은 두 번까지만. 오르는 내내 조금씩 파는 건 성향이 아니라 잡음이다.
+  const profitTargets = [0.25, 0.6];
 
   for (let day = 1; day < buyHold.length; day += 1) {
     const marketReturn = buyHold[day] / buyHold[day - 1] - 1;
     value *= 1 + position * marketReturn;
-    const drawdown = value / peak - 1;
+    if (exitIndex !== null) lowAfterExit = Math.min(lowAfterExit, buyHold[day]);
 
-    if (position > 0 && profile.panicAction > 0 && drawdown <= threshold) {
-      const sold = position * profile.panicAction;
-      exitPosition = position;
-      position -= sold;
-      exitIndex = day;
-      lowAfterExit = buyHold[day];
-      events.push({
-        index: day,
-        date: dates[day],
-        type: "panic-sell",
-        position,
-        detail: `고점 대비 ${(drawdown * 100).toFixed(1)}% 구간에서 보유의 ${(profile.panicAction * 100).toFixed(0)}%를 정리`,
-      });
-    } else if (exitIndex !== null && position < exitPosition) {
-      lowAfterExit = Math.min(lowAfterExit, buyHold[day]);
-      const waited = day - exitIndex;
-      const rebounded = buyHold[day] / lowAfterExit - 1 >= 0.03;
-      if (waited >= profile.reentryDelay && rebounded) {
-        position = exitPosition;
-        // 다시 산 가격이 새로운 기준점이 된다(기준점 의존).  이 초기화가 없으면
-        // 예전 고점 대비 낙폭이 그대로 남아 재진입 다음 날 곧바로 되팔게 된다.
-        peak = value;
+    // 판단은 판단일에만 내린다. 값은 매일 움직이지만 손은 매일 움직이지 않는다.
+    if (day % DECISION_STEP === 0) {
+      const drawdown = value / peak - 1;
+      const canSell = day - lastSellIndex >= SELL_COOLDOWN;
+
+      if (position > 0 && profile.panicAction > 0 && drawdown <= threshold && canSell) {
+        if (exitIndex === null) positionBeforeExit = position;
+        position -= position * profile.panicAction;
+        exitIndex = day;
+        lowAfterExit = buyHold[day];
+        lastSellIndex = day;
         events.push({
           index: day,
           date: dates[day],
-          type: "reentry",
+          type: "panic-sell",
           position,
-          detail: `${waited}거래일 기다린 뒤 저점 대비 ${((buyHold[day] / lowAfterExit - 1) * 100).toFixed(1)}% 오른 가격에 재진입`,
+          detail: `고점 대비 ${(drawdown * 100).toFixed(1)}% 구간에서 보유의 ${(profile.panicAction * 100).toFixed(0)}%를 정리`,
         });
-        exitIndex = null;
-      }
-    }
-
-    if (profile.disposition > 0 && position > 0.3) {
-      const gain = value / 100 - 1;
-      if (gain >= 0.2 * (profitSteps + 1)) {
+      } else if (exitIndex !== null && position < positionBeforeExit) {
+        const waited = day - exitIndex;
+        const rebound = buyHold[day] / lowAfterExit - 1;
+        if (waited >= profile.reentryDelay && rebound >= REENTRY_REBOUND) {
+          position = positionBeforeExit;
+          // 다시 산 가격이 새로운 기준점이 된다(기준점 의존).  이 초기화가 없으면
+          // 예전 고점 대비 낙폭이 그대로 남아 재진입 직후 곧바로 되팔게 된다.
+          peak = value;
+          exitIndex = null;
+          events.push({
+            index: day,
+            date: dates[day],
+            type: "reentry",
+            position,
+            detail: `${waited}거래일 기다린 뒤 저점 대비 ${(rebound * 100).toFixed(1)}% 오른 가격에 재진입`,
+          });
+        }
+      } else if (profile.disposition > 0 && position > 0.3 && profitSteps < profitTargets.length && value / 100 - 1 >= profitTargets[profitSteps]) {
+        const gain = value / 100 - 1;
         profitSteps += 1;
         const sold = position * 0.3 * profile.disposition;
         position -= sold;
@@ -181,14 +194,12 @@ function replayBehavior(dates: string[], buyHold: number[], profile: BehaviorPro
           position,
           detail: `누적 ${(gain * 100).toFixed(0)}% 구간에서 ${(sold * 100).toFixed(0)}%p를 미리 익절`,
         });
-      }
-    }
-
-    if (profile.chase > 0 && position < 1 && value > peak && exitIndex === null) {
-      const added = Math.min(1 - position, 0.5 * profile.chase);
-      if (added > 0.05) {
-        position += added;
-        events.push({ index: day, date: dates[day], type: "chase-buy", position, detail: "신고가를 확인하고 남은 현금으로 추격 매수" });
+      } else if (profile.chase > 0 && position < 1 && value > peak && exitIndex === null) {
+        const added = Math.min(1 - position, 0.5 * profile.chase);
+        if (added > 0.05) {
+          position += added;
+          events.push({ index: day, date: dates[day], type: "chase-buy", position, detail: "신고가를 확인하고 남은 현금으로 추격 매수" });
+        }
       }
     }
 
@@ -271,17 +282,21 @@ export function valuate(snapshot: PriceSnapshot, holdings: Holding[]): Valuation
   if (invested <= 0) return null;
   const rows = holdings.map((holding) => {
     const asset = snapshot.assets.find((item) => item.symbol === holding.symbol);
+    const label = holding.symbol === CASH
+      ? { name: "현금", sector: "예금·파킹" }
+      : holding.symbol === STOCK
+        ? { name: "국내주식", sector: "코스피 지수 기준" }
+        : { name: asset?.name ?? holding.symbol, sector: asset?.sector ?? "" };
     const closes = seriesFor(window, holding.symbol);
     const last = closes?.at(-1) ?? null;
     const previous = closes?.at(-2) ?? null;
     const changePct = last !== null && previous !== null && previous !== 0 ? last / previous - 1 : 0;
-    const path = normalized(closes);
-    // 투입 금액이 지금까지 실제 종가를 따라 움직인 평가금액.
-    const amount = holding.symbol === CASH || !path ? holding.amount : holding.amount * path.at(-1)!;
+    // 입력한 금액이 곧 지금의 평가금액이다.  과거 수익률을 곱해 부풀리지 않는다.
+    const amount = holding.amount;
     return {
       symbol: holding.symbol,
-      name: holding.symbol === CASH ? "현금" : asset?.name ?? holding.symbol,
-      sector: holding.symbol === CASH ? "유동성" : asset?.sector ?? "",
+      name: label.name,
+      sector: label.sector,
       close: last,
       amount,
       weight: 0,

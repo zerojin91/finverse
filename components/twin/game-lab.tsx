@@ -25,7 +25,7 @@ import {
 import { characterFor, deriveProfile } from "@/lib/twin/profile";
 
 const GAMES_KEY = "finverse.twin.games.v1";
-const TWIN_KEY = "finverse.twin.v1";
+const TWIN_KEY = "finverse.twin.v2";
 
 const pct = (value: number, digits = 1) => `${value >= 0 ? "+" : ""}${(value * 100).toFixed(digits)}%`;
 const money = (value: number) => `${Math.round(value * 1_000_000).toLocaleString("ko-KR")}원`;
@@ -278,7 +278,8 @@ export default function GameLab({ onGoToTwin }: { onGoToTwin: () => void }) {
     if (!gameProfile) return;
     try {
       const raw = window.localStorage.getItem(TWIN_KEY);
-      const twin = raw ? JSON.parse(raw) as Record<string, unknown> : { holdings: [], answers: {} };
+      // 자산 배분이 아직 없으면 트윈 화면이 설정부터 묻도록 total 을 0 으로 둔다.
+      const twin = raw ? JSON.parse(raw) as Record<string, unknown> : { total: 0, stockWeight: 0.6, answers: {} };
       window.localStorage.setItem(TWIN_KEY, JSON.stringify({ ...twin, gameProfile }));
     } catch { /* 저장 실패해도 화면은 유지 */ }
     setApplied(true);

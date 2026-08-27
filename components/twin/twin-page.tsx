@@ -2,34 +2,35 @@
 
 // 마이 금융 트윈.
 //
-//   1) 내 포트폴리오를 담는다        (브라우저에만 저장)
-//   2) 행동 6문항으로 트윈을 만든다  (매매 규칙으로 변환)
-//   3) 실제 과거 충격에 넣어본다     (버티기 경로 vs 트윈 경로)
+//   1) 총 자산과 주식 비중을 정한다   (브라우저에만 저장)
+//   2) 행동 6문항으로 트윈을 만든다   (행동 실험실 결과가 있으면 그쪽이 우선)
+//   3) 실제 과거 충격에 넣어본다      (버티기 경로 vs 트윈 경로)
+//
+// 개별 종목은 묻지 않는다.  계좌를 연동하지 않는 이상 종목까지 알 수 없고,
+// 매도 트리거를 정하는 건 결국 위험자산 비중 하나이기 때문이다.  국내주식은
+// 코스피 지수 경로로 평가한다.
 //
 // 가격은 public/twin/shock-prices.json 의 실제 종가이고, 매매 판단은 결정적인
 // 규칙이다.  화면에 나오는 수익률·낙폭·회복일은 모두 여기서 계산된 값이다.
 
-import { ArrowRight, ChevronRight, Gauge, LoaderCircle, Quote, RotateCcw, ShieldCheck, Target, TrendingDown, UserRound, Wallet } from "lucide-react";
+import { ArrowRight, ChevronRight, Gamepad2, Gauge, LoaderCircle, Quote, RotateCcw, ShieldCheck, TrendingDown, UserRound, Wallet } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CASH,
+  STOCK,
   formatSnapshotDate,
   runBacktest,
   valuate,
   type BacktestResult,
   type BehaviorProfile,
-  type Holding,
   type PriceSnapshot,
 } from "@/lib/twin/backtest";
-import { simulateGoal, type Goal, type GoalResult } from "@/lib/twin/goal";
 import { marketMood, type MarketMood } from "@/lib/twin/market-mood";
 import { behaviorNote, harshest, mentorVerdicts, type MentorInput, type MentorVerdict } from "@/lib/twin/mentor";
-import { buildReport, characterFor, demoPortfolios, deriveProfile, questions } from "@/lib/twin/profile";
+import { allocationHoldings, allocationPresets, buildReport, characterFor, deriveProfile, questions } from "@/lib/twin/profile";
 
-const STORAGE_KEY = "finverse.twin.v1";
-type Saved = { holdings: Holding[]; answers: Record<string, string>; goal?: Goal; gameProfile?: BehaviorProfile };
-
-const defaultGoal: Goal = { amount: 1_000_000_000, years: 10, monthly: 1_000_000 };
+const STORAGE_KEY = "finverse.twin.v2";
+type Saved = { total: number; stockWeight: number; answers: Record<string, string>; gameProfile?: BehaviorProfile };
 
 const won = (value: number) => `${Math.round(value).toLocaleString("ko-KR")}원`;
 const korean = (value: number) => {
@@ -74,7 +75,7 @@ function TimeMachineChart({ result }: { result: BacktestResult }) {
           key={`${event.type}-${event.index}`}
           cx={x(event.index)}
           cy={y(twin[event.index])}
-          r={event.type === "panic-sell" ? 4 : 3.2}
+          r={event.type === "panic-sell" ? 4.5 : 3.6}
           fill={event.type === "panic-sell" ? "#ef4444" : event.type === "reentry" ? "#2563eb" : "#fff"}
           stroke={event.type === "panic-sell" ? "#ef4444" : "#2563eb"}
           strokeWidth="1.6"
@@ -84,82 +85,6 @@ function TimeMachineChart({ result }: { result: BacktestResult }) {
       ))}
       {yearMarks.map((mark) => <text key={mark.year} x={x(mark.position)} y="240" fill="#a1a1aa" fontSize="9">{mark.year}</text>)}
     </svg>
-  );
-}
-
-function SetupWizard({ snapshot, onDone }: { snapshot: PriceSnapshot; onDone: (saved: Saved) => void }) {
-  const [step, setStep] = useState<1 | 2>(1);
-  const [amounts, setAmounts] = useState<Record<string, number>>({});
-  const [answers, setAnswers] = useState<Record<string, string>>({});
-  const holdings = Object.entries(amounts).filter(([, amount]) => amount > 0).map(([symbol, amount]) => ({ symbol, amount }));
-  const total = holdings.reduce((sum, holding) => sum + holding.amount, 0);
-  const answered = questions.filter((question) => answers[question.id]).length;
-
-  return (
-    <section className="panel twin-setup">
-      <div className="panel-title">
-        <div><span>{step === 1 ? "STEP 01 · MY PORTFOLIO" : "STEP 02 · MY BEHAVIOR"}</span><h2>{step === 1 ? "무엇을 얼마나 가지고 있나요?" : "그 상황에서 실제로 무엇을 하나요?"}</h2></div>
-        <span className="twin-setup-step">{step} / 2</span>
-      </div>
-
-      {step === 1 ? (
-        <div className="twin-setup-body">
-          <p className="twin-setup-lead">입력한 내용은 이 브라우저에만 저장되고 서버로 전송되지 않습니다. 실제 계좌를 연결하지 않아도 됩니다.</p>
-          <div className="twin-demo-row">
-            {demoPortfolios.map((demo) => (
-              <button key={demo.id} type="button" onClick={() => setAmounts(Object.fromEntries(demo.holdings.map((holding) => [holding.symbol, holding.amount])))}>
-                <strong>{demo.name}</strong><small>{demo.detail}</small>
-              </button>
-            ))}
-          </div>
-          <div className="twin-asset-grid">
-            {[...snapshot.assets, { symbol: CASH, name: "현금", kind: "cash", sector: "유동성" }].map((asset) => (
-              <label key={asset.symbol} className={amounts[asset.symbol] ? "active" : ""}>
-                <span><strong>{asset.name}</strong><small>{asset.symbol === CASH ? "예금·파킹" : `${asset.symbol} · ${asset.sector}`}</small></span>
-                <span className="twin-amount-input">
-                  <input
-                    type="number"
-                    min={0}
-                    step={100}
-                    value={amounts[asset.symbol] ? amounts[asset.symbol] / 10_000 : ""}
-                    onChange={(event) => setAmounts((previous) => ({ ...previous, [asset.symbol]: Math.max(0, Number(event.target.value) || 0) * 10_000 }))}
-                    placeholder="0"
-                  />
-                  <em>만원</em>
-                </span>
-              </label>
-            ))}
-          </div>
-          <div className="twin-setup-footer">
-            <span>{holdings.length ? `${holdings.length}개 자산 · 합계 ${korean(total)}` : "담을 자산을 고르거나 예시 구성을 눌러보세요"}</span>
-            <button type="button" disabled={total <= 0} onClick={() => setStep(2)}>다음 <ArrowRight size={15} /></button>
-          </div>
-        </div>
-      ) : (
-        <div className="twin-setup-body">
-          <p className="twin-setup-lead">정답이 없는 질문입니다. 아는 것이 아니라 <b>실제로 하는 행동</b>을 고르세요. 이 답이 그대로 트윈의 매매 규칙이 됩니다.</p>
-          <div className="twin-question-list">
-            {questions.map((question, order) => (
-              <fieldset key={question.id}>
-                <legend><span>Q{order + 1}</span><strong>{question.prompt}</strong><em>{question.hint}</em></legend>
-                <div className="twin-option-row">
-                  {question.options.map((option) => (
-                    <button key={option.id} type="button" className={answers[question.id] === option.id ? "active" : ""} onClick={() => setAnswers((previous) => ({ ...previous, [question.id]: option.id }))}>
-                      <strong>{option.label}</strong><small>{option.detail}</small>
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-            ))}
-          </div>
-          <div className="twin-setup-footer">
-            <button className="twin-ghost-button" type="button" onClick={() => setStep(1)}>이전</button>
-            <span>{answered} / {questions.length} 문항 응답</span>
-            <button type="button" disabled={answered < questions.length} onClick={() => onDone({ holdings, answers })}>트윈 만들기 <ArrowRight size={15} /></button>
-          </div>
-        </div>
-      )}
-    </section>
   );
 }
 
@@ -219,57 +144,10 @@ function MoodPanel({ mood, hasSellRule }: { mood: MarketMood; hasSellRule: boole
                 : `트윈의 매도 버튼까지 ${gap.toFixed(1)}%p`}
           </strong>
           <p>
-            내 포트폴리오는 1년 고점 대비 <b>{pct(mood.drawdown)}</b>이고, 트윈이 실제로 파는 지점은 <b>{pct(mood.trigger)}</b>입니다.
+            내 주식은 1년 고점 대비 <b>{pct(mood.drawdown)}</b>이고, 트윈이 실제로 파는 지점은 <b>{pct(mood.trigger)}</b>입니다.
             {hasSellRule && !mood.triggered ? " 여기서 그만큼만 더 빠지면 같은 선택이 반복됩니다." : ""}
           </p>
         </div>
-      </div>
-    </section>
-  );
-}
-
-function GoalPanel({ goal, onChange, result }: { goal: Goal; onChange: (goal: Goal) => void; result: GoalResult | null }) {
-  const holdRate = result ? result.hold.successRate : 0;
-  const twinRate = result ? result.twin.successRate : 0;
-  const shift = (twinRate - holdRate) * 100;
-  const upsideCut = result ? result.twin.high - result.hold.high : 0;
-
-  return (
-    <section className="panel twin-side-panel">
-      <div className="panel-title"><div><span>GOAL SIMULATION</span><h2>1,000번의 미래</h2></div><Target size={16} /></div>
-      <div className="twin-side-body">
-        <div className="twin-goal-inputs">
-          <label><span>목표 금액</span><input type="number" min={0} step={0.5} value={goal.amount / 100_000_000} onChange={(event) => onChange({ ...goal, amount: Math.max(0, Number(event.target.value) || 0) * 100_000_000 })} /><em>억원</em></label>
-          <label><span>기간</span><input type="number" min={1} max={40} step={1} value={goal.years} onChange={(event) => onChange({ ...goal, years: Math.max(1, Math.min(40, Number(event.target.value) || 1)) })} /><em>년</em></label>
-          <label><span>월 저축</span><input type="number" min={0} step={10} value={goal.monthly / 10_000} onChange={(event) => onChange({ ...goal, monthly: Math.max(0, Number(event.target.value) || 0) * 10_000 })} /><em>만원</em></label>
-        </div>
-        {result ? (
-          <>
-            <div className="twin-goal-bars">
-              <div>
-                <span>끝까지 버텼다면</span>
-                <i><b style={{ width: `${holdRate * 100}%` }} /></i>
-                <strong>{(holdRate * 100).toFixed(0)}<em>%</em></strong>
-              </div>
-              <div className="twin">
-                <span>내 트윈의 행동으로는</span>
-                <i><b style={{ width: `${twinRate * 100}%` }} /></i>
-                <strong>{(twinRate * 100).toFixed(0)}<em>%</em></strong>
-              </div>
-            </div>
-            <p className="twin-goal-copy">
-              같은 1,000개의 미래에서 당신의 규칙은 달성 확률을 <b>{shift >= 0 ? "+" : ""}{shift.toFixed(0)}%p</b> 바꿉니다.
-              {upsideCut < 0
-                ? ` 대신 잘 풀린 경우의 상단이 ${korean(result.hold.high)}에서 ${korean(result.twin.high)}으로 잘립니다.`
-                : " 상단도 함께 커졌습니다."}
-            </p>
-            <ul className="twin-goal-detail">
-              <li><span>버티기 중앙값</span><strong>{korean(result.hold.median)}</strong><em>{korean(result.hold.low)} ~ {korean(result.hold.high)}</em></li>
-              <li><span>트윈 중앙값</span><strong>{korean(result.twin.median)}</strong><em>{korean(result.twin.low)} ~ {korean(result.twin.high)}</em></li>
-            </ul>
-            <p className="twin-side-note">{result.months}개월 × {result.paths.toLocaleString("ko-KR")}회. 이 포트폴리오가 실제로 겪은 {result.sampleMonths}개월의 수익률을 3개월 단위로 다시 뽑아 이었습니다. 수익률 전망이 아니라 과거의 재배열입니다.</p>
-          </>
-        ) : <p className="twin-side-note">목표 금액과 기간을 입력하면 계산합니다.</p>}
       </div>
     </section>
   );
@@ -299,14 +177,138 @@ function MentorPanel({ verdicts, note, source, loading }: { verdicts: MentorVerd
         </div>
         <p className="twin-side-note">{note}</p>
         <p className="twin-side-note">
-          공개된 투자 원칙을 이 포트폴리오에 적용한 해석이며 본인의 발언이 아닙니다. 점수는 집중도·현금·업종 수·시장 온도로 계산합니다{source === "openrouter" ? "(문장만 AI가 다시 씀)" : "(모델 미연결 · 규칙 기반 문장)"}.
+          공개된 투자 원칙을 이 배분에 적용한 해석이며 본인의 발언이 아닙니다. 점수는 주식 비중·현금 여력·매매 빈도·시장 온도로 계산합니다{source === "openrouter" ? "(문장만 AI가 다시 씀)" : "(모델 미연결 · 규칙 기반 문장)"}.
         </p>
       </div>
     </section>
   );
 }
 
-export default function TwinPage({ appliedScenario, onOpenBuilder }: { appliedScenario?: { title: string; forecast: string } | null; onOpenBuilder: () => void }) {
+function SetupWizard({ initial, skipBehavior, onDone, onGoToLab }: {
+  initial: Saved | null;
+  skipBehavior: boolean;
+  onDone: (saved: Saved) => void;
+  onGoToLab: () => void;
+}) {
+  const [step, setStep] = useState<1 | 2>(1);
+  const [total, setTotal] = useState(initial?.total ?? 100_000_000);
+  const [stockWeight, setStockWeight] = useState(initial?.stockWeight ?? 0.6);
+  const [answers, setAnswers] = useState<Record<string, string>>(initial?.answers ?? {});
+  const answered = questions.filter((question) => answers[question.id]).length;
+  const finish = () => onDone({ total, stockWeight, answers, ...(initial?.gameProfile ? { gameProfile: initial.gameProfile } : {}) });
+
+  return (
+    <section className="panel twin-setup">
+      <div className="panel-title">
+        <div>
+          <span>{step === 1 ? "STEP 01 · MY MONEY" : "STEP 02 · MY BEHAVIOR"}</span>
+          <h2>{step === 1 ? "지금 자산이 얼마이고, 그중 주식은 얼마인가요?" : "그 상황에서 실제로 무엇을 하나요?"}</h2>
+        </div>
+        <span className="twin-setup-step">{step} / {skipBehavior ? 1 : 2}</span>
+      </div>
+
+      {step === 1 ? (
+        <div className="twin-setup-body">
+          <p className="twin-setup-lead">
+            개별 종목은 묻지 않습니다. 충격이 왔을 때 무슨 일이 벌어질지는 <b>주식과 현금의 비율</b>이 정합니다.
+            입력한 값은 이 브라우저에만 저장되고 서버로 전송되지 않습니다.
+          </p>
+
+          <label className="twin-total-input">
+            <span>지금 굴리고 있는 총 자산</span>
+            <div>
+              <input
+                type="number"
+                min={0}
+                step={100}
+                value={total / 10_000}
+                onChange={(event) => setTotal(Math.max(0, Number(event.target.value) || 0) * 10_000)}
+              />
+              <em>만원</em>
+            </div>
+          </label>
+
+          <div className="twin-demo-row">
+            {allocationPresets.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                className={Math.abs(stockWeight - preset.stockWeight) < 0.001 ? "active" : ""}
+                onClick={() => setStockWeight(preset.stockWeight)}
+              >
+                <strong>{preset.name} · 주식 {(preset.stockWeight * 100).toFixed(0)}%</strong>
+                <small>{preset.detail}</small>
+              </button>
+            ))}
+          </div>
+
+          <div className="twin-slider">
+            <div className="twin-slider-head">
+              <span>주식 비중</span>
+              <strong>{(stockWeight * 100).toFixed(0)}<em>%</em></strong>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={Math.round(stockWeight * 100)}
+              onChange={(event) => setStockWeight(Number(event.target.value) / 100)}
+              aria-label="주식 비중"
+            />
+            <div className="twin-slider-split">
+              <div className="stock" style={{ width: `${stockWeight * 100}%` }}><span>국내주식 {korean(total * stockWeight)}</span></div>
+              <div className="cash"><span>현금 {korean(total * (1 - stockWeight))}</span></div>
+            </div>
+          </div>
+
+          <div className="twin-setup-footer">
+            <span>국내주식은 코스피 지수 경로로 평가합니다.</span>
+            {skipBehavior ? (
+              <button type="button" disabled={total <= 0} onClick={finish}>트윈 만들기 <ArrowRight size={15} /></button>
+            ) : (
+              <button type="button" disabled={total <= 0} onClick={() => setStep(2)}>다음 <ArrowRight size={15} /></button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="twin-setup-body">
+          <p className="twin-setup-lead">
+            정답이 없는 질문입니다. 아는 것이 아니라 <b>실제로 하는 행동</b>을 고르세요. 이 답이 그대로 트윈의 매매 규칙이 됩니다.
+          </p>
+          <button className="twin-lab-link" type="button" onClick={onGoToLab}>
+            <Gamepad2 size={15} /> 말로 답하는 대신 <b>행동 실험실</b>에서 직접 플레이해 찾을 수도 있습니다 <ChevronRight size={14} />
+          </button>
+          <div className="twin-question-list">
+            {questions.map((question, order) => (
+              <fieldset key={question.id}>
+                <legend><span>Q{order + 1}</span><strong>{question.prompt}</strong><em>{question.hint}</em></legend>
+                <div className="twin-option-row">
+                  {question.options.map((option) => (
+                    <button key={option.id} type="button" className={answers[question.id] === option.id ? "active" : ""} onClick={() => setAnswers((previous) => ({ ...previous, [question.id]: option.id }))}>
+                      <strong>{option.label}</strong><small>{option.detail}</small>
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+            ))}
+          </div>
+          <div className="twin-setup-footer">
+            <button className="twin-ghost-button" type="button" onClick={() => setStep(1)}>이전</button>
+            <span>{answered} / {questions.length} 문항 응답</span>
+            <button type="button" disabled={answered < questions.length} onClick={finish}>트윈 만들기 <ArrowRight size={15} /></button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+export default function TwinPage({ appliedScenario, onOpenBuilder, onGoToLab }: {
+  appliedScenario?: { title: string; forecast: string } | null;
+  onOpenBuilder: () => void;
+  onGoToLab: () => void;
+}) {
   const [snapshot, setSnapshot] = useState<PriceSnapshot | null>(null);
   const [saved, setSaved] = useState<Saved | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -348,32 +350,23 @@ export default function TwinPage({ appliedScenario, onOpenBuilder }: { appliedSc
     () => (saved ? saved.gameProfile ?? deriveProfile(saved.answers) : null),
     [saved],
   );
-  const valuation = useMemo(() => (snapshot && saved ? valuate(snapshot, saved.holdings) : null), [snapshot, saved]);
+  const holdings = useMemo(() => (saved ? allocationHoldings(saved.total, saved.stockWeight) : []), [saved]);
+  const valuation = useMemo(() => (snapshot && holdings.length ? valuate(snapshot, holdings) : null), [snapshot, holdings]);
   const result = useMemo(
-    () => (snapshot && saved && profile ? runBacktest(snapshot, windowId, saved.holdings, profile) : null),
-    [snapshot, saved, profile, windowId],
+    () => (snapshot && holdings.length && profile ? runBacktest(snapshot, windowId, holdings, profile) : null),
+    [snapshot, holdings, profile, windowId],
   );
   const report = useMemo(() => (result && profile ? buildReport(result, profile) : []), [result, profile]);
   const character = useMemo(() => (profile ? characterFor(profile) : null), [profile]);
-  const goal = saved?.goal ?? defaultGoal;
   const mood = useMemo(
-    () => (snapshot && saved && profile ? marketMood(snapshot, saved.holdings, profile) : null),
-    [snapshot, saved, profile],
-  );
-  const goalResult = useMemo(
-    () => (snapshot && saved && profile && valuation ? simulateGoal(snapshot, saved.holdings, profile, goal, valuation.total) : null),
-    [snapshot, saved, profile, goal, valuation],
+    () => (snapshot && holdings.length && profile ? marketMood(snapshot, holdings, profile) : null),
+    [snapshot, holdings, profile],
   );
   const mentorInput = useMemo<MentorInput | null>(() => {
-    if (!valuation || !mood || !result || !character) return null;
-    const top = valuation.rows.reduce((widest, row) => (row.weight > widest.weight ? row : widest), valuation.rows[0]);
+    if (!saved || !mood || !result || !character) return null;
     return {
-      cashWeight: valuation.cashWeight,
-      topWeight: top.weight,
-      topName: top.name,
-      herfindahl: valuation.rows.reduce((sum, row) => sum + row.weight * row.weight, 0),
-      assetCount: valuation.rows.length,
-      sectorCount: new Set(valuation.rows.map((row) => row.sector)).size,
+      stockWeight: saved.stockWeight,
+      cashWeight: 1 - saved.stockWeight,
       moodScore: mood.score,
       moodLabel: mood.label,
       drawdown: mood.drawdown,
@@ -382,7 +375,7 @@ export default function TwinPage({ appliedScenario, onOpenBuilder }: { appliedSc
       tradeCount: result.events.length,
       character: character.name,
     };
-  }, [valuation, mood, result, character]);
+  }, [saved, mood, result, character]);
   const mentorKey = mentorInput ? JSON.stringify(mentorInput) : "";
 
   useEffect(() => {
@@ -418,7 +411,10 @@ export default function TwinPage({ appliedScenario, onOpenBuilder }: { appliedSc
   if (!loaded || !snapshot) {
     return (
       <div className="twin-page">
-        <div className="twin-loading"><LoaderCircle size={22} className={snapshot ? "" : "spin"} /><p>{loaded && !snapshot ? "가격 스냅샷을 불러오지 못했습니다. scripts/twin_price_snapshot.mjs 를 실행해주세요." : "실제 가격 스냅샷을 불러오는 중입니다."}</p></div>
+        <div className="twin-loading">
+          <LoaderCircle size={22} className={snapshot ? "" : "spin"} />
+          <p>{loaded && !snapshot ? "가격 스냅샷을 불러오지 못했습니다. scripts/twin_price_snapshot.mjs 를 실행해주세요." : "실제 가격 스냅샷을 불러오는 중입니다."}</p>
+        </div>
       </div>
     );
   }
@@ -427,7 +423,7 @@ export default function TwinPage({ appliedScenario, onOpenBuilder }: { appliedSc
     <header className="page-heading twin-heading">
       <div>
         <span>MY FINANCIAL TWIN</span>
-        <h1>{saved ? "같은 시장, 다른 결과. 차이를 만든 건 내 행동입니다." : "내 포트폴리오와 내 행동으로 트윈을 만듭니다."}</h1>
+        <h1>{saved ? "같은 시장, 다른 결과. 차이를 만든 건 내 행동입니다." : "내 자산과 내 행동으로 트윈을 만듭니다."}</h1>
       </div>
       <div className="twin-heading-actions">
         <span className="market-stamp"><Wallet size={15} />{formatSnapshotDate(snapshot.windows.recent.dates.at(-1) ?? "")} 종가 기준</span>
@@ -436,8 +432,18 @@ export default function TwinPage({ appliedScenario, onOpenBuilder }: { appliedSc
     </header>
   );
 
-  if (!saved || editing) {
-    return <div className="twin-page">{heading}<SetupWizard snapshot={snapshot} onDone={persist} /></div>;
+  if (!saved || saved.total <= 0 || editing) {
+    return (
+      <div className="twin-page">
+        {heading}
+        <SetupWizard
+          initial={saved}
+          skipBehavior={Boolean(saved?.gameProfile)}
+          onDone={persist}
+          onGoToLab={onGoToLab}
+        />
+      </div>
+    );
   }
 
   return (
@@ -451,63 +457,66 @@ export default function TwinPage({ appliedScenario, onOpenBuilder }: { appliedSc
         </div>
         <div className="twin-assets-grid">
           <div className="twin-metric">
-            <span>총 평가금액</span>
-            <strong>{korean(valuation?.total ?? 0)}</strong>
+            <span>총 자산</span>
+            <strong>{korean(saved.total)}</strong>
             <small>전일 대비 <b className={tone(valuation?.dayChange ?? 0)}>{won(valuation?.dayChange ?? 0)} ({pct(valuation?.dayChangePct ?? 0, 2)})</b></small>
           </div>
           <div className="twin-metric">
-            <span>현금 비중</span>
-            <strong>{((valuation?.cashWeight ?? 0) * 100).toFixed(1)}<em>%</em></strong>
-            <small>충격이 왔을 때 쓸 수 있는 여력</small>
+            <span>주식 비중</span>
+            <strong>{(saved.stockWeight * 100).toFixed(0)}<em>%</em></strong>
+            <div className="twin-progress"><i style={{ width: `${saved.stockWeight * 100}%` }} /></div>
+            <small>{korean(saved.total * saved.stockWeight)}</small>
           </div>
           <div className="twin-metric">
-            <span>최대 종목 집중도</span>
-            <strong>{(Math.max(...(valuation?.rows ?? [{ weight: 0 }]).map((row) => row.weight)) * 100).toFixed(1)}<em>%</em></strong>
-            <div className="twin-progress"><i style={{ width: `${Math.max(...(valuation?.rows ?? [{ weight: 0 }]).map((row) => row.weight)) * 100}%` }} /></div>
-            <small>한 종목에 실린 비중이 클수록 낙폭이 커집니다</small>
+            <span>현금 비중</span>
+            <strong>{((1 - saved.stockWeight) * 100).toFixed(0)}<em>%</em></strong>
+            <small>충격이 왔을 때 쓸 수 있는 여력 {korean(saved.total * (1 - saved.stockWeight))}</small>
           </div>
           <div className="twin-net-chart">
             <div><span>내 행동이 만든 차이 · {result?.window.label}</span><strong className={tone(result?.behaviorGap ?? 0)}>{pct(result?.behaviorGap ?? 0)}p</strong></div>
             <p className="twin-gap-copy">
               같은 자산을 버텼다면 <b>{pct(result?.buyHoldReturn ?? 0)}</b>, 당신의 트윈은 <b className={tone(result?.twinReturn ?? 0)}>{pct(result?.twinReturn ?? 0)}</b>였습니다.
             </p>
-            <p className="twin-gap-amount">{won((result?.behaviorGap ?? 0) * (valuation?.total ?? 0))}<em>지금 자산 기준</em></p>
+            <p className="twin-gap-amount">{won((result?.behaviorGap ?? 0) * saved.total)}<em>지금 자산 기준</em></p>
           </div>
         </div>
       </section>
 
       <section className="twin-main-grid">
-        <section className="panel twin-portfolio-panel">
-          <div className="panel-title"><h2>보유 현황</h2><span className="twin-path-caption">최근 종가 기준</span></div>
-          <div className="twin-table-wrap">
-            <table className="twin-table">
-              <thead><tr><th>자산</th><th>평가금액</th><th>비중</th><th>등락률(1D)</th><th>기여도(1D)</th></tr></thead>
-              <tbody>
-                {(valuation?.rows ?? []).map((row) => (
-                  <tr key={row.symbol}>
-                    <td>
-                      <div className="twin-holding-name">
-                        <span className={`twin-holding-symbol ${tone(row.changePct)}`}>{row.name.slice(0, 1)}</span>
-                        <div><strong>{row.name}</strong><small>{row.symbol === CASH ? "유동성" : `${row.symbol} · ${row.sector}`}</small></div>
-                      </div>
-                    </td>
-                    <td>{korean(row.amount)}</td>
-                    <td>{(row.weight * 100).toFixed(1)}%</td>
-                    <td className={tone(row.changePct)}>{pct(row.changePct, 2)}</td>
-                    <td className={tone(row.contribution)}>{won(row.contribution)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="twin-table-note">
-            * 투입 금액이 실제 수정주가를 따라 움직인 평가금액입니다. 가격 출처는 {snapshot.source}이며 기준일은 {formatSnapshotDate(snapshot.windows.recent.dates.at(-1) ?? "")}입니다.
-          </p>
-        </section>
+        <div className="twin-report-column">
+          <section className="panel twin-portfolio-panel">
+            <div className="panel-title"><h2>보유 현황</h2><span className="twin-path-caption">최근 종가 기준</span></div>
+            <div className="twin-table-wrap">
+              <table className="twin-table">
+                <thead><tr><th>자산</th><th>금액</th><th>비중</th><th>등락률(1D)</th><th>기여도(1D)</th></tr></thead>
+                <tbody>
+                  {(valuation?.rows ?? []).map((row) => (
+                    <tr key={row.symbol}>
+                      <td>
+                        <div className="twin-holding-name">
+                          <span className={`twin-holding-symbol ${row.symbol === CASH ? "flat" : tone(row.changePct)}`}>{row.symbol === STOCK ? "주" : "현"}</span>
+                          <div><strong>{row.name}</strong><small>{row.sector}</small></div>
+                        </div>
+                      </td>
+                      <td>{korean(row.amount)}</td>
+                      <td>{(row.weight * 100).toFixed(0)}%</td>
+                      <td className={tone(row.changePct)}>{pct(row.changePct, 2)}</td>
+                      <td className={tone(row.contribution)}>{won(row.contribution)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="twin-table-note">
+              * 개별 종목 대신 국내주식 전체를 코스피 지수 경로로 평가합니다. 가격 출처는 {snapshot.source}이며 기준일은 {formatSnapshotDate(snapshot.windows.recent.dates.at(-1) ?? "")}입니다.
+            </p>
+          </section>
+          {mood && <MoodPanel mood={mood} hasSellRule={(profile?.panicAction ?? 0) > 0} />}
+        </div>
 
         <section className="panel twin-path-panel">
           <div className="panel-title">
-            <div><span>TIME MACHINE</span><h2>이 포트폴리오를 그때로 보내면</h2></div>
+            <div><span>TIME MACHINE</span><h2>이 배분을 그때로 보내면</h2></div>
             <span className="twin-path-caption">실제 종가로 계산</span>
           </div>
           <div className="twin-shock-row">
@@ -530,16 +539,15 @@ export default function TwinPage({ appliedScenario, onOpenBuilder }: { appliedSc
                 <span><i className="hold" />버티기</span><span><i className="twin" />내 트윈</span><span><i className="index" />코스피</span>
                 <span><i className="sell" />트윈의 매도·재진입</span>
               </div>
-              <p className="twin-shock-note">{result.window.summary}{result.proxied.length ? ` 이 구간에 상장 전이던 ${result.proxied.map((item) => item.name).join(", ")}은(는) 코스피 지수 경로로 대체했습니다.` : ""}</p>
+              <p className="twin-shock-note">{result.window.summary} 트윈은 한 달에 한 번 판단하고, 한 번 팔면 최소 3개월은 다시 팔지 않습니다.</p>
               {result.events.length > 0 && (
                 <ol className="twin-event-list">
-                  {result.events.slice(0, 6).map((event) => (
+                  {result.events.map((event) => (
                     <li key={`${event.type}-${event.index}`} className={event.type}>
                       <time>{formatSnapshotDate(event.date)}</time>
                       <span>{event.detail}</span>
                     </li>
                   ))}
-                  {result.events.length > 6 && <li className="twin-event-more">외 {result.events.length - 6}건의 매매가 더 있었습니다</li>}
                 </ol>
               )}
             </>
@@ -548,46 +556,40 @@ export default function TwinPage({ appliedScenario, onOpenBuilder }: { appliedSc
       </section>
 
       <div className="twin-lower-grid">
-      <div className="twin-report-column">
-      <section className="panel twin-experts-panel">
-        <div className="panel-title">
-          <div><span>BEHAVIOR REPORT</span><h2>트윈이 드러낸 내 판단 습관</h2></div>
-          <span>{result?.window.label} 구간에서 실제로 일어난 매매 기준</span>
-        </div>
-        {character && (
-          <div className="twin-character-card">
-            <div className="twin-expert-avatar">{character.name.slice(0, 2)}</div>
-            <div><span>내 트윈 유형</span><h3>{character.name}</h3><p>{character.tagline}</p><p className="twin-character-watch"><ShieldCheck size={13} /> {character.watch}</p></div>
+        <section className="panel twin-experts-panel">
+          <div className="panel-title">
+            <div><span>BEHAVIOR REPORT</span><h2>트윈이 드러낸 내 판단 습관</h2></div>
+            <span>{result?.window.label} 구간에서 실제로 일어난 매매 기준</span>
           </div>
-        )}
-        <div className="twin-bias-grid">
-          {report.map((card) => (
-            <article key={card.bias} className={card.tone}>
-              <span>{card.bias}</span>
-              <h3>{card.headline}</h3>
-              <p>{card.body}</p>
-            </article>
-          ))}
-        </div>
-        <div className="twin-next-row">
-          {appliedScenario && (
-            <p className="twin-applied">
-              <TrendingDown size={14} /> 시장 인사이트에서 가져온 시나리오: <b>{appliedScenario.title}</b> ({appliedScenario.forecast})
-            </p>
+          {character && (
+            <div className="twin-character-card">
+              <div className="twin-expert-avatar">{character.name.slice(0, 2)}</div>
+              <div><span>내 트윈 유형</span><h3>{character.name}</h3><p>{character.tagline}</p><p className="twin-character-watch"><ShieldCheck size={13} /> {character.watch}</p></div>
+            </div>
           )}
-          <button className="twin-text-button" type="button" onClick={onOpenBuilder}>내 시나리오로 앞으로의 구간도 만들어보기 <ChevronRight size={15} /></button>
-        </div>
-        <div className="twin-disclaimer">
-          과거 실제 종가와 응답한 행동 규칙으로 계산한 교육용 결과입니다. 미래 수익을 예측하지 않으며 특정 종목의 매매를 권유하지 않습니다.
-        </div>
-      </section>
-      {shownVerdicts.length > 0 && <MentorPanel verdicts={shownVerdicts} note={shownNote} source={mentor.source} loading={!mentorReady} />}
-      </div>
+          <div className="twin-bias-grid">
+            {report.map((card) => (
+              <article key={card.bias} className={card.tone}>
+                <span>{card.bias}</span>
+                <h3>{card.headline}</h3>
+                <p>{card.body}</p>
+              </article>
+            ))}
+          </div>
+          <div className="twin-next-row">
+            {appliedScenario && (
+              <p className="twin-applied">
+                <TrendingDown size={14} /> 시장 인사이트에서 가져온 시나리오: <b>{appliedScenario.title}</b> ({appliedScenario.forecast})
+              </p>
+            )}
+            <button className="twin-text-button" type="button" onClick={onOpenBuilder}>내 시나리오로 앞으로의 구간도 만들어보기 <ChevronRight size={15} /></button>
+          </div>
+          <div className="twin-disclaimer">
+            과거 실제 종가와 응답한 행동 규칙으로 계산한 교육용 결과입니다. 미래 수익을 예측하지 않으며 특정 종목의 매매를 권유하지 않습니다.
+          </div>
+        </section>
 
-      <aside className="twin-side-rail" aria-label="트윈 부가 진단">
-        {mood && <MoodPanel mood={mood} hasSellRule={(profile?.panicAction ?? 0) > 0} />}
-        <GoalPanel goal={goal} onChange={(next) => saved && persist({ ...saved, goal: next })} result={goalResult} />
-      </aside>
+        {shownVerdicts.length > 0 && <MentorPanel verdicts={shownVerdicts} note={shownNote} source={mentor.source} loading={!mentorReady} />}
       </div>
     </div>
   );

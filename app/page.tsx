@@ -2326,7 +2326,7 @@ export default function Home() {
             </div>
           ) : activeTab === "lab" ? (
             <GameLab onGoToTwin={() => activateTab("twin")} />
-          ) : <TwinPage appliedScenario={appliedScenario} onOpenBuilder={openBuilder} />}
+          ) : <TwinPage appliedScenario={appliedScenario} onOpenBuilder={openBuilder} onGoToLab={() => activateTab("lab")} />}
         </main>
       </div>
 

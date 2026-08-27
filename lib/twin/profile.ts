@@ -4,7 +4,7 @@
 // 지식 점수가 아니라 매매 규칙을 만들어야 시뮬레이션에 넣을 수 있기 때문이다.
 
 import type { BacktestResult, BehaviorProfile, Holding, TradeEvent } from "./backtest";
-import { CASH, effectivePanicThreshold } from "./backtest";
+import { CASH, STOCK, effectivePanicThreshold } from "./backtest";
 
 export type ProfileQuestion = {
   id: string;
@@ -195,43 +195,17 @@ export function buildReport(result: BacktestResult, profile: BehaviorProfile): B
   return cards;
 }
 
-export type DemoPortfolio = { id: string; name: string; detail: string; holdings: Holding[] };
+export type AllocationPreset = { id: string; name: string; detail: string; stockWeight: number };
 
-/** 직접 담기 전에 바로 체험할 수 있는 예시 구성. 금액 단위는 원. */
-export const demoPortfolios: DemoPortfolio[] = [
-  {
-    id: "concentrated",
-    name: "반도체 집중형",
-    detail: "국내 반도체 대형주에 절반 이상",
-    holdings: [
-      { symbol: "005930", amount: 45_000_000 },
-      { symbol: "000660", amount: 35_000_000 },
-      { symbol: "069500", amount: 10_000_000 },
-      { symbol: CASH, amount: 10_000_000 },
-    ],
-  },
-  {
-    id: "growth",
-    name: "성장 분산형",
-    detail: "국내외 지수와 성장주를 나눠 담은 구성",
-    holdings: [
-      { symbol: "005930", amount: 25_000_000 },
-      { symbol: "133690", amount: 25_000_000 },
-      { symbol: "035420", amount: 15_000_000 },
-      { symbol: "207940", amount: 15_000_000 },
-      { symbol: CASH, amount: 20_000_000 },
-    ],
-  },
-  {
-    id: "stable",
-    name: "배당·안정형",
-    detail: "현금 비중이 크고 경기방어 업종 중심",
-    holdings: [
-      { symbol: "105560", amount: 20_000_000 },
-      { symbol: "015760", amount: 20_000_000 },
-      { symbol: "005380", amount: 15_000_000 },
-      { symbol: "069500", amount: 15_000_000 },
-      { symbol: CASH, amount: 30_000_000 },
-    ],
-  },
+/** 주식과 현금 두 덩어리로만 나눈 기본 구성. 개별 종목은 묻지 않는다. */
+export const allocationPresets: AllocationPreset[] = [
+  { id: "aggressive", name: "공격형", detail: "현금은 최소한만 남깁니다", stockWeight: 0.9 },
+  { id: "balanced", name: "균형형", detail: "충격이 왔을 때 쓸 현금을 남깁니다", stockWeight: 0.6 },
+  { id: "defensive", name: "안정형", detail: "절반 이상을 현금으로 둡니다", stockWeight: 0.3 },
+];
+
+/** 총 자산과 주식 비중을 두 줄짜리 보유 현황으로 바꾼다. */
+export const allocationHoldings = (total: number, stockWeight: number): Holding[] => [
+  { symbol: STOCK, amount: total * stockWeight },
+  { symbol: CASH, amount: total * (1 - stockWeight) },
 ];

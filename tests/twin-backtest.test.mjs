@@ -12,10 +12,11 @@ registerHooks({
 });
 
 const { runBacktest, valuate, buyHoldPath, CASH } = await import("../lib/twin/backtest.ts");
-const { deriveProfile, buildReport, characterFor, demoPortfolios } = await import("../lib/twin/profile.ts");
+const { deriveProfile, buildReport, characterFor, allocationHoldings } = await import("../lib/twin/profile.ts");
 
 const snapshot = JSON.parse(readFileSync(new URL("../public/twin/shock-prices.json", import.meta.url), "utf8"));
-const holdings = demoPortfolios[0].holdings;
+// 기본 배분: 국내주식 80% / 현금 20%
+const holdings = allocationHoldings(100_000_000, 0.8);
 const panicky = deriveProfile({ threshold: "shallow", action: "all", crowd: "high", profit: "part", reentry: "quarter", chase: "much" });
 const steady = deriveProfile({ threshold: "deep", action: "hold", crowd: "low", profit: "keep", reentry: "month", chase: "none" });
 
@@ -29,7 +30,9 @@ test("스냅샷은 실제 거래일과 종가를 담고 있다", () => {
 });
 
 test("버티기 경로는 100에서 시작하고 미상장 종목은 지수로 대체된다", () => {
-  const base = buyHoldPath(snapshot, snapshot.windows["imf-1997"], holdings);
+  // 종목을 직접 지정한 경우에도 그 시절 없던 종목은 지수로 대체된다.
+  const withEtf = [{ symbol: "005930", amount: 50_000_000 }, { symbol: "069500", amount: 50_000_000 }];
+  const base = buyHoldPath(snapshot, snapshot.windows["imf-1997"], withEtf);
   assert.ok(Math.abs(base.path[0] - 100) < 1e-9);
   // 1997년에는 KODEX 200 이 상장 전이므로 대체 목록에 잡혀야 한다.
   assert.ok(base.proxied.some((item) => item.symbol === "069500"));
@@ -74,7 +77,6 @@ test("현재 평가금액은 최근 종가 기준으로 계산된다", () => {
 });
 
 const { marketMood } = await import("../lib/twin/market-mood.ts");
-const { simulateGoal, monthlyReturns } = await import("../lib/twin/goal.ts");
 const { mentorVerdicts, harshest } = await import("../lib/twin/mentor.ts");
 
 test("시장 온도계는 0~100 범위와 네 개 구성요소를 낸다", () => {
@@ -93,45 +95,20 @@ test("매도 규칙이 없는 성향은 온도계에서 트리거되지 않는�
   assert.equal(mood.triggered, false);
 });
 
-test("목표 시뮬레이션은 같은 입력에 같은 결과를 준다", () => {
-  const goal = { amount: 1_000_000_000, years: 10, monthly: 1_000_000 };
-  const first = simulateGoal(snapshot, holdings, panicky, goal, 500_000_000);
-  const second = simulateGoal(snapshot, holdings, panicky, goal, 500_000_000);
-  assert.ok(first, "시뮬레이션 실패");
-  assert.deepEqual(first, second, "같은 입력인데 결과가 흔들린다");
-  assert.equal(first.months, 120);
-  assert.equal(first.paths, 1000);
-  assert.ok(first.sampleMonths > 100, `표본 ${first.sampleMonths}개월`);
-  for (const outcome of [first.hold, first.twin]) {
-    assert.ok(outcome.successRate >= 0 && outcome.successRate <= 1);
-    assert.ok(outcome.low <= outcome.median && outcome.median <= outcome.high);
-  }
-});
 
-test("월간 수익률 표본은 실제 구간에서 나온다", () => {
-  const samples = monthlyReturns(snapshot, holdings);
-  assert.ok(samples.length > 100);
-  assert.ok(samples.every((value) => Number.isFinite(value) && value > -1));
-});
-
-test("대가 진단은 세 개의 서로 다른 점수를 낸다", () => {
-  const input = { cashWeight: 0.02, topWeight: 0.63, topName: "SK하이닉스", herfindahl: 0.49, assetCount: 4, sectorCount: 3, moodScore: 22, moodLabel: "극단적 공포", drawdown: -0.18, behaviorGap: -0.4, windowLabel: "2020 코로나 급락", tradeCount: 11, character: "공포 이탈형" };
+test("대가 진단은 주식·현금 비중으로 세 점수를 낸다", () => {
+  const input = { stockWeight: 0.95, cashWeight: 0.05, moodScore: 22, moodLabel: "극단적 공포", drawdown: -0.18, behaviorGap: -0.4, windowLabel: "2020 코로나 급락", tradeCount: 3, character: "공포 이탈형" };
   const verdicts = mentorVerdicts(input);
   assert.equal(verdicts.length, 3);
   for (const verdict of verdicts) assert.ok(verdict.score >= 5 && verdict.score <= 95, `${verdict.key} ${verdict.score}`);
   assert.equal(harshest(verdicts).score, Math.min(...verdicts.map((verdict) => verdict.score)));
-  // 집중도가 높으면 분산 원칙 점수가 집중을 허용하는 원칙보다 낮게 나와야 한다.
-  const spread = mentorVerdicts({ ...input, topWeight: 0.25, herfindahl: 0.2, sectorCount: 5 });
-  assert.ok(spread.find((v) => v.key === "dalio").score > verdicts.find((v) => v.key === "dalio").score);
-});
-
-test("목표 금액만 바꾸면 분포는 그대로고 달성률만 움직인다", () => {
-  const base = { years: 10, monthly: 1_000_000 };
-  const low = simulateGoal(snapshot, holdings, panicky, { ...base, amount: 1_000_000_000 }, 500_000_000);
-  const high = simulateGoal(snapshot, holdings, panicky, { ...base, amount: 3_000_000_000 }, 500_000_000);
-  assert.equal(low.hold.median, high.hold.median, "목표만 바꿨는데 경로가 달라졌다");
-  assert.equal(low.twin.high, high.twin.high);
-  assert.ok(low.hold.successRate > high.hold.successRate, "목표가 커졌는데 달성률이 안 떨어졌다");
+  const score = (list, key) => list.find((verdict) => verdict.key === key).score;
+  // 한쪽으로 몰릴수록 균형 점수가 낮아야 한다.
+  const balanced = mentorVerdicts({ ...input, stockWeight: 0.6, cashWeight: 0.4 });
+  assert.ok(score(balanced, "dalio") > score(verdicts, "dalio"));
+  assert.ok(score(mentorVerdicts({ ...input, stockWeight: 0.05, cashWeight: 0.95 }), "dalio") < score(balanced, "dalio"));
+  // 자주 손댈수록 "오래 들고 갈 수 있는가" 점수가 낮아야 한다.
+  assert.ok(score(mentorVerdicts({ ...input, tradeCount: 0 }), "buffett") > score(verdicts, "buffett"));
 });
 
 const { loadSlice, replayGames, summarizeReplay, deriveProfileFromGames, scoreLottery, lotteryPairs, playedCount } = await import("../lib/twin/games.ts");
@@ -192,4 +169,32 @@ test("복권 선택에서 손실 민감도와 반사효과를 잡아낸다", () 
   assert.equal(steadyHand.lambda, 1);
   assert.equal(steadyHand.consistent, true);
   assert.equal(playedCount({ hold: {}, lottery: reflex }), 2);
+});
+
+test("트윈은 판단일에만 움직이고 매도 뒤에는 쉰다", () => {
+  const twoBucket = allocationHoldings(100_000_000, 0.8);
+  for (const id of Object.keys(snapshot.windows)) {
+    const result = runBacktest(snapshot, id, twoBucket, panicky);
+    // 개수를 못박지 않는다. 성향이 정하는 값이고, 보장해야 할 건 리듬이다.
+    for (const event of result.events) assert.equal(event.index % 21, 0, `${id} 판단일이 아닌 날 매매`);
+    const sells = result.events.filter((event) => event.type === "panic-sell");
+    for (let index = 1; index < sells.length; index += 1) {
+      assert.ok(sells[index].index - sells[index - 1].index >= 63, `${id} 매도 간격이 3개월 미만`);
+    }
+    // 100거래일당 2건을 넘지 않는다. 하루 단위로 재생하던 시절엔 이 값을 넘겼다.
+    const rate = (result.events.length / result.dates.length) * 100;
+    assert.ok(rate <= 2, `${id} 100거래일당 ${rate.toFixed(2)}건 — 너무 잦다`);
+  }
+});
+
+test("재진입은 매도 직전 비중으로 되돌아간다", () => {
+  const half = deriveProfile({ threshold: "shallow", action: "half", crowd: "low", profit: "keep", reentry: "month", chase: "none" });
+  const twoBucket = [{ symbol: "KOSPI", amount: 100_000_000 }];
+  for (const id of Object.keys(snapshot.windows)) {
+    const result = runBacktest(snapshot, id, twoBucket, half);
+    for (const event of result.events.filter((item) => item.type === "reentry")) {
+      // 부분 매도(50%) 뒤 재진입이면 다시 100% 여야 한다. 연속 매도로 깎이면 안 된다.
+      assert.ok(event.position > 0.99, `${id} 재진입 비중 ${event.position}`);
+    }
+  }
 });
