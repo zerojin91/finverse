@@ -54,7 +54,7 @@ Historical `impact-channel-{id}.json`에서 `evidence_sufficient: false`일 때:
 }
 ```
 
-- 방향은 시나리오 `tone`과 정합
+- `I_web_direction_pct`는 **양의 magnitude**로 제출한다. `impact_model`이 시나리오 `tone`에 따라 부호를 정한다.
 - 크기 상한: [`impact_model.spec.md`](./impact_model.spec.md) §5
 - `evidence_sufficient: true`이면 **I_news = 0** (채우지 않음)
 

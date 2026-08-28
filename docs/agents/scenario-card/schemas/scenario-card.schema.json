@@ -2,121 +2,95 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "finverse/scenario-card/scenario_card/v1",
   "title": "ScenarioCard",
+  "description": "One self-contained Scenario Library card. It contains every field required by the card and detail modal; the UI must not supply scenario-specific fallback copy.",
   "type": "object",
-  "required": [
-    "id", "title", "duration", "tags", "forecast", "tone",
-    "summary", "thesis", "context",
-    "chapters", "investorGuide", "studyGuide", "biasChecks",
-    "path", "events", "agentInsights", "riskPoints"
-  ],
   "additionalProperties": false,
+  "required": [
+    "id", "target", "title", "duration", "tags", "forecast", "tone", "image",
+    "summary", "thesis", "context", "chapters", "chapterLessons", "learningReport",
+    "investorGuide", "studyGuide", "biasChecks", "path", "events", "agentInsights", "riskPoints"
+  ],
   "properties": {
     "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+    "target": { "type": "string", "minLength": 1, "description": "Display target, for example KOSPI or KOSDAQ." },
     "title": { "type": "string", "minLength": 1 },
-    "duration": { "type": "string" },
-    "tags": { "type": "array", "items": { "type": "string" }, "minItems": 1, "maxItems": 4 },
-    "forecast": { "type": "string" },
+    "duration": { "type": "string", "minLength": 1 },
+    "tags": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1, "maxItems": 4 },
+    "forecast": { "type": "string", "pattern": "^[^\\s]+ [+-][0-9]+\\.[0-9]+%$", "description": "Copied from impact_model; target prefix must equal target." },
     "tone": { "type": "string", "enum": ["up", "down", "neutral"] },
-    "image": { "type": "string", "format": "uri" },
+    "image": { "type": "string", "pattern": "^(https?://|/).+", "description": "Absolute HTTPS URL or public-root path such as /scenarios/{id}.png." },
     "summary": { "type": "string", "minLength": 50 },
     "thesis": { "type": "string", "minLength": 10 },
     "context": { "type": "string", "minLength": 10 },
-    "chapters": {
-      "type": "array",
-      "minItems": 4,
-      "maxItems": 4,
-      "items": {
-        "type": "object",
-        "required": ["title", "body", "evidence"],
-        "properties": {
-          "title": { "type": "string" },
-          "body": { "type": "string" },
-          "evidence": { "type": "string" }
-        }
+    "chapters": { "type": "array", "items": { "$ref": "#/$defs/chapter" }, "minItems": 4, "maxItems": 4 },
+    "chapterLessons": { "type": "array", "description": "Beginner-friendly explanation paired by index with chapters.", "items": { "type": "string", "minLength": 30 }, "minItems": 4, "maxItems": 4 },
+    "learningReport": { "$ref": "#/$defs/learningReport" },
+    "investorGuide": { "type": "array", "items": { "$ref": "#/$defs/investorGuide" }, "minItems": 3, "maxItems": 3 },
+    "studyGuide": { "type": "array", "items": { "$ref": "#/$defs/studyGuide" }, "minItems": 3, "maxItems": 3 },
+    "biasChecks": { "type": "array", "items": { "$ref": "#/$defs/biasCheck" }, "minItems": 3, "maxItems": 3 },
+    "path": { "type": "array", "items": { "type": "number" }, "minItems": 12, "maxItems": 12 },
+    "events": { "type": "array", "items": { "$ref": "#/$defs/event" }, "minItems": 3, "maxItems": 3 },
+    "agentInsights": { "type": "array", "items": { "$ref": "#/$defs/agentInsight" }, "minItems": 3, "maxItems": 3 },
+    "riskPoints": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 3, "maxItems": 3 }
+  },
+  "$defs": {
+    "chapter": {
+      "type": "object", "additionalProperties": false,
+      "required": ["title", "body", "evidence"],
+      "properties": { "title": { "type": "string", "minLength": 1 }, "body": { "type": "string", "minLength": 1 }, "evidence": { "type": "string", "minLength": 1 } }
+    },
+    "learningReport": {
+      "type": "object", "additionalProperties": false,
+      "required": ["title", "lead", "metrics", "sections"],
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "lead": { "type": "string", "minLength": 30 },
+        "metrics": { "type": "array", "items": { "$ref": "#/$defs/learningMetric" }, "minItems": 4, "maxItems": 4 },
+        "sections": { "type": "array", "items": { "$ref": "#/$defs/learningSection" }, "minItems": 3, "maxItems": 3 }
+      }
+    },
+    "learningMetric": {
+      "type": "object", "additionalProperties": false,
+      "required": ["label", "value", "note"],
+      "properties": { "label": { "type": "string", "minLength": 1 }, "value": { "type": "string", "minLength": 1 }, "note": { "type": "string", "minLength": 1 } }
+    },
+    "learningSection": {
+      "type": "object", "additionalProperties": false,
+      "required": ["title", "paragraphs", "takeaway"],
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "paragraphs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 2, "maxItems": 3 },
+        "takeaway": { "type": "string", "minLength": 1 }
       }
     },
     "investorGuide": {
-      "type": "array",
-      "minItems": 3,
-      "maxItems": 3,
-      "items": {
-        "type": "object",
-        "required": ["stance", "action", "rationale"],
-        "properties": {
-          "stance": { "type": "string" },
-          "action": { "type": "string" },
-          "rationale": { "type": "string" }
-        }
-      }
+      "type": "object", "additionalProperties": false,
+      "required": ["stance", "action", "rationale"],
+      "properties": { "stance": { "type": "string", "minLength": 1 }, "action": { "type": "string", "minLength": 1 }, "rationale": { "type": "string", "minLength": 1 } }
     },
     "studyGuide": {
-      "type": "array",
-      "minItems": 3,
-      "maxItems": 3,
-      "items": {
-        "type": "object",
-        "required": ["topic", "question"],
-        "properties": {
-          "topic": { "type": "string" },
-          "question": { "type": "string" }
-        }
+      "type": "object", "additionalProperties": false,
+      "required": ["topic", "question"],
+      "properties": { "topic": { "type": "string", "minLength": 1 }, "question": { "type": "string", "minLength": 1 } }
+    },
+    "biasCheck": {
+      "type": "object", "additionalProperties": false,
+      "required": ["bias", "trap", "counter"],
+      "properties": { "bias": { "type": "string", "minLength": 1 }, "trap": { "type": "string", "minLength": 1 }, "counter": { "type": "string", "minLength": 1 } }
+    },
+    "event": {
+      "type": "object", "additionalProperties": false,
+      "required": ["week", "category", "title", "body", "impact"],
+      "properties": {
+        "week": { "type": "string", "minLength": 1 }, "category": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 }, "body": { "type": "string", "minLength": 1 },
+        "impact": { "type": "string", "pattern": "^[+-][0-9]+\\.[0-9]+%$" }
       }
     },
-    "biasChecks": {
-      "type": "array",
-      "minItems": 3,
-      "maxItems": 3,
-      "items": {
-        "type": "object",
-        "required": ["bias", "trap", "counter"],
-        "properties": {
-          "bias": { "type": "string" },
-          "trap": { "type": "string" },
-          "counter": { "type": "string" }
-        }
-      }
-    },
-    "path": {
-      "type": "array",
-      "minItems": 12,
-      "maxItems": 12,
-      "items": { "type": "number" }
-    },
-    "events": {
-      "type": "array",
-      "minItems": 3,
-      "maxItems": 3,
-      "items": {
-        "type": "object",
-        "required": ["week", "category", "title", "body", "impact"],
-        "properties": {
-          "week": { "type": "string" },
-          "category": { "type": "string" },
-          "title": { "type": "string" },
-          "body": { "type": "string" },
-          "impact": { "type": "string", "pattern": "^[+-][0-9]+\\.[0-9]+%$" }
-        }
-      }
-    },
-    "agentInsights": {
-      "type": "array",
-      "minItems": 3,
-      "maxItems": 3,
-      "items": {
-        "type": "object",
-        "required": ["role", "title", "body"],
-        "properties": {
-          "role": { "type": "string" },
-          "title": { "type": "string" },
-          "body": { "type": "string" }
-        }
-      }
-    },
-    "riskPoints": {
-      "type": "array",
-      "minItems": 3,
-      "maxItems": 3,
-      "items": { "type": "string" }
+    "agentInsight": {
+      "type": "object", "additionalProperties": false,
+      "required": ["role", "title", "body"],
+      "properties": { "role": { "type": "string", "minLength": 1 }, "title": { "type": "string", "minLength": 1 }, "body": { "type": "string", "minLength": 1 } }
     }
   }
 }

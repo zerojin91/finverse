@@ -3,10 +3,11 @@
   "$id": "finverse/scenario-card/impact_model/v1",
   "title": "ImpactModel",
   "type": "object",
-  "required": ["scenario_id", "base_index", "weights", "events", "path", "forecast", "forecast_pct"],
+  "required": ["scenario_id", "target", "base_index", "weights", "events", "path", "forecast", "forecast_pct"],
   "additionalProperties": false,
   "properties": {
     "scenario_id": { "type": "string" },
+    "target": { "type": "string", "minLength": 1 },
     "base_index": { "type": "number", "exclusiveMinimum": 0 },
     "tone": { "type": "string", "enum": ["up", "down", "neutral"] },
     "weights": {
@@ -55,7 +56,7 @@
       "maxItems": 12,
       "items": { "type": "number" }
     },
-    "forecast": { "type": "string", "pattern": "^KOSPI [+-]" },
+    "forecast": { "type": "string", "pattern": "^[^\\s]+ [+-]" },
     "forecast_pct": { "type": "number" },
     "band": {
       "type": "object",

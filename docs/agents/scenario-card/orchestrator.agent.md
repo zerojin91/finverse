@@ -30,7 +30,7 @@ output/scenario-cards/kospi-asof-2026-07-28/
 ├── impact-channel-{id}.json
 ├── impact-model-{id}.json
 ├── scenario-{id}.json
-└── scenarios.json                 # 최종 배열 (UI 팀 handoff)
+└── scenarios.json                 # { schema_version, meta, scenarios[] } UI handoff envelope
 ```
 
 ## Pipeline
@@ -39,11 +39,11 @@ output/scenario-cards/kospi-asof-2026-07-28/
 | --- | --- |
 | 0 | `run_spec` 확정: target, as_of, horizon, scenario_mix, info_cutoff |
 | 1 | Web + Historical 병렬 → regime brief, volume_regime |
-| 2 | outlook skew + regime → `scenario_set_plan.json` (2~4 scenarios) |
+| 2 | outlook skew + regime → `scenario_set_plan.json` (2~4 scenarios + 각 3개 event blueprint: week/title/body) |
 | 3 | 시나리오별 Historical plan 위임 → channels; gap 시 Web 보완 요청 |
 | 4 | `impact_model.build_impact_model(...)` 호출 → `impact-model-{id}.json` |
 | 5 | Scenario Author 위임 → `scenario-{id}.json` |
-| 6 | QA + `scenarios.json` 조립 |
+| 6 | QA + `scenarios.json` envelope 조립 (`schema_version`, `meta`, `scenarios[]`) |
 
 ## Scenario mix policy
 
@@ -72,10 +72,11 @@ output/scenario-cards/kospi-asof-2026-07-28/
 
 ## QA checklist
 
-- [ ] `scenarios.json`이 [scenario-card.schema.json](./schemas/scenario-card.schema.json) 통과
-- [ ] 각 카드: chapters=4, events=3, path len=12
+- [ ] `scenarios.json`이 [scenarios-output.schema.json](./schemas/scenarios-output.schema.json) 통과, 각 `scenarios[]` 원소가 [scenario-card.schema.json](./schemas/scenario-card.schema.json) 통과
+- [ ] 각 카드: chapters=4, chapterLessons=4, learningReport.metrics=4, learningReport.sections=3, events=3, path len=12
 - [ ] `path[0] == base_index`, `forecast` ↔ `path[11]` 일치
 - [ ] `events[].impact` == impact_model cumulative
+- [ ] learningReport의 수치가 impact_model 또는 Evidence Register에 존재
 - [ ] 확정적 투자 권유·목표가 단정 없음
 - [ ] look-ahead bias 없음 (Historical evidence 확인)
 

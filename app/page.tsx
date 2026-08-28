@@ -25,13 +25,21 @@ import type { ChangeEvent, PointerEvent as ReactPointerEvent } from "react";
 
 type MainTab = "market" | "twin";
 
-type Scenario = {
+type LearningReport = {
+  title: string;
+  lead: string;
+  metrics: { label: string; value: string; note: string }[];
+  sections: { title: string; paragraphs: string[]; takeaway: string }[];
+};
+
+type ScenarioCore = {
   id: string;
+  target: string;
   title: string;
   duration: string;
   tags: string[];
   forecast: string;
-  tone: "up" | "down";
+  tone: "up" | "down" | "neutral";
   image: string;
   summary: string;
   thesis: string;
@@ -44,6 +52,11 @@ type Scenario = {
   events: { week: string; category: string; title: string; body: string; impact: string }[];
   agentInsights: { role: string; title: string; body: string }[];
   riskPoints: string[];
+};
+
+type Scenario = ScenarioCore & {
+  chapterLessons: string[];
+  learningReport: LearningReport;
 };
 
 const marketConnections = [
@@ -74,9 +87,10 @@ const makeTradingDates = (endDate: string, count: number) => {
 const actualDates = makeTradingDates("2026-07-28", actualPath.length);
 const scenarioAssetBase = "https://raw.githubusercontent.com/zerojin91/finverse/main/public/scenarios";
 
-const scenarios: Scenario[] = [
+const scenarioCards: ScenarioCore[] = [
   {
     id: "kospi-rebound",
+    target: "KOSPI",
     title: "KOSPI 조건부 반등",
     duration: "1개월",
     tags: ["외국인 순매수", "AI CapEx"],
@@ -123,6 +137,7 @@ const scenarios: Scenario[] = [
   },
   {
     id: "chip-miss",
+    target: "KOSPI",
     title: "반도체 실적 미스·AI CapEx 둔화",
     duration: "1개월",
     tags: ["SK하이닉스 실적 하회", "AI 투자 재평가"],
@@ -169,6 +184,7 @@ const scenarios: Scenario[] = [
   },
   {
     id: "risk-off",
+    target: "KOSPI",
     title: "외국인 매도·원화 약세 재확산",
     duration: "1개월",
     tags: ["외국인 순매도", "원·달러·금리"],
@@ -236,14 +252,7 @@ const chapterLessonMap: Record<string, string[]> = {
   ],
 };
 
-type ScenarioArticle = {
-  title: string;
-  lead: string;
-  metrics: { label: string; value: string; note: string }[];
-  sections: { title: string; paragraphs: string[]; takeaway: string }[];
-};
-
-const scenarioArticleMap: Record<string, ScenarioArticle> = {
+const scenarioArticleMap: Record<string, LearningReport> = {
   "kospi-rebound": {
     title: "KOSPI 조건부 반등을 읽는 법",
     lead: "이 시나리오는 ‘급락했으니 곧 오른다’는 낙관론이 아닙니다. 시장이 기대를 다시 쌓는 과정을 외국인 수급, 반도체 이익, 빅테크 투자라는 세 개의 연결 고리로 나눠서 읽는 학습용 리포트입니다.",
@@ -354,8 +363,17 @@ const scenarioArticleMap: Record<string, ScenarioArticle> = {
   },
 };
 
+const scenarios: Scenario[] = scenarioCards.map((scenario) => {
+  const chapterLessons = chapterLessonMap[scenario.id];
+  const learningReport = scenarioArticleMap[scenario.id];
+  if (!chapterLessons || !learningReport) {
+    throw new Error(`Missing Scenario Library detail content for ${scenario.id}`);
+  }
+  return { ...scenario, chapterLessons, learningReport };
+});
+
 function ScenarioLearningArticle({ scenario }: { scenario: Scenario }) {
-  const article = scenarioArticleMap[scenario.id] ?? scenarioArticleMap["kospi-rebound"];
+  const article = scenario.learningReport;
   const min = Math.min(...scenario.path);
   const max = Math.max(...scenario.path);
   const span = Math.max(1, max - min);
@@ -396,7 +414,7 @@ function ScenarioDetailLearning({ scenario }: { scenario: Scenario }) {
       <section className="scenario-narrative" aria-label="시나리오 상세 전개">
         <div className="scenario-detail-label">시나리오를 읽는 순서</div>
         <div className="scenario-narrative-list">
-          {scenario.chapters.map((chapter, index) => <article key={`${scenario.id}-${chapter.title}`} className="scenario-narrative-card"><div className="scenario-narrative-index">0{index + 1}</div><div><h4>{chapter.title}</h4><p>{chapter.body}</p>{chapterLessonMap[scenario.id]?.[index] && <p className="scenario-narrative-lesson">{chapterLessonMap[scenario.id][index]}</p>}<span>{chapter.evidence}</span></div></article>)}
+          {scenario.chapters.map((chapter, index) => <article key={`${scenario.id}-${chapter.title}`} className="scenario-narrative-card"><div className="scenario-narrative-index">0{index + 1}</div><div><h4>{chapter.title}</h4><p>{chapter.body}</p><p className="scenario-narrative-lesson">{scenario.chapterLessons[index]}</p><span>{chapter.evidence}</span></div></article>)}
         </div>
       </section>
 
@@ -1197,7 +1215,7 @@ export default function Home() {
                           <div>
                             <h4>{chapter.title}</h4>
                             <p>{chapter.body}</p>
-                            {chapterLessonMap[selectedScenario.id]?.[index] && <p className="scenario-narrative-lesson">{chapterLessonMap[selectedScenario.id][index]}</p>}
+                            <p className="scenario-narrative-lesson">{selectedScenario.chapterLessons[index]}</p>
                             <span>{chapter.evidence}</span>
                           </div>
                         </article>

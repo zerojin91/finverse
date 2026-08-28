@@ -3,9 +3,10 @@
   "$id": "finverse/scenario-card/scenarios_output/v1",
   "title": "ScenariosOutput",
   "type": "object",
-  "required": ["scenarios", "meta"],
+  "required": ["schema_version", "scenarios", "meta"],
   "additionalProperties": false,
   "properties": {
+    "schema_version": { "const": "scenario-card/v1" },
     "scenarios": {
       "type": "array",
       "minItems": 2,

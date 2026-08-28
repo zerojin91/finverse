@@ -35,13 +35,16 @@
           "maxItems": 3,
           "items": {
             "type": "object",
-            "required": ["key", "week_offset", "category", "analog_event_type"],
+            "required": ["key", "week_offset", "week_label", "category", "analog_event_type", "title", "body"],
             "additionalProperties": false,
             "properties": {
               "key": { "type": "string" },
               "week_offset": { "type": "integer", "minimum": 1, "maximum": 4 },
+              "week_label": { "type": "string", "minLength": 1, "description": "Display timing resolved from the trigger calendar, for example 8/4 전후." },
               "category": { "type": "string" },
-              "analog_event_type": { "type": "string" }
+              "analog_event_type": { "type": "string" },
+              "title": { "type": "string", "minLength": 1, "description": "Event headline supplied to impact_model EventMeta." },
+              "body": { "type": "string", "minLength": 1, "description": "Conditional mechanism. Scenario Author may only add impact_model-derived numbers." }
             }
           }
         },

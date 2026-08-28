@@ -11,6 +11,7 @@ from agents.scenario_card.impact_model import (
     compute_volume_regime,
     format_impact_pct,
     weights_from_activity,
+    compute_news_channel,
 )
 
 
@@ -88,3 +89,44 @@ def test_web_fallback_when_evidence_insufficient():
         web_fallbacks={"e1": WebNewsFallback(I_web_direction_pct=3.0, narrative_strength=0.8)},
     )
     assert result.events[0].news_fallback_used
+
+
+def test_downside_web_fallback_is_negative_even_with_signed_input():
+    impact, used = compute_news_channel(
+        tone="down",
+        I_quant=-2.0,
+        I_analyst=-2.0,
+        n_analog=0,
+        channel_confidence=0.2,
+        web=WebNewsFallback(I_web_direction_pct=-3.0, narrative_strength=0.8),
+    )
+
+    assert used
+    assert impact == pytest.approx(-2.0)
+
+
+def test_impact_model_formats_the_requested_target_name():
+    weights = weights_from_activity(0.5)
+    channels = [
+        EventChannelInput("e1", 1.0, 1.0),
+        EventChannelInput("e2", 1.0, 1.0),
+        EventChannelInput("e3", 1.0, 1.0),
+    ]
+    meta = [
+        EventMeta("e1", "w1", "c", "t1", "b1"),
+        EventMeta("e2", "w2", "c", "t2", "b2"),
+        EventMeta("e3", "w3", "c", "t3", "b3"),
+    ]
+
+    result = build_impact_model(
+        scenario_id="target-name",
+        base_index=1000.0,
+        tone="up",
+        weights=weights,
+        channel_inputs=channels,
+        event_meta=meta,
+        target_name="KOSDAQ",
+    )
+
+    assert result.forecast.startswith("KOSDAQ +")
+    assert result.as_dict()["target"] == "KOSDAQ"

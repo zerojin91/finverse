@@ -56,15 +56,15 @@ Subagent는 같은 Evidence를 한 번 보완하며, 적용 결과와 남은 dat
 
 Market Agent는 기간 수익률 같은 요약값만 작성하지 않는다. 정량 판단에 쓴 지수·종목의 일별
 원시 관측치를 Raw Time Series 섹션에 날짜 오름차순으로 보존한다. 현재 구간과 Moderator가 선정한
-과거 사례의 각 anchor date에 대해 기본 관측 구간은 기준일 전 240거래일이며, 이 시계열을 단기
-20일·중기 60일·장기 240일 창으로 구분한다. 각 행은 case ID, anchor date, 시계열 식별자,
+과거 사례의 각 anchor date에 대해 기본 관측 구간은 기준일 전 60거래일이며, 이 시계열을 단기
+20일·중기 60일 창으로 구분한다. 각 행은 case ID, anchor date, 시계열 식별자,
 거래일, 필드, 값, 단위 또는 price basis, source, record ID를 포함한다.
 
-사용자가 더 긴 기간을 지정하면 그 기간의 전 행을, 기간이 없으면 현재 구간과 사례별 기준일 전
-240거래일의 전 행을 가져온다. 단일 DB 조회가 100행을 넘으면 연속된 날짜 청크로 나누며, 누락값을 보간하거나
+사용자가 더 긴 기간을 지정해도 현재 구간과 사례별 기준일 전 60거래일까지만 원시 행을 가져온다.
+단일 DB 조회가 100행을 넘으면 연속된 날짜 청크로 나누며, 누락값을 보간하거나
 요약값으로 원시 관측치를 대체하지 않는다. 수익률·변동성·최대 낙폭 등은 원시 행을 바탕으로
 계산식, 시작·종료 관측일, 행 수와 함께 별도 기재한다. 같은 close·price basis에 대해서만
-MA20·MA60·MA120·MA240을 계산하며, 필요한 관측치가 부족하면 data gap으로 기록한다.
+MA20·MA60을 계산하며, 필요한 관측치가 부족하면 data gap으로 기록한다.
 
 ## 출력 언어
 
@@ -89,10 +89,16 @@ AWS_REGION=<Bedrock model access가 활성화된 리전>
 # IAM role/profile 대신 Bedrock API key를 쓸 경우에만 설정
 # AWS_BEARER_TOKEN_BEDROCK=<Bedrock API key>
 BEDROCK_MODEL_ID=amazon.nova-lite-v1:0
-FINVERSE_AGENT_MODEL=bedrock:amazon.nova-lite-v1:0
+FINVERSE_AGENT_MODEL=openrouter:z-ai/glm-5.3-flash
 FINVERSE_BEDROCK_MAX_TOKENS=4096
 FINVERSE_BEDROCK_TEMPERATURE=0
 FINVERSE_BEDROCK_TIMEOUT_SECONDS=3600
+OPENROUTER_API_KEY=<OpenRouter API key>
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+OPENROUTER_APP_NAME=FINVERSE
+FINVERSE_OPENROUTER_MAX_TOKENS=8192
+FINVERSE_OPENROUTER_TIMEOUT_SECONDS=3600
+FINVERSE_OPENROUTER_REASONING_EFFORT=high
 ```
 
 Bedrock 모델은 LangChain의 `ChatBedrockConverse`를 통해 Converse API와 function tools를 사용한다.
@@ -103,13 +109,15 @@ Bedrock 모델은 LangChain의 `ChatBedrockConverse`를 통해 Converse API와 f
 `amazon.nova-lite-v1:0`은 비용 중심의 디버깅 기본값이며, 더 높은 품질이 필요하면
 `amazon.nova-pro-v1:0` 등 승인된 모델 ID로 교체한다.
 
+OpenRouter를 사용할 때는 `FINVERSE_AGENT_MODEL=openrouter:z-ai/glm-5.3-flash`로 설정한다.
+이 경로는 OpenRouter의 OpenAI-compatible **Chat Completions** endpoint를 사용하므로 `openai:`
+prefix와 호환되지 않는다. `OPENROUTER_API_KEY`가 필요하며, 이전 `stealth/ox-alpha` 별칭 대신
+현재 공개 모델 ID인 `z-ai/glm-5.3-flash`를 사용한다. 이 모델은 reasoning effort에 `low`, `high`,
+`max`를 지원하므로 `FINVERSE_OPENROUTER_REASONING_EFFORT=high`를 기본값으로 둔다.
+
 DB 조회 제한시간은 기본 60초다. 원격 DB가 느리면 `FINVERSE_DB_STATEMENT_TIMEOUT_MS`를
 최대 `300000`(5분)까지 늘릴 수 있다. 시간 초과가 발생하면 DB Agent는 기간과 검색 조건을
 좁혀 한 번만 재조회하고, 다시 실패하면 전체 실행을 중단하지 않고 `Limitations`에 데이터 부족으로 남긴다.
-
-각 A2A DB 읽기 연결은 max_parallel_workers_per_gather=0을 세션 옵션으로 설정한다. 이는
-공유 메모리가 작은 원격 PostgreSQL에서 병렬 정렬·해시 작업이 동적 공유 메모리를 과도하게
-점유하는 것을 방지하기 위한 설정이며, DB 전체의 병렬 처리 설정은 변경하지 않는다.
 
 의존성을 설치한다.
 

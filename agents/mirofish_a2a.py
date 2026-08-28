@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 import argparse
+from html import unescape
 import ipaddress
 import json
 import os
 import re
 import socket
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
 import psycopg
 from ddgs import DDGS
@@ -43,6 +45,9 @@ DEFAULT_BEDROCK_MAX_TOKENS = 4096
 DEFAULT_BEDROCK_TIMEOUT_SECONDS = 3600
 DEFAULT_MODEL = f"bedrock:{DEFAULT_BEDROCK_MODEL_ID}"
 DEFAULT_REASONING_EFFORT = "medium"
+DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+DEFAULT_OPENROUTER_APP_NAME = "FINVERSE"
+DEFAULT_OPENROUTER_REASONING_EFFORT = "high"
 
 REQUIRED_EVIDENCE_HEADINGS = {
     "market": ("# Market Evidence", "## Scenario-Aligned Retrieval Plan", "## Current State", "## Raw Time Series", "## Investor Flow", "## Similar Historical Cases", "## Feedback and Scope Gaps", "## Relation Candidates", "## Evidence Register", "## Limitations"),
@@ -124,7 +129,7 @@ def _environment_float(name: str, default: float) -> float:
 
 
 def _create_chat_model(model_id: str):
-    """Create an AWS Bedrock Converse or OpenAI Responses chat model."""
+    """Create a Bedrock, OpenRouter, or OpenAI chat model from its provider prefix."""
     if model_id.startswith("bedrock:"):
         bedrock_model_id = model_id.split(":", 1)[1] or os.environ.get(
             "BEDROCK_MODEL_ID", DEFAULT_BEDROCK_MODEL_ID
@@ -147,6 +152,29 @@ def _create_chat_model(model_id: str):
         if profile_name := os.environ.get("AWS_PROFILE"):
             kwargs["credentials_profile_name"] = profile_name
         return ChatBedrockConverse(**kwargs)
+    if model_id.startswith("openrouter:"):
+        api_key = os.environ.get("OPENROUTER_API_KEY")
+        if not api_key:
+            raise RuntimeError("OPENROUTER_API_KEY is required for OpenRouter")
+
+        headers = {"X-Title": os.environ.get("OPENROUTER_APP_NAME", DEFAULT_OPENROUTER_APP_NAME)}
+        if referer := os.environ.get("OPENROUTER_HTTP_REFERER"):
+            headers["HTTP-Referer"] = referer
+
+        return ChatOpenAI(
+            model=model_id.split(":", 1)[1],
+            api_key=api_key,
+            base_url=os.environ.get("OPENROUTER_BASE_URL", DEFAULT_OPENROUTER_BASE_URL),
+            max_tokens=_environment_int("FINVERSE_OPENROUTER_MAX_TOKENS", 8192),
+            max_retries=_environment_int("FINVERSE_OPENROUTER_MAX_RETRIES", 3),
+            timeout=_environment_int("FINVERSE_OPENROUTER_TIMEOUT_SECONDS", 3600),
+            reasoning_effort=os.environ.get(
+                "FINVERSE_OPENROUTER_REASONING_EFFORT",
+                DEFAULT_OPENROUTER_REASONING_EFFORT,
+            ),
+            default_headers=headers,
+            use_responses_api=False,
+        )
     if model_id.startswith("openai:"):
         reasoning_effort = os.environ.get(
             "FINVERSE_AGENT_REASONING_EFFORT",
@@ -172,8 +200,7 @@ def _read_query(sql: str, params: tuple[Any, ...]) -> list[dict[str, Any]]:
             row_factory=dict_row,
             options=(
                 "-c default_transaction_read_only=on "
-                f"-c statement_timeout={timeout_ms} "
-                "-c max_parallel_workers_per_gather=0"
+                f"-c statement_timeout={timeout_ms}"
             ),
         ) as connection:
             with connection.cursor() as cursor:
@@ -483,13 +510,55 @@ def fetch_web_page(url: str) -> str:
     try:
         extracted = DDGS(timeout=15).extract(url, fmt="text_plain")
     except Exception as exc:  # Keep source failures as evidence gaps rather than aborting the run.
-        return _json({"url": url, "error": f"page request failed: {exc}"})
+        try:
+            text = _fetch_public_page_text(url)
+        except Exception as fallback_exc:
+            return _json({"url": url, "error": f"page request failed: {exc}; fallback failed: {fallback_exc}"})
+        return _json({
+            "url": url,
+            "date_candidates": _publication_date_candidates(text),
+            "text": text,
+            "transport": "urllib_fallback",
+        })
     text = str(extracted.get("content", ""))[:10_000]
     return _json({
         "url": url,
-        "date_candidates": re.findall(r"\b20\d{2}[-/.]\d{1,2}[-/.]\d{1,2}\b", text)[:10],
+        "date_candidates": _publication_date_candidates(text),
         "text": text,
     })
+
+
+def _fetch_public_page_text(url: str) -> str:
+    """Small verified-source fallback when DDGS extraction cannot negotiate TLS."""
+    request = Request(url, headers={"User-Agent": "FINVERSE evidence verifier/1.0"})
+    with urlopen(request, timeout=15) as response:  # noqa: S310 - URL passed _validate_public_url above.
+        raw = response.read(1_000_000).decode(response.headers.get_content_charset() or "utf-8", errors="replace")
+    without_script = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", raw, flags=re.IGNORECASE | re.DOTALL)
+    return " ".join(unescape(re.sub(r"<[^>]+>", " ", without_script)).split())[:10_000]
+
+
+def _publication_date_candidates(text: str) -> list[str]:
+    """Return normalized ISO dates found in numeric or common English article formats."""
+    candidates = re.findall(r"\b20\d{2}[-/.]\d{1,2}[-/.]\d{1,2}\b", text)
+    month_names = (
+        "January|February|March|April|May|June|July|August|September|October|November|December|"
+        "Jan\\.?|Feb\\.?|Mar\\.?|Apr\\.?|Jun\\.?|Jul\\.?|Aug\\.?|Sep\\.?|Sept\\.?|Oct\\.?|Nov\\.?|Dec\\.?"
+    )
+    for raw in re.findall(rf"\b(?:{month_names})\s+\d{{1,2}},\s+20\d{{2}}\b", text, flags=re.IGNORECASE):
+        cleaned = raw.replace(".", "")
+        for pattern in ("%B %d, %Y", "%b %d, %Y"):
+            try:
+                candidates.append(datetime.strptime(cleaned, pattern).date().isoformat())
+                break
+            except ValueError:
+                continue
+    normalized: list[str] = []
+    for candidate in candidates:
+        parsed = _normalized_evidence_date(candidate)
+        value = parsed.isoformat() if parsed else candidate
+        if value not in normalized:
+            normalized.append(value)
+    return normalized[:10]
 
 
 class EvidenceDateValidationError(ValueError):
@@ -818,15 +887,15 @@ Moderator가 준 query, target, as_of, horizon, assigned_scope, already_covered�
 필수 작업:
 - query_market으로 지수·가격·수급·외국인 보유·종목 마스터를 필요한 범위만 조회한다.
 - 정량 판단에 앞서, target과 직접 비교할 핵심 시계열을 식별한다. 지수는 index_daily, 종목은 price_daily를 우선 사용하며 수급·외국인 보유는 보조 시계열로만 사용한다.
-- 기본 정량 시계열은 as_of까지 최근 240거래일을 사용한다. 이를 단기=최근 20거래일, 중기=최근 60거래일, 장기=최근 240거래일로 분리하고, 사용 가능한 관측치가 부족하면 각 창의 실제 행 수와 부족 사유를 기록한다. 사용자가 더 긴 기간을 명시하면 그 기간도 전부 조회한다.
+- 기본 정량 시계열은 as_of까지 최근 60거래일을 사용한다. 이를 단기=최근 20거래일, 중기=최근 60거래일로 분리하고, 사용 가능한 관측치가 부족하면 각 창의 실제 행 수와 부족 사유를 기록한다. 사용자가 더 긴 기간을 명시해도 Market Agent는 60거래일 창을 넘는 원시 시계열을 추가 조회하지 않고 Limitations에 기록한다.
 - 현재 구간은 case_id=CURRENT, anchor_date=as_of로 취급한다. 과거 시계열은 Moderator의 historical_retrieval_plan에 맞춰 선정된 Top-K와 반례의 각 anchor_date를 기준으로 조회한다. CURRENT만 조회하고 과거 사례의 같은 정렬 창을 생략하지 않는다.
-- 단일 도구 호출은 최대 100행이므로 240거래일 이상은 겹치지 않는 날짜 청크로 나눠 조회한다. 최신 100행을 먼저 받은 뒤 가장 이른 trade_date 바로 전을 다음 end_date로 삼아 필요한 240행을 모두 확보한다. timeout이면 DATABASE_TIMEOUT_PROTOCOL을 따르고, 누락 행을 추정하거나 보간하지 않는다.
-- 원시 행을 조회한 뒤에만 단기·중기·장기 변화, 변동성, 거래대금, 주요 섹터, 수급, 과거 유사 구간을 정리한다. 5거래일만을 독립 분석 창 또는 원시 시계열의 대체물로 사용하지 않는다.
-- ## Raw Time Series에는 정량 판단에 사용한 관측치를 날짜 오름차순으로 그대로 기록한다. 표 형식은 | case_id | anchor_date | window | series_id | trade_date | field | value | unit_or_price_basis | source | record_id | 이다. CURRENT와 선택된 과거 사례마다 240거래일 원시 행을 기준 시계열로 보존하고, 단기 20일·중기 60일은 같은 case_id 시계열의 정확한 끝부분 범위로 참조한다. 각 series_id마다 조회 시작일·종료일·행 수·누락/비거래일·도구의 dataset을 바로 위에 적는다.
+- 단일 도구 호출은 최대 100행이므로 60거래일 원시 행을 한 번의 좁은 요청으로 조회한다. timeout이면 DATABASE_TIMEOUT_PROTOCOL을 따르고, 누락 행을 추정하거나 보간하지 않는다.
+- 원시 행을 조회한 뒤에만 단기·중기 변화, 변동성, 거래대금, 주요 섹터, 수급, 과거 유사 구간을 정리한다. 5거래일만을 독립 분석 창 또는 원시 시계열의 대체물로 사용하지 않는다.
+- ## Raw Time Series에는 정량 판단에 사용한 관측치를 날짜 오름차순으로 그대로 기록한다. 표 형식은 | case_id | anchor_date | window | series_id | trade_date | field | value | unit_or_price_basis | source | record_id | 이다. CURRENT와 선택된 과거 사례마다 60거래일 원시 행을 기준 시계열로 보존하고, 단기 20일은 같은 case_id 시계열의 정확한 끝부분 범위로 참조한다. 각 series_id마다 조회 시작일·종료일·행 수·누락/비거래일·도구의 dataset을 바로 위에 적는다.
 - Raw Time Series의 값은 기간 수익률·평균·변동성·최대 낙폭·누적 수급 등 요약치로 대체하지 않는다. 이 요약치는 원시 행을 보조하는 계산 결과로만 Current State 또는 Investor Flow에 쓴다.
-- Current State에 단기 20일·중기 60일·장기 240일별 수익률, 변동성, 최대 낙폭을 구분해 제시한다. 모든 계산에는 사용한 series_id, 시작·종료 관측일, 행 수, 계산식과 분모를 함께 적는다. 예: 단순수익률=(종료 close/시작 close-1)*100. 서로 다른 price_basis·단위·빈도가 섞인 행은 계산하지 않는다.
-- 이동평균은 같은 close·price_basis의 원시 행만으로 계산한다. 최소 MA20, MA60, MA120, MA240을 각각 제시하고, 해당 이동평균에 필요한 관측치가 부족하면 값을 만들지 말고 data gap으로 기록한다. 각 MA에는 계산 기준일과 포함 행 수를 적는다.
-- 유사 구간의 사후 경로를 정량 비교할 때도, Top-K를 고른 뒤 anchor_date 전 240거래일과 확정된 사후 horizon의 원시 가격/지수 행을 동일한 방식으로 Raw Time Series에 기록한다.
+- Current State에 단기 20일·중기 60일별 수익률, 변동성, 최대 낙폭을 구분해 제시한다. 모든 계산에는 사용한 series_id, 시작·종료 관측일, 행 수, 계산식과 분모를 함께 적는다. 예: 단순수익률=(종료 close/시작 close-1)*100. 서로 다른 price_basis·단위·빈도가 섞인 행은 계산하지 않는다.
+- 이동평균은 같은 close·price_basis의 원시 행만으로 계산한다. MA20과 MA60만 제시하고, 해당 이동평균에 필요한 관측치가 부족하면 값을 만들지 말고 data gap으로 기록한다. 각 MA에는 계산 기준일과 포함 행 수를 적는다.
+- 유사 구간의 사후 경로를 정량 비교할 때도, Top-K를 고른 뒤 anchor_date 전 60거래일과 확정된 사후 horizon의 원시 가격/지수 행을 동일한 방식으로 Raw Time Series에 기록한다.
 - 유사 구간은 추세·변동성·거래대금·수급 방향·섹터 주도력·외국인 보유 변화의 조합을 중심으로 비교한다.
 - 관측 사실과 해석을 분리하고 관계는 확정 인과가 아닌 후보 관계로 쓴다.
 - KRX/Naver price_basis 차이, 단위 차이, 누락 데이터를 명시한다.
@@ -1003,7 +1072,7 @@ MiroFish가 사용할 현재 시장 상황 온톨로지와 조건부 미래 시�
 4. attention_plan을 historical_retrieval_plan으로 구체화한다.
    - scenario_scheme: 충격·전달 경로·대상·시장/거시 regime의 결합
    - candidate_case_rules: 사례 후보의 anchor_date 조건과 제외 조건
-   - case_windows: CURRENT와 과거 사례 각각의 사전 20/60/240거래일, Top-K 선정 후의 사후 horizon
+   - case_windows: CURRENT와 과거 사례 각각의 사전 20/60거래일, Top-K 선정 후의 사후 horizon
    - web_evidence_window: primary 조사 범위, secondary 확장 조건, 오래된 자료를 허용할 구조적 지속성 기준
    이 계획은 과거 결과가 아니라 anchor_date 당시 알 수 있었던 정보로 만든다.
 5. 소유권을 먼저 배정한다.
@@ -1014,13 +1083,13 @@ MiroFish가 사용할 현재 시장 상황 온톨로지와 조건부 미래 시�
 6. 각 작업에 query, target, as_of, horizon, assigned_scope, already_covered,
    scenario_signature, attention_dimensions, attention_weights, top_k, counterexample_requirement,
    historical_retrieval_plan, web_evidence_window를 명시한다.
-   market_agent의 assigned_scope에는 정량 판단에 필요한 대상·필드·CURRENT와 사례별 단기 20일·중기 60일·장기 240거래일 조회와 이동평균, 원시 시계열 보존을 명시한다.
+   market_agent의 assigned_scope에는 정량 판단에 필요한 대상·필드·CURRENT와 사례별 단기 20일·중기 60일 조회와 MA20/MA60, 원시 시계열 보존을 명시한다.
 7. 네 Agent를 1차 조사 단계로 호출해 후보 사례·조회 범위·data gap을 포함한 Evidence 초안을 저장하게 한다.
 8. read_specialist_evidence를 호출해 다음을 검토한다.
    - 기준 시점이 같은가
    - 사실·해석·관계 후보가 구분됐는가
    - market Evidence의 Raw Time Series가 실제 조회한 날짜별 원시 행, source, record_id를 보존하며 요약치의 재계산 근거가 되는가
-   - market Evidence가 단기 20일·중기 60일·장기 240거래일의 원시 관측치와 MA20/MA60/MA120/MA240을 각각 구분했는가
+   - market Evidence가 단기 20일·중기 60일의 원시 관측치와 MA20/MA60을 각각 구분했는가
    - 영어 원문을 그대로 복사하지 않고 모든 Agent Evidence와 최종 문서가 한국어로 작성됐는가
    - 각 Evidence의 Feedback and Scope Gaps에 범위·사례·소유권 판단 요청이 있는가
    - web Evidence가 primary 범위 밖의 자료를 채택했다면 구조적 지속성·현재 연결고리·더 최근 대체자료 부재를 설명했는가

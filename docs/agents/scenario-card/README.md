@@ -4,7 +4,7 @@ FINVERSE Scenario Library 카드 JSON을 생성하는 4-Agent 파이프라인 �
 
 - **Entry point (신규)**: `agents/scenario_card_a2a.py` — `mirofish_a2a.py`와 분리
 - **Impact 계산 (순수 함수)**: [`agents/scenario_card/impact_model.py`](../../../agents/scenario_card/impact_model.py)
-- **최종 산출물**: `output/scenario-cards/<target>-asof-<date>/scenarios.json` (+ per-scenario artifacts)
+- **최종 산출물**: `output/scenario-cards/<target>-asof-<date>/scenarios.json` — `schema_version`, `meta`, `scenarios[]`를 가진 UI handoff envelope (+ per-scenario artifacts)
 
 ## 문서 목록
 
@@ -22,12 +22,21 @@ FINVERSE Scenario Library 카드 JSON을 생성하는 4-Agent 파이프라인 �
 ```text
 run_spec
   ├─ Phase 1 (병렬): Web outlook + Historical regime/volume
-  ├─ Phase 2: Orchestrator → scenario_set_plan.json
+  ├─ Phase 2: Orchestrator → scenario_set_plan.json (3개 event blueprint 포함)
   ├─ Phase 3 (시나리오별): Historical channels + Web evidence
   ├─ Phase 4: impact_model.py → impact-model-{id}.json
   ├─ Phase 5: Scenario Author → scenario-{id}.json
-  └─ Phase 6: Orchestrator → scenarios.json (배열 조립)
+  └─ Phase 6: Orchestrator → scenarios.json (envelope 조립)
 ```
+
+## UI contract
+
+`scenario-card.schema.json`의 카드 하나만으로 Scenario Library의 카드와 상세 모달을 렌더링한다. UI는 scenario id별 fallback 문구나 별도 콘텐츠 맵을 제공하지 않는다.
+
+- **정량 단일 소스**: `forecast`, `path`, `events[].impact`는 `impact-model-{id}.json`에서 복사한다.
+- **상세 콘텐츠**: `chapters[4]`, `chapterLessons[4]`, `learningReport`, 투자자 가이드·인지 편향·리스크는 Scenario Author가 Evidence를 바탕으로 작성한다.
+- **학습 리포트 수치**: `learningReport.metrics`의 값은 `base_index`, event `index_level`, `forecast` 또는 Evidence Register에 있는 값만 사용한다.
+- **최종 파일**: `scenarios.json`은 배열이 아니라 [scenarios-output.schema.json](./schemas/scenarios-output.schema.json) 객체다.
 
 ## 시나리오 세트 규칙
 

@@ -14,6 +14,7 @@ LLM은 이 모듈의 **입력을 준비**하고 **출력을 서술에 반영**�
 | `web_news_channel` | Web Agent (evidence gap 시만) |
 | `weights` | `volume_regime.json` (또는 모듈 내 재계산) |
 | `tone` | `up` / `down` / `neutral` |
+| `target_name` | `run_spec.target_index_name` 또는 `target`; forecast 접두어 |
 | `event_templates[]` | `scenario_set_plan.json` |
 
 ## 2. 결측 backfill
@@ -70,7 +71,7 @@ else:
     I_news = sign(tone) * min(|I_web_direction|, cap)
 ```
 
-`I_web_direction`: Web Agent narrative strength × (가능하면) 유사 narrative 과거 median.
+`I_web_direction`은 Web Agent의 양의 magnitude × narrative strength다. 입력값이 실수로 signed여도 모델은 절댓값만 사용하고 `tone`이 최종 부호를 정한다.
 
 ## 6. 이벤트 impact
 

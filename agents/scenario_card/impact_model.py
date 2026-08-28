@@ -102,6 +102,7 @@ class ImpactEventResult:
 @dataclass(frozen=True)
 class ImpactModelResult:
     scenario_id: str
+    target: str
     base_index: float
     tone: Tone
     weights: ChannelWeights
@@ -116,6 +117,7 @@ class ImpactModelResult:
     def as_dict(self) -> dict:
         return {
             "scenario_id": self.scenario_id,
+            "target": self.target,
             "base_index": self.base_index,
             "tone": self.tone,
             "weights": self.weights.as_dict(),
@@ -282,14 +284,12 @@ def compute_news_channel(
         cap = min(cap, NEWS_ABS_CAP_PCT)
 
     magnitude = min(abs(web.I_web_direction_pct) * web.narrative_strength, cap)
-    raw_sign = 1.0 if web.I_web_direction_pct >= 0 else -1.0
-
     if tone == "up":
-        sign = raw_sign
+        sign = 1.0
     elif tone == "down":
-        sign = -raw_sign
+        sign = -1.0
     else:
-        sign = raw_sign
+        sign = 1.0 if web.I_web_direction_pct >= 0 else -1.0
         magnitude = min(magnitude, DEFAULT_NEUTRAL_CAP_PCT)
 
     return sign * magnitude, True
@@ -419,6 +419,7 @@ def build_impact_model(
     band_low_pct: float | None = None,
     band_high_pct: float | None = None,
     limitations: Sequence[str] = (),
+    target_name: str = "KOSPI",
 ) -> ImpactModelResult:
     """Compose full impact model from channel estimates and metadata."""
     if len(channel_inputs) != 3 or len(event_meta) != 3:
@@ -494,13 +495,14 @@ def build_impact_model(
 
     return ImpactModelResult(
         scenario_id=scenario_id,
+        target=target_name,
         base_index=base_index,
         tone=tone,
         weights=weights,
         events=tuple(event_results),
         path=path,
         forecast_pct=forecast_pct,
-        forecast=format_forecast(forecast_pct),
+        forecast=format_forecast(forecast_pct, target=target_name),
         band_low_pct=band_low_pct,
         band_high_pct=band_high_pct,
         limitations=tuple(limitations),

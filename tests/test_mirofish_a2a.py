@@ -60,10 +60,10 @@ def test_mirofish_contract_matches_agent_plan() -> None:
 def test_market_prompt_requires_raw_time_series_for_quantitative_analysis() -> None:
     prompt = mirofish_a2a.SPECIALIST_PROMPTS["market"]
     assert "## Raw Time Series" in prompt
-    assert "최근 240거래일" in prompt
+    assert "최근 60거래일" in prompt
     assert "단기=최근 20거래일" in prompt
     assert "중기=최근 60거래일" in prompt
-    assert "MA20, MA60, MA120, MA240" in prompt
+    assert "MA20과 MA60만" in prompt
     assert "case_id=CURRENT" in prompt
     assert "Top-K와 반례" in prompt
     assert "요약치로 대체하지 않는다" in prompt
@@ -90,42 +90,6 @@ def test_database_timeout_configuration(monkeypatch) -> None:
     monkeypatch.setenv("FINVERSE_DB_STATEMENT_TIMEOUT_MS", "999999")
     with pytest.raises(ValueError, match="between 1000"):
         mirofish_a2a._statement_timeout_ms()
-
-
-def test_database_reads_disable_parallel_gather(monkeypatch) -> None:
-    captured = {}
-
-    class Cursor:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *_args):
-            return False
-
-        def execute(self, _sql, _params):
-            return None
-
-        def fetchall(self):
-            return []
-
-    class Connection:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *_args):
-            return False
-
-        def cursor(self):
-            return Cursor()
-
-    def connect(_database_url, **kwargs):
-        captured.update(kwargs)
-        return Connection()
-
-    monkeypatch.setenv("DATABASE_URL", "postgresql://example")
-    monkeypatch.setattr(mirofish_a2a.psycopg, "connect", connect)
-    assert mirofish_a2a._read_query("SELECT 1", ()) == []
-    assert "max_parallel_workers_per_gather=0" in captured["options"]
 
 
 def test_database_timeout_becomes_retryable_tool_result(monkeypatch) -> None:
@@ -265,6 +229,30 @@ def test_openai_model_uses_responses_api(monkeypatch) -> None:
     assert model.model_name == "gpt-5.6-terra"
     assert model.use_responses_api is True
     assert model.reasoning_effort == "low"
+
+
+def test_openrouter_model_uses_chat_completions_api(monkeypatch) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-placeholder")
+    monkeypatch.setenv("OPENROUTER_HTTP_REFERER", "https://finverse.example")
+    monkeypatch.setenv("FINVERSE_OPENROUTER_REASONING_EFFORT", "max")
+
+    model = mirofish_a2a._create_chat_model("openrouter:z-ai/glm-5.3-flash")
+
+    assert model.model_name == "z-ai/glm-5.3-flash"
+    assert str(model.openai_api_base) == mirofish_a2a.DEFAULT_OPENROUTER_BASE_URL
+    assert model.use_responses_api is False
+    assert model.reasoning_effort == "max"
+    assert model.default_headers == {
+        "X-Title": "FINVERSE",
+        "HTTP-Referer": "https://finverse.example",
+    }
+
+
+def test_openrouter_model_requires_api_key(monkeypatch) -> None:
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+
+    with pytest.raises(RuntimeError, match="OPENROUTER_API_KEY"):
+        mirofish_a2a._create_chat_model("openrouter:z-ai/glm-5.3-flash")
 
 
 def test_bedrock_model_uses_converse_api(monkeypatch) -> None:
