@@ -9,6 +9,7 @@ import {
   ChevronRight,
   CircleDollarSign,
   Flag,
+  Landmark,
   LoaderCircle,
   MessageSquare,
   Radio,
@@ -266,7 +267,7 @@ const PHASE_META: Record<Phase, {
     cta: "이벤트 직전까지 장 진행",
     guide: "에이전트들이 사전 신호만 보고 스스로 거래합니다. 지금은 주문을 낼 수 없고, 흘러나오는 신호를 읽는 것이 과제입니다.",
     todo: [
-      "아래 *장 진행* 버튼을 누르면 이벤트 직전까지 하루씩 장이 열립니다.",
+      "*하루만* 버튼으로 한 거래일씩 넘기며 반응을 보거나, *장 진행*으로 이벤트 직전까지 한 번에 갈 수 있습니다.",
       "하루가 지날 때마다 캔들이 쌓이고, 40명의 에이전트 반응이 오른쪽 피드에 올라옵니다.",
       "이 구간은 관찰 전용입니다. 누가 사고 누가 파는지 보고 다음 판단의 근거를 모으세요.",
     ],
@@ -862,8 +863,8 @@ function SetupScreen({
   onClose,
 }: {
   onStart: (input: {
-    ticker: string; name: string; premise: string; eventCount: number;
-    initialCash: number; personaCounts: Record<string, number>;
+    ticker: string; name: string; premise: string; eventSource: string;
+    eventCount: number; initialCash: number; personaCounts: Record<string, number>;
   }) => void;
   onResume: (gameId: string) => void;
   starting: boolean;
@@ -871,6 +872,8 @@ function SetupScreen({
   onClose: () => void;
 }) {
   const [saved, setSaved] = useState<GameSummary[]>([]);
+  // 기본은 온톨로지의 실제 사건이다. 전제 입력은 명시적으로 선택했을 때만 쓴다.
+  const [manualPremise, setManualPremise] = useState(false);
   const [marketSize, setMarketSize] = useState(MARKET_SIZES[1]);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Security[]>([]);
@@ -928,7 +931,9 @@ function SetupScreen({
     event.preventDefault();
     if (!picked || starting) return;
     onStart({
-      ticker: picked.ticker, name: picked.name, premise: premise.trim(),
+      ticker: picked.ticker, name: picked.name,
+      premise: manualPremise ? premise.trim() : "",
+      eventSource: manualPremise ? "premise" : "ontology",
       eventCount, initialCash, personaCounts: marketSize.counts,
     });
   };
@@ -1006,15 +1011,46 @@ function SetupScreen({
       </section>
 
       <section className="paper-setup-block">
-        <div className="paper-setup-heading"><span>02 · MARKET PREMISE</span><h3>어떤 국면을 가정할까요?</h3></div>
-        <textarea
-          className="paper-premise"
-          value={premise}
-          onChange={(event) => setPremise(event.target.value)}
-          rows={4}
-          placeholder="예: HBM 수요가 급증하는 가운데 환율 변동성이 확대되는 국면"
-        />
-        <div className="paper-hint"><Sparkles size={13} /> 전제를 바탕으로 아직 공개되지 않은 이벤트가 생성됩니다.</div>
+        <div className="paper-setup-heading"><span>02 · EVENT SOURCE</span><h3>어떤 사건을 마주할까요?</h3></div>
+        <div className="paper-source-card">
+          <div className="paper-source-head">
+            <Landmark size={15} />
+            <div>
+              <strong>실제로 일어난 사건</strong>
+              <span>기본값</span>
+            </div>
+          </div>
+          <p>
+            조회 기간에 실제로 있었던 한국은행 기준금리 변경, 원달러 환율 급변,
+            국고채 금리 변동과 이 종목 관련 뉴스를 골라 시나리오를 만듭니다.
+            <b>날짜와 방향은 실제 지표에서 옵니다.</b>
+          </p>
+          <div className="paper-source-tags">
+            <span>기준금리</span><span>환율</span><span>국고채</span><span>종목 뉴스</span>
+          </div>
+        </div>
+
+        {manualPremise ? (
+          <>
+            <textarea
+              className="paper-premise"
+              value={premise}
+              onChange={(event) => setPremise(event.target.value)}
+              rows={3}
+              placeholder="예: HBM 수요가 급증하는 가운데 환율 변동성이 확대되는 국면"
+            />
+            <div className="paper-hint">
+              <Sparkles size={13} /> 이 전제로 가상의 사건을 지어냅니다. 실제 사건 기반이 아닙니다.
+            </div>
+            <button type="button" className="paper-source-toggle" onClick={() => setManualPremise(false)}>
+              실제 사건으로 되돌리기
+            </button>
+          </>
+        ) : (
+          <button type="button" className="paper-source-toggle" onClick={() => setManualPremise(true)}>
+            직접 국면을 가정하고 싶다면
+          </button>
+        )}
       </section>
 
       <section className="paper-setup-block">
@@ -1063,10 +1099,16 @@ function SetupScreen({
 
       <button className="paper-start-button" type="submit" disabled={!picked || starting}>
         {starting
-          ? <><LoaderCircle size={17} className="spin" /> 시나리오와 이벤트를 생성하고 있습니다</>
+          ? <><LoaderCircle size={17} className="spin" /> {manualPremise ? "가상 이벤트를 생성하고 있습니다" : "실제 사건을 찾아 시나리오를 만들고 있습니다"}</>
           : <><CircleDollarSign size={17} /> 모의 투자 시작하기 <ArrowRight size={16} /></>}
       </button>
-      {starting && <p className="paper-start-note">AI가 전제에 맞는 이벤트를 만드는 중입니다. 1분 정도 걸릴 수 있습니다.</p>}
+      {starting && (
+        <p className="paper-start-note">
+          {manualPremise
+            ? "AI가 전제에 맞는 가상 이벤트를 만드는 중입니다."
+            : "실제 지표와 뉴스에서 사건을 고르는 중입니다."} 최초 조회는 30초 정도 걸릴 수 있습니다.
+        </p>
+      )}
     </form>
   );
 }
@@ -1243,7 +1285,7 @@ function TradingScreen({
   assessment: Assessment | null;
   orderSubmitting: boolean;
   onOrder: (input: { side: "BUY" | "SELL"; quantity: number; rationale: string; confidence: number }) => void;
-  onAdvance: () => void;
+  onAdvance: (days?: number) => void;
   onReset: () => void;
   onClose: () => void;
 }) {
@@ -1404,11 +1446,18 @@ function TradingScreen({
 
           </div>
 
-          <button className="paper-advance" type="button" onClick={onAdvance} disabled={busy}>
-            {busy
-              ? <><LoaderCircle size={16} className="spin" /> {job?.message ?? "진행 중"}</>
-              : <>{meta.cta} <ChevronRight size={16} /></>}
-          </button>
+          <div className="paper-advance-row">
+            {meta.action === "advance_days" && !busy && (
+              <button className="paper-advance-day" type="button" onClick={() => onAdvance(1)}>
+                <CalendarClock size={15} /> 하루만
+              </button>
+            )}
+            <button className="paper-advance" type="button" onClick={() => onAdvance()} disabled={busy}>
+              {busy
+                ? <><LoaderCircle size={16} className="spin" /> {job?.message ?? "진행 중"}</>
+                : <>{meta.cta} <ChevronRight size={16} /></>}
+            </button>
+          </div>
         </section>
 
         <section className="paper-panel paper-feed-panel" aria-label="시장 반응">
@@ -1445,7 +1494,7 @@ function TradingScreen({
                     assessment={assessment}
                     canGenerate={game.phase === "completed"}
                     generating={busy && job?.kind === "report"}
-                    onGenerate={onAdvance}
+                    onGenerate={() => onAdvance()}
                   />
                 : <div className="paper-feed-empty">
                     <Sparkles size={22} />
@@ -1515,8 +1564,8 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
   }, [refreshGame, refreshAssessment]);
 
   const start = useCallback(async (input: {
-    ticker: string; name: string; premise: string; eventCount: number;
-    initialCash: number; personaCounts: Record<string, number>;
+    ticker: string; name: string; premise: string; eventSource: string;
+    eventCount: number; initialCash: number; personaCounts: Record<string, number>;
   }) => {
     setStarting(true);
     setError(null);
@@ -1529,6 +1578,7 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
           event_count: input.eventCount,
           initial_cash: input.initialCash,
           persona_counts: input.personaCounts,
+          event_source: input.eventSource,
           // 캐시 리플레이 이력은 종가만 있어 캔들이 선으로 뭉개진다.
           // finverse는 실제 OHLC를 쓰고, DB가 죽었을 때만 백엔드가 캐시로 내려간다.
           prefer_live_finverse: true,
@@ -1602,7 +1652,7 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
     pollRef.current = setTimeout(tick, 900);
   }, [refreshGame, refreshAssessment]);
 
-  const advance = useCallback(async () => {
+  const advance = useCallback(async (days?: number) => {
     if (!game || busy) return;
     setError(null);
     setStalled(false);
@@ -1610,7 +1660,7 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
     try {
       const payload = await callApi<{ data: Job }>(`/scenarios/${game.game_id}/actions`, {
         method: "POST",
-        body: JSON.stringify({ action: meta.action }),
+        body: JSON.stringify({ action: meta.action, ...(days ? { days } : {}) }),
       });
       setJob(payload.data);
       pollJob(payload.data.job_id, game.game_id);
