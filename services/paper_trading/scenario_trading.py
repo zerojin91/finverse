@@ -132,6 +132,8 @@ def _validate_events(events: list[dict[str, Any]], scenario_start: date) -> list
             "surprise": max(0.0, min(1.0, float(item.get("surprise", .55)))),
             "persistence_days": max(1, min(10, int(item.get("persistence_days", 4)))),
             "lead_signals": signals,
+            # 이 사건이 실제로 언제 어디서 있었는지. 공개 후 화면에서 근거로 쓴다.
+            "ontology_source": item.get("ontology_source"),
             "status": "hidden",
         })
         cursor = event_date
@@ -249,6 +251,11 @@ def public_scenario_game(game: dict[str, Any]) -> dict[str, Any]:
             "trading_days_until": event["trading_days_until"],
             "released_signals": [signal for signal in game.get("released_signals", [])
                                  if signal["event_id"] == event["event_id"]],
+            # 공개 전에는 사건의 정체를 숨기되, 지어낸 것이 아니라는 사실만
+            # 알린다. 지표명이나 변화량은 결과를 그대로 누설하므로 뺀다.
+            "ontology_source": {
+                "origin": (event.get("ontology_source") or {}).get("origin"),
+            } if event.get("ontology_source") else None,
         })
     else:
         result["current_event"] = None

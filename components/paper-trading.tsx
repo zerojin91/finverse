@@ -58,7 +58,33 @@ type ScenarioEvent = {
   pre_brief: string;
   trading_days_until: number;
   title?: string;
+  description?: string;
   released_signals?: LeadSignal[];
+  ontology_source?: OntologySource;
+};
+
+// 이벤트가 어디서 왔는지. 실제로 있었던 일이라는 근거를 화면에 남기기 위한 것.
+type OntologySource = {
+  origin?: "macro" | "micro";
+  series_name?: string;
+  observed_change?: number;
+  observed_value?: number;
+  headline?: string;
+  publisher?: string;
+  url?: string | null;
+  event_types?: string[];
+  scope?: string;
+  original_date?: string;
+  original_title?: string;
+};
+
+type EventProvenance = {
+  mode?: string;
+  sector?: string | null;
+  macro_candidates?: number;
+  micro_candidates?: number;
+  global_observations?: number;
+  event_source_window?: [string, string];
 };
 
 type PricePoint = {
@@ -171,6 +197,7 @@ type ScenarioGame = {
   last_market_date?: string;
   market_psychology?: { aggregate_sentiment?: number };
   settings?: { fee_rate: number; sell_tax_rate: number; slippage_bps: number };
+  event_provenance?: EventProvenance;
   history_candles?: HistoryCandle[];
   agent_rounds?: AgentRound[];
   fills?: Fill[];
@@ -566,6 +593,47 @@ function CandleChart({ game }: { game: ScenarioGame }) {
         <span className="buy">내 매수</span>
         <span className="sell">내 매도</span>
       </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------- provenance */
+
+const SERIES_UNIT: Record<string, string> = {
+  "한국은행 기준금리": "%p", "국고채3년": "%p", "원달러환율": "원",
+  "미국 10년물 국채금리": "%p", "WTI 유가": "달러", "달러 인덱스": "p",
+};
+
+/** Where an event came from, so a reader can check it actually happened. */
+function EventProvenanceStrip({ source }: { source: OntologySource }) {
+  const change = source.observed_change;
+  const unit = SERIES_UNIT[source.series_name ?? ""] ?? "";
+  return (
+    <div className="paper-provenance">
+      <div className="paper-provenance-head">
+        <Landmark size={12} />
+        <span>{source.origin === "micro" ? "실제 종목 뉴스" : "실제 시장 지표"}</span>
+        {source.original_date && <em>{source.original_date} 발생</em>}
+      </div>
+      {source.series_name && typeof change === "number" && (
+        <p className="paper-provenance-move">
+          <b>{source.series_name}</b>
+          <span className={toneOf(change)}>
+            {change > 0 ? "+" : ""}{change.toFixed(Math.abs(change) < 1 ? 3 : 2)}{unit}
+          </span>
+          {typeof source.observed_value === "number" && (
+            <em>→ {source.observed_value.toLocaleString("ko-KR")}{unit}</em>
+          )}
+        </p>
+      )}
+      {source.headline && <p className="paper-provenance-headline">{source.headline}</p>}
+      <footer>
+        {source.publisher && <span>{source.publisher}</span>}
+        {(source.event_types ?? []).slice(0, 3).map((type) => <span key={type}>{type}</span>)}
+        {source.url && (
+          <a href={source.url} target="_blank" rel="noreferrer">원문 <ArrowRight size={10} /></a>
+        )}
+      </footer>
     </div>
   );
 }
@@ -1482,7 +1550,16 @@ function TradingScreen({
               {event.status === "revealed" && event.title
                 ? <strong>{event.title}</strong>
                 : <strong className="masked">아직 공개되지 않은 이벤트</strong>}
-              <p>{event.pre_brief}</p>
+              <p>{event.status === "revealed" && event.description ? event.description : event.pre_brief}</p>
+              {event.status === "revealed" && event.ontology_source
+                ? <EventProvenanceStrip source={event.ontology_source} />
+                : event.ontology_source && (
+                    // 공개 전에는 내용을 숨기되, 지어낸 사건이 아니라는 것은 알린다.
+                    <div className="paper-provenance pending">
+                      <Landmark size={12} />
+                      <span>실제로 일어난 사건입니다. 내용은 공개 시점에 드러납니다.</span>
+                    </div>
+                  )}
             </div>
           )}
 
@@ -1507,7 +1584,12 @@ function TradingScreen({
 
       <footer className="paper-run-footer">
         <span>GAME {game.game_id.slice(0, 22)}</span>
-        <span>{game.data_source === "cached_replay_fallback" ? "캐시 리플레이 이력" : "FINVERSE 실거래 이력"} · 실제 투자 결과를 보장하지 않는 교육용 시뮬레이션입니다.</span>
+        <span>
+          {game.event_provenance?.mode === "ontology_events"
+            ? `실제 시장 사건 기반${game.event_provenance.sector ? ` · ${game.event_provenance.sector}` : ""}` +
+              ` · 후보 ${(game.event_provenance.macro_candidates ?? 0) + (game.event_provenance.micro_candidates ?? 0)}건`
+            : "AI 생성 가상 이벤트"} · 실제 투자 결과를 보장하지 않는 교육용 시뮬레이션입니다.
+        </span>
       </footer>
     </div>
   );
