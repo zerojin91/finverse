@@ -54,3 +54,7 @@ next-env.d.ts
 /work/
 /config/youtube_channels.json
 /.tools/
+
+# 페이퍼 트레이딩 엔진 로컬 환경·저장 게임
+.venv-paper/
+var/

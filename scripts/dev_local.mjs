@@ -38,6 +38,11 @@ start(process.platform === "win32" ? "node" : process.execPath, [resolve(root, "
 if (process.env.FINVERSE_SIMULATION_TUNNEL_ENABLED === "1") {
   start(process.platform === "win32" ? "node" : process.execPath, [resolve(root, "scripts/simulation_api_tunnel.mjs")], "simulation API tunnel");
 }
+// 페이퍼 트레이딩 엔진. 예전에는 FinSimulation을 따로 띄워야 했다.
+const paperPython = process.env.FINVERSE_PYTHON?.trim()
+  || (existsSync(resolve(root, ".venv-paper/bin/python")) ? resolve(root, ".venv-paper/bin/python") : "python3");
+start(paperPython, ["-m", "services.paper_trading_api"], "paper trading engine");
+
 // vinext dev currently fails while scanning the lazily loaded AI chat bundle,
 // while the same Next application builds and runs normally.  Use Next's own
 // development server so `npm run dev` remains the single reliable local entry.

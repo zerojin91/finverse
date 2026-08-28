@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
-// FinSimulation(MiroFish) 백엔드의 `/api/paper-trading/*`를 그대로 중계합니다.
+// 같은 저장소의 페이퍼 트레이딩 엔진(services/paper_trading)으로 중계합니다.
+// `npm run dev`가 함께 띄우고, 배포 시에는 별도 프로세스로 돕니다.
 // 엔드포인트가 25개라 개별 라우트 대신 catch-all 프록시 하나로 유지합니다.
 const finsimUrl = () =>
   process.env.FINVERSE_FINSIM_API_URL?.trim() ?? "http://127.0.0.1:5055";
