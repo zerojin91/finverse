@@ -189,7 +189,7 @@ def start_event_scenario_action(game_id: str):
         if action == "advance_days":
             def advance_days(game):
                 event = game["events"][game["current_event_index"]]
-                from ..services.scenario_trading import pending_inter_event_dates
+                from .scenario_trading import pending_inter_event_dates
                 dates = pending_inter_event_dates(game)
                 if max_days is not None:
                     dates = dates[:max_days]
