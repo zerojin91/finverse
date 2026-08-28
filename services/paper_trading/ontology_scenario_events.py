@@ -23,6 +23,7 @@ import statistics
 from typing import Any, Callable
 
 from .kospi_paper_trading import TradingError
+from .global_macro import fetch_global_observations, sector_sensitivity
 from .llm_market_simulator import LLMMarketUnavailable, _parse_json
 
 
@@ -88,6 +89,30 @@ MACRO_RULES: dict[str, dict[str, Any]] = {
 # 상시 변동하는 지표는 자기 변동성의 이 배수를 넘어야 사건으로 친다.
 MACRO_SIGMA_THRESHOLD = 1.6
 
+# 국내 정책금리·환율만으로는 시장을 움직인 이유의 절반만 잡힌다. 미국 장기금리,
+# 유가, 달러는 KOSPI 종목의 공시 어디에도 안 나오지만 가격을 움직인다.
+# 방향은 업종 민감도가 정한다 — 유가는 화학에 비용이고 정유에 매출이다.
+GLOBAL_MACRO_RULES: dict[str, dict[str, Any]] = {
+    "미국 10년물 국채금리": {
+        "kind": "us_yield", "full_scale": .18, "unit": "%p", "decimals": 3,
+        "persistence": 6, "up": "미국 10년물 금리 급등", "down": "미국 10년물 금리 급락",
+        "why_up": "글로벌 할인율이 올라 위험자산 전반이 압박받습니다.",
+        "why_down": "글로벌 할인율이 내려 위험자산 선호가 개선됩니다.",
+    },
+    "WTI 유가": {
+        "kind": "oil", "full_scale": 5.0, "unit": "달러", "decimals": 2,
+        "persistence": 5, "up": "국제 유가 급등", "down": "국제 유가 급락",
+        "why_up": "원유 가격이 올라 비용 구조와 물가 경로가 함께 흔들립니다.",
+        "why_down": "원유 가격이 내려 비용 부담과 물가 압력이 완화됩니다.",
+    },
+    "달러 인덱스": {
+        "kind": "dollar", "full_scale": 1.2, "unit": "p", "decimals": 2,
+        "persistence": 5, "up": "달러 강세", "down": "달러 약세",
+        "why_up": "달러가 강해져 수출 채산성과 외국인 자금이 반대로 움직입니다.",
+        "why_down": "달러가 약해져 수출 채산성과 외국인 자금이 반대로 움직입니다.",
+    },
+}
+
 
 def _subject_particle(word: str) -> str:
     """Pick 이/가 by whether the last syllable ends in a consonant."""
@@ -120,19 +145,24 @@ def detect_macro_events(macro_observations: list[dict[str, Any]],
                         sector: str | None) -> list[dict[str, Any]]:
     """Find sessions where a policy or market rate actually moved."""
     events = []
-    for series_name, rule in MACRO_RULES.items():
+    for series_name, rule in {**MACRO_RULES, **GLOBAL_MACRO_RULES}.items():
         rows = _series_by_date(macro_observations, series_name)
         if len(rows) < 3:
             continue
         deltas = [rows[i][1] - rows[i - 1][1] for i in range(1, len(rows))]
         moved = [abs(value) for value in deltas if value]
-        threshold = rule["min_move"]
+        threshold = rule.get("min_move")
         if threshold is None:
             spread = statistics.pstdev(moved) if len(moved) > 1 else 0.0
             centre = statistics.median(moved) if moved else 0.0
             threshold = max(centre + MACRO_SIGMA_THRESHOLD * spread, 1e-9)
-        equity_sign = rule["equity_sign"]
-        if equity_sign is None:
+        equity_sign = rule.get("equity_sign")
+        if series_name in GLOBAL_MACRO_RULES:
+            # 글로벌 지표는 업종에 따라 부호와 크기가 모두 달라진다.
+            equity_sign = sector_sensitivity(series_name, sector)
+            if abs(equity_sign) < 1e-6:
+                continue
+        elif equity_sign is None:
             equity_sign = fx_equity_sign(sector)
         for index in range(1, len(rows)):
             day, value = rows[index]
@@ -156,7 +186,7 @@ def detect_macro_events(macro_observations: list[dict[str, Any]],
                     f"{'상승' if rising else '하락'}했습니다. "
                     f"{rule['why_up'] if rising else rule['why_down']}"),
                 "event_types": [rule["kind"].upper()],
-                "publisher": "ECOS",
+                "publisher": "ECOS" if series_name in MACRO_RULES else "글로벌 시장",
                 "url": None,
                 "source_score": 7.0,
                 "available_before_open": False,
@@ -481,8 +511,9 @@ def build_ontology_scenario(history: dict[str, Any], event_count: int = 3,
     window_end = market_days[-1]["trade_date"]
     sector = history.get("sector")
 
-    macro = detect_macro_events(history.get("macro_observations") or [],
-                                window_start, window_end, sector)
+    observations = [*(history.get("macro_observations") or []),
+                    *fetch_global_observations(window_start, window_end)]
+    macro = detect_macro_events(observations, window_start, window_end, sector)
     micro = collect_micro_events(
         market_days, split,
         _name_tokens(history.get("name"), history.get("english_name")))
@@ -498,6 +529,8 @@ def build_ontology_scenario(history: dict[str, Any], event_count: int = 3,
         "calibration_end": market_days[-1]["trade_date"],
         "event_source_window": [window_start, window_end],
         "macro_candidates": len(macro),
+        "global_observations": sum(1 for row in observations
+                                   if row.get("series_name") in GLOBAL_MACRO_RULES),
         "micro_candidates": len(micro),
         "selected_events": len(events),
         "direction_basis": "macro_indicator_moves_and_news_keywords",
