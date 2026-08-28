@@ -77,6 +77,28 @@ def data_source_status():
     return jsonify({"success": True, "data": _market_data().healthcheck()})
 
 
+def _summary(game):
+    """Light row for the resume list.
+
+    The full payload carries every agent round with 40 persona orders each, which
+    is megabytes once a few games exist. The picker only needs identity and
+    progress, so it never pays for the rest.
+    """
+    portfolio = scenario_portfolio(game) if game.get("mode") == "scenario" else None
+    return {
+        "game_id": game["game_id"], "mode": game.get("mode"),
+        "ticker": game.get("ticker"), "name": game.get("name"),
+        "status": game.get("status"), "phase": game.get("phase"),
+        "created_at": game.get("created_at"), "updated_at": game.get("updated_at"),
+        "scenario_premise": game.get("scenario_premise", ""),
+        "current_event_index": game.get("current_event_index", 0),
+        "total_events": len(game.get("events", [])),
+        "market_days": len(game.get("agent_rounds", [])),
+        "current_price": game.get("current_price"),
+        "total_return_pct": portfolio["total_return_pct"] if portfolio else None,
+    }
+
+
 @paper_trading_bp.route("/games", methods=["GET"])
 def list_games():
     games = _store().list(request.args.get("limit", 50, type=int))

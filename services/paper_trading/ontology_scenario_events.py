@@ -336,8 +336,11 @@ def pick_events(candidates: list[dict[str, Any]], event_count: int) -> list[dict
         # 좋고, 이 레이크에서는 드물어서 놓치면 다시 안 나온다.
         # 종목 고유 사건은 우대하되, 시상식 수상 같은 무영향 기사가 실제
         # 금리 결정을 밀어내지 않도록 방향성이 있을 때만 가산점을 준다.
-        micro_bonus = .6 if (item.get("origin") == "micro"
-                             and (item["severity"] > .05 or item["source_score"] >= 5)) else 0
+        # 방향이 0인 사건은 시나리오의 한 막이 될 수 없다. 시상식 수상 기사가
+        # 이벤트로 뽑히면 공개해도 아무 일이 없어 그 구간이 통째로 빈다.
+        if item["severity"] < .05:
+            return -1.0
+        micro_bonus = .6 if item.get("origin") == "micro" else 0
         return item["source_score"] / 7 + item["severity"] * .8 + micro_bonus
 
     picked: list[dict[str, Any]] = []
@@ -347,8 +350,9 @@ def pick_events(candidates: list[dict[str, Any]], event_count: int) -> list[dict
         lo = bucket * span // buckets
         hi = max(lo + 1, (bucket + 1) * span // buckets)
         pool = [item for item in ordered[lo:hi]
-                if all(_business_gap(item["event_date"], chosen["event_date"])
-                       >= MIN_EVENT_GAP_DAYS for chosen in picked)]
+                if weight(item) > 0
+                and all(_business_gap(item["event_date"], chosen["event_date"])
+                        >= MIN_EVENT_GAP_DAYS for chosen in picked)]
         if not pool:
             continue
         picked.append(max(pool, key=weight))

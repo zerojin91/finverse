@@ -12,6 +12,7 @@ from .kospi_paper_trading import (
     INVESTOR_GROUPS, TradingError, build_personas, calibrate_impact_model,
     round_to_krx_tick,
 )
+from .volatility_regime import fetch_vix_regime, session_multiplier, update_cluster_level
 from .ontology import standardize_market_context
 
 
@@ -20,6 +21,17 @@ PHASE_POST_EVENT = "post_event_decision"
 PHASE_INTER_EVENT = "inter_event_market"
 PHASE_COMPLETED = "completed"
 MAX_LLM_ALLOCATION_PCT = .05
+# 관측 가능한 수급과 심리로 설명되는 부분은 하루 변동의 일부일 뿐이다. 실제
+# 시장에서 대부분은 설명되지 않고 남는다. 그 몫을 이 종목의 실제 수익률 분포에서
+# 뽑아 더한다. 없으면 가격이 에이전트 신호만 따라가며 변동성이 실제의 7%까지
+# 줄고(실측), 신호가 이어지는 탓에 같은 방향으로 71% 연속해 흐른다.
+# 평균은 빼고 쓴다. 추세는 모델링된 요인에서 나와야지 잡음에서 나오면 안 된다.
+IDIOSYNCRATIC_SHARE = .9
+# 사건이 공개된 날은 그 사건이 하루의 이야기다. 잔차를 눌러 사건이 읽히게 한다.
+EVENT_DAY_NOISE_DAMPING = .3
+# _empirical_return은 신호를 p10~p90 안으로만 매핑한다. 잔차는 꼬리까지 쓰는
+# 전체 분포에서 뽑으므로, 배수를 주지 않으면 이벤트가 평범한 하루보다 작아진다.
+EVENT_AMPLIFICATION = 2.2
 CONTEXT_MODE = "integrated"
 GROUP_PSYCHOLOGY = {
     "retail": {"half_life_days": 2.0, "baseline_risk_aversion": .45,
@@ -212,6 +224,9 @@ def new_scenario_game(
                               (_real_candles(impact_history, 1) or [{}])[0].items()
                               if key in ("open", "high", "low", "close", "volume")}}],
         "impact_model": model,
+        # 시나리오를 만든 시점의 공포 수준. 시나리오 내내 고정한다.
+        "volatility_regime": fetch_vix_regime(),
+        "volatility_state": {"level": 1.0},
         "settings": {"fee_rate": fee_rate, "sell_tax_rate": sell_tax_rate,
                      "slippage_bps": slippage_bps, "context_mode": CONTEXT_MODE},
         "decision_log": [],
@@ -465,10 +480,16 @@ def apply_agent_round(game: dict[str, Any], round_data: dict[str, Any], *,
     sentiment_return_pct = .35 * _empirical_return(game["impact_model"], sentiment_signal)
     regime_return_pct = (.35 * _empirical_return(game["impact_model"], regime_signal)
                          if phase != "event_reaction" else 0.0)
-    event_return_pct = (_empirical_return(game["impact_model"], event_signal)
+    event_return_pct = (EVENT_AMPLIFICATION * _empirical_return(game["impact_model"], event_signal)
                         if phase == "event_reaction" else 0.0)
+    volatility_multiplier = session_multiplier(game)
+    if phase == "event_reaction":
+        volatility_multiplier *= EVENT_DAY_NOISE_DAMPING
+    idiosyncratic_return_pct = volatility_multiplier * _idiosyncratic_return(
+        game["impact_model"], f"{game['game_id']}:{len(game['agent_rounds'])}")
     target_return_pct = max(-30.0, min(30.0, market_context_return_pct + flow_return_pct
-                                      + sentiment_return_pct + regime_return_pct + event_return_pct))
+                                      + sentiment_return_pct + regime_return_pct
+                                      + event_return_pct + idiosyncratic_return_pct))
     impact_signal = max(-1.0, min(1.0,
         .35 * market_pressure + .25 * sentiment_signal + .2 * regime_signal + .5 * event_signal))
     next_price = round_to_krx_tick(price * (1 + target_return_pct / 100))
@@ -509,6 +530,8 @@ def apply_agent_round(game: dict[str, Any], round_data: dict[str, Any], *,
                   "persistent_sentiment": round(sentiment_return_pct, 4),
                   "event_regime": round(regime_return_pct, 4),
                   "event_shock": round(event_return_pct, 4),
+                  "idiosyncratic": round(idiosyncratic_return_pct, 4),
+                  "volatility_multiplier": round(volatility_multiplier, 4),
                   "context_signals": market_context,
               },
               "psychology": psychology,
@@ -518,6 +541,8 @@ def apply_agent_round(game: dict[str, Any], round_data: dict[str, Any], *,
               "market_summary": round_data.get("market_summary", ""),
               "observations": round_data.get("observations", []),
               "risk_flags": round_data.get("risk_flags", [])}
+    # 오늘 실제로 움직인 폭을 다음 세션 폭에 반영한다. 큰 날 뒤에는 큰 날이 온다.
+    update_cluster_level(game, return_pct)
     game["agent_rounds"].append(result)
     candle = _intraday_candle(
         price, next_price, phase, result["return_components_pct"],
@@ -577,6 +602,24 @@ def _intraday_candle(
     low = min(body_bottom, max(low, limit_low, 1))
     return {"open": open_price, "high": high, "low": low, "close": close,
             "volume": int(turnover_shares)}
+
+
+def _idiosyncratic_return(model: dict[str, Any], seed: str) -> float:
+    """Draw the unexplained part of a session's move from real returns.
+
+    Sampling the security's own historical distribution keeps the tails and
+    the shape that security actually had, instead of assuming a normal curve.
+    Seeded so a reloaded game replays the same path.
+    """
+    distribution = model.get("return_distribution_pct") or []
+    if len(distribution) < 5:
+        return 0.0
+    centre = sum(distribution) / len(distribution)
+    # 분위 보간이 아니라 실제 관측치 하나를 그대로 뽑는다. 보간은 정렬된 표본
+    # 사이를 메우면서 꼬리를 눌러, 큰 하루가 사라지고 변동성이 실제보다 낮아진다.
+    position = int(_seeded_unit(seed, "idio") * len(distribution))
+    draw = distribution[min(position, len(distribution) - 1)]
+    return (draw - centre) * IDIOSYNCRATIC_SHARE
 
 
 def pending_inter_event_dates(game: dict[str, Any]) -> list[str]:

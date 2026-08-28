@@ -19,6 +19,8 @@ dependencies = [
     # 페이퍼 트레이딩 엔진
     "httpx>=0.27.0",
     "psycopg[binary]>=3.1.0",
+    # VIX 등 외부 지수. 없으면 변동성 레짐이 중립으로 떨어질 뿐 동작은 한다.
+    "yfinance>=0.2.40",
 ]
 
 [tool.uv]
