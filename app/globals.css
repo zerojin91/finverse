@@ -1230,8 +1230,9 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
   .daily-editor-note { padding: 36px 38px 40px; }
   .daily-original-report { padding: 20px; }
   .premium-brief-footer { display: grid; gap: 6px; }
-  .mobile-tabs { position: fixed; z-index: 50; right: 0; bottom: 0; left: 0; height: 64px; display: grid; grid-template-columns: repeat(2,1fr); padding: 5px 10px env(safe-area-inset-bottom); border-top: 1px solid var(--line); background: rgba(255,255,255,.96); backdrop-filter: blur(12px); }
-  .mobile-tabs button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; border: 0; color: var(--light); background: transparent; font-size: 9px; }
+  .mobile-tabs { position: fixed; z-index: 50; right: 0; bottom: 0; left: 0; height: 64px; display: grid; grid-template-columns: repeat(3,1fr); padding: 5px 6px env(safe-area-inset-bottom); border-top: 1px solid var(--line); background: rgba(255,255,255,.96); backdrop-filter: blur(12px); }
+  .mobile-tabs button { min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; border: 0; color: var(--light); background: transparent; font-size: 9px; }
+  .mobile-tabs button span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 100%; }
   .mobile-tabs button.active { color: var(--ink); }
 }
 
