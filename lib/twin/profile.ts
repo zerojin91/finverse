@@ -127,12 +127,12 @@ export function buildReport(result: BacktestResult, profile: BehaviorProfile): B
     const after = missedRebound(result, first);
     // 판 뒤 시장이 올랐는지 내렸는지에 따라 같은 매도의 의미가 달라진다.
     const consequence = after.gain > 0
-      ? `그 뒤 ${after.days}거래일 동안 시장은 ${pct(after.gain)} 올랐고, 트윈은 그 구간에 ${after.returned ? "뒤늦게 참여했습니다" : "끝내 참여하지 못했습니다"}.`
+      ? `그 뒤 ${after.days}거래일 동안 시장은 ${pct(after.gain)} 올랐고, 나는 그 구간에 ${after.returned ? "뒤늦게 참여했습니다" : "끝내 참여하지 못했습니다"}.`
       : `그 뒤 ${after.days}거래일 동안 시장은 ${pct(after.gain)} 더 내려서 이번 매도는 손실을 줄였습니다. 다만 같은 규칙이 항상 맞지는 않는다는 점을 다른 구간에서도 확인해보세요.`;
     cards.push({
       bias: "손실회피 · 공포 매도",
       headline: `${day(first.date)}에 팔았습니다`,
-      body: `트윈은 ${first.detail}했습니다. ${consequence}`,
+      body: `나는 ${first.detail}했습니다. ${consequence}`,
       tone: after.gain > 0 ? "warn" : "info",
     });
   } else {

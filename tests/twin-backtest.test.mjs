@@ -198,3 +198,28 @@ test("재진입은 매도 직전 비중으로 되돌아간다", () => {
     }
   }
 });
+
+const { projectForward } = await import("../lib/twin/forward.ts");
+
+test("시나리오 경로를 내 배분에 적용한다", () => {
+  const down = [6023.66, 5900, 5750, 5650, 5520, 5400, 5330, 5260, 5220, 5200, 5180, 5190];
+  const up = [6023.66, 6200, 6400, 6650, 6800, 6950, 7050, 7180, 7280, 7380, 7460, 7500];
+  // 주식 85% 이면 지수 -13.8% 는 내 자산 -11.7% 쯤이 된다. 현금이 나머지를 붙든다.
+  const hold = projectForward(down, 0.85, steady);
+  assert.ok(Math.abs(hold.holdReturn - 0.85 * (down.at(-1) / down[0] - 1)) < 1e-9);
+  assert.equal(hold.events.length, 0, "버티기 성향인데 매매가 생겼다");
+  assert.ok(Math.abs(hold.gap) < 1e-9);
+  // 현금만 있으면 어떤 경로에서도 값이 변하지 않는다.
+  const allCash = projectForward(down, 0, panicky);
+  assert.ok(Math.abs(allCash.holdReturn) < 1e-9);
+  assert.ok(Math.abs(allCash.myReturn) < 1e-9);
+  // 공포 성향은 하락 경로에서 팔고, 그래서 그대로 둔 경우보다 덜 잃는다.
+  const panicked = projectForward(down, 0.85, panicky);
+  assert.ok(panicked.events.some((event) => event.type === "sell"), "하락 경로인데 매도가 없다");
+  assert.ok(panicked.myReturn > panicked.holdReturn);
+  // 상승 경로에서는 낙폭이 없어 매도가 나오지 않는다.
+  assert.equal(projectForward(up, 0.85, panicky).events.filter((event) => event.type === "sell").length, 0);
+  assert.ok(projectForward(up, 0.85, panicky).worstDrawdown === 0);
+  // 포인트가 너무 적으면 계산하지 않는다.
+  assert.equal(projectForward([100, 101], 0.5, panicky), null);
+});

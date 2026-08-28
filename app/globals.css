@@ -578,6 +578,24 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .twin-applied { display: inline-flex; align-items: center; gap: 6px; margin: 0; color: var(--muted); font-size: 11px; }
 .twin-applied b { color: var(--ink); }
 
+/* 시나리오 앞으로의 경로 */
+.twin-forward-panel { min-height: 0; margin-top: 16px; border-color: var(--ink); }
+.twin-forward-panel > .panel-title { min-height: 60px; }
+.twin-forward-tag { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; padding: 6px 11px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: var(--soft); font-size: 10.5px; }
+.twin-forward-body { padding: 16px 20px 18px; }
+.twin-forward-stats { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; }
+.twin-forward-stats > div { padding: 13px 15px; border: 1px solid var(--line); border-radius: 8px; }
+.twin-forward-stats > div.mine { border-color: var(--down); background: #f5f9ff; }
+.twin-forward-stats span { display: block; color: var(--muted); font-size: 10.5px; }
+.twin-forward-stats strong { display: block; margin-top: 7px; color: var(--ink); font-size: clamp(16px,1.4vw,21px); letter-spacing: -.035em; }
+.twin-forward-stats small { display: block; margin-top: 6px; color: var(--light); font-size: 10.5px; }
+.twin-forward-chart { width: 100%; height: 150px; margin-top: 12px; }
+.twin-forward-panel .twin-chart-legend { padding: 0; }
+.twin-forward-panel .twin-event-list { margin: 12px 0 0; }
+.twin-forward-panel .twin-shock-note { margin: 12px 0 0; }
+.twin-forward-note { margin: 12px 0 0; padding-top: 12px; border-top: 1px solid var(--line); color: var(--light); font-size: 10px; line-height: 1.6; }
+.twin-forward-note b { color: var(--muted); }
+
 /* 사이드 레일 · 시장 온도 / 목표 확률 / 대가 진단 */
 .twin-lower-grid { display: grid; align-items: start; grid-template-columns: minmax(0,1.4fr) minmax(340px,1fr); gap: 16px; margin-top: 16px; }
 .twin-report-column { display: grid; align-content: start; gap: 16px; min-width: 0; }
@@ -1185,6 +1203,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
   .twin-metric strong { font-size: 21px; }
   .twin-net-chart { grid-column: 1 / -1; }
   .twin-shock-row { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .twin-forward-stats { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .lab-profile-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .twin-bias-grid { grid-template-columns: 1fr; }
   .twin-asset-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }

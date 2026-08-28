@@ -1548,7 +1548,7 @@ function ForecastChart({ scenario, marketData, liveSeries }: { scenario: Scenari
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<MainTab>("market");
-  const [appliedScenario, setAppliedScenario] = useState<{ title: string; forecast: string } | null>(null);
+  const [appliedScenario, setAppliedScenario] = useState<{ title: string; forecast: string; duration: string; path: number[] } | null>(null);
   const [kospiData, setKospiData] = useState<KospiMarketData | null>(null);
   const [intradayIndices, setIntradayIndices] = useState<IntradayIndex[]>([]);
   const [dashboardSignals, setDashboardSignals] = useState<DashboardSignal[]>(marketSignals);
@@ -1666,7 +1666,7 @@ export default function Home() {
 
   // 시장 인사이트에서 본 시나리오를 그대로 들고 트윈으로 넘어가는 전환점.
   const applyToTwin = (scenario: Scenario) => {
-    setAppliedScenario({ title: scenario.title, forecast: scenario.forecast });
+    setAppliedScenario({ title: scenario.title, forecast: scenario.forecast, duration: scenario.duration, path: scenario.path });
     activateTab("twin");
   };
 
@@ -2189,7 +2189,7 @@ export default function Home() {
                   <div>
                     <span>NEXT · MY FINANCIAL TWIN</span>
                     <h3>이 시장을 내 포트폴리오와 내 행동에 넣어보세요</h3>
-                    <p>같은 충격에서 버텼을 때와, 당신의 성향이 실제로 했을 매매를 실제 종가로 비교합니다.</p>
+                    <p>이 시나리오의 조건부 경로를 내 배분에 적용해, 그대로 뒀을 때와 내 성향이 실제로 했을 매매를 비교합니다.</p>
                   </div>
                   <button type="button" onClick={() => applyToTwin(selectedScenario)}>내 트윈에 적용하기 <ArrowRight size={16} /></button>
                 </section>
