@@ -12,7 +12,8 @@ from .kospi_paper_trading import (
     INVESTOR_GROUPS, TradingError, build_personas, calibrate_impact_model,
     round_to_krx_tick,
 )
-from .volatility_regime import fetch_vix_regime, session_multiplier, update_cluster_level
+from .volatility_regime import (
+    IDIOSYNCRATIC_SHARE, fetch_vix_regime, session_multiplier, update_cluster_level)
 from .ontology import standardize_market_context
 
 
@@ -26,7 +27,6 @@ MAX_LLM_ALLOCATION_PCT = .05
 # 뽑아 더한다. 없으면 가격이 에이전트 신호만 따라가며 변동성이 실제의 7%까지
 # 줄고(실측), 신호가 이어지는 탓에 같은 방향으로 71% 연속해 흐른다.
 # 평균은 빼고 쓴다. 추세는 모델링된 요인에서 나와야지 잡음에서 나오면 안 된다.
-IDIOSYNCRATIC_SHARE = .9
 # 사건이 공개된 날은 그 사건이 하루의 이야기다. 잔차를 눌러 사건이 읽히게 한다.
 EVENT_DAY_NOISE_DAMPING = .3
 # _empirical_return은 신호를 p10~p90 안으로만 매핑한다. 잔차는 꼬리까지 쓰는
