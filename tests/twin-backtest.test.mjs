@@ -339,3 +339,35 @@ test("매도는 파랑, 매수는 빨강이고 경로 선과 겹치지 않는다
   }
   assert.equal(new Set(lines).size, 3, "경로 선끼리 색이 겹친다");
 });
+
+const { mergeLiveIndex } = await import("../lib/twin/backtest.ts");
+
+test("레이크에서 받은 최근 지수를 스냅샷에 이어붙인다", () => {
+  const before = snapshot.windows.recent;
+  const lastDate = before.dates.at(-1);
+  const lastClose = before.closes.KOSPI.at(-1);
+  const merged = mergeLiveIndex(snapshot, {
+    dates: [lastDate, "20990101", "20990102"],
+    closes: [lastClose + 1, 7000, 7100],
+  });
+  const after = merged.windows.recent;
+  assert.equal(after.dates.length, before.dates.length + 2, "새 거래일이 붙지 않았다");
+  assert.equal(after.dates.at(-1), "20990102");
+  assert.equal(after.closes.KOSPI.at(-1), 7100);
+  // 이미 있던 거래일은 레이크 값으로 덮어쓴다.
+  assert.equal(after.closes.KOSPI[before.dates.length - 1], lastClose + 1);
+  // 모든 종목 배열 길이가 지수와 맞아야 정규화가 깨지지 않는다.
+  for (const series of Object.values(after.closes)) assert.equal(series.length, after.dates.length);
+  // 원본은 그대로 둔다.
+  assert.equal(snapshot.windows.recent.dates.length, before.dates.length);
+  assert.equal(snapshot.windows.recent.closes.KOSPI.at(-1), lastClose);
+  // 살아 있는 값이 없으면 스냅샷을 그대로 돌려준다.
+  assert.equal(mergeLiveIndex(snapshot, { dates: [], closes: [] }), snapshot);
+});
+
+test("이어붙인 스냅샷으로 평가금액과 온도가 최신 종가를 쓴다", () => {
+  const merged = mergeLiveIndex(snapshot, { dates: ["20990101"], closes: [9999] });
+  const holdings = allocationHoldings(100_000_000, 0.8);
+  assert.equal(valuate(merged, holdings).asOf, "20990101");
+  assert.equal(marketMood(merged, holdings, panicky).asOf, "20990101");
+});

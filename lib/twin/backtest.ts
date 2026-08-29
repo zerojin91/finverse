@@ -125,6 +125,38 @@ const DECISION_STEP = 21;      // 판단 주기(거래일). 대략 한 달에 �
 const SELL_COOLDOWN = 63;      // 한 번 팔면 최소 3개월은 다시 팔지 않는다
 const REENTRY_REBOUND = 0.1;   // 저점 대비 이만큼은 올라야 "돌아섰다"고 본다
 
+/** 데이터 레이크에서 받은 최근 지수를 최근 구간에 이어붙인 새 스냅샷. */
+export function mergeLiveIndex(
+  snapshot: PriceSnapshot,
+  live: { dates: string[]; closes: number[] },
+): PriceSnapshot {
+  const window = snapshot.windows.recent;
+  if (!window || live.dates.length !== live.closes.length || !live.dates.length) return snapshot;
+
+  const dates = [...window.dates];
+  const closes: Record<string, (number | null)[]> = {};
+  for (const [symbol, series] of Object.entries(window.closes)) closes[symbol] = [...series];
+  const positionOf = new Map(dates.map((date, index) => [date, index]));
+
+  for (let index = 0; index < live.dates.length; index += 1) {
+    const date = live.dates[index];
+    const close = live.closes[index];
+    const known = positionOf.get(date);
+    if (known !== undefined) {
+      // 이미 있는 거래일은 레이크 값을 정본으로 본다.
+      closes.KOSPI[known] = close;
+      continue;
+    }
+    if (date <= dates.at(-1)!) continue; // 스냅샷 중간에 빠진 날은 건드리지 않는다
+    dates.push(date);
+    positionOf.set(date, dates.length - 1);
+    // 지수만 새로 받으므로 개별 종목은 빈 칸으로 늘린다. 정규화가 직전 값으로 메운다.
+    for (const symbol of Object.keys(closes)) closes[symbol].push(symbol === "KOSPI" ? close : null);
+  }
+
+  return { ...snapshot, windows: { ...snapshot.windows, recent: { ...window, dates, closes, end: dates.at(-1)! } } };
+}
+
 /** 버티기 경로 위에서 행동 성향이 했을 매매를 재생한다. */
 function replayBehavior(dates: string[], buyHold: number[], profile: BehaviorProfile) {
   const events: TradeEvent[] = [];

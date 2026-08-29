@@ -22,13 +22,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CASH,
   STOCK,
-  formatSnapshotDate,
   effectivePanicThreshold,
+  formatSnapshotDate,
+  mergeLiveIndex,
   runBacktest,
   valuate,
   type BacktestResult,
   type BehaviorProfile,
   type PriceSnapshot,
+  type SnapshotWindow,
 } from "@/lib/twin/backtest";
 import { BUY_COLOR, HOLD_LINE, INDEX_LINE, MINE_LINE, SELL_COLOR } from "@/lib/twin/chart-colors";
 import { projectForward, type ForwardResult } from "@/lib/twin/forward";
@@ -418,6 +420,8 @@ export default function TwinPage({ appliedScenario, onOpenBuilder, onGoToLab }: 
   const [windowId, setWindowId] = useState("covid-2020");
   const [editing, setEditing] = useState(false);
   const [mentor, setMentor] = useState<{ key: string; verdicts: MentorVerdict[]; note: string; source: string }>({ key: "", verdicts: [], note: "", source: "rules" });
+  // 데이터 레이크에서 받은 최근 지수. 못 받으면 스냅샷만으로 돈다.
+  const [live, setLive] = useState<{ asOf: string; dates: string[]; closes: number[] } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -432,9 +436,21 @@ export default function TwinPage({ appliedScenario, onOpenBuilder, onGoToLab }: 
         const response = await fetch("/twin/shock-prices.json", { cache: "force-cache" });
         if (response.ok) prices = await response.json() as PriceSnapshot;
       } catch { /* 스냅샷이 없으면 안내 화면을 보여준다 */ }
+      // 최근 며칠은 레이크가 정본이다. 브리지가 죽어 있으면 스냅샷 날짜로 남는다.
+      let recent: { asOf: string; dates: string[]; closes: number[] } | null = null;
+      try {
+        const response = await fetch("/api/twin/market", { cache: "no-store" });
+        if (response.ok) {
+          const payload = await response.json() as { asOf?: string; dates?: string[]; closes?: number[] };
+          if (payload.asOf && payload.dates?.length && payload.closes?.length) {
+            recent = { asOf: payload.asOf, dates: payload.dates, closes: payload.closes };
+          }
+        }
+      } catch { /* 오프라인이면 스냅샷만 쓴다 */ }
       if (!active) return;
       setSaved(stored);
       setSnapshot(prices);
+      setLive(recent);
       setLoaded(true);
     };
     void load();
@@ -449,15 +465,18 @@ export default function TwinPage({ appliedScenario, onOpenBuilder, onGoToLab }: 
 
   // 행동 실험실에서 관측한 프로필이 있으면 설문보다 우선한다.  말한 것보다 한 것이
   // 실제 판단에 가깝기 때문이다.
+  // 이 아래 계산은 전부 병합본을 쓴다. 과거 구간은 그대로고 최근 구간만 최신이 된다.
+  const prices = useMemo(() => (snapshot && live ? mergeLiveIndex(snapshot, live) : snapshot), [snapshot, live]);
+
   const profile: BehaviorProfile | null = useMemo(
     () => (saved ? saved.gameProfile ?? deriveProfile(saved.answers) : null),
     [saved],
   );
   const holdings = useMemo(() => (saved ? allocationHoldings(saved.total, saved.stockWeight) : []), [saved]);
-  const valuation = useMemo(() => (snapshot && holdings.length ? valuate(snapshot, holdings) : null), [snapshot, holdings]);
+  const valuation = useMemo(() => (prices && holdings.length ? valuate(prices, holdings) : null), [prices, holdings]);
   const result = useMemo(
-    () => (snapshot && holdings.length && profile ? runBacktest(snapshot, windowId, holdings, profile) : null),
-    [snapshot, holdings, profile, windowId],
+    () => (prices && holdings.length && profile ? runBacktest(prices, windowId, holdings, profile) : null),
+    [prices, holdings, profile, windowId],
   );
   const report = useMemo(() => (result && profile ? buildReport(result, profile) : []), [result, profile]);
   // 설문은 여섯 문항을 다 받으므로 전부 관측이고, 실험실 프로필은 플레이한 만큼만이다.
@@ -466,8 +485,8 @@ export default function TwinPage({ appliedScenario, onOpenBuilder, onGoToLab }: 
     [profile, saved],
   );
   const mood = useMemo(
-    () => (snapshot && holdings.length && profile ? marketMood(snapshot, holdings, profile) : null),
-    [snapshot, holdings, profile],
+    () => (prices && holdings.length && profile ? marketMood(prices, holdings, profile) : null),
+    [prices, holdings, profile],
   );
   const forward = useMemo(
     () => (appliedScenario && saved && profile ? projectForward(appliedScenario.path, saved.stockWeight, profile) : null),
@@ -534,7 +553,7 @@ export default function TwinPage({ appliedScenario, onOpenBuilder, onGoToLab }: 
   const mentorReady = mentor.key === mentorKey && mentor.verdicts.length > 0;
   const shownVerdicts = mentorReady ? mentor.verdicts : mentorInput ? mentorVerdicts(mentorInput) : [];
   const shownNote = mentorReady ? mentor.note : mentorInput ? behaviorNote(mentorInput) : "";
-  const shocks = useMemo(() => Object.values(snapshot?.windows ?? {}), [snapshot]);
+  const shocks = useMemo<SnapshotWindow[]>(() => Object.values(prices?.windows ?? {}), [prices]);
 
   if (!loaded || !snapshot) {
     return (
@@ -554,7 +573,7 @@ export default function TwinPage({ appliedScenario, onOpenBuilder, onGoToLab }: 
         <h1>{saved ? "같은 시장, 다른 결과. 차이를 만든 건 내 행동입니다." : "내 자산과 내 행동으로 트윈을 만듭니다."}</h1>
       </div>
       <div className="twin-heading-actions">
-        <span className="market-stamp"><Wallet size={15} />{formatSnapshotDate(snapshot.windows.recent.dates.at(-1) ?? "")} 종가 기준</span>
+        <span className="market-stamp"><Wallet size={15} />{formatSnapshotDate(prices?.windows.recent.dates.at(-1) ?? "")} 종가 기준<em className={live ? "live" : ""}>{live ? "DB 연결" : "스냅샷"}</em></span>
         {saved && !editing && <button className="twin-ghost-button" type="button" onClick={() => setEditing(true)}><RotateCcw size={14} /> 다시 설정</button>}
       </div>
     </header>
@@ -638,7 +657,7 @@ export default function TwinPage({ appliedScenario, onOpenBuilder, onGoToLab }: 
               </table>
             </div>
             <p className="twin-table-note">
-              * 개별 종목 대신 국내주식 전체를 코스피 지수 경로로 평가합니다. 가격 출처는 {snapshot.source}이며 기준일은 {formatSnapshotDate(snapshot.windows.recent.dates.at(-1) ?? "")}입니다.
+              * 개별 종목 대신 국내주식 전체를 코스피 지수 경로로 평가합니다. 과거 구간은 {snapshot.source}이고, 최근 구간은 {live ? "데이터 레이크의 코스피 일별 종가" : "스냅샷(레이크 미연결)"}이며 기준일은 {formatSnapshotDate(prices?.windows.recent.dates.at(-1) ?? "")}입니다.
             </p>
           </section>
           {mood && <MoodPanel mood={mood} hasSellRule={(profile?.panicAction ?? 0) > 0} />}

@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-const bridgeUrl = () => process.env.FINVERSE_KOSPI_BRIDGE_URL?.trim() ?? "http://127.0.0.1:5439";
+const bridgeUrl = () => process.env.FINVERSE_KOSPI_BRIDGE_URL?.trim() || "http://127.0.0.1:5439";
 
 export async function POST(request: Request) {
   const body = await request.text();

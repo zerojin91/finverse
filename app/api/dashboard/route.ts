@@ -21,7 +21,7 @@ const DEFAULT_OPENROUTER_FALLBACK_MODELS = [
 ];
 const OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 
-const env = (name: string) => process.env[name]?.trim();
+const env = (name: string) => process.env[name]?.trim() || undefined;
 
 const remotePsql = async (query: string): Promise<Row[]> => {
   const bridgeUrl = env("FINVERSE_KOSPI_BRIDGE_URL") ?? "http://127.0.0.1:5439";

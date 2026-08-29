@@ -79,6 +79,8 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 19px; }
 .page-heading > div:first-child > span { color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .1em; }
 .page-heading h1 { margin: 8px 0 0; color: var(--ink); font-size: clamp(29px,2.3vw,40px); line-height: 1.18; letter-spacing: -.045em; }
+.market-stamp em { margin-left: 7px; padding: 2px 7px; border-radius: 999px; color: var(--light); background: #ededf0; font-size: 9px; font-style: normal; font-weight: 700; }
+.market-stamp em.live { color: #15803d; background: #f0fdf4; }
 .market-stamp { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; padding: 10px 13px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); background: #fff; font-size: 11px; }
 
 .market-dashboard { display: grid; grid-template-columns: minmax(235px, .8fr) minmax(520px, 1.55fr) minmax(300px, 1fr); gap: 16px; }

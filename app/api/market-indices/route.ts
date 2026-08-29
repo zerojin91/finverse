@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 type Row = { key: string; name: string; date: string; close: number; change_pct: number; open: number | null; high: number | null; low: number | null };
 const keys = ["KOSPI", "KOSDAQ", "SP500", "NASDAQ"];
 const compact = (date: Date) => date.toISOString().slice(0, 10).replaceAll("-", "");
-const env = (name: string) => process.env[name]?.trim();
+const env = (name: string) => process.env[name]?.trim() || undefined;
 const remotePsql = async (query: string): Promise<Row[]> => {
   const bridgeUrl = env("FINVERSE_KOSPI_BRIDGE_URL") ?? "http://127.0.0.1:5439";
   const controller = new AbortController();
