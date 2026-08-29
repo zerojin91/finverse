@@ -9,6 +9,7 @@
 import { ArrowRight, Check, LoaderCircle, RotateCcw, Sparkles, TriangleAlert, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { BehaviorProfile, PriceSnapshot } from "@/lib/twin/backtest";
+import { BUY_COLOR, HOLD_LINE, SELL_COLOR } from "@/lib/twin/chart-colors";
 import {
   deriveProfileFromGames,
   loadSlice,
@@ -53,16 +54,16 @@ function ReplayChart({ closes, upto, records }: { closes: number[]; upto: number
   return (
     <svg className="lab-chart" viewBox="0 0 720 150" role="img" aria-label="지금까지 공개된 시장 경로">
       {[20, 55, 90, 125].map((line) => <line key={line} x1="40" y1={line} x2="700" y2={line} stroke="#ededf0" strokeWidth="1" />)}
-      <path d={path} fill="none" stroke="#111113" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={x(upto)} cy={y(shown.at(-1)!)} r="4.5" fill="#111113" />
+      <path d={path} fill="none" stroke={HOLD_LINE} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={x(upto)} cy={y(shown.at(-1)!)} r="4.5" fill={HOLD_LINE} />
       {records.filter((record) => record.session <= upto).map((record) => (
         <circle
           key={`${record.turn}-${record.action}`}
           cx={x(record.session)}
           cy={y(closes[record.session])}
           r="4"
-          fill={record.action === "buy" ? "#2563eb" : record.action === "hold" ? "#fff" : "#ef4444"}
-          stroke={record.action === "buy" ? "#2563eb" : record.action === "hold" ? "#a1a1aa" : "#ef4444"}
+          fill={record.action === "buy" ? BUY_COLOR : record.action === "hold" ? "#fff" : SELL_COLOR}
+          stroke={record.action === "buy" ? BUY_COLOR : record.action === "hold" ? "#a1a1aa" : SELL_COLOR}
           strokeWidth="1.6"
         />
       ))}

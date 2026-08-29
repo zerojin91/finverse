@@ -30,6 +30,7 @@ import {
   type BehaviorProfile,
   type PriceSnapshot,
 } from "@/lib/twin/backtest";
+import { BUY_COLOR, HOLD_LINE, INDEX_LINE, MINE_LINE, SELL_COLOR } from "@/lib/twin/chart-colors";
 import { projectForward, type ForwardResult } from "@/lib/twin/forward";
 import { marketMood, type MarketMood } from "@/lib/twin/market-mood";
 import { behaviorNote, mentorVerdicts, mostSevere, stanceLabels, type MentorInput, type MentorVerdict } from "@/lib/twin/mentor";
@@ -48,6 +49,8 @@ const korean = (value: number) => {
 };
 const pct = (value: number, digits = 1) => `${value >= 0 ? "+" : ""}${(value * 100).toFixed(digits)}%`;
 const tone = (value: number) => (value > 0 ? "up" : value < 0 ? "down" : "flat");
+
+const sells = ["panic-sell", "take-profit"];
 
 function TimeMachineChart({ result }: { result: BacktestResult }) {
   const { buyHold, twin, index, dates } = result;
@@ -73,17 +76,18 @@ function TimeMachineChart({ result }: { result: BacktestResult }) {
           <text x="42" y={y(value) + 3} textAnchor="end" fill="#a1a1aa" fontSize="9">{`${value >= 100 ? "+" : ""}${(value - 100).toFixed(0)}%`}</text>
         </g>
       ))}
-      <path d={line(index)} fill="none" stroke="#d4d4d8" strokeWidth="1.6" strokeDasharray="4 4" />
-      <path d={line(buyHold)} fill="none" stroke="#111113" strokeWidth="2.4" strokeLinecap="round" />
-      <path d={line(twin)} fill="none" stroke="#2563eb" strokeWidth="2.4" strokeLinecap="round" />
+      <path d={line(index)} fill="none" stroke={INDEX_LINE} strokeWidth="1.6" strokeDasharray="4 4" />
+      <path d={line(buyHold)} fill="none" stroke={HOLD_LINE} strokeWidth="2.4" strokeLinecap="round" />
+      <path d={line(twin)} fill="none" stroke={MINE_LINE} strokeWidth="2.4" strokeLinecap="round" />
       {result.events.map((event) => (
         <circle
           key={`${event.type}-${event.index}`}
           cx={x(event.index)}
           cy={y(twin[event.index])}
           r={event.type === "panic-sell" ? 4.5 : 3.6}
-          fill={event.type === "panic-sell" ? "#ef4444" : event.type === "reentry" ? "#2563eb" : "#fff"}
-          stroke={event.type === "panic-sell" ? "#ef4444" : "#2563eb"}
+          // 테두리는 방향(파는가 사는가), 채움은 전량인가 일부인가를 뜻한다.
+          fill={event.type === "panic-sell" || event.type === "reentry" ? sells.includes(event.type) ? SELL_COLOR : BUY_COLOR : "#fff"}
+          stroke={sells.includes(event.type) ? SELL_COLOR : BUY_COLOR}
           strokeWidth="1.6"
         >
           <title>{`${formatSnapshotDate(event.date)} · ${event.detail}`}</title>
@@ -171,16 +175,16 @@ function ForwardChart({ forward }: { forward: ForwardResult }) {
   return (
     <svg className="twin-forward-chart" viewBox="0 0 680 136" role="img" aria-label="시나리오 경로에서의 내 자산">
       {[18, 52, 86, 120].map((row) => <line key={row} x1="40" y1={row} x2="660" y2={row} stroke="#ededf0" strokeWidth="1" />)}
-      <path d={line(forward.hold)} fill="none" stroke="#111113" strokeWidth="2.4" strokeLinecap="round" />
-      <path d={line(forward.mine)} fill="none" stroke="#2563eb" strokeWidth="2.4" strokeLinecap="round" />
+      <path d={line(forward.hold)} fill="none" stroke={HOLD_LINE} strokeWidth="2.4" strokeLinecap="round" />
+      <path d={line(forward.mine)} fill="none" stroke={MINE_LINE} strokeWidth="2.4" strokeLinecap="round" />
       {forward.events.map((event) => (
         <circle
           key={`${event.type}-${event.index}`}
           cx={x(event.index)}
           cy={y(forward.mine[event.index])}
           r="4.5"
-          fill={event.type === "sell" ? "#ef4444" : "#2563eb"}
-          stroke={event.type === "sell" ? "#ef4444" : "#2563eb"}
+          fill={event.type === "sell" ? SELL_COLOR : BUY_COLOR}
+          stroke={event.type === "sell" ? SELL_COLOR : BUY_COLOR}
           strokeWidth="1.6"
         ><title>{event.detail}</title></circle>
       ))}
@@ -222,7 +226,7 @@ function ForwardPanel({ scenario, forward, total }: { scenario: AppliedScenario;
         </div>
         <ForwardChart forward={forward} />
         <div className="twin-chart-legend">
-          <span><i className="hold" />그대로 두기</span><span><i className="twin" />내 성향대로</span><span><i className="sell" />매도·재진입 시점</span>
+          <span><i className="hold" />그대로 두기</span><span><i className="twin" />내 성향대로</span><span><i className="sell" />매도</span><span><i className="buy" />재진입</span>
         </div>
         {forward.events.length > 0 ? (
           <ol className="twin-event-list">
@@ -663,7 +667,7 @@ export default function TwinPage({ appliedScenario, onOpenBuilder, onGoToLab }: 
               <TimeMachineChart result={result} />
               <div className="twin-chart-legend">
                 <span><i className="hold" />그대로 두기</span><span><i className="twin" />내 성향대로</span><span><i className="index" />코스피</span>
-                <span><i className="sell" />매도·재진입 시점</span>
+                <span><i className="sell" />매도</span><span><i className="buy" />매수</span><span><i className="partial" />일부만</span>
               </div>
               <p className="twin-shock-note">{result.window.summary} 아래 매매는 실제 기록이 아니라 <b>지금 성향과 배분</b>을 이 구간에 넣었을 때 나오는 시점입니다. 한 달에 한 번 판단하고, 한 번 팔면 최소 3개월은 다시 팔지 않는다고 가정합니다.</p>
               {result.events.length > 0 && (

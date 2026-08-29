@@ -551,15 +551,18 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .twin-chart-legend { display: flex; flex-wrap: wrap; gap: 14px; padding: 0 16px; color: var(--muted); font-size: 10px; }
 .twin-chart-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .twin-chart-legend i { width: 14px; height: 2.5px; border-radius: 2px; background: var(--ink); }
-.twin-chart-legend i.twin { background: var(--down); }
+.twin-chart-legend i.twin { background: #7c3aed; }
 .twin-chart-legend i.index { background: #d4d4d8; }
-.twin-chart-legend i.sell { width: 8px; height: 8px; border-radius: 50%; background: var(--up); }
+/* 한국 증권 관례: 매도는 파랑, 매수는 빨강. lib/twin/chart-colors.ts 와 같은 값. */
+.twin-chart-legend i.sell { width: 8px; height: 8px; border-radius: 50%; background: var(--down); }
+.twin-chart-legend i.buy { width: 8px; height: 8px; border-radius: 50%; background: var(--up); }
+.twin-chart-legend i.partial { width: 8px; height: 8px; border: 1.6px solid var(--muted); border-radius: 50%; background: #fff; }
 .twin-shock-note { margin: 12px 16px 0; color: var(--muted); font-size: 10.5px; line-height: 1.6; }
 .twin-event-list { margin: 12px 16px 16px; padding: 12px 0 0; border-top: 1px solid var(--line); list-style: none; }
 .twin-event-list li { display: grid; grid-template-columns: 76px minmax(0,1fr); gap: 10px; padding: 5px 0; color: var(--muted); font-size: 10.5px; line-height: 1.5; }
 .twin-event-list time { color: var(--light); font-size: 10px; }
-.twin-event-list li.panic-sell span { color: var(--up); }
-.twin-event-list li.reentry span { color: var(--down); }
+.twin-event-list li.panic-sell span { color: var(--down); }
+.twin-event-list li.reentry span { color: var(--up); }
 .twin-event-more { display: block!important; color: var(--light)!important; font-size: 10px; }
 
 /* 편향 리포트 */
@@ -678,8 +681,8 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .lab-actions { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; }
 .lab-actions button { padding: 14px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); font-size: 13px; font-weight: 700; cursor: pointer; }
 .lab-actions button:hover:not(:disabled) { border-color: var(--ink); }
-.lab-actions button.sell:hover:not(:disabled) { border-color: var(--up); color: var(--up); }
-.lab-actions button.buy:hover:not(:disabled) { border-color: var(--down); color: var(--down); }
+.lab-actions button.sell:hover:not(:disabled) { border-color: var(--down); color: var(--down); }
+.lab-actions button.buy:hover:not(:disabled) { border-color: var(--up); color: var(--up); }
 .lab-actions button:disabled { color: var(--light); background: var(--soft); cursor: not-allowed; }
 .lab-lottery-lead { margin: 0 0 16px; color: var(--text); font-size: 13px; }
 .lab-lottery { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin-bottom: 18px; }

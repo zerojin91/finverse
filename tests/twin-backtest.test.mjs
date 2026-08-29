@@ -324,3 +324,18 @@ test("트윈 쪽 문구는 실제로 한 일처럼 쓰지 않는다", () => {
   }
   assert.ok(!asserted.test(behaviorNote(mentorBase)), behaviorNote(mentorBase));
 });
+
+const colors = await import("../lib/twin/chart-colors.ts");
+
+test("매도는 파랑, 매수는 빨강이고 경로 선과 겹치지 않는다", () => {
+  // 한국 증권 관례. 한 번 뒤집힌 적이 있어 값으로 고정한다.
+  assert.equal(colors.SELL_COLOR, "#2563eb", "매도가 파랑이 아니다");
+  assert.equal(colors.BUY_COLOR, "#ef4444", "매수가 빨강이 아니다");
+  // 경로 선이 마커와 같은 색이면 선 위에서 점이 묻힌다.
+  const lines = [colors.HOLD_LINE, colors.MINE_LINE, colors.INDEX_LINE];
+  for (const line of lines) {
+    assert.notEqual(line, colors.SELL_COLOR, "경로 선이 매도 색과 같다");
+    assert.notEqual(line, colors.BUY_COLOR, "경로 선이 매수 색과 같다");
+  }
+  assert.equal(new Set(lines).size, 3, "경로 선끼리 색이 겹친다");
+});
