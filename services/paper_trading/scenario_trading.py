@@ -31,7 +31,7 @@ MAX_LLM_ALLOCATION_PCT = .05
 EVENT_DAY_NOISE_DAMPING = .3
 # _empirical_return은 신호를 p10~p90 안으로만 매핑한다. 잔차는 꼬리까지 쓰는
 # 전체 분포에서 뽑으므로, 배수를 주지 않으면 이벤트가 평범한 하루보다 작아진다.
-EVENT_AMPLIFICATION = 2.2
+EVENT_AMPLIFICATION = 3.6
 CONTEXT_MODE = "integrated"
 GROUP_PSYCHOLOGY = {
     "retail": {"half_life_days": 2.0, "baseline_risk_aversion": .45,
