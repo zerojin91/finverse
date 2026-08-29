@@ -77,7 +77,7 @@ test("현재 평가금액은 최근 종가 기준으로 계산된다", () => {
 });
 
 const { marketMood } = await import("../lib/twin/market-mood.ts");
-const { mentorVerdicts, harshest } = await import("../lib/twin/mentor.ts");
+const { mentorVerdicts, mostSevere, stanceLabels } = await import("../lib/twin/mentor.ts");
 
 test("시장 온도계는 0~100 범위와 네 개 구성요소를 낸다", () => {
   const mood = marketMood(snapshot, holdings, panicky);
@@ -96,19 +96,52 @@ test("매도 규칙이 없는 성향은 온도계에서 트리거되지 않는�
 });
 
 
-test("대가 진단은 주식·현금 비중으로 세 점수를 낸다", () => {
-  const input = { stockWeight: 0.95, cashWeight: 0.05, moodScore: 22, moodLabel: "극단적 공포", drawdown: -0.18, behaviorGap: -0.4, windowLabel: "2020 코로나 급락", tradeCount: 3, character: "공포 이탈형" };
-  const verdicts = mentorVerdicts(input);
-  assert.equal(verdicts.length, 3);
-  for (const verdict of verdicts) assert.ok(verdict.score >= 5 && verdict.score <= 95, `${verdict.key} ${verdict.score}`);
-  assert.equal(harshest(verdicts).score, Math.min(...verdicts.map((verdict) => verdict.score)));
-  const score = (list, key) => list.find((verdict) => verdict.key === key).score;
-  // 한쪽으로 몰릴수록 균형 점수가 낮아야 한다.
-  const balanced = mentorVerdicts({ ...input, stockWeight: 0.6, cashWeight: 0.4 });
-  assert.ok(score(balanced, "dalio") > score(verdicts, "dalio"));
-  assert.ok(score(mentorVerdicts({ ...input, stockWeight: 0.05, cashWeight: 0.95 }), "dalio") < score(balanced, "dalio"));
-  // 자주 손댈수록 "오래 들고 갈 수 있는가" 점수가 낮아야 한다.
-  assert.ok(score(mentorVerdicts({ ...input, tradeCount: 0 }), "buffett") > score(verdicts, "buffett"));
+const mentorBase = {
+  stockWeight: 0.85, cashWeight: 0.15, moodScore: 30, moodLabel: "공포", drawdown: -0.24,
+  windowLabel: "2020 코로나 급락", buyHoldReturn: 0.438, behaviorGap: -0.076, tradeCount: 3, soldCount: 1,
+  reentered: true, character: "공포 이탈형", panicThreshold: -0.07, reentryDelay: 60,
+};
+
+test("네 사람이 서로 다른 것을 보고 입장을 낸다", () => {
+  const verdicts = mentorVerdicts(mentorBase);
+  assert.deepEqual(verdicts.map((v) => v.key), ["buffett", "marks", "kahneman", "parkhyeonjoo"]);
+  for (const verdict of verdicts) {
+    assert.ok(["ok", "watch", "risk"].includes(verdict.stance), `${verdict.key} ${verdict.stance}`);
+    assert.ok(stanceLabels[verdict.stance]);
+    assert.ok(verdict.check.length > 5, `${verdict.key} 확인 항목 없음`);
+    assert.ok(verdict.question.length > 5);
+  }
+  // 네 사람의 본문이 서로 달라야 한다. 같은 말을 반복하면 패널이 의미를 잃는다.
+  assert.equal(new Set(verdicts.map((v) => v.body)).size, 4);
+  assert.equal(mostSevere(verdicts).stance, "risk");
+});
+
+test("입장은 각자 보는 데이터에만 반응한다", () => {
+  const stance = (input, key) => mentorVerdicts(input).find((v) => v.key === key).stance;
+  // 버핏은 매매 빈도와 비중에 반응한다.
+  assert.equal(stance({ ...mentorBase, tradeCount: 5 }, "buffett"), "risk");
+  assert.equal(stance({ ...mentorBase, tradeCount: 0, stockWeight: 0.5, cashWeight: 0.5 }, "buffett"), "ok");
+  // 막스는 시장 온도와 현금에 반응한다. 매매 횟수를 바꿔도 그대로다.
+  assert.equal(stance({ ...mentorBase, cashWeight: 0.05 }, "marks"), "risk");
+  assert.equal(stance({ ...mentorBase, tradeCount: 9 }, "marks"), stance(mentorBase, "marks"));
+  // 카너먼은 백테스트 결과에 반응한다. 비중을 바꿔도 그대로다.
+  assert.equal(stance({ ...mentorBase, soldCount: 1, reentered: false }, "kahneman"), "risk");
+  assert.equal(stance({ ...mentorBase, behaviorGap: 0.02, soldCount: 1 }, "kahneman"), "ok");
+  assert.equal(stance({ ...mentorBase, stockWeight: 0.2, cashWeight: 0.8 }, "kahneman"), stance(mentorBase, "kahneman"));
+  // 박현주는 국내주식 비중에만 반응한다.
+  assert.equal(stance({ ...mentorBase, stockWeight: 0.9 }, "parkhyeonjoo"), "risk");
+  assert.equal(stance({ ...mentorBase, stockWeight: 0.2 }, "parkhyeonjoo"), "ok");
+  assert.equal(stance({ ...mentorBase, moodScore: 90 }, "parkhyeonjoo"), stance(mentorBase, "parkhyeonjoo"));
+});
+
+test("시나리오를 가져오면 막스만 그것을 언급한다", () => {
+  const scenario = { title: "반도체 실적 미스", forecast: "KOSPI -13.8%", holdReturn: -0.118, myReturn: -0.077, sold: true };
+  const withScenario = mentorVerdicts({ ...mentorBase, scenario });
+  const mentions = withScenario.filter((v) => v.body.includes("반도체 실적 미스"));
+  assert.equal(mentions.length, 1);
+  assert.equal(mentions[0].key, "marks");
+  // 시나리오가 없으면 아무도 언급하지 않는다.
+  assert.equal(mentorVerdicts(mentorBase).filter((v) => v.body.includes("시나리오")).length, 0);
 });
 
 const { loadSlice, replayGames, summarizeReplay, deriveProfileFromGames, scoreLottery, lotteryPairs, playedCount } = await import("../lib/twin/games.ts");
@@ -264,4 +297,14 @@ test("네 게임을 다 하면 판정 보류가 사라진다", () => {
   const character = characterFor(deriveProfileFromGames(full), observedTraits(full));
   assert.notEqual(character.key, "unknown");
   assert.ok(!character.provisional);
+});
+
+test("헤드라인이 입장보다 앞서 나가지 않는다", () => {
+  // 현금이 넉넉하면 "괜찮습니다"인데 헤드라인이 부족을 지적하면 안 된다.
+  const easy = mentorVerdicts({ ...mentorBase, cashWeight: 0.4, stockWeight: 0.6 }).find((v) => v.key === "marks");
+  assert.equal(easy.stance, "ok");
+  assert.ok(!easy.headline.includes("뿐입니다"), easy.headline);
+  const tight = mentorVerdicts({ ...mentorBase, cashWeight: 0.05, stockWeight: 0.95 }).find((v) => v.key === "marks");
+  assert.equal(tight.stance, "risk");
+  assert.ok(tight.headline.includes("뿐입니다"), tight.headline);
 });

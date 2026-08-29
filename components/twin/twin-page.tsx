@@ -13,12 +13,13 @@
 // 가격은 public/twin/shock-prices.json 의 실제 종가이고, 매매 판단은 결정적인
 // 규칙이다.  화면에 나오는 수익률·낙폭·회복일은 모두 여기서 계산된 값이다.
 
-import { ArrowRight, ChevronRight, Gamepad2, Gauge, LoaderCircle, Quote, RotateCcw, ShieldCheck, Route, UserRound, Wallet } from "lucide-react";
+import { ArrowRight, CheckCircle2, ChevronRight, Gamepad2, Gauge, LoaderCircle, Quote, RotateCcw, Route, ShieldCheck, UserRound, Wallet } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CASH,
   STOCK,
   formatSnapshotDate,
+  effectivePanicThreshold,
   runBacktest,
   valuate,
   type BacktestResult,
@@ -27,7 +28,7 @@ import {
 } from "@/lib/twin/backtest";
 import { projectForward, type ForwardResult } from "@/lib/twin/forward";
 import { marketMood, type MarketMood } from "@/lib/twin/market-mood";
-import { behaviorNote, harshest, mentorVerdicts, type MentorInput, type MentorVerdict } from "@/lib/twin/mentor";
+import { behaviorNote, mentorVerdicts, mostSevere, stanceLabels, type MentorInput, type MentorVerdict } from "@/lib/twin/mentor";
 import { allocationHoldings, allocationPresets, buildReport, characterFor, deriveProfile, questions, type ObservedTraits } from "@/lib/twin/profile";
 
 const STORAGE_KEY = "finverse.twin.v2";
@@ -240,30 +241,36 @@ function ForwardPanel({ scenario, forward, total }: { scenario: AppliedScenario;
 }
 
 function MentorPanel({ verdicts, note, source, loading }: { verdicts: MentorVerdict[]; note: string; source: string; loading: boolean }) {
-  const worst = verdicts.length ? harshest(verdicts) : null;
+  const worst = verdicts.length ? mostSevere(verdicts) : null;
   return (
     <section className="panel twin-side-panel">
       <div className="panel-title">
-        <div><span>MENTOR REVIEW</span><h2>세 사람의 다른 채점표</h2></div>
+        <div><span>MENTOR REVIEW</span><h2>네 사람이 서로 다른 곳을 봅니다</h2></div>
         {loading ? <LoaderCircle size={15} className="spin" /> : <Quote size={16} />}
       </div>
       <div className="twin-side-body">
-        {worst && <p className="twin-mentor-worst"><span>가장 낮은 점수</span><strong>{worst.name} {worst.score}점</strong></p>}
+        {worst && worst.stance !== "ok" && (
+          <p className={`twin-mentor-worst ${worst.stance}`}>
+            <span>가장 크게 걸리는 지점</span>
+            <strong>{worst.name} · {worst.question}</strong>
+          </p>
+        )}
         <div className="twin-mentor-list">
           {verdicts.map((verdict) => (
-            <article key={verdict.key} className={worst && verdict.key === worst.key ? "worst" : ""}>
+            <article key={verdict.key} className={worst && verdict.key === worst.key && verdict.stance !== "ok" ? "worst" : ""}>
               <header>
-                <div><strong>{verdict.name}</strong><small>{verdict.principle}</small></div>
-                <span className="twin-mentor-score">{verdict.score}</span>
+                <div><strong>{verdict.name}</strong><small>{verdict.question}</small></div>
+                <span className={`twin-stance ${verdict.stance}`}>{stanceLabels[verdict.stance]}</span>
               </header>
               <h3>{verdict.headline}</h3>
               <p>{verdict.body}</p>
+              <p className="twin-mentor-check"><CheckCircle2 size={13} /> {verdict.check}</p>
             </article>
           ))}
         </div>
         <p className="twin-side-note">{note}</p>
         <p className="twin-side-note">
-          공개된 투자 원칙을 이 배분에 적용한 해석이며 본인의 발언이 아닙니다. 점수는 주식 비중·현금 여력·매매 빈도·시장 온도로 계산합니다{source === "openrouter" ? "(문장만 AI가 다시 씀)" : "(모델 미연결 · 규칙 기반 문장)"}.
+          공개된 투자 원칙과 연구를 이 상황에 적용한 해석이며 본인의 발언이 아닙니다. 입장은 주식 비중·현금 여력·매매 빈도·시장 온도·백테스트 결과로 계산합니다{source === "openrouter" ? "(문장만 AI가 다시 씀)" : "(모델 미연결 · 규칙 기반 문장)"}.
         </p>
       </div>
     </section>
@@ -459,19 +466,36 @@ export default function TwinPage({ appliedScenario, onOpenBuilder, onGoToLab }: 
     [appliedScenario, saved, profile],
   );
   const mentorInput = useMemo<MentorInput | null>(() => {
-    if (!saved || !mood || !result || !character) return null;
+    if (!saved || !mood || !result || !character || !profile) return null;
+    const sells = result.events.filter((event) => event.type === "panic-sell");
     return {
       stockWeight: saved.stockWeight,
       cashWeight: 1 - saved.stockWeight,
       moodScore: mood.score,
       moodLabel: mood.label,
       drawdown: mood.drawdown,
-      behaviorGap: result.behaviorGap,
       windowLabel: result.window.label,
+      buyHoldReturn: result.buyHoldReturn,
+      behaviorGap: result.behaviorGap,
       tradeCount: result.events.length,
+      soldCount: sells.length,
+      reentered: result.events.some((event) => event.type === "reentry"),
       character: character.name,
+      panicThreshold: effectivePanicThreshold(profile),
+      reentryDelay: profile.reentryDelay,
+      ...(appliedScenario && forward
+        ? {
+            scenario: {
+              title: appliedScenario.title,
+              forecast: appliedScenario.forecast,
+              holdReturn: forward.holdReturn,
+              myReturn: forward.myReturn,
+              sold: forward.events.some((event) => event.type === "sell"),
+            },
+          }
+        : {}),
     };
-  }, [saved, mood, result, character]);
+  }, [saved, mood, result, character, profile, appliedScenario, forward]);
   const mentorKey = mentorInput ? JSON.stringify(mentorInput) : "";
 
   useEffect(() => {

@@ -626,17 +626,23 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .twin-trigger p { margin: 7px 0 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
 .twin-trigger b { color: var(--ink); }
 
-.twin-mentor-worst { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 12px; padding: 9px 12px; border: 1px solid var(--ink); border-radius: 7px; }
-.twin-mentor-worst span { color: var(--muted); font-size: 10px; }
-.twin-mentor-worst strong { color: var(--ink); font-size: 12px; }
+.twin-mentor-worst { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 7px; }
+.twin-mentor-worst.risk { border-color: var(--up); background: #fef2f2; }
+.twin-mentor-worst.watch { border-color: #f59e0b; background: #fffbeb; }
+.twin-mentor-worst span { flex: 0 0 auto; color: var(--muted); font-size: 10px; }
+.twin-mentor-worst strong { color: var(--ink); font-size: 11.5px; text-align: right; }
 .twin-mentor-list { display: grid; gap: 9px; }
-.twin-mentor-list article { padding: 12px 13px; border: 1px solid var(--line); border-radius: 8px; }
+.twin-mentor-list article { padding: 13px; border: 1px solid var(--line); border-radius: 8px; }
 .twin-mentor-list article.worst { border-color: var(--up); }
 .twin-mentor-list header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .twin-mentor-list strong { display: block; color: var(--ink); font-size: 12.5px; }
 .twin-mentor-list small { display: block; margin-top: 3px; color: var(--light); font-size: 9.5px; }
-.twin-mentor-score { flex: 0 0 auto; min-width: 34px; padding: 4px 0; border-radius: 6px; color: #fff; background: var(--ink); font-size: 13px; font-weight: 750; text-align: center; }
-.twin-mentor-list article.worst .twin-mentor-score { background: var(--up); }
+.twin-stance { flex: 0 0 auto; padding: 4px 9px; border-radius: 999px; font-size: 9.5px; font-weight: 700; white-space: nowrap; }
+.twin-stance.ok { color: #15803d; background: #f0fdf4; }
+.twin-stance.watch { color: #b45309; background: #fffbeb; }
+.twin-stance.risk { color: #fff; background: var(--up); }
+.twin-mentor-check { display: flex; align-items: flex-start; gap: 5px; margin: 9px 0 0!important; padding-top: 9px; border-top: 1px dashed var(--line); color: var(--ink)!important; font-size: 10.5px!important; font-weight: 600; }
+.twin-mentor-check svg { flex: 0 0 auto; margin-top: 1px; color: var(--muted); }
 .twin-mentor-list h3 { margin: 10px 0 6px; color: var(--ink); font-size: 13px; line-height: 1.45; }
 .twin-mentor-list p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
 
