@@ -35,7 +35,8 @@ run_spec
 
 - **정량 단일 소스**: `forecast`, `path`, `events[].impact`는 `impact-model-{id}.json`에서 복사한다.
 - **상세 콘텐츠**: `chapters[4]`, `chapterLessons[4]`, `learningReport`, 투자자 가이드·인지 편향·리스크는 Scenario Author가 Evidence를 바탕으로 작성한다.
-- **학습 리포트 수치**: `learningReport.metrics`의 값은 `base_index`, event `index_level`, `forecast` 또는 Evidence Register에 있는 값만 사용한다.
+- **학습 리포트**: `learningReport.drivers`는 거시 환경·사건·산업 전달 경로·검증 조건을 설명한다. 정량값은 교육 요소로 노출하지 않으며, `forecast`·`path`·`events[].impact`의 모델 표시값에만 남긴다.
+- **표기 언어**: 카드의 사용자 노출 서술은 자연스러운 한국어로 작성한다. `은(는)` 같은 괄호 조사는 쓰지 않고, 영문 약어·영문 기술어는 한국어 명칭으로 풀어쓴다. URL·ticker·식별자와 impact 모델 계약 필드는 예외다.
 - **최종 파일**: `scenarios.json`은 배열이 아니라 [scenarios-output.schema.json](./schemas/scenarios-output.schema.json) 객체다.
 
 ## 시나리오 세트 규칙

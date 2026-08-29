@@ -57,6 +57,7 @@ output/scenario-cards/kospi-asof-2026-07-28/
 
 - `neutral`: `tone: "neutral"` 또는 `|forecast| <= neutral_forecast_abs_cap_pct`
 - 약한 up/down도 neutral 슬롯에 허용
+- Web Agent가 확정한 **긍정 거시 포인트 1개**는 상승 시나리오 1개, **우려 거시 포인트 1개**는 하락 시나리오 1개로 반드시 전개한다. 각 카드의 chapter와 learningReport는 해당 포인트의 거시 → 사건 → 산업 전달 경로를 설명한다.
 
 ## Feedback codes (subagent당 최대 1회)
 
@@ -73,10 +74,11 @@ output/scenario-cards/kospi-asof-2026-07-28/
 ## QA checklist
 
 - [ ] `scenarios.json`이 [scenarios-output.schema.json](./schemas/scenarios-output.schema.json) 통과, 각 `scenarios[]` 원소가 [scenario-card.schema.json](./schemas/scenario-card.schema.json) 통과
-- [ ] 각 카드: chapters=4, chapterLessons=4, learningReport.metrics=4, learningReport.sections=3, events=3, path len=12
+- [ ] 각 카드: chapters=4, chapterLessons=4, learningReport.drivers=4, learningReport.sections=3, events=3, path len=12
 - [ ] `path[0] == base_index`, `forecast` ↔ `path[11]` 일치
 - [ ] `events[].impact` == impact_model cumulative
-- [ ] learningReport의 수치가 impact_model 또는 Evidence Register에 존재
+- [ ] 학습 본문은 거시·이벤트 전달 경로와 검증 조건을 설명하며 정량값을 교육 요소로 노출하지 않음
+- [ ] 사용자 노출 서술은 자연스러운 한국어이며 `은(는)` 같은 괄호 조사와 영문 약어·영문 기술어가 없음 (식별자·URL·ticker·impact 계약 필드 제외)
 - [ ] 확정적 투자 권유·목표가 단정 없음
 - [ ] look-ahead bias 없음 (Historical evidence 확인)
 

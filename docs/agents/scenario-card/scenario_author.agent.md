@@ -33,7 +33,7 @@ Evidence + **`impact-model-{id}.json`** → 카드와 상세 모달을 단독으
 | `context` | 확인 순서 스토리 |
 | `chapters[4]` | 1~3 현황·인과, 4 단계적 대응 |
 | `chapterLessons[4]` | 각 chapter와 같은 index의 초심자용 기초 개념; 독립 문단 |
-| `learningReport` | 제목·lead·metrics[4]·sections[3]; 상세보기의 학습 리포트 전체 |
+| `learningReport` | 제목·lead·drivers[4]·sections[3]; 거시·이벤트 전달 경로 중심 학습 리포트 |
 | `investorGuide[3]` | stance: 확인 전 / 진행 / 이탈 |
 | `studyGuide[3]` | 검증 가능 질문 |
 | `biasChecks[3]` | tone별 인지 편향 |
@@ -41,28 +41,34 @@ Evidence + **`impact-model-{id}.json`** → 카드와 상세 모달을 단독으
 | `riskPoints[3]` | falsification 조건 |
 | `image` | HTTPS URL 또는 public-root 경로 (`/scenarios/{id}.png`) |
 
-### Learning report 숫자 규칙
+### Learning report 교육 원칙
 
-- `metrics[].value`는 `impact_model.base_index`, `events[].index_level`, `forecast` 또는 Evidence Register의 검증된 값만 사용한다.
-- 숫자를 문장으로 반복할 때도 같은 원천을 사용한다. 확률·목표가·밴드는 Evidence 또는 impact_model에 없으면 서술하지 않는다.
-- `sections[3]`은 원인 → 전달 경로 → 개인 투자자 판단 순으로, 각 항목에 2~3문단과 `takeaway`를 작성한다.
+- 학습 본문·`chapterLessons`·`learningReport`에는 지수 수준, 수익률, 밸류에이션 배수, 컨센서스 같은 **정량값을 교육 요소로 노출하지 않는다**.
+- `drivers[4]`는 `거시 환경 → 사건/정책 → 산업·기업 전달 경로 → 검증·무효화 조건`을 각각 설명한다.
+- 숫자는 `forecast`, `path`, `events[].impact`처럼 영향 모델 계약상 필요한 표시 필드에만 남긴다.
+- `sections[3]`은 원인 → 전달 경로 → 검증·무효화 순으로 작성한다.
 
 ## Tone & language
 
 - 조건부: "~하면 ~을 **시험합니다**", "반증 신호"
 - 확정적 목표가·매수 권유 금지
-- 한국어 (ticker, URL, record_id 원문 허용)
+- 사용자에게 보이는 서술 필드(`summary`, `thesis`, `context`, `chapters`, `chapterLessons`, `learningReport`, 가이드·편향·리스크)는 자연스러운 **한국어만** 사용한다.
+- 조사 선택을 괄호로 쓰지 않는다. `은(는)`, `이(가)`, `을(를)` 대신 문맥에 맞는 조사 하나를 고른다.
+- 영문 약어·영문 기술어를 본문에 쓰지 않는다. `AI`는 `인공지능`, `headline`은 `기사 제목`, `FOMC`는 `연방공개시장위원회`처럼 한국어로 풀어쓴다.
+- `id`, `target`, ticker, URL, record_id, 이미지 경로와 impact 모델 계약 필드는 원문 식별값을 유지할 수 있다.
 
 ## Validation (self-check before submit)
 
 - JSON schema pass
 - `events.length == 3`, `chapters.length == 4`, `chapterLessons.length == 4`
-- `learningReport.metrics.length == 4`, `learningReport.sections.length == 3`
+- `learningReport.drivers.length == 4`, `learningReport.sections.length == 3`
 - `Math.abs(parseForecast(forecast) - impact_model.forecast_pct) < 0.05`
 - every `events[i].impact` matches impact_model cumulative
+- 사용자 노출 서술 필드에 `은(는)` 같은 괄호 조사나 영문 알파벳이 없음
 
 ## Do not
 
 - impact/path/forecast 수정
-- evidence 없는 숫자 invent
+- 교육 본문에 정량값을 나열하거나 evidence 없는 숫자 invent
+- 영문 약어·영문 기술어 또는 괄호 조사로 자연스러운 한국어 문장을 훼손
 - UI가 제공할 scenario별 fallback 본문을 기대

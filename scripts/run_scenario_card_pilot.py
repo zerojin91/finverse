@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from datetime import date, datetime, timezone
 from decimal import Decimal
@@ -34,39 +35,27 @@ from agents.scenario_card.impact_model import (
 
 SCENARIOS = (
     {
-        "id": "pilot-rebound",
-        "title": "조건부 수급 안정 반등",
+        "id": "macro-export-recovery",
+        "title": "반도체 수출·내수 회복 확산",
         "tone": "up",
-        "tags": ["거래대금", "위험선호"],
+        "tags": ["수출 회복", "내수 개선", "인공지능 기반 시설 수요"],
         "channels": ((1.2, 1.6, 1.8), (1.0, 1.4, 1.6), (0.8, 1.2, 1.4)),
         "events": (
-            ("1주 전후", "수급", "매도 압력 완화 확인", "거래대금과 시장 참여가 안정되는지 확인합니다."),
-            ("2주 전후", "기술", "단기 추세 회복 시도", "가격이 최근 변동 구간을 회복하는지 관찰합니다."),
-            ("1개월 전후", "분기점", "반등 지속성 검증", "수급과 변동성이 함께 안정되는지 검증합니다."),
+            ("초기", "거시", "수출·소비 회복의 지속성", "수출과 내수의 개선이 일회성 반등이 아닌지 확인합니다."),
+            ("중간", "산업", "인공지능 기반 시설 수요의 전달", "세계 인공지능 투자 수요가 국내 반도체 주문으로 이어지는지 살핍니다."),
+            ("후속", "정책", "성장 기대의 재확인", "정책 환경과 기업 가이던스가 회복 서사를 지지하는지 검증합니다."),
         ),
     },
     {
-        "id": "pilot-risk-off",
-        "title": "위험회피 재확산",
+        "id": "macro-policy-risk",
+        "title": "무역정책·물가 불확실성 재확산",
         "tone": "down",
-        "tags": ["변동성", "수급 이탈"],
+        "tags": ["무역정책", "물가 압력", "위험회피"],
         "channels": ((-1.5, -1.8, 1.8), (-1.3, -1.6, 1.6), (-1.1, -1.4, 1.4)),
         "events": (
-            ("1주 전후", "수급", "매도 우위 지속", "거래대금 증가가 매수 전환이 아닌 매도 압력인지 점검합니다."),
-            ("2주 전후", "변동성", "가격 변동 확대", "단기 반등이 추세 전환인지 구분합니다."),
-            ("1개월 전후", "분기점", "방어 국면 지속 여부", "수급 안정과 가격 회복이 함께 나타나는지 확인합니다."),
-        ),
-    },
-    {
-        "id": "pilot-rangebound",
-        "title": "변동성 높은 박스권",
-        "tone": "neutral",
-        "tags": ["방향성 부재", "확인 대기"],
-        "channels": ((0.0, 0.0, 0.0), (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)),
-        "events": (
-            ("1주 전후", "수급", "매수·매도 균형 탐색", "하루 수급보다 며칠간의 누적 방향을 확인합니다."),
-            ("2주 전후", "기술", "가격 범위 재확인", "상단·하단 돌파에 거래대금이 동반되는지 봅니다."),
-            ("1개월 전후", "분기점", "방향성 선택", "수급과 변동성의 동시 개선 또는 악화를 판단합니다."),
+            ("초기", "무역", "정책 불확실성의 전파", "무역정책 변화가 수출 기업의 주문과 투자 계획을 흔드는지 확인합니다."),
+            ("중간", "물가", "비용·금리 부담의 확대", "에너지와 물가 압력이 통화정책과 위험선호에 미치는 영향을 살핍니다."),
+            ("후속", "분기점", "방어 심리의 지속 여부", "대외 불확실성이 완화되거나 기업 가이던스가 버티는지 검증합니다."),
         ),
     },
 )
@@ -225,47 +214,47 @@ def author_detail(model: Any, *, scenario: dict[str, Any], as_of: str, base_inde
     while exercising the production-style model boundary and full card contract.
     """
     prompt = (
-        "다음 조건부 KOSPI 시나리오를 설명하는 한국어 문장 두 개만 작성하세요. "
+        "다음 조건부 코스피 시나리오를 설명하는 한국어 문장 두 개만 작성하세요. "
         "투자 권유나 새 숫자는 금지하며, 무엇을 확인해야 하는지 포함하세요. "
-        f"제목: {scenario['title']}. 기준일: {as_of}. 기준값: {base_index:,.2f}. 전망: {forecast}."
+        f"제목: {scenario['title']}. 기준일: {as_of}."
     )
     # Keep the remote call in the pilot to test the agent boundary, but do not
     # persist unconstrained prose until the scenario-author validator is wired.
     # This prevents unsupported external facts from entering a scenario card.
     _generated = " ".join(_content(model.invoke(prompt)).split())
     summary = (
-        f"{scenario['title']}은(는) {base_index:,.2f}을 기준으로 {forecast} 경로를 시험하는 조건부 학습 시나리오입니다. "
-        "수급과 변동성 신호가 함께 확인되는지에 따라 경로의 유효성을 다시 판단해야 합니다."
+        f"{scenario['title']}은 거시 환경과 사건 전개가 위험선호에 어떻게 전달되는지 살피는 조건부 학습 시나리오입니다. "
+        "뉴스의 방향, 정책 반응, 산업 수요가 함께 바뀌는지에 따라 경로의 유효성을 다시 판단해야 합니다."
     )
     title = scenario["title"]
     tone = scenario["tone"]
     check = "회복 신호" if tone == "up" else "방어 신호" if tone == "down" else "방향성 신호"
     chapters = [
-        {"title": "출발점", "body": f"{base_index:,.2f}을 기준으로 {title}의 전개를 관찰합니다.", "evidence": "기준 지수와 단기 수익률"},
-        {"title": "수급 확인", "body": "하루 변화보다 며칠 동안의 거래대금과 참여 강도를 함께 봅니다.", "evidence": "거래대금 레짐"},
-        {"title": "변동성 해석", "body": "가격 움직임의 방향과 폭이 같은 신호를 주는지 점검합니다.", "evidence": "경로별 누적 영향"},
-        {"title": "분기점", "body": f"{check}가 이어지는지 확인한 뒤 시나리오의 조건 충족 여부를 판단합니다.", "evidence": "이벤트 체크포인트"},
+        {"title": "거시 환경", "body": "통화정책, 환율, 에너지 가격처럼 위험선호를 바꾸는 환경이 완화되는지 또는 악화되는지 살핍니다.", "evidence": "거시 환경 변화"},
+        {"title": "사건의 의미", "body": "정책 발표·실적 가이던스·지정학 뉴스가 시장의 기대를 강화하는지 훼손하는지 구분합니다.", "evidence": "검증된 사건·정책 사실"},
+        {"title": "산업 전달 경로", "body": "거시와 사건이 산업 수요, 기업 주문, 투자 심리로 이어지는 과정을 순서대로 확인합니다.", "evidence": "산업·기업 전달 경로"},
+        {"title": "분기점", "body": f"{check}가 이어지는지 확인한 뒤 시나리오의 조건 충족 여부를 판단합니다.", "evidence": "검증·무효화 조건"},
     ]
     lessons = [
-        "기준값은 결과를 단정하는 숫자가 아니라 이후 변화율을 읽기 위한 출발점입니다.",
-        "수급은 매수와 매도의 힘을 뜻하므로 하루치보다 누적 흐름을 살펴야 합니다.",
-        "변동성이 크면 같은 방향의 가격 움직임도 신뢰도가 낮아질 수 있습니다.",
-        "분기점은 한 신호가 아니라 가격·수급·변동성이 함께 확인되는 순간입니다.",
+        "거시 환경은 기업 실적과 별개로 위험자산을 선호하거나 회피하게 만드는 배경입니다.",
+        "사건은 기사 제목 자체보다 시장이 기존 기대를 바꿔야 하는지에 영향을 주는지를 읽어야 합니다.",
+        "전달 경로를 이해하면 뉴스가 산업 수요와 기업 이익에 닿기까지의 시간차를 구분할 수 있습니다.",
+        "분기점은 하나의 수치가 아니라 서로 다른 사실이 같은 방향을 가리키는지 확인하는 과정입니다.",
     ]
     return {
         "summary": summary,
-        "thesis": f"{title}은(는) 조건이 충족될 때만 유효한 학습용 경로입니다.",
+        "thesis": f"{title}은 조건이 충족될 때만 유효한 학습용 경로입니다.",
         "context": "이 결과는 현재 데이터에 시험 보정을 적용한 파일럿이며, 단정적 전망으로 사용하지 않습니다.",
         "chapters": chapters,
         "chapterLessons": lessons,
         "learningReport": {
             "title": f"{title} 읽기",
-            "lead": "기준값·예상 경로·확인 항목을 분리해 읽으면 시나리오를 단정적 예측으로 오해하지 않을 수 있습니다.",
-            "metrics": [
-                {"label": "기준 지수", "value": f"{base_index:,.2f}", "note": "DB 최신 관측값"},
-                {"label": "조건부 전망", "value": forecast, "note": "결정론적 영향 모델"},
-                {"label": "수급 상태", "value": "확인 대기", "note": "파일럿 보정값"},
-                {"label": "판단 방식", "value": "조건부", "note": "단일 결론 금지"},
+            "lead": "시장 수치를 외우기보다 거시 환경과 사건이 산업·기업·투자심리에 전달되는 순서를 읽는 것이 이 리포트의 목적입니다.",
+            "drivers": [
+                {"title": "거시 환경", "transmission": "금리·환율·에너지 환경은 위험자산을 대하는 시장의 태도를 바꿉니다.", "check": "정책 기조와 위험회피 신호가 같은 방향인지 확인합니다."},
+                {"title": "사건·정책", "transmission": "실적 전망·정책 발표·지정학 사건은 기대를 다시 쓰게 만듭니다.", "check": "기사 제목보다 원인과 후속 조치를 확인합니다."},
+                {"title": "산업·기업", "transmission": "새로운 환경은 주문·재고·투자 계획을 거쳐 기업의 전망으로 전달됩니다.", "check": "산업 수요와 기업 설명이 서로 맞는지 확인합니다."},
+                {"title": "무효화 조건", "transmission": "핵심 전제가 깨지면 같은 뉴스도 정반대 결론으로 이어질 수 있습니다.", "check": "반대 사실이 확인되면 시나리오를 보류하고 다시 작성합니다."},
             ],
             "sections": [
                 {"title": "기준값 읽기", "paragraphs": ["기준 지수는 변화율 계산의 출발점입니다.", "기준일이 바뀌면 같은 경로도 다른 의미를 가질 수 있습니다."], "takeaway": "먼저 기준일과 기준값을 확인합니다."},
@@ -289,12 +278,38 @@ def author_detail(model: Any, *, scenario: dict[str, Any], as_of: str, base_inde
             {"bias": "정밀성 착각", "trap": "소수점 전망을 확정값처럼 봅니다.", "counter": "전망값보다 조건과 한계를 먼저 읽습니다."},
         ],
         "agentInsights": [
-            {"role": "Impact Model", "title": "경로 계산", "body": "이벤트별 입력을 누적해 조건부 경로를 계산했습니다."},
-            {"role": "Market Data", "title": "기준값", "body": "읽기 전용 DB의 최신 KOSPI 관측값을 기준으로 사용했습니다."},
-            {"role": "Scenario Author", "title": "학습형 서술", "body": "OpenRouter 연결을 확인했고, 화면 본문은 검증 가능한 입력값만으로 조립했습니다."},
+            {"role": "영향 계산", "title": "경로 계산", "body": "이벤트별 입력을 누적해 조건부 경로를 계산했습니다."},
+            {"role": "시장 자료", "title": "기준값", "body": "읽기 전용 데이터베이스의 최신 코스피 관측값을 기준으로 사용했습니다."},
+            {"role": "시나리오 작성", "title": "학습형 서술", "body": "언어 모델 연결을 확인했고, 화면 본문은 검증 가능한 입력값만으로 조립했습니다."},
         ],
         "riskPoints": ["유사사례 수와 유사도는 결과의 신뢰도를 제한합니다.", "웹 보완은 과거 채널이 부족한 경우에만 적용됩니다.", "이 시나리오는 투자 조언이나 확정적 예측이 아닙니다."],
     }
+
+
+_DISPLAY_LANGUAGE_EXCEPTIONS = {"id", "target", "tone", "image", "forecast", "path", "impact"}
+_PARENTHETICAL_PARTICLE = re.compile(r"[은는이가을를과와](?:\([^)]*\))")
+_LATIN_LETTER = re.compile(r"[A-Za-z]")
+
+
+def validate_display_language(card: dict[str, Any]) -> None:
+    """Reject non-Korean prose before a pilot card is written to disk."""
+
+    def visit(value: Any, field: str = "") -> None:
+        if field in _DISPLAY_LANGUAGE_EXCEPTIONS:
+            return
+        if isinstance(value, dict):
+            for key, nested_value in value.items():
+                visit(nested_value, key)
+        elif isinstance(value, list):
+            for nested_value in value:
+                visit(nested_value, field)
+        elif isinstance(value, str):
+            if _PARENTHETICAL_PARTICLE.search(value):
+                raise ValueError(f"display prose contains a parenthetical particle: {value}")
+            if _LATIN_LETTER.search(value):
+                raise ValueError(f"display prose contains Latin characters: {value}")
+
+    visit(card)
 
 
 def run(output_dir: Path) -> Path:
@@ -330,6 +345,7 @@ def run(output_dir: Path) -> Path:
             ],
             **detail,
         }
+        validate_display_language(card)
         cards.append(card)
         (output_dir / f"historical-evidence-{spec['id']}.json").write_text(
             json.dumps({"scenario_id": spec["id"], "analog_cases": analog_cases,

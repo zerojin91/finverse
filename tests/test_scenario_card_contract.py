@@ -22,8 +22,8 @@ def test_scenario_card_is_self_contained_for_the_detail_modal():
     assert schema["properties"]["chapterLessons"]["maxItems"] == 4
 
     report = schema["$defs"]["learningReport"]
-    assert set(report["required"]) == {"title", "lead", "metrics", "sections"}
-    assert report["properties"]["metrics"]["minItems"] == 4
+    assert set(report["required"]) == {"title", "lead", "drivers", "sections"}
+    assert report["properties"]["drivers"]["minItems"] == 4
     assert report["properties"]["sections"]["minItems"] == 3
 
 
@@ -39,3 +39,11 @@ def test_scenarios_output_is_a_versioned_envelope():
 
     assert {"schema_version", "meta", "scenarios"} <= set(schema["required"])
     assert schema["properties"]["schema_version"]["const"] == "scenario-card/v1"
+
+
+def test_authoring_guide_requires_natural_korean_display_prose():
+    guide = (SCHEMA_DIR.parent / "scenario_author.agent.md").read_text()
+
+    assert "`은(는)`" in guide
+    assert "영문 약어·영문 기술어" in guide
+    assert "ticker, URL, record_id" in guide

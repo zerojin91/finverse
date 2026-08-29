@@ -28,7 +28,8 @@ type MainTab = "market" | "twin";
 type LearningReport = {
   title: string;
   lead: string;
-  metrics: { label: string; value: string; note: string }[];
+  drivers?: { title: string; transmission: string; check: string }[];
+  metrics?: { label: string; value: string; note: string }[];
   sections: { title: string; paragraphs: string[]; takeaway: string }[];
 };
 
@@ -363,13 +364,46 @@ const scenarioArticleMap: Record<string, LearningReport> = {
   },
 };
 
+const macroEventEducation = (tone: ScenarioCore["tone"]): Pick<Scenario, "chapters" | "chapterLessons" | "learningReport"> => {
+  const stance = tone === "up" ? "완화" : tone === "down" ? "악화" : "엇갈림";
+  return {
+    chapters: [
+      { title: "거시 환경", body: `통화정책·환율·에너지 환경이 위험선호를 ${stance}시키는지 살핍니다.`, evidence: "거시 환경 변화" },
+      { title: "사건의 의미", body: "정책 발표, 기업 가이던스, 지정학 뉴스가 기존 기대를 강화하는지 훼손하는지 구분합니다.", evidence: "검증된 사건·정책 사실" },
+      { title: "산업 전달 경로", body: "거시와 사건이 산업 수요, 기업 주문, 투자 심리로 이어지는 순서를 확인합니다.", evidence: "산업·기업 전달 경로" },
+      { title: "검증과 무효화", body: "핵심 전제와 반대되는 사실이 확인되면 시나리오를 보류하고 새로운 근거로 다시 판단합니다.", evidence: "검증·무효화 조건" },
+    ],
+    chapterLessons: [
+      "거시 환경은 기업 실적과 별개로 시장이 위험을 감수하려는 태도를 바꾸는 배경입니다.",
+      "사건은 headline 자체보다 시장의 기존 기대를 바꿔야 하는지를 중심으로 읽어야 합니다.",
+      "전달 경로를 이해하면 뉴스가 산업과 기업에 영향을 미치기까지의 시간차를 구분할 수 있습니다.",
+      "좋은 시나리오는 맞히는 예언이 아니라 무엇이 확인되거나 깨지면 판단을 바꿀지를 적는 도구입니다.",
+    ],
+    learningReport: {
+      title: "거시·이벤트 시나리오를 읽는 법",
+      lead: "시장 수치를 외우기보다 거시 환경과 사건이 산업·기업·투자심리에 전달되는 순서를 읽는 것이 이 리포트의 목적입니다.",
+      drivers: [
+        { title: "거시 환경", transmission: "정책과 환율 환경은 위험자산을 대하는 시장의 태도를 바꿉니다.", check: "정책 기조와 위험회피 신호가 같은 방향인지 확인합니다." },
+        { title: "사건·정책", transmission: "실적 가이던스·정책 발표·지정학 사건은 기대를 다시 쓰게 만듭니다.", check: "headline보다 원인과 후속 조치를 확인합니다." },
+        { title: "산업·기업", transmission: "새로운 환경은 주문·재고·투자 계획을 거쳐 기업 전망으로 전달됩니다.", check: "산업 수요와 기업 설명이 서로 맞는지 확인합니다." },
+        { title: "무효화 조건", transmission: "핵심 전제가 깨지면 같은 뉴스도 정반대 결론으로 이어질 수 있습니다.", check: "반대 사실이 확인되면 시나리오를 보류하고 다시 작성합니다." },
+      ],
+      sections: [
+        { title: "환경을 먼저 읽기", paragraphs: ["시장 움직임을 기업 하나의 뉴스로 설명하기 전에 통화정책, 환율, 에너지, 지정학 환경을 함께 확인합니다.", "같은 사건도 위험선호가 강한 환경과 약한 환경에서 전혀 다르게 받아들여질 수 있습니다."], takeaway: "거시 환경은 모든 사건을 해석하는 배경입니다." },
+        { title: "사건의 전달 경로", paragraphs: ["정책이나 기업 발표가 산업의 주문과 투자 계획을 어떻게 바꾸는지 연결해 봅니다.", "즉각적인 headline 반응과 실제 수요 변화는 시간차가 있을 수 있습니다."], takeaway: "사건과 기업 성과 사이의 과정을 분리해 읽습니다." },
+        { title: "판단을 갱신하기", paragraphs: ["시나리오의 핵심 전제를 지지하는 사실과 반대되는 사실을 같은 비중으로 기록합니다.", "반대 사실이 확인되면 기존 결론을 지키기보다 판단을 보류하고 근거를 다시 점검합니다."], takeaway: "검증과 무효화 조건이 학습의 핵심입니다." },
+      ],
+    },
+  };
+};
+
 const scenarios: Scenario[] = scenarioCards.map((scenario) => {
   const chapterLessons = chapterLessonMap[scenario.id];
   const learningReport = scenarioArticleMap[scenario.id];
   if (!chapterLessons || !learningReport) {
     throw new Error(`Missing Scenario Library detail content for ${scenario.id}`);
   }
-  return { ...scenario, chapterLessons, learningReport };
+  return { ...scenario, ...macroEventEducation(scenario.tone) };
 });
 
 function ScenarioLearningArticle({ scenario }: { scenario: Scenario }) {
@@ -387,10 +421,10 @@ function ScenarioLearningArticle({ scenario }: { scenario: Scenario }) {
       </header>
       <div className="scenario-learning-overview">
         <div className="scenario-learning-table-wrap">
-          <div className="scenario-learning-label">숫자로 먼저 읽기</div>
+          <div className="scenario-learning-label">거시·이벤트 전달 경로</div>
           <table className="scenario-learning-table">
-            <thead><tr><th>지표</th><th>현재·예상</th><th>이 숫자가 뜻하는 것</th></tr></thead>
-            <tbody>{article.metrics.map((metric) => <tr key={metric.label}><th scope="row">{metric.label}</th><td>{metric.value}</td><td>{metric.note}</td></tr>)}</tbody>
+            <thead><tr><th>요소</th><th>전달 경로</th><th>확인할 사실</th></tr></thead>
+            <tbody>{(article.drivers ?? article.metrics?.map((metric) => ({ title: metric.label, transmission: metric.note, check: "관련 사건과 후속 반응을 확인합니다." })) ?? []).map((driver) => <tr key={driver.title}><th scope="row">{driver.title}</th><td>{driver.transmission}</td><td>{driver.check}</td></tr>)}</tbody>
           </table>
         </div>
         <div className="scenario-learning-chart-card">
@@ -422,7 +456,7 @@ function ScenarioDetailLearning({ scenario }: { scenario: Scenario }) {
 
       <section className="scenario-decision-grid" aria-label="개인 투자자 학습 가이드">
         <article className="scenario-decision-panel"><div className="scenario-detail-label">개인 투자자의 선택지</div><p className="scenario-section-note">예측을 따라 하기보다 조건이 바뀔 때 어떤 행동을 선택할지 미리 적어보세요.</p><div className="scenario-choice-list">{scenario.investorGuide.map((guide) => <div key={`${scenario.id}-${guide.stance}`} className="scenario-choice-row"><strong>{guide.stance}</strong><div><h4>{guide.action}</h4><p>{guide.rationale}</p></div></div>)}</div></article>
-        <article className="scenario-decision-panel"><div className="scenario-detail-label">다음에 공부할 질문</div><p className="scenario-section-note">이 시나리오의 숫자를 직접 검증할 수 있는 질문입니다.</p><div className="scenario-study-list">{scenario.studyGuide.map((study) => <div key={`${scenario.id}-${study.topic}`}><span>{study.topic}</span><p>{study.question}</p></div>)}</div></article>
+        <article className="scenario-decision-panel"><div className="scenario-detail-label">다음에 공부할 질문</div><p className="scenario-section-note">이 시나리오의 거시·사건 전제를 검증할 수 있는 질문입니다.</p><div className="scenario-study-list">{scenario.studyGuide.map((study) => <div key={`${scenario.id}-${study.topic}`}><span>{study.topic}</span><p>{study.question}</p></div>)}</div></article>
       </section>
 
       <section className="scenario-bias-section" aria-label="인지 편향 체크"><div className="scenario-detail-label">판단 전, 인지 편향 체크</div><p className="scenario-section-note">같은 뉴스도 내 포지션과 기대에 따라 다르게 보입니다. 아래 함정을 먼저 확인하세요.</p><div className="scenario-bias-grid">{scenario.biasChecks.map((item) => <article key={`${scenario.id}-${item.bias}`} className="scenario-bias-card"><span>{item.bias}</span><strong>{item.trap}</strong><p><b>대응:</b> {item.counter}</p></article>)}</div></section>
@@ -1240,7 +1274,7 @@ export default function Home() {
                     </article>
                     <article className="scenario-decision-panel">
                       <div className="scenario-detail-label">다음에 공부할 질문</div>
-                      <p className="scenario-section-note">이 시나리오의 숫자를 직접 검증할 수 있는 질문입니다.</p>
+                      <p className="scenario-section-note">이 시나리오의 거시·사건 전제를 검증할 수 있는 질문입니다.</p>
                       <div className="scenario-study-list">
                         {selectedScenario.studyGuide.map((study) => (
                           <div key={`${selectedScenario.id}-${study.topic}`}><span>{study.topic}</span><p>{study.question}</p></div>

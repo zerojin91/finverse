@@ -73,6 +73,10 @@ evidence_sufficient = (n_analog >= 2) AND (channel_confidence >= 0.55)
 
 `I_news`는 **채우지 않음** (Web Agent fallback).
 
+## Educational handoff rule
+
+정량 추정치는 impact 모델 입력으로만 전달한다. Scenario Author에 제공하는 교육 근거는 유사 국면의 **촉발 사건, 거시 배경, 산업 전달 경로, 반증 조건**을 서술하며, 수익률·지수 수준·기술지표 값을 학습 요소로 제시하지 않는다.
+
 ## Volume regime
 
 [`impact_model.compute_volume_regime`](../../../agents/scenario_card/impact_model.py) 호출 또는 동일 로직 inline.

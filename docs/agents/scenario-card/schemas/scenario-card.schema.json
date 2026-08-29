@@ -41,18 +41,18 @@
     },
     "learningReport": {
       "type": "object", "additionalProperties": false,
-      "required": ["title", "lead", "metrics", "sections"],
+      "required": ["title", "lead", "drivers", "sections"],
       "properties": {
         "title": { "type": "string", "minLength": 1 },
         "lead": { "type": "string", "minLength": 30 },
-        "metrics": { "type": "array", "items": { "$ref": "#/$defs/learningMetric" }, "minItems": 4, "maxItems": 4 },
+        "drivers": { "type": "array", "items": { "$ref": "#/$defs/learningDriver" }, "minItems": 4, "maxItems": 4 },
         "sections": { "type": "array", "items": { "$ref": "#/$defs/learningSection" }, "minItems": 3, "maxItems": 3 }
       }
     },
-    "learningMetric": {
+    "learningDriver": {
       "type": "object", "additionalProperties": false,
-      "required": ["label", "value", "note"],
-      "properties": { "label": { "type": "string", "minLength": 1 }, "value": { "type": "string", "minLength": 1 }, "note": { "type": "string", "minLength": 1 } }
+      "required": ["title", "transmission", "check"],
+      "properties": { "title": { "type": "string", "minLength": 1 }, "transmission": { "type": "string", "minLength": 1 }, "check": { "type": "string", "minLength": 1 } }
     },
     "learningSection": {
       "type": "object", "additionalProperties": false,
