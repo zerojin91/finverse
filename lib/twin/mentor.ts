@@ -12,6 +12,9 @@
 // 생성형 모델은 입장을 바꾸지 못하고 문장만 다시 쓴다(app/api/twin/mentor/route.ts).
 // 실존 인물의 발언이 아니라 공개된 원칙·연구를 적용한 해석이라고 화면에 표시한다.
 // 화면에 나오는 숫자는 전부 이 서비스가 계산한 값이고, 외부 통계는 인용하지 않는다.
+//
+// 백테스트에서 나온 매도·재진입은 사용자가 실제로 한 매매가 아니라 지금의 성향과
+// 배분이 그 구간에서 만들어냈을 시점이다.  문장도 그렇게 읽히도록 가정법으로 쓴다.
 
 export type MentorStance = "ok" | "watch" | "risk";
 
@@ -71,10 +74,10 @@ function buffett(input: MentorInput): MentorVerdict {
       : input.tradeCount >= 2 || input.stockWeight >= 0.75 ? "watch"
         : "ok";
   const headline = input.tradeCount >= 2
-    ? `주식 ${pct(input.stockWeight)}인데 ${input.windowLabel} 구간에서 ${input.tradeCount}번 손을 댔습니다`
-    : `주식 ${pct(input.stockWeight)}를 거의 손대지 않았습니다`;
+    ? `주식 ${pct(input.stockWeight)}인데 ${input.windowLabel} 구간에서 ${input.tradeCount}번 손이 갑니다`
+    : `주식 ${pct(input.stockWeight)}를 거의 손대지 않게 됩니다`;
   const body = input.tradeCount >= 2
-    ? `오래 들고 가겠다는 비중과 실제로 손댄 횟수가 어긋납니다. 문제는 시장이 아니라 처음부터 견딜 수 없는 크기였을 가능성입니다. 사고파는 횟수 자체가 비용이자 판단 실수의 기회입니다.`
+    ? `오래 들고 가겠다는 비중과 이 성향이 손대는 횟수가 어긋납니다. 문제는 시장이 아니라 처음부터 견딜 수 없는 크기였을 가능성입니다. 사고파는 횟수 자체가 비용이자 판단 실수의 기회입니다.`
     : input.stockWeight >= 0.75
       ? `비중을 자주 바꾸지 않는 건 좋습니다. 다만 주식 ${pct(input.stockWeight)}는 다음 하락에서 시험받을 크기입니다. 지금 편안한 이유가 아직 안 겪어서일 수 있습니다.`
       : `비중도 매매도 안정적입니다. 남은 질문은 이 돈을 언제 쓸 것이냐입니다. 쓸 시점이 가까우면 지금의 주식 ${pct(input.stockWeight)}도 큰 편입니다.`;
@@ -129,17 +132,17 @@ function kahneman(input: MentorInput): MentorVerdict {
       : input.behaviorGap < 0 ? "watch"
         : "ok";
   const headline = input.soldCount === 0
-    ? `${input.windowLabel} 구간에서는 규칙이 걸리지 않았습니다`
+    ? `${input.windowLabel} 구간에서는 내 규칙이 걸리지 않습니다`
     : input.behaviorGap < 0
-      ? `${input.character}인 내 규칙이 ${signed(input.behaviorGap)}p를 만들었습니다`
-      : `이번 구간에서는 파는 쪽이 유리했습니다 (${signed(input.behaviorGap)}p)`;
+      ? `${input.character}인 내 규칙이 ${signed(input.behaviorGap)}p를 만듭니다`
+      : `이 구간에서는 파는 쪽이 유리하게 나옵니다 (${signed(input.behaviorGap)}p)`;
   const body = input.soldCount === 0
-    ? `매도 임계 ${signed(input.panicThreshold)}에 닿지 않아 아무 일도 없었습니다. 버틴 것이 아니라 시험받지 않은 것이니, 낙폭이 더 깊은 구간도 눌러보세요.`
+    ? `매도 임계 ${signed(input.panicThreshold)}에 닿지 않아 아무 일도 일어나지 않습니다. 버틴 것이 아니라 시험받지 않은 것이니, 낙폭이 더 깊은 구간도 눌러보세요.`
     : stuckOut
-      ? `${signed(input.panicThreshold)}에서 팔고 ${input.reentryDelay}거래일을 기다리는 성향이라 이 구간 안에서는 돌아오지 못했습니다. 손실을 만든 건 매도가 아니라 돌아오는 기준이 없다는 점입니다. 나가는 규칙만 있고 들어오는 규칙이 없으면 반등은 늘 남의 것이 됩니다.`
+      ? `${signed(input.panicThreshold)}에서 팔고 ${input.reentryDelay}거래일을 기다리는 설정이라 이 구간 안에서는 돌아오지 못합니다. 손실을 만드는 건 매도가 아니라 돌아오는 기준이 없다는 점입니다. 나가는 규칙만 있고 들어오는 규칙이 없으면 반등은 늘 남의 것이 됩니다.`
       : input.behaviorGap < 0
-        ? `그대로 뒀다면 ${signed(input.buyHoldReturn)}였습니다. 판 것 자체보다 다시 산 가격이 판 가격보다 높았는지를 보세요. 팔고 사는 왕복이 손실의 실제 형태입니다.`
-        : `이번엔 빠져나온 것이 맞았습니다. 다만 같은 규칙이 다른 구간에서도 맞는지는 별개입니다. 한 번 통한 규칙을 실력으로 기억하면 다음 구간에서 더 크게 겁니다.`;
+        ? `그대로 뒀다면 ${signed(input.buyHoldReturn)}입니다. 파는 것 자체보다 다시 사는 가격이 팔았을 가격보다 높은지를 보세요. 팔고 사는 왕복이 손실의 실제 형태입니다.`
+        : `이 구간에서는 빠져나오는 쪽이 맞습니다. 다만 같은 규칙이 다른 구간에서도 맞는지는 별개입니다. 한 번 통한 규칙을 실력으로 기억하면 다음 구간에서 더 크게 겁니다.`;
   return {
     key: "kahneman",
     name: "대니얼 카너먼의 관점",
@@ -181,4 +184,4 @@ export const mostSevere = (verdicts: MentorVerdict[]) =>
   verdicts.reduce((worst, verdict) => (severity[verdict.stance] > severity[worst.stance] ? verdict : worst), verdicts[0]);
 
 export const behaviorNote = (input: MentorInput) =>
-  `${input.windowLabel} 구간에서 나는 그대로 뒀을 때보다 ${signed(input.behaviorGap)}p였습니다. 성향 판정은 ${input.character}입니다.`;
+  `${input.windowLabel} 구간에 지금 성향과 배분을 넣으면 그대로 뒀을 때보다 ${signed(input.behaviorGap)}p입니다. 성향 판정은 ${input.character}입니다.`;

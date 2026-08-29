@@ -4,7 +4,11 @@
 //
 //   1) 총 자산과 주식 비중을 정한다   (브라우저에만 저장)
 //   2) 행동 6문항으로 트윈을 만든다   (행동 실험실 결과가 있으면 그쪽이 우선)
-//   3) 실제 과거 충격에 넣어본다      (버티기 경로 vs 트윈 경로)
+//   3) 실제 과거 충격에 넣어본다      (그대로 두기 vs 내 성향대로)
+//
+// 화면의 매도·재진입은 사용자가 실제로 한 매매가 아니다.  지금의 성향과 배분을
+// 그 구간에 넣었을 때 규칙이 만들어낸 시점이므로 문구도 가정법으로 쓴다.
+// 실제로 누른 기록은 행동 실험실에만 있다.
 //
 // 개별 종목은 묻지 않는다.  계좌를 연동하지 않는 이상 종목까지 알 수 없고,
 // 매도 트리거를 정하는 건 결국 위험자산 비중 하나이기 때문이다.  국내주식은
@@ -142,12 +146,12 @@ function MoodPanel({ mood, hasSellRule }: { mood: MarketMood; hasSellRule: boole
             {!hasSellRule
               ? "이 성향에는 매도 규칙이 없습니다"
               : mood.triggered
-                ? "나는 이미 매도 버튼을 눌렀습니다"
-                : `내 매도 버튼까지 ${gap.toFixed(1)}%p`}
+                ? "지금이라면 내 매도 기준이 이미 걸립니다"
+                : `내 매도 기준까지 ${gap.toFixed(1)}%p`}
           </strong>
           <p>
-            내 주식은 1년 고점 대비 <b>{pct(mood.drawdown)}</b>이고, 내가 실제로 파는 지점은 <b>{pct(mood.trigger)}</b>입니다.
-            {hasSellRule && !mood.triggered ? " 여기서 그만큼만 더 빠지면 같은 선택이 반복됩니다." : ""}
+            내 주식은 1년 고점 대비 <b>{pct(mood.drawdown)}</b>이고, 내 기준이 걸리는 지점은 <b>{pct(mood.trigger)}</b>입니다.
+            {hasSellRule && !mood.triggered ? " 여기서 그만큼만 더 빠지면 같은 선택을 마주하게 됩니다." : ""}
           </p>
         </div>
       </div>
@@ -201,7 +205,7 @@ function ForwardPanel({ scenario, forward, total }: { scenario: AppliedScenario;
             <small className={tone(forward.holdReturn)}>{pct(forward.holdReturn)}</small>
           </div>
           <div className="mine">
-            <span>실제로 나는</span>
+            <span>내 성향대로라면</span>
             <strong className={tone(forward.myReturn)}>{korean(total * (1 + forward.myReturn))}</strong>
             <small className={tone(forward.myReturn)}>{pct(forward.myReturn)}</small>
           </div>
@@ -218,7 +222,7 @@ function ForwardPanel({ scenario, forward, total }: { scenario: AppliedScenario;
         </div>
         <ForwardChart forward={forward} />
         <div className="twin-chart-legend">
-          <span><i className="hold" />그대로 두기</span><span><i className="twin" />나</span><span><i className="sell" />나의 매도·재진입</span>
+          <span><i className="hold" />그대로 두기</span><span><i className="twin" />내 성향대로</span><span><i className="sell" />매도·재진입 시점</span>
         </div>
         {forward.events.length > 0 ? (
           <ol className="twin-event-list">
@@ -233,7 +237,7 @@ function ForwardPanel({ scenario, forward, total }: { scenario: AppliedScenario;
           <p className="twin-shock-note">이 경로에서는 내 기준에 닿는 지점이 없어 아무것도 하지 않습니다.</p>
         )}
         <p className="twin-forward-note">
-          이 경로는 시장 인사이트가 제시한 <b>조건부 전제</b>이며 예측이 아닙니다. 한 달짜리 구간이라 주 단위로 판단한다고 가정했습니다.
+          이 경로는 시장 인사이트가 제시한 <b>조건부 전제</b>이며 예측이 아닙니다. 표시된 매매는 실제 기록이 아니라 <b>지금 성향과 배분</b>으로 계산한 시점이고, 한 달짜리 구간이라 주 단위로 판단한다고 가정했습니다.
         </p>
       </div>
     </section>
@@ -595,7 +599,7 @@ export default function TwinPage({ appliedScenario, onOpenBuilder, onGoToLab }: 
           <div className="twin-net-chart">
             <div><span>내 행동이 만든 차이 · {result?.window.label}</span><strong className={tone(result?.behaviorGap ?? 0)}>{pct(result?.behaviorGap ?? 0)}p</strong></div>
             <p className="twin-gap-copy">
-              같은 자산을 그대로 뒀다면 <b>{pct(result?.buyHoldReturn ?? 0)}</b>, 실제로 나는 <b className={tone(result?.twinReturn ?? 0)}>{pct(result?.twinReturn ?? 0)}</b>였습니다.
+              같은 자산을 그대로 뒀다면 <b>{pct(result?.buyHoldReturn ?? 0)}</b>, 내 성향대로라면 <b className={tone(result?.twinReturn ?? 0)}>{pct(result?.twinReturn ?? 0)}</b>입니다.
             </p>
             <p className="twin-gap-amount">{won((result?.behaviorGap ?? 0) * saved.total)}<em>지금 자산 기준</em></p>
           </div>
@@ -651,17 +655,17 @@ export default function TwinPage({ appliedScenario, onOpenBuilder, onGoToLab }: 
           {result ? (
             <>
               <div className="twin-shock-summary">
-                <div><span>버티기</span><strong className={tone(result.buyHoldReturn)}>{pct(result.buyHoldReturn)}</strong></div>
-                <div><span>나</span><strong className={tone(result.twinReturn)}>{pct(result.twinReturn)}</strong></div>
+                <div><span>그대로 두기</span><strong className={tone(result.buyHoldReturn)}>{pct(result.buyHoldReturn)}</strong></div>
+                <div><span>내 성향대로</span><strong className={tone(result.twinReturn)}>{pct(result.twinReturn)}</strong></div>
                 <div><span>최대 낙폭</span><strong className="down-text">{pct(result.maxDrawdown)}</strong></div>
                 <div><span>고점 회복</span><strong>{result.recoveryDays === null ? "구간 내 미회복" : `${result.recoveryDays}거래일`}</strong></div>
               </div>
               <TimeMachineChart result={result} />
               <div className="twin-chart-legend">
-                <span><i className="hold" />버티기</span><span><i className="twin" />나</span><span><i className="index" />코스피</span>
-                <span><i className="sell" />나의 매도·재진입</span>
+                <span><i className="hold" />그대로 두기</span><span><i className="twin" />내 성향대로</span><span><i className="index" />코스피</span>
+                <span><i className="sell" />매도·재진입 시점</span>
               </div>
-              <p className="twin-shock-note">{result.window.summary} 이 시뮬레이션에서 나는 한 달에 한 번 판단하고, 한 번 팔면 최소 3개월은 다시 팔지 않습니다.</p>
+              <p className="twin-shock-note">{result.window.summary} 아래 매매는 실제 기록이 아니라 <b>지금 성향과 배분</b>을 이 구간에 넣었을 때 나오는 시점입니다. 한 달에 한 번 판단하고, 한 번 팔면 최소 3개월은 다시 팔지 않는다고 가정합니다.</p>
               {result.events.length > 0 && (
                 <ol className="twin-event-list">
                   {result.events.map((event) => (
@@ -680,8 +684,8 @@ export default function TwinPage({ appliedScenario, onOpenBuilder, onGoToLab }: 
       <div className="twin-lower-grid">
         <section className="panel twin-experts-panel">
           <div className="panel-title">
-            <div><span>BEHAVIOR REPORT</span><h2>트윈이 드러낸 내 판단 습관</h2></div>
-            <span>{result?.window.label} 구간에서 실제로 일어난 매매 기준</span>
+            <div><span>BEHAVIOR REPORT</span><h2>내 성향이 이 구간에서 할 선택</h2></div>
+            <span>{result?.window.label} 구간에 지금 성향과 배분을 넣은 결과</span>
           </div>
           {character && (
             <div className="twin-character-card">
@@ -702,7 +706,7 @@ export default function TwinPage({ appliedScenario, onOpenBuilder, onGoToLab }: 
             <button className="twin-text-button" type="button" onClick={onOpenBuilder}>내 시나리오로 앞으로의 구간도 만들어보기 <ChevronRight size={15} /></button>
           </div>
           <div className="twin-disclaimer">
-            과거 실제 종가와 응답한 행동 규칙으로 계산한 교육용 결과입니다. 미래 수익을 예측하지 않으며 특정 종목의 매매를 권유하지 않습니다.
+            과거 실제 종가에 지금의 성향과 배분을 넣어 계산한 교육용 결과이며, 실제 매매 기록이 아닙니다. 미래 수익을 예측하지 않으며 특정 종목의 매매를 권유하지 않습니다.
           </div>
         </section>
 

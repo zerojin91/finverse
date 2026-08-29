@@ -1,5 +1,9 @@
 // 행동 트윈 프로필.  온보딩 6문항 -> 행동 파라미터 -> 편향 리포트.
 //
+// 리포트 문장은 전부 가정법이다.  여기 나오는 매도·재진입은 사용자가 실제로 한
+// 매매가 아니라, 지금의 성향과 배분을 과거 구간에 넣었을 때 규칙이 만들어낸
+// 시점이다.  실제로 누른 기록은 행동 실험실 쪽에만 있다.
+//
 // 문항은 "무엇을 아느냐"가 아니라 "그 상황에서 실제로 무엇을 하느냐"를 묻는다.
 // 지식 점수가 아니라 매매 규칙을 만들어야 시뮬레이션에 넣을 수 있기 때문이다.
 
@@ -156,19 +160,19 @@ export function buildReport(result: BacktestResult, profile: BehaviorProfile): B
     const after = missedRebound(result, first);
     // 판 뒤 시장이 올랐는지 내렸는지에 따라 같은 매도의 의미가 달라진다.
     const consequence = after.gain > 0
-      ? `그 뒤 ${after.days}거래일 동안 시장은 ${pct(after.gain)} 올랐고, 나는 그 구간에 ${after.returned ? "뒤늦게 참여했습니다" : "끝내 참여하지 못했습니다"}.`
-      : `그 뒤 ${after.days}거래일 동안 시장은 ${pct(after.gain)} 더 내려서 이번 매도는 손실을 줄였습니다. 다만 같은 규칙이 항상 맞지는 않는다는 점을 다른 구간에서도 확인해보세요.`;
+      ? `그 뒤 ${after.days}거래일 동안 시장은 ${pct(after.gain)} 올랐고, 그 구간에 ${after.returned ? "뒤늦게 돌아왔을 것입니다" : "끝내 돌아오지 못했을 것입니다"}.`
+      : `그 뒤 ${after.days}거래일 동안 시장은 ${pct(after.gain)} 더 내려서 이 매도는 손실을 줄였을 것입니다. 다만 같은 규칙이 항상 맞지는 않는다는 점을 다른 구간에서도 확인해보세요.`;
     cards.push({
       bias: "손실회피 · 공포 매도",
-      headline: `${day(first.date)}에 팔았습니다`,
-      body: `나는 ${first.detail}했습니다. ${consequence}`,
+      headline: `${day(first.date)}에 팔았을 것입니다`,
+      body: `내 기준대로라면 ${first.detail}합니다. ${consequence}`,
       tone: after.gain > 0 ? "warn" : "info",
     });
   } else {
     cards.push({
       bias: "손실회피 · 공포 매도",
-      headline: `최대 ${pct(result.maxDrawdown)} 낙폭을 버텼습니다`,
-      body: `설정한 임계(${pct(profile.panicDrawdown)})에 닿지 않아 매도가 없었습니다. 버틴 것 자체가 성과는 아니며, 이 구간에서 회복이 ${result.recoveryDays === null ? "구간 안에 오지 않았다는 점" : `${result.recoveryDays}거래일 걸렸다는 점`}을 함께 보세요.`,
+      headline: `최대 ${pct(result.maxDrawdown)} 낙폭에도 손대지 않았을 것입니다`,
+      body: `설정한 임계(${pct(profile.panicDrawdown)})에 닿지 않아 매도가 걸리지 않습니다. 버티는 설정 자체가 성과는 아니며, 이 구간에서 회복이 ${result.recoveryDays === null ? "구간 안에 오지 않았다는 점" : `${result.recoveryDays}거래일 걸렸다는 점`}을 함께 보세요.`,
       tone: "good",
     });
   }
@@ -178,8 +182,8 @@ export function buildReport(result: BacktestResult, profile: BehaviorProfile): B
     const effective = effectivePanicThreshold(profile);
     cards.push({
       bias: "군집행동",
-      headline: `기준보다 ${((Math.abs(raw) - Math.abs(effective)) * 100).toFixed(1)}%p 먼저 팔았습니다`,
-      body: `스스로 정한 임계는 ${pct(raw)}였지만, 외부 의견에 민감한 성향이 실제 매도 지점을 ${pct(effective)}로 앞당겼습니다.`,
+      headline: `기준보다 ${((Math.abs(raw) - Math.abs(effective)) * 100).toFixed(1)}%p 먼저 팔게 됩니다`,
+      body: `스스로 정한 임계는 ${pct(raw)}인데, 외부 의견에 민감한 성향이 실제 걸리는 지점을 ${pct(effective)}로 앞당깁니다.`,
       tone: "warn",
     });
   }
@@ -188,15 +192,15 @@ export function buildReport(result: BacktestResult, profile: BehaviorProfile): B
   if (first && !reentry) {
     cards.push({
       bias: "현재편향 · 판단 회피",
-      headline: "구간이 끝날 때까지 돌아오지 않았습니다",
-      body: `재진입까지 ${profile.reentryDelay}거래일을 기다리는 성향이라, 이 구간 안에서는 다시 들어갈 시점을 찾지 못했습니다. 나가는 기준만 있고 들어오는 기준이 없을 때 나타나는 형태입니다.`,
+      headline: "구간이 끝날 때까지 돌아오지 못합니다",
+      body: `재진입까지 ${profile.reentryDelay}거래일을 기다리는 설정이라, 이 구간 안에서는 다시 들어갈 시점이 나오지 않습니다. 나가는 기준만 있고 들어오는 기준이 없을 때 나타나는 형태입니다.`,
       tone: "warn",
     });
   } else if (reentry) {
     cards.push({
       bias: "현재편향 · 판단 회피",
-      headline: `${day(reentry.date)}에 다시 들어갔습니다`,
-      body: `${reentry.detail}했습니다. 판 가격보다 비싸게 다시 산 구간이 있는지 확인해보세요.`,
+      headline: `${day(reentry.date)}에 다시 들어가게 됩니다`,
+      body: `${reentry.detail}하게 됩니다. 팔았을 가격보다 비싸게 다시 사는 구간이 있는지 확인해보세요.`,
       tone: "info",
     });
   }
@@ -205,8 +209,8 @@ export function buildReport(result: BacktestResult, profile: BehaviorProfile): B
   if (takeProfits.length) {
     cards.push({
       bias: "처분효과",
-      headline: `이익 구간에서 ${takeProfits.length}번 미리 줄였습니다`,
-      body: `${takeProfits[0].detail}했습니다. 손실은 견디고 이익은 빨리 확정하는 방향이면, 남는 것은 손실 쪽 위험뿐입니다.`,
+      headline: `이익 구간에서 ${takeProfits.length}번 미리 줄이게 됩니다`,
+      body: `${takeProfits[0].detail}하게 됩니다. 손실은 견디고 이익은 빨리 확정하는 방향이면, 남는 것은 손실 쪽 위험뿐입니다.`,
       tone: "warn",
     });
   }
@@ -215,7 +219,7 @@ export function buildReport(result: BacktestResult, profile: BehaviorProfile): B
   if (chases.length) {
     cards.push({
       bias: "과신 · FOMO",
-      headline: `신고가에서 ${chases.length}번 비중을 늘렸습니다`,
+      headline: `신고가에서 ${chases.length}번 비중을 늘리게 됩니다`,
       body: "가장 편안하게 느껴지는 시점(신고가)에 위험 노출이 가장 커집니다. 다음 하락에서 체감 낙폭이 커지는 이유입니다.",
       tone: "warn",
     });

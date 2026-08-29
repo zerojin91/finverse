@@ -77,7 +77,7 @@ test("현재 평가금액은 최근 종가 기준으로 계산된다", () => {
 });
 
 const { marketMood } = await import("../lib/twin/market-mood.ts");
-const { mentorVerdicts, mostSevere, stanceLabels } = await import("../lib/twin/mentor.ts");
+const { mentorVerdicts, mostSevere, stanceLabels, behaviorNote } = await import("../lib/twin/mentor.ts");
 
 test("시장 온도계는 0~100 범위와 네 개 구성요소를 낸다", () => {
   const mood = marketMood(snapshot, holdings, panicky);
@@ -307,4 +307,20 @@ test("헤드라인이 입장보다 앞서 나가지 않는다", () => {
   const tight = mentorVerdicts({ ...mentorBase, cashWeight: 0.05, stockWeight: 0.95 }).find((v) => v.key === "marks");
   assert.equal(tight.stance, "risk");
   assert.ok(tight.headline.includes("뿐입니다"), tight.headline);
+});
+
+test("트윈 쪽 문구는 실제로 한 일처럼 쓰지 않는다", () => {
+  // 타임머신·시나리오·대가 문장은 전부 성향과 배분으로 계산한 투영이다.
+  // 관측을 뜻하는 단정 과거형이 섞이면 사용자가 자기 매매 기록으로 읽는다.
+  const asserted = /했습니다|팔았습니다|들어갔습니다|눌렀습니다|참여했습니다|버텼습니다|늘렸습니다|줄였습니다/;
+  const result = runBacktest(snapshot, "covid-2020", allocationHoldings(100_000_000, 0.85), panicky);
+  for (const card of buildReport(result, panicky)) {
+    assert.ok(!asserted.test(card.headline), `편향 리포트 헤드라인: ${card.headline}`);
+    assert.ok(!asserted.test(card.body), `편향 리포트 본문: ${card.headline}`);
+  }
+  for (const verdict of mentorVerdicts(mentorBase)) {
+    assert.ok(!asserted.test(verdict.headline), `${verdict.key} 헤드라인: ${verdict.headline}`);
+    assert.ok(!asserted.test(verdict.body), `${verdict.key} 본문: ${verdict.body}`);
+  }
+  assert.ok(!asserted.test(behaviorNote(mentorBase)), behaviorNote(mentorBase));
 });
