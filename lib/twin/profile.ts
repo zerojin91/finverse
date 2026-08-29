@@ -90,19 +90,48 @@ export function deriveProfile(answers: Record<string, string>): BehaviorProfile 
   return profile;
 }
 
-export type TwinCharacter = { key: string; name: string; tagline: string; watch: string };
+export type TwinCharacter = {
+  key: string;
+  name: string;
+  tagline: string;
+  watch: string;
+  /** 관측이 모자라 아직 유형을 정하지 못한 상태 */
+  provisional?: boolean;
+};
 
-export function characterFor(profile: BehaviorProfile): TwinCharacter {
-  if (profile.panicAction >= 0.8 && profile.reentryDelay >= 60)
+/**
+ * 어떤 성향을 실제로 관측했는가.
+ *
+ * 설문은 여섯 문항을 다 받으므로 전부 관측이지만, 행동 실험실은 플레이한 게임의
+ * 항목만 관측이다.  관측하지 않은 항목은 중립 기본값이 채워지는데, 그 값을 판정에
+ * 그대로 쓰면 하지도 않은 행동으로 유형이 갈린다.
+ */
+export type ObservedTraits = { panic?: boolean; herding?: boolean; disposition?: boolean; chase?: boolean };
+
+const ALL_OBSERVED: ObservedTraits = { panic: true, herding: true, disposition: true, chase: true };
+
+export function characterFor(profile: BehaviorProfile, observed: ObservedTraits = ALL_OBSERVED): TwinCharacter {
+  const { panic = false, herding = false, disposition = false, chase = false } = observed;
+
+  if (panic && profile.panicAction >= 0.8 && profile.reentryDelay >= 60)
     return { key: "exit", name: "공포 이탈형", tagline: "빠르게 손실을 끊지만, 회복 구간에는 시장 밖에 있습니다.", watch: "매도보다 재진입 기준을 먼저 정해두세요." };
-  if (profile.panicAction >= 0.5 && profile.herding >= 0.6)
+  if (panic && herding && profile.panicAction >= 0.5 && profile.herding >= 0.6)
     return { key: "crowd", name: "군중 동조형", tagline: "내 기준보다 시장 분위기가 결정을 앞당깁니다.", watch: "매도 조건을 커뮤니티가 아니라 숫자로 적어두세요." };
-  if (profile.chase >= 0.8)
+  if (chase && profile.chase >= 0.8)
     return { key: "chaser", name: "추격 돌진형", tagline: "오르는 흐름에 올라타지만 고점 부근에서 비중이 가장 커집니다.", watch: "추가 매수 한도를 미리 정해두세요." };
-  if (profile.disposition >= 0.8)
+  if (disposition && profile.disposition >= 0.8)
     return { key: "early", name: "조기 익절형", tagline: "손실은 견디고 이익은 빨리 확정합니다.", watch: "이익 구간을 끊는 기준이 손실 구간보다 엄격하지 않은지 보세요." };
-  if (profile.panicAction <= 0.2 && profile.chase <= 0.2 && profile.disposition <= 0.5)
+  // 관측하지 않은 항목은 조건에서 뺀다. 그래야 버티기만 해도 이 유형에 닿는다.
+  if (panic && profile.panicAction <= 0.2 && (!chase || profile.chase <= 0.2) && (!disposition || profile.disposition <= 0.5))
     return { key: "steady", name: "무던한 장기형", tagline: "잘 흔들리지 않지만 위험 점검도 미루기 쉽습니다.", watch: "버티는 것과 방치하는 것을 구분하세요." };
+  if (!panic || !herding || !disposition || !chase)
+    return {
+      key: "unknown",
+      name: "판정 보류",
+      tagline: "지금까지 관측한 것만으로는 어느 쪽이라고 말하기 이릅니다.",
+      watch: "남은 실험을 마치면 추정값이 아니라 관측값으로 판정합니다.",
+      provisional: true,
+    };
   return { key: "balanced", name: "균형 탐색형", tagline: "상황에 따라 다르게 반응하는, 가장 흔한 유형입니다.", watch: "구간마다 기준이 달라지지 않는지 기록해보세요." };
 }
 

@@ -223,3 +223,45 @@ test("시나리오 경로를 내 배분에 적용한다", () => {
   // 포인트가 너무 적으면 계산하지 않는다.
   assert.equal(projectForward([100, 101], 0.5, panicky), null);
 });
+
+const { observedTraits } = await import("../lib/twin/games.ts");
+
+test("유형 판정은 관측한 항목만 쓴다", () => {
+  const held = { id: "hold", sellDrawdown: null, sellFraction: 0, reentryGap: null, trimmed: 0, chased: 0, finalReturn: 0, buyHoldReturn: 0, records: [] };
+  const onlyHold = { hold: held };
+  const profile = deriveProfileFromGames(onlyHold);
+  // 버티기만 했고 끝까지 안 팔았으면 무던한 장기형이어야 한다.
+  // 예전에는 채워 넣은 chase 기본값 0.4 때문에 이 유형에 닿을 수 없었다.
+  assert.equal(characterFor(profile, observedTraits(onlyHold)).key, "steady");
+  // 관측 범위를 무시하면 기본값이 판정을 가로챈다.
+  assert.notEqual(characterFor(profile).key, "steady");
+});
+
+test("관측이 모자라면 균형 탐색형이 아니라 판정 보류가 된다", () => {
+  const halfSell = { id: "hold", sellDrawdown: -0.12, sellFraction: 0.5, reentryGap: 24, trimmed: 0, chased: 0, finalReturn: 0, buyHoldReturn: 0, records: [] };
+  const onlyHold = { hold: halfSell };
+  const character = characterFor(deriveProfileFromGames(onlyHold), observedTraits(onlyHold));
+  assert.equal(character.key, "unknown");
+  assert.equal(character.provisional, true);
+  // 아무 게임도 안 했으면 역시 보류다.
+  assert.equal(characterFor(deriveProfileFromGames({}), observedTraits({})).key, "unknown");
+  // 설문은 여섯 문항을 다 받으므로 보류가 나오지 않는다.
+  for (const answers of [
+    { threshold: "mid", action: "half", crowd: "mid", profit: "part", reentry: "month", chase: "some" },
+    { threshold: "deep", action: "hold", crowd: "low", profit: "keep", reentry: "month", chase: "none" },
+  ]) {
+    assert.notEqual(characterFor(deriveProfile(answers)).key, "unknown");
+  }
+});
+
+test("네 게임을 다 하면 판정 보류가 사라진다", () => {
+  const full = {
+    hold: { id: "hold", sellDrawdown: -0.12, sellFraction: 0.5, reentryGap: 24, trimmed: 0, chased: 0, finalReturn: 0, buyHoldReturn: 0, records: [] },
+    crowd: { id: "crowd", sellDrawdown: -0.1, sellFraction: 1, reentryGap: null, trimmed: 0, chased: 0, finalReturn: 0, buyHoldReturn: 0, records: [] },
+    profit: { id: "profit", sellDrawdown: null, sellFraction: 0, reentryGap: null, trimmed: 0.5, chased: 0, finalReturn: 0, buyHoldReturn: 0, records: [] },
+    lottery: { lambda: 2, consistent: true },
+  };
+  const character = characterFor(deriveProfileFromGames(full), observedTraits(full));
+  assert.notEqual(character.key, "unknown");
+  assert.ok(!character.provisional);
+});

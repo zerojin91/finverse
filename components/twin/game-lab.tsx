@@ -13,6 +13,7 @@ import {
   deriveProfileFromGames,
   loadSlice,
   lotteryPairs,
+  observedTraits,
   playedCount,
   replayGames,
   scoreLottery,
@@ -272,6 +273,9 @@ export default function GameLab({ onGoToTwin }: { onGoToTwin: () => void }) {
 
   const played = playedCount(results);
   const gameProfile = useMemo(() => (played ? deriveProfileFromGames(results) : null), [results, played]);
+  // 유형 판정에는 실제로 플레이한 게임의 항목만 쓴다. 채워 넣은 기본값으로 유형이
+  // 갈리면 하지도 않은 행동으로 이름이 붙는다.
+  const observed = useMemo(() => observedTraits(results), [results]);
   const saidProfile = useMemo(() => (quizAnswers && Object.keys(quizAnswers).length ? deriveProfile(quizAnswers) : null), [quizAnswers]);
 
   const applyToTwin = () => {
@@ -280,7 +284,7 @@ export default function GameLab({ onGoToTwin }: { onGoToTwin: () => void }) {
       const raw = window.localStorage.getItem(TWIN_KEY);
       // 자산 배분이 아직 없으면 트윈 화면이 설정부터 묻도록 total 을 0 으로 둔다.
       const twin = raw ? JSON.parse(raw) as Record<string, unknown> : { total: 0, stockWeight: 0.6, answers: {} };
-      window.localStorage.setItem(TWIN_KEY, JSON.stringify({ ...twin, gameProfile }));
+      window.localStorage.setItem(TWIN_KEY, JSON.stringify({ ...twin, gameProfile, gameObserved: observed }));
     } catch { /* 저장 실패해도 화면은 유지 */ }
     setApplied(true);
     onGoToTwin();
@@ -324,7 +328,7 @@ export default function GameLab({ onGoToTwin }: { onGoToTwin: () => void }) {
     );
   }
 
-  const character = gameProfile ? characterFor(gameProfile) : null;
+  const character = gameProfile ? characterFor(gameProfile, observed) : null;
   const saidCharacter = saidProfile ? characterFor(saidProfile) : null;
   const cards = [
     ...replayGames.map((game) => ({ id: game.id, title: game.title, brief: game.brief, done: Boolean(results[game.id]) })),
@@ -361,7 +365,7 @@ export default function GameLab({ onGoToTwin }: { onGoToTwin: () => void }) {
         <section className="panel lab-result">
           <div className="panel-title">
             <div><span>OBSERVED PROFILE</span><h2>관측된 당신의 성향</h2></div>
-            <span className="twin-character-chip"><UserRound size={13} /> {character.name}</span>
+            <span className={`twin-character-chip ${character.provisional ? "provisional" : ""}`}><UserRound size={13} /> {character.name}</span>
           </div>
           <div className="lab-result-body">
             <div className="lab-profile-grid">
@@ -392,9 +396,11 @@ export default function GameLab({ onGoToTwin }: { onGoToTwin: () => void }) {
                   <em>견디는 낙폭 {pct(gameProfile.panicDrawdown)} · 매도 비중 {(gameProfile.panicAction * 100).toFixed(0)}%</em>
                 </div>
                 <p>
-                  {saidCharacter.key === character.key
-                    ? "말한 것과 한 것이 같습니다. 자기 기준을 알고 있는 편입니다."
-                    : "말한 것과 한 것이 다릅니다. 대부분의 사람이 그렇고, 실제 판단을 만드는 건 오른쪽입니다."}
+                  {character.provisional
+                    ? "아직 유형을 정하기엔 관측이 모자랍니다. 남은 실험을 마치면 왼쪽과 제대로 비교할 수 있습니다."
+                    : saidCharacter.key === character.key
+                      ? "말한 것과 한 것이 같습니다. 자기 기준을 알고 있는 편입니다."
+                      : "말한 것과 한 것이 다릅니다. 대부분의 사람이 그렇고, 실제 판단을 만드는 건 오른쪽입니다."}
                 </p>
               </div>
             )}
@@ -406,7 +412,11 @@ export default function GameLab({ onGoToTwin }: { onGoToTwin: () => void }) {
               </p>
             )}
 
-            <p className="lab-note">{played}개 실험 기준입니다. 남은 실험을 마치면 나머지 항목도 추정치가 아니라 관측치가 됩니다.</p>
+            <p className="lab-note">
+              {played}개 실험 기준입니다. {character.provisional
+                ? "남은 실험을 마치면 추정값이 아니라 관측값으로 유형을 정합니다."
+                : "남은 실험을 마치면 나머지 항목도 추정치가 아니라 관측치가 됩니다."}
+            </p>
             <button className="lab-primary" type="button" onClick={applyToTwin}>
               {applied ? <><Check size={16} /> 트윈에 적용했습니다</> : <>이 성향으로 내 트윈 만들기 <ArrowRight size={16} /></>}
             </button>

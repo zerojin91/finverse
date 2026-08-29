@@ -28,10 +28,10 @@ import {
 import { projectForward, type ForwardResult } from "@/lib/twin/forward";
 import { marketMood, type MarketMood } from "@/lib/twin/market-mood";
 import { behaviorNote, harshest, mentorVerdicts, type MentorInput, type MentorVerdict } from "@/lib/twin/mentor";
-import { allocationHoldings, allocationPresets, buildReport, characterFor, deriveProfile, questions } from "@/lib/twin/profile";
+import { allocationHoldings, allocationPresets, buildReport, characterFor, deriveProfile, questions, type ObservedTraits } from "@/lib/twin/profile";
 
 const STORAGE_KEY = "finverse.twin.v2";
-type Saved = { total: number; stockWeight: number; answers: Record<string, string>; gameProfile?: BehaviorProfile };
+type Saved = { total: number; stockWeight: number; answers: Record<string, string>; gameProfile?: BehaviorProfile; gameObserved?: ObservedTraits };
 
 const won = (value: number) => `${Math.round(value).toLocaleString("ko-KR")}원`;
 const korean = (value: number) => {
@@ -445,7 +445,11 @@ export default function TwinPage({ appliedScenario, onOpenBuilder, onGoToLab }: 
     [snapshot, holdings, profile, windowId],
   );
   const report = useMemo(() => (result && profile ? buildReport(result, profile) : []), [result, profile]);
-  const character = useMemo(() => (profile ? characterFor(profile) : null), [profile]);
+  // 설문은 여섯 문항을 다 받으므로 전부 관측이고, 실험실 프로필은 플레이한 만큼만이다.
+  const character = useMemo(
+    () => (profile ? characterFor(profile, saved?.gameProfile ? saved.gameObserved ?? {} : undefined) : null),
+    [profile, saved],
+  );
   const mood = useMemo(
     () => (snapshot && holdings.length && profile ? marketMood(snapshot, holdings, profile) : null),
     [snapshot, holdings, profile],
@@ -545,7 +549,7 @@ export default function TwinPage({ appliedScenario, onOpenBuilder, onGoToLab }: 
       <section className="panel twin-assets-panel">
         <div className="panel-title">
           <h2>나의 자산 현황</h2>
-          {character && <span className="twin-character-chip"><UserRound size={13} /> {character.name}</span>}
+          {character && <span className={`twin-character-chip ${character.provisional ? "provisional" : ""}`}><UserRound size={13} /> {character.name}</span>}
         </div>
         <div className="twin-assets-grid">
           <div className="twin-metric">

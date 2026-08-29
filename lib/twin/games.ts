@@ -141,6 +141,14 @@ export function deriveProfileFromGames(results: GameResults): BehaviorProfile {
   };
 }
 
+/** 어떤 성향을 실제로 관측했는지. 플레이한 게임이 곧 관측 범위다. */
+export const observedTraits = (results: GameResults) => ({
+  panic: Boolean(results.hold),
+  herding: Boolean(results.crowd),
+  disposition: Boolean(results.profit),
+  chase: Boolean(results.profit),
+});
+
 /** 게임 네 개를 다 했는지. 결과 화면에서 신뢰도 표시에 쓴다. */
 export const playedCount = (results: GameResults) =>
   [results.hold, results.crowd, results.profit, results.lottery].filter(Boolean).length;

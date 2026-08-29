@@ -100,4 +100,4 @@ export const harshest = (verdicts: MentorVerdict[]) =>
   verdicts.reduce((low, verdict) => (verdict.score < low.score ? verdict : low), verdicts[0]);
 
 export const behaviorNote = (input: MentorInput) =>
-  `${input.windowLabel} 구간에서 ${input.character}인 나는 그대로 뒀을 때보다 ${signed(input.behaviorGap)}p였습니다.`;
+  `${input.windowLabel} 구간에서 나는 그대로 뒀을 때보다 ${signed(input.behaviorGap)}p였습니다. 성향 판정은 ${input.character}입니다.`;
