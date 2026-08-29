@@ -4,8 +4,13 @@ import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
 
+// .env 는 저장소에 공유되고, .env.local 은 추적하지 않는다.  PEM 경로처럼 머신마다
+// 다른 값은 .env.local 에 두고 그쪽을 나중에 읽어 덮어쓴다.
 function loadEnv() {
-  const envPath = resolve(root, ".env");
+  for (const name of [".env", ".env.local"]) loadEnvFile(resolve(root, name));
+}
+
+function loadEnvFile(envPath) {
   if (!existsSync(envPath)) return;
   for (const raw of readFileSync(envPath, "utf8").split(/\r?\n/)) {
     const line = raw.trim();
@@ -16,7 +21,7 @@ function loadEnv() {
     const key = normalized.slice(0, separator).trim();
     let value = normalized.slice(separator + 1).trim();
     if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1);
-    if (!(key in process.env)) process.env[key] = value;
+    if (value) process.env[key] = value;
   }
 }
 
