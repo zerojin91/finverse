@@ -38,6 +38,7 @@
 - 로컬 개발은 `npm run dev`로 시작한다. Next.js, SSH DB 브리지, 모의 투자 Flask API를 함께 띄운다.
 - DB는 원격 서버의 Docker 컨테이너 `finverse-db`, 데이터베이스 `finverse`다. 수집 원본과 AI 분석 결과의 중심 저장소는 `lake.records`다.
 - `services/paper_trading/`은 별도 도메인 엔진이다. 과거 KOSPI 데이터·규칙 기반 체결·행동 분석을 사용하며, LLM 설명에는 OpenRouter를 선택적으로 사용한다. 이 서비스는 `FINVERSE_DATABASE_URL`을 직접 요구할 수 있어 SSH 브리지와 데이터 접근 경로가 다르다.
+- 로컬 모의투자 서비스는 Tailscale 사설망의 읽기 전용 PostgreSQL 연결을 `FINVERSE_DATABASE_URL`로 사용한다. 이 값은 `.env`에만 두며, 코드·문서·로그에는 값 자체를 기록하지 않는다.
 
 ### 데이터·AI 흐름
 
@@ -92,6 +93,13 @@ scripts/run_bedrock_signal_update.sh --dry-run
 - UI 이상은 다음 순서로 본다: `GET /api/dashboard` 응답 → 5439 브리지 상태 → `lake.records` 데이터/배치 로그 → OpenRouter 키·모델 설정.
 
 ### 운영 변경·사고 기록
+
+#### 2026-08-30 — 모의투자 종목 검색의 DB 연결 누락
+
+- 증상: 모의투자 설정 화면에서 종목명을 입력하면 `FINVERSE_DATABASE_URL이 설정되지 않았습니다` 오류가 표시됐다.
+- 원인: 모의투자 Flask 서비스는 SSH 브리지가 아니라 `psycopg`로 읽기 전용 PostgreSQL에 직접 연결하도록 구현됐는데, 로컬 `.env`에 해당 연결 문자열이 없었다.
+- 조치: 로컬 `.env`에 Tailscale 사설망의 읽기 전용 DB 연결을 설정하고 서비스를 재시작했다.
+- 재발 방지: 모의투자 관련 오류는 먼저 `/health`의 설정 상태와 `FINVERSE_DATABASE_URL`의 존재 여부(값 비노출)를 확인한다. 공개 클라이언트에는 이 연결 문자열을 절대 전달하지 않는다.
 
 #### 2026-08-30 — WSL SSH 개인 키 권한 문제
 
