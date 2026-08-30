@@ -5,3 +5,80 @@
 - 코드나 설정을 변경한 뒤에는 필요한 검증을 거쳐 로컬 Git 커밋까지 만든다.
 - 사용자가 명시적으로 "푸시해줘"라고 요청하기 전에는 원격 저장소(GitHub)에 `git push`를 실행하지 않는다.
 - 여러 커밋은 사용자의 푸시 요청 시점에 한 번에 푸시할 수 있도록 로컬에 보관한다.
+
+## 프로젝트 하네스: 빠른 운영·개발 맥락
+
+### 서비스 구성
+
+```
+브라우저
+  └─ Next.js 앱 (포트 3000, app/)
+       ├─ 대시보드·KOSPI·온톨로지 API
+       │    └─ KOSPI SSH 브리지 (포트 5439, scripts/kospi_bridge.mjs)
+       │         └─ SSH → 원격 수집 서버 → docker exec finverse-db psql
+       └─ 모의 투자 API 프록시 (/api/paper-trading/*)
+            └─ Flask 서비스 (포트 5055, services/paper_trading_api.py)
+
+원격 수집 서버
+  ├─ collectors/*.py → data/*.jsonl
+  ├─ scripts/load_postgres.py → PostgreSQL lake.records
+  ├─ scripts/bedrock_signal_update.py → OpenRouter 요약 → lake.records
+  └─ scripts/sync_ontology.sh → lake → core → graph 동기화
+```
+
+- 프론트엔드 진입점은 `app/page.tsx`이고, Next.js API 라우트는 `app/api/`에 있다.
+- 로컬 개발은 `npm run dev`로 시작한다. Next.js, SSH DB 브리지, 모의 투자 Flask API를 함께 띄운다.
+- DB는 원격 서버의 Docker 컨테이너 `finverse-db`, 데이터베이스 `finverse`다. 수집 원본과 AI 분석 결과의 중심 저장소는 `lake.records`다.
+- `services/paper_trading/`은 별도 도메인 엔진이다. 과거 KOSPI 데이터·규칙 기반 체결·행동 분석을 사용하며, LLM 설명에는 OpenRouter를 선택적으로 사용한다. 이 서비스는 `FINVERSE_DATABASE_URL`을 직접 요구할 수 있어 SSH 브리지와 데이터 접근 경로가 다르다.
+
+### 데이터·AI 흐름
+
+- 시장·경제·뉴스·커뮤니티 수집기는 `collectors/`에 있다. `scripts/run_ingest.sh`가 수집과 PostgreSQL 적재를 묶는다.
+- 대시보드는 `app/api/dashboard/route.ts`에서 KOSPI·거시지표·뉴스·수급을 읽고, 최신 `market_signal_analysis` 레코드의 OpenRouter 분석을 사용한다.
+- AI 요약 레코드가 없으면 UI는 “요약을 불러오고 있다” 기본 문구를 표시한다. 레코드 형식은 `record_type='market_signal_analysis'`, `source='openrouter'`이다.
+- `scripts/bedrock_signal_update.py`라는 파일명은 과거 호환 이름일 뿐, 현재 구현은 AWS Bedrock이 아니라 OpenRouter Chat Completions API를 사용한다.
+- 요약·시나리오·모의 투자 LLM은 `OPENROUTER_API_KEY`를 사용한다. 키나 `.env` 값은 절대로 로그·커밋·응답에 노출하지 않는다.
+
+### 원격 서버 접속
+
+- SSH 대상: `ubuntu@44.206.56.75`.
+- Windows에서 `D:\finverse_key.pem`을 직접 쓰면 WSL SSH가 권한이 너무 열려 있다고 거부할 수 있다. WSL 홈으로 복사한 뒤 소유자 전용 권한을 사용한다.
+
+```bash
+mkdir -p ~/.ssh
+cp /mnt/d/finverse_key.pem ~/.ssh/finverse_key.pem
+chmod 400 ~/.ssh/finverse_key.pem
+ssh -i ~/.ssh/finverse_key.pem ubuntu@44.206.56.75
+```
+
+- Windows 로컬 브리지에서는 `.env`에 아래를 사용하면 WSL의 권한 정상 키로 SSH를 실행한다.
+
+```env
+FINVERSE_SSH_USE_WSL=1
+FINVERSE_WSL_DISTRO=Ubuntu
+FINVERSE_WSL_SSH_KEY=~/.ssh/finverse_key.pem
+```
+
+- 원격 서버의 작업 경로는 `/home/ubuntu/finverse`다. 원격 `.env`에는 로컬에 없는 Docker 전용 값(예: `POSTGRES_PASSWORD`)이 포함될 수 있다. 로컬 `.env`를 복사할 때는 서버 전용 값을 무조건 덮어쓰지 말고 보존·병합한 뒤 `chmod 600 .env`를 적용한다.
+- 배포 전에는 원격의 수정·미추적 파일을 백업 및 stash로 보존한다. `git reset --hard`나 `git clean`을 백업 없이 실행하지 않는다.
+
+### 원격 배치 운영
+
+- 원격 cron은 `deploy/crontab`에서 관리하고 `crontab deploy/crontab`으로 설치한다. 서버 시간은 UTC다.
+- 평일 10:00 UTC(19:00 KST): 시장 수집·DB 적재 성공 후 같은 작업에서 OpenRouter 시장 요약을 생성한다. 따라서 수집이 끝난 직후에만 요약이 실행된다.
+- 매일 20:30 UTC(05:30 KST): 경제·뉴스 수집 및 적재.
+- 매일 22:00 UTC(07:00 KST): `scripts/sync_ontology.sh`로 lake → core → graph 동기화.
+- 배치 장애 확인은 원격 `logs/cron.log`와 아래의 읽기 전용 입력 점검을 우선 사용한다.
+
+```bash
+cd /home/ubuntu/finverse
+scripts/run_bedrock_signal_update.sh --dry-run
+```
+
+- 실제 요약 생성은 시장·뉴스 기반 입력을 OpenRouter로 전송하고 결과를 DB에 저장한다. 명시적으로 승인된 경우에만 수동 `--force` 실행을 한다.
+
+### 현재 배포 기준과 점검 순서
+
+- 2026-08-30 기준 원격 코드는 `origin/main`의 `df294d8`로 배포됐다. 이후 로컬에서 만든 커밋은 사용자의 푸시 요청 전까지 원격 GitHub에는 올리지 않는다.
+- 원격에는 배포 전 상태 백업과 stash가 있을 수 있다. 복구가 필요할 때만 해당 백업을 사용하며, 일상 작업에서는 건드리지 않는다.
+- UI 이상은 다음 순서로 본다: `GET /api/dashboard` 응답 → 5439 브리지 상태 → `lake.records` 데이터/배치 로그 → OpenRouter 키·모델 설정.
