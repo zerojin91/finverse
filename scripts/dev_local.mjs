@@ -32,15 +32,16 @@ const start = (command, args, label) => {
   return child;
 };
 
-console.log(`KOSPI SSH bridge: ${process.env.FINVERSE_SSH_HOST || "ubuntu@44.206.56.75"}`);
-console.log(`KOSPI PEM path: ${process.env.FINVERSE_SSH_KEY || "(미설정)"}`);
-start(process.platform === "win32" ? "node" : process.execPath, [resolve(root, "scripts/kospi_bridge.mjs")], "KOSPI bridge");
+start(process.platform === "win32" ? "node" : process.execPath, [resolve(root, "scripts/mirofish_gateway.mjs")], "MiroFish gateway");
 if (process.env.FINVERSE_SIMULATION_TUNNEL_ENABLED === "1") {
   start(process.platform === "win32" ? "node" : process.execPath, [resolve(root, "scripts/simulation_api_tunnel.mjs")], "simulation API tunnel");
 }
 // 페이퍼 트레이딩 엔진. 예전에는 FinSimulation을 따로 띄워야 했다.
 const paperPython = process.env.FINVERSE_PYTHON?.trim()
-  || (existsSync(resolve(root, ".venv-paper/bin/python")) ? resolve(root, ".venv-paper/bin/python") : "python3");
+  || (existsSync(resolve(root, ".venv-paper/bin/python")) ? resolve(root, ".venv-paper/bin/python")
+    : process.platform === "win32" && existsSync(resolve(root, ".venv", "Scripts", "python.exe"))
+      ? resolve(root, ".venv", "Scripts", "python.exe")
+      : "python3");
 start(paperPython, ["-m", "services.paper_trading_api"], "paper trading engine");
 
 // vinext dev currently fails while scanning the lazily loaded AI chat bundle,

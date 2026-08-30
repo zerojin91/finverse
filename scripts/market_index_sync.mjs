@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { spawn } from "node:child_process";
+import postgres from "postgres";
 
 for (const path of [".env", ".env.local"]) {
   try { process.loadEnvFile(path); } catch { /* optional */ }
@@ -43,11 +43,9 @@ async function fetchMarket(market) {
   return points.map((point) => ({ ...point, market, previousClose }));
 }
 
-const keyPath = process.env.FINVERSE_SSH_KEY;
-const sshHost = process.env.FINVERSE_SSH_HOST;
-const database = process.env.FINVERSE_DB_NAME || "finverse";
-const container = process.env.FINVERSE_DB_CONTAINER || "finverse-db";
-if (!keyPath || !sshHost) throw new Error("FINVERSE_SSH_KEY and FINVERSE_SSH_HOST are required");
+const databaseUrl = process.env.FINVERSE_DATABASE_URL?.trim();
+if (!databaseUrl) throw new Error("FINVERSE_DATABASE_URL is required");
+const db = postgres(databaseUrl, { connect_timeout: 8, idle_timeout: 20, max: 1, prepare: false });
 
 const collectedAt = new Date().toISOString();
 const fetched = (await Promise.all(markets.map(fetchMarket))).flat();
@@ -64,23 +62,15 @@ const rows = fetched.map(({ market, previousClose, ...point }) => {
   return { record_id: recordId, collector: "market_index_sync", record_type: payload.record_type, source: payload.source, schema_version: payload.schema_version, record_hash: recordHash, collected_at: collectedAt, payload: JSON.stringify({ ...payload, record_id: recordId, record_hash: recordHash, collected_at: collectedAt }) };
 });
 
-const remotePsql = (query) => new Promise((resolve, reject) => {
-  const child = spawn("ssh", ["-T", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=15", "-i", keyPath, sshHost, "docker", "exec", "-i", container, "psql", "-X", "-qAt", "-v", "ON_ERROR_STOP=1", "-U", "finverse", "-d", database, "-f", "-"], { windowsHide: true });
-  let stderr = "";
-  child.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
-  child.on("error", reject);
-  child.on("close", (code) => code === 0 ? resolve() : reject(new Error(stderr.trim() || `ssh exited with code ${code}`)));
-  child.stdin.end(query, "utf8");
-});
-
-if (rows.length) {
-  const encoded = JSON.stringify(rows).replaceAll("'", "''");
-  await remotePsql(`
+try {
+  if (rows.length) await db`
     insert into lake.records (record_id, collector, record_type, source, schema_version, record_hash, collected_at, payload)
     select record_id, collector, record_type, source, schema_version, record_hash, collected_at::timestamptz, payload::jsonb
-    from jsonb_to_recordset('${encoded}'::jsonb) as x(record_id text, collector text, record_type text, source text, schema_version text, record_hash text, collected_at text, payload text)
+    from jsonb_to_recordset(${JSON.stringify(rows)}::jsonb) as x(record_id text, collector text, record_type text, source text, schema_version text, record_hash text, collected_at text, payload text)
     on conflict (record_id) do update set record_hash = excluded.record_hash, collected_at = excluded.collected_at, payload = excluded.payload, loaded_at = now()
     where lake.records.record_hash is distinct from excluded.record_hash;
-  `);
+  `;
+  console.log(JSON.stringify({ synced: rows.length, indices: markets.map((market) => market.key), generatedAt: collectedAt }));
+} finally {
+  await db.end();
 }
-console.log(JSON.stringify({ synced: rows.length, indices: markets.map((market) => market.key), generatedAt: collectedAt }));

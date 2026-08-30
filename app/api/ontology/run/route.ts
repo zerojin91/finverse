@@ -1,11 +1,11 @@
 export const dynamic = "force-dynamic";
 
-const bridgeUrl = () => process.env.FINVERSE_KOSPI_BRIDGE_URL?.trim() ?? "http://127.0.0.1:5439";
+const gatewayUrl = () => process.env.FINVERSE_MIROFISH_GATEWAY_URL?.trim() ?? "http://127.0.0.1:5440";
 
 export async function POST(request: Request) {
   const body = await request.text();
   try {
-    const response = await fetch(`${bridgeUrl()}/ontology/run`, {
+    const response = await fetch(`${gatewayUrl()}/ontology/run`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body,
@@ -24,6 +24,6 @@ export async function POST(request: Request) {
       },
     });
   } catch {
-    return Response.json({ error: "온톨로지 실행 브리지에 연결하지 못했습니다. 로컬 서비스를 다시 실행해주세요." }, { status: 503 });
+    return Response.json({ error: "온톨로지 실행 게이트웨이에 연결하지 못했습니다. 로컬 서비스를 다시 실행해주세요." }, { status: 503 });
   }
 }

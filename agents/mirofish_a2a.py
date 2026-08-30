@@ -8,7 +8,6 @@ import json
 import os
 import re
 import socket
-import subprocess
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Literal
@@ -191,109 +190,30 @@ def _create_chat_model(model_id: str):
     return _openrouter_chat_model(openrouter_model_id, api_key)
 
 
-def _sql_literal(value: Any) -> str:
-    """Render an internal, allowlisted query parameter for remote psql."""
-    if value is None:
-        return "NULL"
-    if isinstance(value, bool):
-        return "TRUE" if value else "FALSE"
-    if isinstance(value, (list, tuple)):
-        return "ARRAY[" + ", ".join(_sql_literal(item) for item in value) + "]"
-    if isinstance(value, (int, float)) and not isinstance(value, bool):
-        return str(value)
-    if isinstance(value, (date,)):
-        value = value.isoformat()
-    escaped = str(value).replace("'", "''")
-    return f"'{escaped}'"
-
-
-def _render_query(sql: str, params: tuple[Any, ...]) -> str:
-    """Substitute only the fixed tool parameters before sending SQL to psql."""
-    sql = sql.replace("%%", "%")
-    index = 0
-
-    def replace_placeholder(match: re.Match[str]) -> str:
-        nonlocal index
-        if index >= len(params):
-            raise ValueError("database query has more placeholders than parameters")
-        value = _sql_literal(params[index])
-        index += 1
-        return value
-
-    rendered = re.sub(r"(?<!%)%s", replace_placeholder, sql)
-    if index != len(params):
-        raise ValueError("database query has more parameters than placeholders")
-    return rendered
-
-
 def _read_query(sql: str, params: tuple[Any, ...]) -> list[dict[str, Any]]:
-    """Run an approved read-only SELECT through SSH and remote Docker psql."""
-    key_path = os.environ.get("FINVERSE_SSH_KEY")
-    ssh_host = os.environ.get("FINVERSE_SSH_HOST")
-    if not key_path or not ssh_host:
-        raise RuntimeError("FINVERSE_SSH_KEY and FINVERSE_SSH_HOST are required for database access")
-
+    """Run an approved read-only SELECT through the private PostgreSQL URL."""
+    database_url = os.environ.get("FINVERSE_DATABASE_URL", "").strip()
+    if not database_url:
+        raise RuntimeError("FINVERSE_DATABASE_URL is required for database access")
     timeout_ms = _statement_timeout_ms()
-    database = os.environ.get("FINVERSE_DB_NAME", "finverse")
-    container = os.environ.get("FINVERSE_DB_CONTAINER", "finverse-db")
-    ssh_timeout = _environment_int(
-        "FINVERSE_DB_SSH_TIMEOUT_SECONDS",
-        90,
-        minimum=30,
-    )
-    rendered_sql = _render_query(sql, params).strip().rstrip(";")
-    query_script = (
-        f"SET statement_timeout = {timeout_ms};\n"
-        "SET default_transaction_read_only = on;\n"
-        "SET max_parallel_workers_per_gather = 0;\n"
-        "SELECT COALESCE(json_agg(row_to_json(result)), '[]'::json)\n"
-        "FROM (\n"
-        f"{rendered_sql}\n"
-        ") AS result;\n"
-    )
-    command = [
-        "ssh", "-i", key_path, "-T",
-        "-o", "BatchMode=yes",
-        "-o", "ConnectTimeout=15",
-        ssh_host,
-        "docker", "exec", "-i", container,
-        "psql", "-X", "-qAt", "-v", "ON_ERROR_STOP=1",
-        "-U", "finverse", "-d", database, "-f", "-",
-    ]
     try:
-        result = subprocess.run(
-            command,
-            input=query_script,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            capture_output=True,
-            timeout=ssh_timeout,
-            check=False,
+        import psycopg
+        from psycopg.rows import dict_row
+        options = (
+            f"-c statement_timeout={timeout_ms} "
+            "-c default_transaction_read_only=on "
+            "-c max_parallel_workers_per_gather=0 "
+            "-c idle_in_transaction_session_timeout=15s"
         )
-    except subprocess.TimeoutExpired as exc:
-        raise DatabaseQueryTimeoutError(
-            f"database query exceeded {timeout_ms / 1000:g}s"
-        ) from exc
-    if result.returncode != 0:
-        error = (result.stderr or "").strip().splitlines()
-        message = error[0] if error else "SSH/psql exited with an error"
-        if "statement timeout" in (result.stderr or "").lower():
+        with psycopg.connect(database_url, autocommit=True, connect_timeout=8, options=options, row_factory=dict_row) as connection, connection.cursor() as cursor:
+            cursor.execute(sql, params)
+            return list(cursor.fetchall())
+    except Exception as exc:
+        if "statement timeout" in str(exc).lower():
             raise DatabaseQueryTimeoutError(
                 f"database query exceeded {timeout_ms / 1000:g}s"
-            )
-        raise RuntimeError(f"database query failed: {message}")
-
-    output = (result.stdout or "").strip()
-    if not output:
-        raise RuntimeError("database query returned no JSON result")
-    try:
-        rows = json.loads(output.splitlines()[-1])
-    except json.JSONDecodeError as exc:
-        raise RuntimeError("database query returned invalid JSON") from exc
-    if not isinstance(rows, list):
-        raise RuntimeError("database query returned an unexpected result shape")
-    return rows
+            ) from exc
+        raise RuntimeError(f"database query failed: {exc}") from exc
 
 
 def _read_query_payload(

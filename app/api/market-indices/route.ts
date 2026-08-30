@@ -1,20 +1,10 @@
+import { finverseQuery } from "@/lib/finverse-db";
+
 export const dynamic = "force-dynamic";
 
 type Row = { key: string; name: string; date: string; close: number; change_pct: number; open: number | null; high: number | null; low: number | null };
 const keys = ["KOSPI", "KOSDAQ", "SP500", "NASDAQ"];
 const compact = (date: Date) => date.toISOString().slice(0, 10).replaceAll("-", "");
-const env = (name: string) => process.env[name]?.trim();
-const remotePsql = async (query: string): Promise<Row[]> => {
-  const bridgeUrl = env("FINVERSE_KOSPI_BRIDGE_URL") ?? "http://127.0.0.1:5439";
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), Math.max(30, Number(env("FINVERSE_DB_SSH_TIMEOUT_SECONDS") ?? 90)) * 1000);
-  try {
-    const response = await fetch(`${bridgeUrl}/query`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sql: query }), signal: controller.signal, cache: "no-store" });
-    const body = await response.json() as unknown;
-    if (!response.ok) throw new Error(typeof body === "object" && body && "error" in body ? String(body.error) : `브리지 응답 ${response.status}`);
-    return Array.isArray(body) ? body as Row[] : [];
-  } finally { clearTimeout(timer); }
-};
 
 const sample = <T,>(points: T[], maximum = 80) => {
   if (points.length <= maximum) return points;
@@ -25,11 +15,11 @@ const sample = <T,>(points: T[], maximum = 80) => {
 };
 
 export async function GET() {
-  if (!env("FINVERSE_SSH_KEY") || !env("FINVERSE_SSH_HOST")) return Response.json({ error: "PEM SSH 환경변수가 설정되지 않았습니다." }, { status: 503 });
+  if (!process.env.FINVERSE_DATABASE_URL?.trim()) return Response.json({ error: "FINVERSE_DATABASE_URL이 설정되지 않았습니다." }, { status: 503 });
   const end = new Date();
   const start = new Date(end.getTime() - 5 * 24 * 60 * 60_000);
   try {
-    const rows = await remotePsql(`
+    const rows = await finverseQuery<Row>(`
       select payload->>'index_key' as key, payload->>'idx_name' as name,
         payload->>'trade_at' as date, (payload->>'close')::double precision as close,
         (payload->>'change_pct')::double precision as change_pct,

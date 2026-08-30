@@ -1,10 +1,10 @@
 export const dynamic = "force-dynamic";
 
-const bridgeUrl = () => process.env.FINVERSE_KOSPI_BRIDGE_URL?.trim() ?? "http://127.0.0.1:5439";
+const gatewayUrl = () => process.env.FINVERSE_MIROFISH_GATEWAY_URL?.trim() ?? "http://127.0.0.1:5440";
 
 export async function POST(request: Request) {
   try {
-    const response = await fetch(`${bridgeUrl()}/mirofish/runtime`, {
+    const response = await fetch(`${gatewayUrl()}/mirofish/runtime`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: await request.text(),

@@ -21,9 +21,9 @@ uv run python tools/site.py build
 
 `uv`는 빌드 실행 환경과 캐시를 각각 `.venv`, `.uv-cache`로 격리하고, Node.js 패키지는 `package-lock.json`과 프로젝트 내부 `node_modules`로 분리해 관리합니다. 첫 실행 시 필요한 패키지를 자동으로 설치합니다. Node.js 22.13 이상이 필요합니다.
 
-### 로컬 실행과 KOSPI 데이터 연동
+### 로컬 실행과 PostgreSQL 데이터 연동
 
-로컬 서비스는 `.env`에 지정한 PEM 키로 수집 서버에 SSH 접속하고, 서버의 Docker PostgreSQL에서 KOSPI OHLC 데이터를 받아옵니다. PEM 파일 자체는 저장소에 넣지 않고, 로컬 파일 경로만 설정합니다.
+서버 사이드 서비스는 `.env`의 읽기 전용 `FINVERSE_DATABASE_URL`로 Tailscale 사설망 PostgreSQL에 직접 연결합니다. 이 값은 브라우저·Git·로그에 노출하면 안 됩니다.
 
 ```bash
 copy .env.example .env
@@ -31,23 +31,10 @@ npm install
 npm run dev
 ```
 
-`.env`의 수집 서버 설정은 다음과 같습니다.
+`.env`의 데이터 연결 설정은 다음과 같습니다.
 
 ```env
-FINVERSE_SSH_KEY=D:\finverse_key.pem
-FINVERSE_SSH_HOST=ubuntu@44.206.56.75
-FINVERSE_KOSPI_BRIDGE_PORT=5439
-FINVERSE_KOSPI_BRIDGE_URL=http://127.0.0.1:5439
-```
-
-WSL에서 키를 `~/.ssh/finverse_key.pem`으로 복사하고 `chmod 400`으로 보호했다면,
-Windows 드라이브의 키 권한 문제를 피하기 위해 다음 설정을 추가합니다. KOSPI 브리지만
-WSL의 SSH를 통해 원격 PostgreSQL을 조회합니다.
-
-```env
-FINVERSE_SSH_USE_WSL=1
-FINVERSE_WSL_DISTRO=Ubuntu
-FINVERSE_WSL_SSH_KEY=~/.ssh/finverse_key.pem
+FINVERSE_DATABASE_URL=postgresql://readonly_user:password@private-host:5432/finverse
 ```
 
 웹 시나리오 브리핑, 일일 시장 연결 분석, MiroFish와 온톨로지 Agent의 LLM 호출은 모두 OpenRouter의 `google/gemma-4-31b-it:free`를 기본으로 사용합니다. `.env`에는 다음 키 하나만 추가하면 됩니다.
@@ -58,7 +45,7 @@ OPENROUTER_API_KEY=발급받은_키
 
 AWS 리전, Bedrock 토큰, Anthropic 모델 설정은 필요하지 않습니다. 기본 모델이 429 제한을 반환하면 `google/gemma-4-26b-a4b-it:free`로 한 번 자동 재시도합니다. 모델 구성을 바꿔야 할 때만 선택적으로 `OPENROUTER_MODEL`과 `OPENROUTER_FALLBACK_MODEL`을 추가할 수 있습니다.
 
-`npm run dev`는 웹 앱과 SSH 데이터 브리지를 함께 실행합니다. 브리지는 `finverse-db` 컨테이너의 PostgreSQL에서 `lake.records` 중 `market_index_daily`와 KOSPI 레코드를 조회하고, 다음 OHLC 필드를 서비스에 전달합니다.
+`npm run dev`는 웹 앱, 모의투자 API, MiroFish 로컬 게이트웨이를 함께 실행합니다. 대시보드·KOSPI·장중지수·모의투자 데이터는 모두 `FINVERSE_DATABASE_URL`을 통해 `lake.records`를 직접 조회합니다.
 
 ### MiroFish 직접 실행 파이프라인
 
@@ -91,7 +78,7 @@ MIROFISH_EMBEDDING_BASE_URL=http://localhost:11434
 | `low` | 캔들 저가와 아랫꼬리 |
 | `close` | 캔들 종가와 헤더의 현재 지수값 |
 
-서비스는 `/api/kospi`를 통해 최신 데이터와 최근 거래일 캔들을 받고 60초마다 다시 확인합니다. 브리지는 동일 조회 결과를 30초 동안 캐시해 불필요한 SSH 접속을 줄입니다. 따라서 수집 서버에 새 시장 데이터가 적재되면 다음 동기화 주기에 화면의 지수값, 캔들차트, 현재일 라벨이 함께 갱신됩니다.
+서비스는 `/api/kospi`를 통해 최신 데이터와 최근 거래일 캔들을 받고 60초마다 다시 확인합니다. 따라서 수집 서버에 새 시장 데이터가 적재되면 다음 동기화 주기에 화면의 지수값, 캔들차트, 현재일 라벨이 함께 갱신됩니다.
 
 Windows에서 SSH가 PEM 권한을 거부하면 키를 현재 사용자만 읽을 수 있도록 제한합니다.
 

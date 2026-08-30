@@ -21,9 +21,10 @@
 ```
 브라우저
   └─ Next.js 앱 (포트 3000, app/)
-       ├─ 대시보드·KOSPI·온톨로지 API
-       │    └─ KOSPI SSH 브리지 (포트 5439, scripts/kospi_bridge.mjs)
-       │         └─ SSH → 원격 수집 서버 → docker exec finverse-db psql
+       ├─ 대시보드·KOSPI·장중지수 API
+       │    └─ FINVERSE_DATABASE_URL → Tailscale 사설망 PostgreSQL
+       ├─ 온톨로지·MiroFish API
+       │    └─ MiroFish 로컬 게이트웨이 (포트 5440, scripts/mirofish_gateway.mjs)
        └─ 모의 투자 API 프록시 (/api/paper-trading/*)
             └─ Flask 서비스 (포트 5055, services/paper_trading_api.py)
 
@@ -35,10 +36,9 @@
 ```
 
 - 프론트엔드 진입점은 `app/page.tsx`이고, Next.js API 라우트는 `app/api/`에 있다.
-- 로컬 개발은 `npm run dev`로 시작한다. Next.js, SSH DB 브리지, 모의 투자 Flask API를 함께 띄운다.
+- 로컬 개발은 `npm run dev`로 시작한다. Next.js, MiroFish 로컬 게이트웨이, 모의 투자 Flask API를 함께 띄운다.
 - DB는 원격 서버의 Docker 컨테이너 `finverse-db`, 데이터베이스 `finverse`다. 수집 원본과 AI 분석 결과의 중심 저장소는 `lake.records`다.
-- `services/paper_trading/`은 별도 도메인 엔진이다. 과거 KOSPI 데이터·규칙 기반 체결·행동 분석을 사용하며, LLM 설명에는 OpenRouter를 선택적으로 사용한다. 이 서비스는 `FINVERSE_DATABASE_URL`을 직접 요구할 수 있어 SSH 브리지와 데이터 접근 경로가 다르다.
-- 로컬 모의투자 서비스는 Tailscale 사설망의 읽기 전용 PostgreSQL 연결을 `FINVERSE_DATABASE_URL`로 사용한다. 이 값은 `.env`에만 두며, 코드·문서·로그에는 값 자체를 기록하지 않는다.
+- 대시보드·KOSPI·장중지수·모의투자·MiroFish A2A의 DB 접근은 모두 `FINVERSE_DATABASE_URL`을 사용한다. 이 값은 `.env`에만 두며, 코드·문서·로그에는 값 자체를 기록하지 않는다.
 
 ### 데이터·AI 흐름
 
@@ -48,27 +48,10 @@
 - `scripts/bedrock_signal_update.py`라는 파일명은 과거 호환 이름일 뿐, 현재 구현은 AWS Bedrock이 아니라 OpenRouter Chat Completions API를 사용한다.
 - 요약·시나리오·모의 투자 LLM은 `OPENROUTER_API_KEY`를 사용한다. 키나 `.env` 값은 절대로 로그·커밋·응답에 노출하지 않는다.
 
-### 원격 서버 접속
+### 데이터 연결과 원격 배포
 
-- SSH 대상: `ubuntu@44.206.56.75`.
-- Windows에서 `D:\finverse_key.pem`을 직접 쓰면 WSL SSH가 권한이 너무 열려 있다고 거부할 수 있다. WSL 홈으로 복사한 뒤 소유자 전용 권한을 사용한다.
-
-```bash
-mkdir -p ~/.ssh
-cp /mnt/d/finverse_key.pem ~/.ssh/finverse_key.pem
-chmod 400 ~/.ssh/finverse_key.pem
-ssh -i ~/.ssh/finverse_key.pem ubuntu@44.206.56.75
-```
-
-- Windows 로컬 브리지에서는 `.env`에 아래를 사용하면 WSL의 권한 정상 키로 SSH를 실행한다.
-
-```env
-FINVERSE_SSH_USE_WSL=1
-FINVERSE_WSL_DISTRO=Ubuntu
-FINVERSE_WSL_SSH_KEY=~/.ssh/finverse_key.pem
-```
-
-- 원격 서버의 작업 경로는 `/home/ubuntu/finverse`다. 원격 `.env`에는 로컬에 없는 Docker 전용 값(예: `POSTGRES_PASSWORD`)이 포함될 수 있다. 로컬 `.env`를 복사할 때는 서버 전용 값을 무조건 덮어쓰지 말고 보존·병합한 뒤 `chmod 600 .env`를 적용한다.
+- `FINVERSE_DATABASE_URL`은 서버 사이드 전용 읽기 계정으로 사용한다. 브라우저에는 절대 전달하지 않으며 Tailscale 사설망에서만 연결한다.
+- 원격 서버의 작업 경로는 `/home/ubuntu/finverse`다. 원격 `.env`에는 로컬에 없는 Docker 전용 값(예: `POSTGRES_PASSWORD`)이 포함될 수 있다. 환경 파일을 갱신할 때는 서버 전용 값을 보존·병합한 뒤 `chmod 600 .env`를 적용한다.
 - 배포 전에는 원격의 수정·미추적 파일을 백업 및 stash로 보존한다. `git reset --hard`나 `git clean`을 백업 없이 실행하지 않는다.
 
 ### 원격 배치 운영
@@ -90,7 +73,7 @@ scripts/run_bedrock_signal_update.sh --dry-run
 
 - 2026-08-30 기준 원격 코드는 `origin/main`의 `df294d8`로 배포됐다. 이후 로컬에서 만든 커밋은 사용자의 푸시 요청 전까지 원격 GitHub에는 올리지 않는다.
 - 원격에는 배포 전 상태 백업과 stash가 있을 수 있다. 복구가 필요할 때만 해당 백업을 사용하며, 일상 작업에서는 건드리지 않는다.
-- UI 이상은 다음 순서로 본다: `GET /api/dashboard` 응답 → 5439 브리지 상태 → `lake.records` 데이터/배치 로그 → OpenRouter 키·모델 설정.
+- UI 이상은 다음 순서로 본다: `GET /api/dashboard` 응답 → `FINVERSE_DATABASE_URL` 연결 상태 → `lake.records` 데이터/배치 로그 → OpenRouter 키·모델 설정.
 
 ### 운영 변경·사고 기록
 
@@ -101,12 +84,11 @@ scripts/run_bedrock_signal_update.sh --dry-run
 - 조치: 로컬 `.env`에 Tailscale 사설망의 읽기 전용 DB 연결을 설정하고 서비스를 재시작했다.
 - 재발 방지: 모의투자 관련 오류는 먼저 `/health`의 설정 상태와 `FINVERSE_DATABASE_URL`의 존재 여부(값 비노출)를 확인한다. 공개 클라이언트에는 이 연결 문자열을 절대 전달하지 않는다.
 
-#### 2026-08-30 — WSL SSH 개인 키 권한 문제
+#### 2026-08-31 — SSH DB 브리지 제거 및 직접 PostgreSQL 연결 통합
 
-- 증상: Windows 드라이브의 PEM 파일을 WSL SSH에서 직접 사용할 때 권한이 너무 열려 있다는 오류로 인증이 거부됐다.
-- 원인: `/mnt/d` 파일 시스템 권한은 OpenSSH의 개인 키 권한 검사와 호환되지 않는다.
-- 조치: 키를 WSL 홈의 `~/.ssh/finverse_key.pem`으로 복사하고 `chmod 400`을 적용했다. 로컬 SSH 브리지는 `FINVERSE_SSH_USE_WSL=1`로 WSL SSH를 사용하도록 지원했다.
-- 재발 방지: WSL에서 개인 키를 사용할 때는 Windows 마운트 경로 대신 WSL 홈의 소유자 전용 키를 사용한다.
+- 변경: 대시보드·KOSPI·장중지수·지수 적재·MiroFish A2A의 DB 접근을 모두 `FINVERSE_DATABASE_URL`로 전환했다.
+- 이유: 다단계 원격 명령 실행에 따른 지연과 운영 복잡도를 제거하고, 모의투자와 같은 데이터 연결 방식을 사용한다.
+- 재발 방지: 새 DB 기능은 서버 전용 `FINVERSE_DATABASE_URL`과 파라미터 바인딩 또는 내부 고정 SQL을 사용한다.
 
 #### 2026-08-30 — 원격 `.env` 전체 덮어쓰기 후 DB 비밀번호 누락
 

@@ -1,3 +1,5 @@
+import { finverseSql } from "@/lib/finverse-db";
+
 export const dynamic = "force-dynamic";
 
 type Row = Record<string, unknown>;
@@ -23,37 +25,7 @@ const OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 
 const env = (name: string) => process.env[name]?.trim();
 
-const remotePsql = async (query: string): Promise<Row[]> => {
-  const bridgeUrl = env("FINVERSE_KOSPI_BRIDGE_URL") ?? "http://127.0.0.1:5439";
-  const timeoutSeconds = Number(env("FINVERSE_DB_SSH_TIMEOUT_SECONDS") ?? 90);
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), Math.max(30, timeoutSeconds) * 1000);
-  try {
-    const response = await fetch(`${bridgeUrl}/query`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ sql: query }),
-      signal: controller.signal,
-      cache: "no-store",
-    });
-    const body = await response.json() as unknown;
-    if (!response.ok) throw new Error(typeof body === "object" && body && "error" in body ? String(body.error) : `브리지 응답 ${response.status}`);
-    return Array.isArray(body) ? body as Row[] : [];
-  } finally {
-    clearTimeout(timer);
-  }
-};
-
-const sqlLiteral = (value: unknown) => {
-  if (typeof value === "number" || typeof value === "bigint") return String(value);
-  if (value === null || value === undefined) return "NULL";
-  return `'${String(value).replaceAll("'", "''")}'`;
-};
-
-const sql = <T = Row[]>(strings: TemplateStringsArray, ...values: unknown[]) => {
-  const query = strings.reduce((result, part, index) => result + part + (index < values.length ? sqlLiteral(values[index]) : ""), "");
-  return remotePsql(query) as Promise<T>;
-};
+const sql = <T = Row[]>(strings: TemplateStringsArray, ...values: unknown[]) => finverseSql<T>(strings, ...values);
 
 const compactDate = (date: Date) => {
   const year = date.getUTCFullYear();
@@ -227,9 +199,7 @@ export async function GET() {
     });
   }
 
-  if (!env("FINVERSE_SSH_KEY") || !env("FINVERSE_SSH_HOST")) {
-    return Response.json({ error: "PEM SSH 환경변수가 설정되지 않았습니다." }, { status: 503 });
-  }
+  if (!env("FINVERSE_DATABASE_URL")) return Response.json({ error: "FINVERSE_DATABASE_URL이 설정되지 않았습니다." }, { status: 503 });
 
   const end = new Date();
   const start = new Date(end);

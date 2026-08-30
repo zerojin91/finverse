@@ -91,26 +91,10 @@ def test_database_timeout_configuration(monkeypatch) -> None:
         mirofish_a2a._statement_timeout_ms()
 
 
-def test_database_reads_disable_parallel_gather(monkeypatch) -> None:
-    captured = {}
-
-    class Completed:
-        returncode = 0
-        stdout = "[]\n"
-        stderr = ""
-
-    def run(command, **kwargs):
-        captured["command"] = command
-        captured.update(kwargs)
-        return Completed()
-
-    monkeypatch.setenv("FINVERSE_SSH_KEY", r"D:\finverse_key.pem")
-    monkeypatch.setenv("FINVERSE_SSH_HOST", "ubuntu@example")
-    monkeypatch.setattr(mirofish_a2a.subprocess, "run", run)
-    assert mirofish_a2a._read_query("SELECT 1", ()) == []
-    assert "max_parallel_workers_per_gather = 0" in captured["input"]
-    assert captured["command"][0:4] == ["ssh", "-i", r"D:\finverse_key.pem", "-T"]
-    assert captured["command"][-11:] == ["psql", "-X", "-qAt", "-v", "ON_ERROR_STOP=1", "-U", "finverse", "-d", "finverse", "-f", "-"]
+def test_database_reads_require_private_database_url(monkeypatch) -> None:
+    monkeypatch.delenv("FINVERSE_DATABASE_URL", raising=False)
+    with pytest.raises(RuntimeError, match="FINVERSE_DATABASE_URL"):
+        mirofish_a2a._read_query("SELECT 1", ())
 
 
 def test_database_timeout_becomes_retryable_tool_result(monkeypatch) -> None:
