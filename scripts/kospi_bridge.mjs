@@ -9,6 +9,16 @@ const keyPath = process.env.FINVERSE_SSH_KEY || "D:\\finverse_key.pem";
 const host = process.env.FINVERSE_SSH_HOST || "ubuntu@44.206.56.75";
 const database = process.env.FINVERSE_DB_NAME || "finverse";
 const container = process.env.FINVERSE_DB_CONTAINER || "finverse-db";
+// Windows-mounted PEM files often look group-readable to WSL's OpenSSH.  When
+// the key has been copied to ~/.ssh with chmod 400, route just this SSH hop
+// through WSL instead of weakening the key's permissions on the D: drive.
+const useWslSsh = process.platform === "win32" && process.env.FINVERSE_SSH_USE_WSL === "1";
+const wslDistribution = process.env.FINVERSE_WSL_DISTRO?.trim() || "Ubuntu";
+const wslKeyPath = process.env.FINVERSE_WSL_SSH_KEY?.trim() || "~/.ssh/finverse_key.pem";
+
+const sshSpawn = (args) => useWslSsh
+  ? { command: "wsl.exe", args: ["-d", wslDistribution, "--", "ssh", ...args] }
+  : { command: "ssh", args };
 
 const sql = `SELECT DISTINCT ON (payload->>'bas_dd')
   payload->>'bas_dd', payload->>'open', payload->>'high', payload->>'low', payload->>'close'
@@ -570,14 +580,15 @@ async function runOntology(request, response, body) {
 
 function queryRemote(query) {
   return new Promise((resolve, reject) => {
-    const child = spawn("ssh", [
+    const ssh = sshSpawn([
       "-o", "BatchMode=yes",
       "-o", "StrictHostKeyChecking=accept-new",
       "-o", "ConnectTimeout=8",
-      "-i", keyPath,
+      "-i", useWslSsh ? wslKeyPath : keyPath,
       host,
       "docker", "exec", "-i", container, "psql", "-X", "-qAt", "-v", "ON_ERROR_STOP=1", "-U", "finverse", "-d", database, "-f", "-",
-    ], { windowsHide: true });
+    ]);
+    const child = spawn(ssh.command, ssh.args, { windowsHide: true });
     let stdout = "";
     let stderr = "";
     const timeout = setTimeout(() => child.kill(), 45_000);

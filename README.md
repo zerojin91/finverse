@@ -40,6 +40,16 @@ FINVERSE_KOSPI_BRIDGE_PORT=5439
 FINVERSE_KOSPI_BRIDGE_URL=http://127.0.0.1:5439
 ```
 
+WSL에서 키를 `~/.ssh/finverse_key.pem`으로 복사하고 `chmod 400`으로 보호했다면,
+Windows 드라이브의 키 권한 문제를 피하기 위해 다음 설정을 추가합니다. KOSPI 브리지만
+WSL의 SSH를 통해 원격 PostgreSQL을 조회합니다.
+
+```env
+FINVERSE_SSH_USE_WSL=1
+FINVERSE_WSL_DISTRO=Ubuntu
+FINVERSE_WSL_SSH_KEY=~/.ssh/finverse_key.pem
+```
+
 웹 시나리오 브리핑, 일일 시장 연결 분석, MiroFish와 온톨로지 Agent의 LLM 호출은 모두 OpenRouter의 `google/gemma-4-31b-it:free`를 기본으로 사용합니다. `.env`에는 다음 키 하나만 추가하면 됩니다.
 
 ```env
