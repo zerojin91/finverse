@@ -33,6 +33,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation";
+import { PaperTradingModal } from "@/components/paper-trading";
 
 const SimulationMessageResponse = dynamic(
   () => import("@/components/ai-elements/message").then((module) => module.MessageResponse),
@@ -1590,6 +1591,7 @@ function TwinPage({ selectedScenario, onSelectScenario, onOpenBuilder }: { selec
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<MainTab>("market");
+  const [paperTradingOpen, setPaperTradingOpen] = useState(false);
   const [kospiData, setKospiData] = useState<KospiMarketData | null>(null);
   const [intradayIndices, setIntradayIndices] = useState<IntradayIndex[]>([]);
   const [dashboardSignals, setDashboardSignals] = useState<DashboardSignal[]>(marketSignals);
@@ -2070,6 +2072,7 @@ export default function Home() {
           <nav className="side-tabs">
             <button className={activeTab === "market" ? "active" : ""} onClick={() => activateTab("market")}><BarChart3 size={18} />시장 인사이트</button>
             <button className={activeTab === "twin" ? "active" : ""} onClick={() => activateTab("twin")}><UserRound size={18} />마이 금융 트윈</button>
+            <button onClick={() => setPaperTradingOpen(true)}><CircleDollarSign size={18} />모의 투자</button>
           </nav>
           <button className="sidebar-help" type="button"><CircleHelp size={20} /><span>도움말</span><ChevronRight size={17} /></button>
         </aside>
@@ -2216,6 +2219,11 @@ export default function Home() {
                   ))}
                   <button className="custom-scenario-card" onClick={openBuilder}>
                     <Plus size={24} /><div><strong>내 시나리오 예측하기</strong><p>원하는 시장 조건과 기간을 직접 선택하세요.</p></div><ArrowRight size={18} />
+                  </button>
+                  <button className="paper-trading-card" type="button" onClick={() => setPaperTradingOpen(true)}>
+                    <span><CircleDollarSign size={21} /></span>
+                    <div><strong>모의 투자로 연습하기</strong><p>실제 KOSPI 시세 위에서 아직 공개되지 않은 이벤트를 마주하며 매매 판단을 훈련합니다.</p></div>
+                    <ArrowRight size={18} />
                   </button>
                 </div>
                 <span className="visually-hidden">SELECTED SCENARIO · 시나리오 전제 · 예상 전개</span>
@@ -2379,6 +2387,8 @@ export default function Home() {
           )}
         </div>
       )}
+
+      {paperTradingOpen && <PaperTradingModal onClose={() => setPaperTradingOpen(false)} />}
 
       {selectedMarketSignal && (
         <div className="modal-backdrop market-signal-backdrop" onMouseDown={() => setSelectedMarketSignal(null)}>

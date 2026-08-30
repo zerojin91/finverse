@@ -1,0 +1,72 @@
+{
+  "ontology_id": "finsimulation.market",
+  "version": "1.0.0",
+  "status": "draft",
+  "scope": {
+    "market": "KOSPI",
+    "instrument": "listed_common_stock",
+    "time_granularity": "trading_day",
+    "simulation_mode": "paper_trading"
+  },
+  "asset_support": {
+    "common_stock": {"status":"connected", "source":"market.security + market.price_daily"},
+    "preferred_stock": {"status":"connected_as_security_variant", "source":"market.security.share_type"},
+    "market_index": {"status":"connected", "source":"market.index_daily"},
+    "bond": {"status":"not_found_in_current_catalog", "required_entities":["Bond","BondObservation","CreditRating"]},
+    "future": {"status":"not_found_in_current_catalog", "required_entities":["DerivativeContract","DerivativeObservation","Settlement"]},
+    "option": {"status":"not_found_in_current_catalog", "required_entities":["DerivativeContract","OptionTerms","DerivativeObservation"]},
+    "etf_etn": {"status":"not_found_in_current_catalog", "required_entities":["Fund","FundHolding","FundObservation"]}
+  },
+  "conventions": {
+    "timezone": "Asia/Seoul",
+    "currency": "KRW",
+    "price_unit": "KRW_per_share",
+    "quantity_unit": "shares",
+    "temporal_fields": ["observed_at", "published_at", "available_at", "effective_at", "ingested_at"],
+    "identity_fields": ["security_id", "ticker", "issuer_id", "source", "source_record_id"],
+    "quality_states": ["verified", "provisional", "missing", "conflict", "rejected"]
+  },
+  "entities": [
+    {"name":"Security","description":"A KRX-listed security selected for a simulation.","key":"security_id","fields":["security_id","ticker","name","market","issuer_id","sector_id","listed_on","share_type"]},
+    {"name":"Issuer","description":"The legal issuer of a security.","key":"issuer_id","fields":["issuer_id","legal_name","business_number"]},
+    {"name":"Market","description":"A trading market such as KOSPI.","key":"market_id","fields":["market_id","code","name"]},
+    {"name":"Sector","description":"A versioned sector classification.","key":"sector_id","fields":["sector_id","code","name","classification"]},
+    {"name":"TradingSession","description":"A KRX trading day and session calendar record.","key":"session_id","fields":["session_id","trade_date","market_id","is_trading_day","open_at","close_at"]},
+    {"name":"PriceObservation","description":"Point-in-time daily OHLCV and valuation observation.","key":"observation_id","fields":["observation_id","security_id","session_id","open","high","low","close","volume","trading_value","market_cap","listed_shares"]},
+    {"name":"Index","description":"A canonical KRX market, broad or sector index.","key":"index_id","fields":["index_id","idx_class","code","name","market","source"]},
+    {"name":"IndexObservation","description":"Daily observation for KOSPI or a sector index.","key":"observation_id","fields":["observation_id","index_id","session_id","open","high","low","close","volume","trading_value","market_cap"]},
+    {"name":"InvestorFlow","description":"Daily net buying by an investor group for a target.","key":"flow_id","fields":["flow_id","security_id","session_id","investor_group","net_volume","net_value_krw"]},
+    {"name":"ForeignHolding","description":"Daily foreign institutional ownership observation.","key":"holding_id","fields":["holding_id","security_id","session_id","held_shares","held_pct"]},
+    {"name":"MarketEvent","description":"A disclosed or scenario event that can affect a security.","key":"event_id","fields":["event_id","event_type","title","description","published_at","available_at","effective_at","direction","surprise","confidence"]},
+    {"name":"SourceDocument","description":"An immutable source record supporting an observation or event.","key":"source_record_id","fields":["source","source_record_id","uri","publisher","retrieved_at","checksum"]},
+    {"name":"SocialSignal","description":"Aggregated social activity and sentiment signal.","key":"signal_id","fields":["signal_id","security_id","session_id","platform","post_count","sentiment","engagement","bot_ratio"]},
+    {"name":"MacroObservation","description":"A macroeconomic or FX observation available to the market.","key":"macro_observation_id","fields":["macro_observation_id","series_code","session_id","value","unit"]},
+    {"name":"InvestorGroup","description":"A market participant category represented by personas.","key":"investor_group_id","fields":["investor_group_id","code","name","information_delay","typical_horizon"]},
+    {"name":"Persona","description":"A simulated participant with cash, holdings, risk and memory state.","key":"persona_id","fields":["persona_id","investor_group_id","cash_krw","risk_tolerance","confidence","sentiment"]},
+    {"name":"Scenario","description":"A paper-trading run with a fixed input snapshot.","key":"scenario_id","fields":["scenario_id","security_id","start_session_id","end_session_id","ontology_version","seed"]},
+    {"name":"Order","description":"An intent to buy or sell within a simulation session.","key":"order_id","fields":["order_id","scenario_id","persona_id","security_id","session_id","side","quantity","limit_price","reason"]},
+    {"name":"Execution","description":"The simulated result of matching or applying an order.","key":"execution_id","fields":["execution_id","order_id","session_id","price","quantity","slippage","impact"]},
+    {"name":"PortfolioState","description":"Cash, holdings and marked value after a session.","key":"portfolio_state_id","fields":["portfolio_state_id","scenario_id","persona_id","session_id","cash_krw","holding_shares","equity_krw","return_pct"]}
+  ],
+  "relations": [
+    {"name":"ISSUED_BY","source":"Security","target":"Issuer"},
+    {"name":"LISTED_ON","source":"Security","target":"Market"},
+    {"name":"CLASSIFIED_IN","source":"Security","target":"Sector"},
+    {"name":"SECURITY_OBSERVED_FOR","source":"PriceObservation","target":"Security"},
+    {"name":"ON_SESSION","source":"PriceObservation","target":"TradingSession"},
+    {"name":"OBSERVED_FOR","source":"IndexObservation","target":"Index"},
+    {"name":"INDEX_ON_SESSION","source":"IndexObservation","target":"TradingSession"},
+    {"name":"HAS_FLOW","source":"Security","target":"InvestorFlow"},
+    {"name":"HAS_FOREIGN_HOLDING","source":"Security","target":"ForeignHolding"},
+    {"name":"AFFECTS","source":"MarketEvent","target":"Security"},
+    {"name":"SUPPORTED_BY","source":"MarketEvent","target":"SourceDocument"},
+    {"name":"HAS_SOCIAL_SIGNAL","source":"Security","target":"SocialSignal"},
+    {"name":"HAS_MACRO_CONTEXT","source":"TradingSession","target":"MacroObservation"},
+    {"name":"REPRESENTS","source":"Persona","target":"InvestorGroup"},
+    {"name":"CONTAINS_PERSONA","source":"Scenario","target":"Persona"},
+    {"name":"PLACES","source":"Persona","target":"Order"},
+    {"name":"TARGETS","source":"Order","target":"Security"},
+    {"name":"EXECUTED_AS","source":"Order","target":"Execution"},
+    {"name":"UPDATES","source":"Execution","target":"PortfolioState"}
+  ]
+}
