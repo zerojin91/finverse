@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Activity, ArrowRight, BarChart3, CalendarClock, CircleDollarSign, Plus, Sparkles } from "lucide-react";
 import { Reveal } from "@/components/Reveal";
@@ -36,6 +37,12 @@ const flow = [
     note: "목표 달성률과 현금 비중까지 함께 갱신",
   },
 ];
+
+export const metadata: Metadata = {
+  title: "FINVERSE | 시장을 이해하고, 나에게 적용하다",
+  description:
+    "오늘의 KOSPI를 만든 조건을 분해하고, 그 조건이 이어질 때의 경로를 시뮬레이션한 뒤, 내 포트폴리오에 그대로 연결합니다.",
+};
 
 export default function LandingPage() {
   const hero = scenarios[0];

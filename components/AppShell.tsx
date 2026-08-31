@@ -11,7 +11,8 @@ const tabs = [
   { href: "/twin", label: "마이 금융 트윈", icon: UserRound },
 ];
 
-/** Sidebar + mobile chrome shared by the two app screens. */
+/** Sidebar + mobile chrome shared by the two app screens.
+ *  The brand returns to /landing: / belongs to the existing app, not to this package. */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
@@ -19,7 +20,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="finverse-app">
       <header className="mobile-header">
-        <Link className="sidebar-brand" href="/">
+        <Link className="sidebar-brand" href="/landing">
           <span className="brand-mark">F</span>
           <span>FINVERSE</span>
         </Link>
@@ -27,7 +28,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
       <div className="app-layout">
         <aside className="sidebar" aria-label="FINVERSE 탐색">
-          <Link className="sidebar-brand" href="/">
+          <Link className="sidebar-brand" href="/landing">
             <span className="brand-mark">F</span>
             <span>FINVERSE</span>
           </Link>
