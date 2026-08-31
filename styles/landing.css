@@ -1,0 +1,118 @@
+/* Smoke page (landing) layer — additive to the FINVERSE component layer.
+   Only tokens and colors already in the design system are used here. */
+.lp { --wrap: min(calc(100% - 72px), 1240px); }
+.lp-wrap { width: var(--wrap); margin: 0 auto; }
+
+.lp-nav { position: sticky; z-index: 30; top: 0; height: 68px; display: flex; align-items: center; border-bottom: 1px solid rgba(255,255,255,.1); background: #0f0f11; }
+.lp-nav .lp-wrap { display: flex; align-items: center; gap: 26px; }
+.lp-brand { display: flex; align-items: center; gap: 11px; color: #fff; font-size: 15px; font-weight: 850; letter-spacing: .19em; }
+.lp-brand .brand-mark { background: #fff; color: #111113; }
+.lp-nav nav { display: flex; gap: 22px; margin-left: 14px; }
+.lp-nav nav a { color: rgba(255,255,255,.62); font-size: 12px; font-weight: 650; text-decoration: none; }
+.lp-nav nav a:hover { color: #fff; text-decoration: none; }
+.lp-nav-cta { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.lp-ghost { display: inline-flex; white-space: nowrap; align-items: center; justify-content: center; height: 34px; padding: 0 14px; border: 1px solid rgba(255,255,255,.28); border-radius: 8px; color: #fff; background: transparent; font: inherit; font-size: 11px; font-weight: 700; text-decoration: none; cursor: pointer; transition: background .15s ease, border-color .15s ease; }
+.lp-ghost:hover { border-color: #fff; background: rgba(255,255,255,.08); color: #fff; text-decoration: none; }
+.lp-solid { display: inline-flex; white-space: nowrap; align-items: center; justify-content: center; height: 34px; padding: 0 15px; border: 0; border-radius: 8px; color: #111113; background: #fff; font: inherit; font-size: 11px; font-weight: 750; text-decoration: none; cursor: pointer; transition: background .15s ease; }
+.lp-solid:hover { background: #e4e4e7; color: #111113; text-decoration: none; }
+
+.lp-hero { position: relative; overflow: hidden; padding: 92px 0 0; background: #0f0f11; color: #fff; }
+.lp-smoke { position: absolute; inset: -20% -10% auto; height: 130%; pointer-events: none; }
+.lp-smoke i { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .5; animation: drift 26s ease-in-out infinite alternate; }
+.lp-smoke i:nth-child(1) { top: 4%; left: 6%; width: 520px; height: 340px; background: radial-gradient(closest-side, rgba(47,118,232,.5), transparent); }
+.lp-smoke i:nth-child(2) { top: 30%; right: 4%; width: 460px; height: 380px; background: radial-gradient(closest-side, rgba(239,68,68,.32), transparent); animation-delay: -9s; }
+.lp-smoke i:nth-child(3) { top: 0; left: 44%; width: 380px; height: 300px; background: radial-gradient(closest-side, rgba(255,255,255,.14), transparent); animation-delay: -16s; }
+.lp-grid { position: absolute; inset: 0; pointer-events: none; background-image: linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px); background-size: 88px 88px; mask-image: radial-gradient(120% 90% at 50% 0%, #000 30%, transparent 78%); }
+@keyframes drift { to { transform: translate3d(40px, -34px, 0) scale(1.14); } }
+.lp-hero .lp-wrap { position: relative; z-index: 1; }
+.lp-kicker { display: inline-flex; align-items: center; gap: 8px; padding: 7px 11px; border: 1px solid rgba(255,255,255,.22); border-radius: 999px; color: rgba(255,255,255,.78); font-size: 9px; font-weight: 800; letter-spacing: .14em; }
+.lp-kicker i { width: 6px; height: 6px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 0 0 rgba(239,68,68,.5); animation: livePulse 1.8s ease-out infinite; }
+.lp-hero h1 { max-width: 900px; margin: 22px 0 0; font-size: clamp(38px, 5.4vw, 76px); font-weight: 700; line-height: 1.08; letter-spacing: -.05em; text-wrap: balance; }
+.lp-hero h1 em { font-style: normal; color: rgba(255,255,255,.42); }
+.lp-hero-lede { max-width: 560px; margin: 22px 0 0; color: rgba(255,255,255,.62); font-size: 15px; line-height: 1.75; word-break: keep-all; }
+.lp-hero-actions { display: flex; align-items: center; gap: 10px; margin-top: 30px; }
+.lp-hero-actions .lp-solid, .lp-hero-actions .lp-ghost { height: 46px; padding: 0 20px; border-radius: 9px; font-size: 12px; }
+
+.lp-ticker { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin-top: 46px; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; background: rgba(255,255,255,.04); }
+.lp-ticker > div { min-width: 0; padding: 15px 18px; border-left: 1px solid rgba(255,255,255,.1); }
+.lp-ticker > div:first-child { border-left: 0; }
+.lp-ticker span { display: block; color: rgba(255,255,255,.42); font-size: 9px; font-weight: 800; letter-spacing: .1em; }
+.lp-ticker b { display: block; margin-top: 7px; font-size: 20px; font-weight: 700; letter-spacing: -.035em; white-space: nowrap; }
+.lp-ticker em { font-style: normal; font-size: 12px; font-weight: 650; }
+.lp-ticker .up { color: #ff7a7a; }
+.lp-ticker .down { color: #7fa8ff; }
+.lp-hero-shot { position: relative; z-index: 1; width: var(--wrap); margin: 54px auto 0; padding: 10px 10px 0; border: 1px solid rgba(255,255,255,.14); border-bottom: 0; border-radius: 16px 16px 0 0; background: rgba(255,255,255,.06); }
+.lp-hero-shot img { display: block; width: 100%; height: auto; border-radius: 10px 10px 0 0; }
+
+.lp-section { padding: 92px 0; }
+.lp-section-head { max-width: 700px; }
+.lp-section-head > span { color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .14em; }
+.lp-section-head h2 { margin: 12px 0 0; color: var(--ink); font-size: clamp(27px, 3vw, 42px); font-weight: 650; line-height: 1.2; letter-spacing: -.045em; text-wrap: balance; }
+.lp-section-head p { margin: 14px 0 0; color: var(--muted); font-size: 14px; line-height: 1.8; word-break: keep-all; }
+
+.lp-flow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 44px; border-top: 1px solid var(--line); }
+.lp-flow > article { min-width: 0; padding: 26px 26px 30px; border-left: 1px solid var(--line); }
+.lp-flow > article:first-child { border-left: 0; padding-left: 0; }
+.lp-flow b { color: var(--light); font-size: 11px; font-weight: 800; letter-spacing: .1em; }
+.lp-flow h3 { margin: 16px 0 9px; color: var(--ink); font-size: 20px; font-weight: 700; letter-spacing: -.03em; }
+.lp-flow p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.75; word-break: keep-all; }
+.lp-flow small { display: block; margin-top: 14px; color: var(--light); font-size: 10.5px; }
+
+.lp-feature { display: grid; grid-template-columns: minmax(0, .82fr) minmax(0, 1.18fr); align-items: center; gap: 54px; padding: 74px 0; border-top: 1px solid var(--line); }
+.lp-feature.reverse > .lp-feature-copy { order: 2; }
+.lp-feature-copy > span { color: var(--light); font-size: 10px; font-weight: 800; letter-spacing: .13em; }
+.lp-feature-copy h3 { margin: 13px 0 12px; color: var(--ink); font-size: clamp(23px, 2.2vw, 32px); font-weight: 650; line-height: 1.28; letter-spacing: -.04em; text-wrap: balance; }
+.lp-feature-copy p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.85; word-break: keep-all; }
+.lp-feature-list { display: grid; gap: 9px; margin-top: 22px; }
+.lp-feature-list > div { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 10px; align-items: start; padding-top: 11px; border-top: 1px solid var(--line); }
+.lp-feature-list b { color: var(--light); font-size: 10px; font-weight: 800; }
+.lp-feature-list strong { display: block; color: var(--ink); font-size: 13px; font-weight: 700; }
+.lp-feature-list small { display: block; margin-top: 4px; color: var(--muted); font-size: 11.5px; line-height: 1.6; }
+.lp-mock { min-width: 0; }
+
+.lp-close { padding: 80px 0 88px; border-top: 1px solid var(--line); }
+.lp-close-card { display: flex; align-items: center; justify-content: space-between; gap: 30px; padding: 40px 42px; border-radius: 14px; background: #0f0f11; color: #fff; }
+.lp-close-card h2 { margin: 0; font-size: clamp(24px, 2.6vw, 36px); font-weight: 650; line-height: 1.22; letter-spacing: -.045em; }
+.lp-close-card p { margin: 12px 0 0; color: rgba(255,255,255,.56); font-size: 12.5px; line-height: 1.7; }
+.lp-close-actions { display: flex; gap: 10px; flex: 0 0 auto; }
+.lp-close-actions .lp-solid, .lp-close-actions .lp-ghost { height: 46px; padding: 0 20px; border-radius: 9px; font-size: 12px; }
+.lp-footer { padding: 22px 0 40px; color: var(--light); font-size: 10px; line-height: 1.7; }
+
+/* reveal — the hidden state only applies once JS has opted in, so the page is never blank */
+.js-reveal [data-reveal] { opacity: 0; transform: translateY(18px); transition: opacity .7s ease, transform .7s cubic-bezier(.2,.7,.2,1); }
+.js-reveal [data-reveal].in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .js-reveal [data-reveal] { opacity: 1; transform: none; }
+  .lp-smoke i { animation: none; }
+}
+
+@media (max-width: 980px) {
+  .lp { --wrap: calc(100% - 32px); }
+  .lp-nav nav { display: none; }
+  .lp-ticker { grid-template-columns: 1fr 1fr; }
+  .lp-ticker > div:nth-child(odd) { border-left: 0; }
+  .lp-ticker > div { border-top: 1px solid rgba(255,255,255,.1); }
+  .lp-flow { grid-template-columns: 1fr; }
+  .lp-flow > article { padding: 22px 0; border-left: 0; border-top: 1px solid var(--line); }
+  .lp-flow > article:first-child { border-top: 0; }
+  .lp-feature { grid-template-columns: 1fr; gap: 30px; padding: 52px 0; }
+  .lp-feature.reverse > .lp-feature-copy { order: 0; }
+  .lp-close-card { display: block; }
+  .lp-close-actions { margin-top: 24px; }
+}
+
+/* Below 480px the nav can't hold brand + three CTAs without squeezing the labels
+   (measured: primary CTA -46px at 390px). The ghost link is repeated verbatim in the
+   hero actions directly below, so drop it here rather than shrinking the type. */
+@media (max-width: 480px) {
+  .lp-nav .lp-wrap { gap: 12px; }
+  .lp-nav-cta { gap: 6px; }
+  .lp-nav-cta .lp-ghost { display: none; }
+}
+
+/* At 360px and below, brand wordmark + toggle + CTA still overflow the viewport by ~19px
+   once labels are allowed to hold their natural width. Collapse the wordmark to the F mark
+   and keep the primary action reachable. */
+@media (max-width: 380px) {
+  .lp-brand span:not(.brand-mark) { display: none; }
+}
