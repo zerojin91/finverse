@@ -1046,7 +1046,7 @@ function SetupScreen({
       )}
 
       <section className="paper-setup-block">
-        <div className="paper-setup-heading"><span>01 · SECURITY</span><h3>어떤 종목으로 연습할까요?</h3></div>
+        <div className="paper-setup-heading"><span>01 · 종목 선택</span><h3>어떤 종목으로 연습할까요?</h3></div>
         <div className="paper-search">
           <Search size={15} />
           <input
