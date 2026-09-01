@@ -396,7 +396,9 @@ const PRICE_H = 210;
 const VOLUME_H = 42;
 
 /** 실제 이력 봉과 시뮬레이션 봉을 하나의 시계열로 합친다. */
-function buildBars(game: ScenarioGame, limit = 46): Bar[] {
+type CandleChartData = Pick<ScenarioGame, "history_candles" | "price_history" | "initial_reference_price" | "revealed_events" | "fills">;
+
+function buildBars(game: CandleChartData, limit = 46): Bar[] {
   const bars: Bar[] = [];
   const seen = new Set<string>();
 
@@ -435,7 +437,7 @@ function buildBars(game: ScenarioGame, limit = 46): Bar[] {
   return bars.slice(-limit);
 }
 
-function CandleChart({ game }: { game: ScenarioGame }) {
+function CandleChart({ game, preview = false }: { game: CandleChartData; preview?: boolean }) {
   const bars = useMemo(() => buildBars(game), [game]);
   const [hovered, setHovered] = useState<number | null>(null);
 
@@ -509,7 +511,7 @@ function CandleChart({ game }: { game: ScenarioGame }) {
         viewBox={`0 0 ${CHART_W} ${PRICE_H + VOLUME_H + 22}`}
         preserveAspectRatio="none"
         role="img"
-        aria-label="시나리오 캔들 차트"
+        aria-label={preview ? "최근 실제 캔들 차트" : "시나리오 캔들 차트"}
         onMouseLeave={() => setHovered(null)}
       >
         {gridValues.map((value) => (
@@ -521,11 +523,13 @@ function CandleChart({ game }: { game: ScenarioGame }) {
           </g>
         ))}
 
-        <line
-          className="paper-chart-reference"
-          x1={0} x2={CHART_W - AXIS_W}
-          y1={y(game.initial_reference_price)} y2={y(game.initial_reference_price)}
-        />
+        {!preview && (
+          <line
+            className="paper-chart-reference"
+            x1={0} x2={CHART_W - AXIS_W}
+            y1={y(game.initial_reference_price)} y2={y(game.initial_reference_price)}
+          />
+        )}
 
         {simStart > 0 && (
           <g>
@@ -545,7 +549,7 @@ function CandleChart({ game }: { game: ScenarioGame }) {
           const flat = bar.high === bar.low && bar.open === bar.close;
           const bodyTop = y(Math.max(bar.open, bar.close));
           const bodyHeight = Math.max(1.4, Math.abs(y(bar.open) - y(bar.close)));
-          const tone = bar.real ? "real" : rising ? "up" : "down";
+          const tone = preview ? (rising ? "up" : "down") : (bar.real ? "real" : rising ? "up" : "down");
           return (
             <g key={bar.key} className={`paper-candle ${tone} ${hovered === index ? "hovered" : ""}`}>
               {bar.event && <line className="paper-candle-event" x1={cx(index)} x2={cx(index)} y1={0} y2={PRICE_H} />}
@@ -591,12 +595,11 @@ function CandleChart({ game }: { game: ScenarioGame }) {
       </div>
 
       <div className="paper-chart-legend">
-        <span className="real">시나리오 이전 이력</span>
-        <span className="up">양봉</span>
-        <span className="down">음봉</span>
-        <span className="event">이벤트 공개일</span>
-        <span className="buy">내 매수</span>
-        <span className="sell">내 매도</span>
+        {preview ? (
+          <><span className="up">양봉</span><span className="down">음봉</span><span className="real">실제 일봉</span></>
+        ) : (
+          <><span className="real">시나리오 이전 이력</span><span className="up">양봉</span><span className="down">음봉</span><span className="event">이벤트 공개일</span><span className="buy">내 매수</span><span className="sell">내 매도</span></>
+        )}
       </div>
     </div>
   );
@@ -953,6 +956,8 @@ function SetupScreen({
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [picked, setPicked] = useState<Security | null>(null);
+  const [previewCandles, setPreviewCandles] = useState<HistoryCandle[] | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [premise, setPremise] = useState("");
   const [eventCount, setEventCount] = useState(3);
   const [initialCash, setInitialCash] = useState(100_000_000);
@@ -1004,6 +1009,25 @@ function SetupScreen({
       clearTimeout(timer);
     };
   }, [query, picked]);
+
+  useEffect(() => {
+    if (!picked) {
+      setPreviewCandles(null);
+      setPreviewError(null);
+      return;
+    }
+    let cancelled = false;
+    setPreviewCandles(null);
+    setPreviewError(null);
+    callApi<{ data: { candles: HistoryCandle[] } }>(`/securities/${encodeURIComponent(picked.ticker)}/candles?limit=36`)
+      .then((payload) => {
+        if (!cancelled) setPreviewCandles(payload.data?.candles ?? []);
+      })
+      .catch((cause) => {
+        if (!cancelled) setPreviewError(cause instanceof Error ? cause.message : "최근 시세를 불러오지 못했습니다.");
+      });
+    return () => { cancelled = true; };
+  }, [picked?.ticker]);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1121,6 +1145,32 @@ function SetupScreen({
             <div><strong>{picked.name}</strong><span>{picked.ticker}</span></div>
             {picked.ticker === "005930" && <em>캐시 리플레이 이력 사용 가능</em>}
           </div>
+        )}
+        {picked && (
+          <section className="paper-security-preview" aria-live="polite">
+            <header>
+              <div><CandlestickChart size={15} /><strong>{picked.name} 최근 시세</strong></div>
+              <span>최근 36거래일 · 실제 일봉</span>
+            </header>
+            {previewCandles === null && (
+              <div className="paper-security-preview-loading"><LoaderCircle size={15} className="spin" /> 최근 시세를 불러오는 중입니다.</div>
+            )}
+            {previewError && <p className="paper-inline-error">{previewError}</p>}
+            {previewCandles && previewCandles.length < 2 && !previewError && (
+              <div className="paper-security-preview-empty">표시할 최근 일봉 데이터가 충분하지 않습니다.</div>
+            )}
+            {previewCandles && previewCandles.length >= 2 && (
+              <CandleChart
+                preview
+                game={{
+                  history_candles: previewCandles,
+                  price_history: [],
+                  initial_reference_price: previewCandles[previewCandles.length - 1].close,
+                  revealed_events: [], fills: [],
+                }}
+              />
+            )}
+          </section>
         )}
       </section>
 

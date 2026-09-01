@@ -72,6 +72,13 @@ def list_securities():
     return jsonify({"success": True, "data": items})
 
 
+@paper_trading_bp.route("/securities/<ticker>/candles", methods=["GET"])
+def security_candles(ticker: str):
+    candles = _market_data().load_recent_candles(
+        ticker, request.args.get("limit", 36, type=int))
+    return jsonify({"success": True, "data": {"ticker": str(ticker).zfill(6), "candles": candles}})
+
+
 @paper_trading_bp.route("/data-source/status", methods=["GET"])
 def data_source_status():
     return jsonify({"success": True, "data": _market_data().healthcheck()})

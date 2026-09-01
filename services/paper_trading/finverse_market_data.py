@@ -147,6 +147,42 @@ class FinverseMarketData:
             cursor.execute(sql, (pattern, pattern, pattern, pattern, limit))
             return [dict(row) for row in cursor.fetchall()]
 
+    def load_recent_candles(self, ticker: str, limit: int = 36) -> list[dict[str, Any]]:
+        """Return a small, read-only OHLC window for the security picker."""
+        ticker = str(ticker).zfill(6)
+        limit = max(12, min(int(limit), 60))
+        sql = """
+            WITH chosen AS (
+              SELECT DISTINCT ON (payload->>'bas_dd')
+                to_date(payload->>'bas_dd', 'YYYYMMDD') AS trade_date,
+                (payload->>'open')::numeric AS open,
+                (payload->>'high')::numeric AS high,
+                (payload->>'low')::numeric AS low,
+                (payload->>'close')::numeric AS close,
+                coalesce(NULLIF(payload->>'volume', '')::bigint, 0) AS volume
+              FROM lake.records
+              WHERE record_type = 'market_price_daily'
+                AND payload @> jsonb_build_object('ticker', %s::text)
+                AND payload->>'market' = 'KOSPI'
+                AND payload->>'bas_dd' >= to_char(current_date - interval '180 days', 'YYYYMMDD')
+              ORDER BY payload->>'bas_dd',
+                       (payload->>'source' = 'krx_open_api') DESC, payload->>'source'
+            ), recent AS (
+              SELECT * FROM chosen ORDER BY trade_date DESC LIMIT %s
+            )
+            SELECT trade_date, open, high, low, close, volume
+            FROM recent
+            ORDER BY trade_date
+        """
+        with self._connection() as connection, connection.cursor() as cursor:
+            cursor.execute(sql, (ticker, limit))
+            return [{
+                "market_date": row["trade_date"].isoformat(),
+                "open": int(row["open"]), "high": int(row["high"]),
+                "low": int(row["low"]), "close": int(row["close"]),
+                "volume": int(row["volume"] or 0), "real": True,
+            } for row in cursor.fetchall()]
+
     def healthcheck(self) -> dict[str, Any]:
         with self._connection() as connection, connection.cursor() as cursor:
             cursor.execute("SELECT current_database() AS database, current_user AS user, now() AS checked_at")

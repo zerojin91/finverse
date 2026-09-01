@@ -39,6 +39,7 @@
 - 로컬 개발은 `npm run dev`로 시작한다. Next.js, MiroFish 로컬 게이트웨이, 모의 투자 Flask API를 함께 띄운다.
 - DB는 원격 서버의 Docker 컨테이너 `finverse-db`, 데이터베이스 `finverse`다. 수집 원본과 AI 분석 결과의 중심 저장소는 `lake.records`다.
 - 대시보드·KOSPI·장중지수·모의투자·MiroFish A2A의 DB 접근은 모두 `FINVERSE_DATABASE_URL`을 사용한다. 이 값은 `.env`에만 두며, 코드·문서·로그에는 값 자체를 기록하지 않는다.
+- 모의투자 종목 선택 화면은 `GET /api/paper-trading/securities/:ticker/candles`로 선택 종목의 최근 36거래일 실제 OHLC를 읽어 시작 전 캔들 미리보기를 표시한다. 이 미리보기에는 시뮬레이션·미래 가격을 섞지 않는다.
 
 ### 데이터·AI 흐름
 
@@ -76,6 +77,13 @@ scripts/run_bedrock_signal_update.sh --dry-run
 - UI 이상은 다음 순서로 본다: `GET /api/dashboard` 응답 → `FINVERSE_DATABASE_URL` 연결 상태 → `lake.records` 데이터/배치 로그 → OpenRouter 키·모델 설정.
 
 ### 운영 변경·사고 기록
+
+#### 2026-09-02 — Windows 모의투자 API 재시작 시 이전 라우트 상태 유지
+
+- 증상: 새 종목 캔들 조회 경로를 추가한 뒤 5055 API를 파일 경로로 실행해 모듈을 찾지 못했고, 하위 Python 프로세스만 종료했을 때에는 이전 라우트가 계속 404를 반환했다.
+- 원인: `services/paper_trading_api.py`는 프로젝트 루트에서 모듈로 실행해야 하며, Windows 가상환경 실행기는 상위 런처와 실제 Python 하위 프로세스로 나뉜다.
+- 조치: 상위 런처까지 종료한 뒤 `.venv\\Scripts\\python.exe -u -m services.paper_trading_api`로 다시 실행하고, 직접 API와 Next 프록시에서 최근 36개 일봉 응답을 확인했다.
+- 재발 방지: 로컬 모의투자 API 재시작은 항상 모듈 방식으로 실행하고, 새 라우트는 5055 직접 경로와 3000 프록시 경로를 모두 확인한다.
 
 #### 2026-08-30 — 모의투자 종목 검색의 DB 연결 누락
 
