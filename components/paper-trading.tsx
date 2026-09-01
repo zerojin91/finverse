@@ -971,6 +971,11 @@ function SetupScreen({
 
   useEffect(() => {
     const keyword = query.trim();
+    if (picked?.name === keyword) {
+      setResults([]);
+      setSearchError(null);
+      return;
+    }
     let cancelled = false;
     const timer = setTimeout(async () => {
       if (!keyword) {
@@ -998,7 +1003,7 @@ function SetupScreen({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [query]);
+  }, [query, picked]);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1010,6 +1015,15 @@ function SetupScreen({
       eventCount, initialCash, personaCounts: marketSize.counts,
     });
   };
+
+  const selectSecurity = (item: Security) => {
+    setPicked(item);
+    setQuery(item.name);
+    setResults([]);
+    setSearchError(null);
+  };
+
+  const isQuickPicked = Boolean(picked && RECOMMENDED_SECURITIES.some((item) => item.ticker === picked.ticker));
 
   return (
     <form className="paper-setup" onSubmit={submit}>
@@ -1051,30 +1065,38 @@ function SetupScreen({
           <Search size={15} />
           <input
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              const nextQuery = event.target.value;
+              setQuery(nextQuery);
+              if (picked && nextQuery !== picked.name) setPicked(null);
+            }}
             placeholder="종목명 또는 티커로 검색 (예: 삼성전자, 005930)"
             aria-label="종목 검색"
           />
           {searching && <LoaderCircle size={14} className="spin" />}
         </div>
-        <div className="paper-security-recommendations" aria-label="추천 종목">
-          <span>추천</span>
-          {RECOMMENDED_SECURITIES.map((item) => (
-            <button
-              key={item.ticker}
-              type="button"
-              className={picked?.ticker === item.ticker ? "active" : ""}
-              aria-pressed={picked?.ticker === item.ticker}
-              onClick={() => {
-                setPicked(item);
-                setQuery(item.name);
-                setResults([]);
-                setSearchError(null);
-              }}
-            >
-              {item.name}
-            </button>
-          ))}
+        <div className="paper-security-quick-pick" aria-label="자주 선택하는 종목">
+          <div className="paper-security-quick-pick-heading">
+            <span>빠른 선택</span>
+            <small>자주 선택하는 종목</small>
+          </div>
+          <div className="paper-security-quick-pick-options">
+            {RECOMMENDED_SECURITIES.map((item) => {
+              const selected = picked?.ticker === item.ticker;
+              return (
+                <button
+                  key={item.ticker}
+                  type="button"
+                  className={selected ? "active" : ""}
+                  aria-pressed={selected}
+                  onClick={() => selectSecurity(item)}
+                >
+                  <div><strong>{item.name}</strong><small>{item.ticker}</small></div>
+                  <span>{selected ? <><CheckCircle2 size={13} /> 선택됨</> : "선택"}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
         {searchError && <p className="paper-inline-error">{searchError}</p>}
         {Boolean(results.length) && (
@@ -1084,7 +1106,7 @@ function SetupScreen({
                 key={item.ticker}
                 type="button"
                 className={picked?.ticker === item.ticker ? "picked" : ""}
-                onClick={() => { setPicked(item); setQuery(item.name); setResults([]); }}
+                onClick={() => selectSecurity(item)}
               >
                 <strong>{item.name}</strong>
                 <em>{item.ticker}</em>
@@ -1093,7 +1115,7 @@ function SetupScreen({
             ))}
           </div>
         )}
-        {picked && (
+        {picked && !isQuickPicked && (
           <div className="paper-picked">
             <CheckCircle2 size={15} />
             <div><strong>{picked.name}</strong><span>{picked.ticker}</span></div>
