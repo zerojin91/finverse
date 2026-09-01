@@ -28,6 +28,11 @@ import type { FormEvent } from "react";
 
 export type Security = { ticker: string; name: string; share_type?: string; listed_on?: string };
 
+const RECOMMENDED_SECURITIES: Security[] = [
+  { ticker: "005930", name: "삼성전자" },
+  { ticker: "000660", name: "SK하이닉스" },
+];
+
 type Portfolio = {
   cash: number;
   quantity: number;
@@ -1051,6 +1056,25 @@ function SetupScreen({
             aria-label="종목 검색"
           />
           {searching && <LoaderCircle size={14} className="spin" />}
+        </div>
+        <div className="paper-security-recommendations" aria-label="추천 종목">
+          <span>추천</span>
+          {RECOMMENDED_SECURITIES.map((item) => (
+            <button
+              key={item.ticker}
+              type="button"
+              className={picked?.ticker === item.ticker ? "active" : ""}
+              aria-pressed={picked?.ticker === item.ticker}
+              onClick={() => {
+                setPicked(item);
+                setQuery(item.name);
+                setResults([]);
+                setSearchError(null);
+              }}
+            >
+              {item.name}
+            </button>
+          ))}
         </div>
         {searchError && <p className="paper-inline-error">{searchError}</p>}
         {Boolean(results.length) && (
