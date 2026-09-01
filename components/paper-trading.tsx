@@ -1061,20 +1061,6 @@ function SetupScreen({
 
       <section className="paper-setup-block">
         <div className="paper-setup-heading"><span>01 · 종목 선택</span><h3>어떤 종목으로 연습할까요?</h3></div>
-        <div className="paper-search">
-          <Search size={15} />
-          <input
-            value={query}
-            onChange={(event) => {
-              const nextQuery = event.target.value;
-              setQuery(nextQuery);
-              if (picked && nextQuery !== picked.name) setPicked(null);
-            }}
-            placeholder="종목명 또는 티커로 검색 (예: 삼성전자, 005930)"
-            aria-label="종목 검색"
-          />
-          {searching && <LoaderCircle size={14} className="spin" />}
-        </div>
         <div className="paper-security-quick-pick" aria-label="자주 선택하는 종목">
           <div className="paper-security-quick-pick-heading">
             <span>빠른 선택</span>
@@ -1097,6 +1083,20 @@ function SetupScreen({
               );
             })}
           </div>
+        </div>
+        <div className="paper-search">
+          <Search size={15} />
+          <input
+            value={query}
+            onChange={(event) => {
+              const nextQuery = event.target.value;
+              setQuery(nextQuery);
+              if (picked && nextQuery !== picked.name) setPicked(null);
+            }}
+            placeholder="종목명 또는 티커로 검색 (예: 삼성전자, 005930)"
+            aria-label="종목 검색"
+          />
+          {searching && <LoaderCircle size={14} className="spin" />}
         </div>
         {searchError && <p className="paper-inline-error">{searchError}</p>}
         {Boolean(results.length) && (
