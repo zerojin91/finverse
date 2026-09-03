@@ -29,6 +29,36 @@ from .config import Config
 paper_trading_bp = Blueprint("paper_trading", __name__)
 
 
+# 사용자는 연습 목적만 고른다. 사건 수와 에이전트 구성은 기간에 맞춰 엔진이
+# 결정해 내부 구현값이 학습 목표처럼 보이지 않게 한다.
+SIMULATION_DURATION_CONFIG = {
+    10: {"event_count": 2, "source_window_days": 40},
+    20: {"event_count": 3, "source_window_days": 60},
+    60: {"event_count": 5, "source_window_days": 75},
+}
+PRACTICE_MODES = {"balanced", "stress", "opportunity", "random"}
+INVESTMENT_MODES = {"new", "holding"}
+INTERNAL_PERSONA_COUNTS = {
+    "retail": 8, "foreign": 4, "institution": 4, "pension": 2,
+}
+
+
+def _fit_scenario_duration(events: list[dict], simulation_days: int) -> list[dict]:
+    """Spread selected events so the scenario spans the chosen trading days."""
+    if not events:
+        raise TradingError("시뮬레이션에 사용할 사건이 없습니다.")
+    gap_days = simulation_days - len(events)
+    base, remainder = divmod(gap_days, len(events))
+    if base < 1 or base + (1 if remainder else 0) > 20:
+        raise TradingError("선택한 기간을 구성할 사건이 충분하지 않습니다.")
+    scheduled = []
+    for index, source in enumerate(events):
+        event = dict(source)
+        event["trading_days_until"] = base + (1 if index < remainder else 0)
+        scheduled.append(event)
+    return scheduled
+
+
 def _store() -> PaperGameStore:
     return PaperGameStore(current_app.config.get("PAPER_TRADING_DATA_DIR"))
 
@@ -131,10 +161,20 @@ def get_game(game_id: str):
 def create_event_scenario():
     data = request.get_json(silent=True) or {}
     ticker = str(data.get("ticker", "")).zfill(6)
+    simulation_days = int(data.get("simulation_days", 20))
+    duration_config = SIMULATION_DURATION_CONFIG.get(simulation_days)
+    if not duration_config:
+        raise TradingError("시뮬레이션 기간은 10일, 20일, 60일 중에서 선택해주세요.")
+    practice_mode = str(data.get("practice_mode") or "balanced").lower()
+    if practice_mode not in PRACTICE_MODES:
+        raise TradingError("지원하지 않는 연습 유형입니다.")
+    investment_mode = str(data.get("investment_mode") or "new").lower()
+    if investment_mode not in INVESTMENT_MODES:
+        raise TradingError("지원하지 않는 투자 상태입니다.")
     history = _market_data().load_game_data(
         ticker, data.get("history_start", ""), data.get("history_end", ""))
     history_source = "finverse_postgresql_history_only"
-    event_count = int(data.get("event_count", 5))
+    event_count = duration_config["event_count"]
     history_days = history["market_days"]
     provenance = {"mode": "llm_premise"}
     if data.get("events"):
@@ -145,7 +185,8 @@ def create_event_scenario():
         # 만든다. 이력이 짧거나 사건이 부족하면 전제 기반 생성으로 물러난다.
         try:
             history_days, events, provenance = build_ontology_scenario(
-                history, event_count, int(data.get("scenario_window_days", 60)))
+                history, event_count, duration_config["source_window_days"],
+                practice_mode=practice_mode)
         except (TradingError, LLMMarketUnavailable) as exc:
             if not str(data.get("premise") or "").strip():
                 raise
@@ -155,10 +196,12 @@ def create_event_scenario():
     else:
         events = generate_scenario_events(
             history["ticker"], history["name"], data.get("premise", ""), event_count)
+    events = _fit_scenario_duration(events, simulation_days)
     game = new_scenario_game(
         history["ticker"], history["name"], history_days[-1]["close"], history_days,
         events, initial_cash=int(data.get("initial_cash", 100_000_000)),
-        persona_counts=data.get("persona_counts"),
+        initial_position=(data.get("initial_position") if investment_mode == "holding" else None),
+        persona_counts=INTERNAL_PERSONA_COUNTS,
         fee_rate=float(data.get("fee_rate", .00015)),
         sell_tax_rate=float(data.get("sell_tax_rate", .0018)),
         slippage_bps=float(data.get("slippage_bps", 5.0)),
@@ -170,6 +213,9 @@ def create_event_scenario():
     game["ontology_coverage"] = history.get("ontology_coverage", {})
     game["scenario_premise"] = str(data.get("premise") or "")
     game["history_quality"] = history.get("quality", {})
+    game["simulation_days"] = simulation_days
+    game["practice_mode"] = practice_mode
+    game["investment_mode"] = investment_mode
     _store().save(game)
     return jsonify({"success": True, "data": public_scenario_game(game)}), 201
 

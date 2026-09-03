@@ -208,6 +208,10 @@ type ScenarioGame = {
   pending_orders: PendingOrder[];
   released_signals: LeadSignal[];
   scenario_premise?: string;
+  simulation_days?: number;
+  practice_mode?: PracticeMode;
+  investment_mode?: InvestmentMode;
+  initial_equity?: number;
   data_source?: string;
   last_market_date?: string;
   market_psychology?: { aggregate_sentiment?: number };
@@ -935,11 +939,23 @@ function ReportView({
 
 /* ---------------------------------------------------------------- setup */
 
-const MARKET_SIZES: { key: string; label: string; total: number; counts: Record<string, number> }[] = [
-  { key: "small", label: "9명", total: 9, counts: { retail: 4, foreign: 2, institution: 2, pension: 1 } },
-  { key: "base", label: "18명", total: 18, counts: { retail: 8, foreign: 4, institution: 4, pension: 2 } },
-  { key: "wide", label: "40명", total: 40, counts: { retail: 18, foreign: 9, institution: 9, pension: 4 } },
+type InvestmentMode = "new" | "holding";
+type PracticeMode = "balanced" | "stress" | "opportunity" | "random";
+
+const CASH_PRESETS = [10_000_000, 50_000_000, 100_000_000];
+const DURATION_OPTIONS = [
+  { days: 10, label: "10거래일", caption: "단기 흐름" },
+  { days: 20, label: "20거래일", caption: "한 달 연습" },
+  { days: 60, label: "60거래일", caption: "중기 판단" },
 ];
+const PRACTICE_OPTIONS: { key: PracticeMode; label: string; caption: string }[] = [
+  { key: "balanced", label: "균형 판단", caption: "호재와 악재를 고르게 경험" },
+  { key: "stress", label: "위기 대응", caption: "악재와 변동성 대응에 집중" },
+  { key: "opportunity", label: "기회 포착", caption: "호재 신호와 진입 판단에 집중" },
+  { key: "random", label: "무작위 실전", caption: "사건 구성을 매번 다르게" },
+];
+
+const parsePositiveInteger = (value: string) => Number(value.replace(/[^0-9]/g, "")) || 0;
 
 function SetupScreen({
   onStart,
@@ -949,8 +965,9 @@ function SetupScreen({
   onClose,
 }: {
   onStart: (input: {
-    ticker: string; name: string; premise: string; eventSource: string;
-    eventCount: number; initialCash: number; personaCounts: Record<string, number>;
+    ticker: string; name: string; initialCash: number;
+    investmentMode: InvestmentMode; initialPosition?: { quantity: number; averagePrice: number };
+    simulationDays: number; practiceMode: PracticeMode;
   }) => void;
   onResume: (gameId: string) => void;
   starting: boolean;
@@ -958,7 +975,6 @@ function SetupScreen({
   onClose: () => void;
 }) {
   const [saved, setSaved] = useState<GameSummary[]>([]);
-  const [marketSize, setMarketSize] = useState(MARKET_SIZES[1]);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Security[]>([]);
   const [searching, setSearching] = useState(false);
@@ -968,8 +984,13 @@ function SetupScreen({
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [collectionSources, setCollectionSources] = useState<CollectionSource[] | null>(null);
   const [collectionError, setCollectionError] = useState<string | null>(null);
-  const [eventCount, setEventCount] = useState(3);
-  const [initialCash, setInitialCash] = useState(100_000_000);
+  const [investmentMode, setInvestmentMode] = useState<InvestmentMode>("new");
+  const [initialCash, setInitialCash] = useState(50_000_000);
+  const [averagePrice, setAveragePrice] = useState(0);
+  const [holdingQuantity, setHoldingQuantity] = useState(0);
+  const [simulationDays, setSimulationDays] = useState(20);
+  const [practiceMode, setPracticeMode] = useState<PracticeMode>("balanced");
+  const pickedTicker = picked?.ticker;
 
   useEffect(() => {
     let cancelled = false;
@@ -986,15 +1007,11 @@ function SetupScreen({
   useEffect(() => {
     const keyword = query.trim();
     if (picked?.name === keyword) {
-      setResults([]);
-      setSearchError(null);
       return;
     }
     let cancelled = false;
     const timer = setTimeout(async () => {
       if (!keyword) {
-        setResults([]);
-        setSearchError(null);
         return;
       }
       setSearching(true);
@@ -1017,18 +1034,12 @@ function SetupScreen({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [query, picked]);
+  }, [query, picked?.name]);
 
   useEffect(() => {
-    if (!picked) {
-      setPreviewCandles(null);
-      setPreviewError(null);
-      return;
-    }
+    if (!pickedTicker) return;
     let cancelled = false;
-    setPreviewCandles(null);
-    setPreviewError(null);
-    callApi<{ data: { candles: HistoryCandle[] } }>(`/securities/${encodeURIComponent(picked.ticker)}/candles?limit=36`)
+    callApi<{ data: { candles: HistoryCandle[] } }>(`/securities/${encodeURIComponent(pickedTicker)}/candles?limit=36`)
       .then((payload) => {
         if (!cancelled) setPreviewCandles(payload.data?.candles ?? []);
       })
@@ -1036,18 +1047,12 @@ function SetupScreen({
         if (!cancelled) setPreviewError(cause instanceof Error ? cause.message : "최근 시세를 불러오지 못했습니다.");
       });
     return () => { cancelled = true; };
-  }, [picked?.ticker]);
+  }, [pickedTicker]);
 
   useEffect(() => {
-    if (!picked) {
-      setCollectionSources(null);
-      setCollectionError(null);
-      return;
-    }
+    if (!pickedTicker) return;
     let cancelled = false;
-    setCollectionSources(null);
-    setCollectionError(null);
-    callApi<{ data: { sources: CollectionSource[] } }>(`/securities/${encodeURIComponent(picked.ticker)}/scenario-context`)
+    callApi<{ data: { sources: CollectionSource[] } }>(`/securities/${encodeURIComponent(pickedTicker)}/scenario-context`)
       .then((payload) => {
         if (!cancelled) setCollectionSources(payload.data?.sources ?? []);
       })
@@ -1055,20 +1060,27 @@ function SetupScreen({
         if (!cancelled) setCollectionError(cause instanceof Error ? cause.message : "시나리오 자료를 수집하지 못했습니다.");
       });
     return () => { cancelled = true; };
-  }, [picked?.ticker]);
+  }, [pickedTicker]);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!picked || starting) return;
+    if (!picked || starting || initialCash < 0) return;
+    if (investmentMode === "new" && initialCash <= 0) return;
+    if (investmentMode === "holding" && (!averagePrice || !holdingQuantity)) return;
     onStart({
       ticker: picked.ticker, name: picked.name,
-      premise: "",
-      eventSource: "ontology",
-      eventCount, initialCash, personaCounts: marketSize.counts,
+      initialCash, investmentMode, simulationDays, practiceMode,
+      initialPosition: investmentMode === "holding"
+        ? { quantity: holdingQuantity, averagePrice }
+        : undefined,
     });
   };
 
   const selectSecurity = (item: Security) => {
+    setPreviewCandles(null);
+    setPreviewError(null);
+    setCollectionSources(null);
+    setCollectionError(null);
     setPicked(item);
     setQuery(item.name);
     setResults([]);
@@ -1077,6 +1089,9 @@ function SetupScreen({
 
   const isQuickPicked = Boolean(picked && RECOMMENDED_SECURITIES.some((item) => item.ticker === picked.ticker));
   const collectionReady = Boolean(collectionSources?.every((source) => source.status === "ready"));
+  const investmentReady = investmentMode === "new"
+    ? initialCash > 0
+    : averagePrice > 0 && holdingQuantity > 0;
 
   return (
     <form className="paper-setup" onSubmit={submit}>
@@ -1144,7 +1159,17 @@ function SetupScreen({
             onChange={(event) => {
               const nextQuery = event.target.value;
               setQuery(nextQuery);
-              if (picked && nextQuery !== picked.name) setPicked(null);
+              if (!nextQuery.trim()) {
+                setResults([]);
+                setSearchError(null);
+              }
+              if (picked && nextQuery !== picked.name) {
+                setPicked(null);
+                setPreviewCandles(null);
+                setPreviewError(null);
+                setCollectionSources(null);
+                setCollectionError(null);
+              }
             }}
             placeholder="종목명 또는 티커로 검색 (예: 삼성전자, 005930)"
             aria-label="종목 검색"
@@ -1232,37 +1257,59 @@ function SetupScreen({
       </section>
 
       <section className="paper-setup-block">
-        <div className="paper-setup-heading"><span>03 · SETTINGS</span><h3>연습 조건</h3></div>
-        <div className="paper-setting-row">
-          <div>
-            <span>이벤트 개수</span>
-            <small>마주할 사건의 수</small>
+        <div className="paper-setup-heading"><span>03 · 투자 상태</span><h3>지금 내 투자 조건을 입력해주세요</h3></div>
+        <div className="paper-investment-mode" aria-label="투자 상태">
+          <button type="button" className={investmentMode === "new" ? "active" : ""} aria-pressed={investmentMode === "new"} onClick={() => setInvestmentMode("new")}>
+            <CircleDollarSign size={15} /><span><strong>새로 투자하기</strong><small>현금으로 처음 시작</small></span>
+          </button>
+          <button type="button" className={investmentMode === "holding" ? "active" : ""} aria-pressed={investmentMode === "holding"} onClick={() => setInvestmentMode("holding")}>
+            <Wallet size={15} /><span><strong>이미 보유 중</strong><small>내 평단과 수량 반영</small></span>
+          </button>
+        </div>
+        <div className="paper-money-panel">
+          <label htmlFor="paper-initial-cash">
+            <span>{investmentMode === "holding" ? "추가 투자 가능 금액" : "투자할 금액"}</span>
+            <small>실제 연습에 사용할 수 있는 현금</small>
+          </label>
+          <div className="paper-money-input">
+            <input id="paper-initial-cash" inputMode="numeric" value={initialCash ? initialCash.toLocaleString("ko-KR") : ""} onChange={(event) => setInitialCash(parsePositiveInteger(event.target.value))} aria-label="투자 가능 금액" />
+            <span>원</span>
           </div>
-          <div className="paper-option-group">
-            {[3, 5, 7].map((count) => (
-              <button key={count} type="button" className={eventCount === count ? "active" : ""} onClick={() => setEventCount(count)}>{count}개</button>
+          <div className="paper-money-presets" aria-label="투자 금액 빠른 선택">
+            {CASH_PRESETS.map((cash) => (
+              <button key={cash} type="button" className={initialCash === cash ? "active" : ""} aria-pressed={initialCash === cash} onClick={() => setInitialCash(cash)}>+ {compactWon(cash)}원</button>
             ))}
           </div>
         </div>
-        <div className="paper-setting-row">
-          <div>
-            <span>시장 참여자</span>
-            <small>개인·외국인·기관·연기금 에이전트 수</small>
+        {investmentMode === "holding" && (
+          <div className="paper-holding-inputs">
+            <label htmlFor="paper-average-price"><span>평균 매입가</span><div><input id="paper-average-price" inputMode="numeric" value={averagePrice ? averagePrice.toLocaleString("ko-KR") : ""} onChange={(event) => setAveragePrice(parsePositiveInteger(event.target.value))} /><em>원</em></div></label>
+            <label htmlFor="paper-holding-quantity"><span>보유 수량</span><div><input id="paper-holding-quantity" inputMode="numeric" value={holdingQuantity ? holdingQuantity.toLocaleString("ko-KR") : ""} onChange={(event) => setHoldingQuantity(parsePositiveInteger(event.target.value))} /><em>주</em></div></label>
           </div>
-          <div className="paper-option-group">
-            {MARKET_SIZES.map((size) => (
-              <button key={size.key} type="button" className={marketSize.key === size.key ? "active" : ""} onClick={() => setMarketSize(size)}>{size.label}</button>
+        )}
+        <p className="paper-setting-note"><CheckCircle2 size={13} /> 실제 주문이나 계좌 연결 없이 입력한 조건으로만 연습합니다.</p>
+      </section>
+
+      <section className="paper-setup-block">
+        <div className="paper-setup-heading"><span>04 · 시뮬레이션 설정</span><h3>어떤 방식으로 연습할까요?</h3></div>
+        <div className="paper-simulation-field">
+          <div className="paper-simulation-label"><span>연습 기간</span><small>거래일 기준</small></div>
+          <div className="paper-duration-options">
+            {DURATION_OPTIONS.map((option) => (
+              <button key={option.days} type="button" className={simulationDays === option.days ? "active" : ""} aria-pressed={simulationDays === option.days} onClick={() => setSimulationDays(option.days)}>
+                <strong>{option.label}</strong><small>{option.caption}</small>
+              </button>
             ))}
           </div>
         </div>
-        <div className="paper-setting-row">
-          <div>
-            <span>초기 자본</span>
-            <small>주문 가능 현금</small>
-          </div>
-          <div className="paper-option-group">
-            {[10_000_000, 100_000_000, 1_000_000_000].map((cash) => (
-              <button key={cash} type="button" className={initialCash === cash ? "active" : ""} onClick={() => setInitialCash(cash)}>{compactWon(cash)}원</button>
+        <div className="paper-simulation-field">
+          <div className="paper-simulation-label"><span>연습 유형</span><small>수집 자료에서 어떤 사건을 우선 구성할지 선택</small></div>
+          <div className="paper-practice-options">
+            {PRACTICE_OPTIONS.map((option) => (
+              <button key={option.key} type="button" className={practiceMode === option.key ? "active" : ""} aria-pressed={practiceMode === option.key} onClick={() => setPracticeMode(option.key)}>
+                <span>{practiceMode === option.key && <CheckCircle2 size={13} />}<strong>{option.label}</strong></span>
+                <small>{option.caption}</small>
+              </button>
             ))}
           </div>
         </div>
@@ -1270,12 +1317,12 @@ function SetupScreen({
 
       <div className="paper-hint">
         <CalendarClock size={13} />
-        참여자가 많을수록 반응이 다양해집니다. 거래일 하나를 넘기는 데 15~25초 정도 걸립니다.
+        사건 수와 시장 참여자는 선택한 기간과 수집 자료에 맞춰 자동으로 구성됩니다. 거래일 하나를 넘기는 데 15~25초 정도 걸립니다.
       </div>
 
       {error && <p className="paper-error"><AlertTriangle size={14} /> {error}</p>}
 
-      <button className="paper-start-button" type="submit" disabled={!picked || !collectionReady || starting}>
+      <button className="paper-start-button" type="submit" disabled={!picked || !collectionReady || !investmentReady || starting}>
         {starting
           ? <><LoaderCircle size={17} className="spin" /> 수집한 자료로 시나리오를 만들고 있습니다</>
           : <><CircleDollarSign size={17} /> 모의 투자 시작하기 <ArrowRight size={16} /></>}
@@ -1754,8 +1801,9 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
   }, [refreshGame, refreshAssessment]);
 
   const start = useCallback(async (input: {
-    ticker: string; name: string; premise: string; eventSource: string;
-    eventCount: number; initialCash: number; personaCounts: Record<string, number>;
+    ticker: string; name: string; initialCash: number;
+    investmentMode: InvestmentMode; initialPosition?: { quantity: number; averagePrice: number };
+    simulationDays: number; practiceMode: PracticeMode;
   }) => {
     setStarting(true);
     setError(null);
@@ -1764,11 +1812,14 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
         method: "POST",
         body: JSON.stringify({
           ticker: input.ticker,
-          premise: input.premise,
-          event_count: input.eventCount,
           initial_cash: input.initialCash,
-          persona_counts: input.personaCounts,
-          event_source: input.eventSource,
+          initial_position: input.initialPosition
+            ? { quantity: input.initialPosition.quantity, average_price: input.initialPosition.averagePrice }
+            : undefined,
+          investment_mode: input.investmentMode,
+          simulation_days: input.simulationDays,
+          practice_mode: input.practiceMode,
+          event_source: "ontology",
           // 캐시 리플레이 이력은 종가만 있어 캔들이 선으로 뭉개진다.
           // finverse는 실제 OHLC를 쓰고, DB가 죽었을 때만 백엔드가 캐시로 내려간다.
           prefer_live_finverse: true,

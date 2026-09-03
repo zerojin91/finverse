@@ -980,6 +980,41 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-option-group { display: flex; gap: 5px; }
 .paper-option-group button { min-width: 58px; height: 34px; padding: 0 11px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); background: #fafafa; font-family: inherit; font-size: 11px; font-weight: 650; cursor: pointer; }
 .paper-option-group button.active { border-color: var(--ink); color: #fff; background: var(--ink); }
+.paper-investment-mode { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.paper-investment-mode button { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 13px 14px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); background: #fafafa; font-family: inherit; text-align: left; cursor: pointer; }
+.paper-investment-mode button.active { border-color: var(--ink); color: var(--ink); background: #fff; box-shadow: inset 0 0 0 1px var(--ink); }
+.paper-investment-mode button > span { display: flex; flex-direction: column; gap: 2px; }
+.paper-investment-mode strong { font-size: 11px; }
+.paper-investment-mode small { color: var(--light); font-size: 9px; }
+.paper-money-panel { display: grid; grid-template-columns: minmax(120px,.7fr) minmax(180px,1fr); gap: 10px 18px; align-items: center; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.paper-money-panel > label { display: flex; flex-direction: column; gap: 3px; }
+.paper-money-panel > label span,.paper-holding-inputs label > span,.paper-simulation-label span { color: var(--ink); font-size: 11px; font-weight: 750; }
+.paper-money-panel > label small,.paper-simulation-label small { color: var(--light); font-size: 9px; }
+.paper-money-input { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 0 12px; border: 1px solid #d4d4d8; border-radius: 9px; background: #fafafa; }
+.paper-money-input:focus-within { border-color: var(--ink); background: #fff; }
+.paper-money-input input { width: 100%; min-width: 0; height: 40px; border: 0; outline: 0; color: var(--ink); background: transparent; font-family: inherit; font-size: 16px; font-weight: 800; text-align: right; }
+.paper-money-input span { color: var(--muted); font-size: 10px; }
+.paper-money-presets { grid-column: 2; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; }
+.paper-money-presets button { min-width: 0; padding: 7px 4px; border: 1px solid var(--line); border-radius: 7px; color: var(--muted); background: #fafafa; font-family: inherit; font-size: 9px; cursor: pointer; }
+.paper-money-presets button.active { border-color: var(--ink); color: var(--ink); background: #f4f4f5; font-weight: 750; }
+.paper-holding-inputs { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; padding: 12px 14px; border: 1px solid #dbeafe; border-radius: 10px; background: #f8fbff; }
+.paper-holding-inputs label { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.paper-holding-inputs label > div { display: flex; align-items: center; gap: 5px; min-width: 0; padding: 0 9px; border: 1px solid #d4d4d8; border-radius: 8px; background: #fff; }
+.paper-holding-inputs input { width: 100%; min-width: 0; height: 35px; border: 0; outline: 0; background: transparent; font-family: inherit; font-size: 11px; font-weight: 700; text-align: right; }
+.paper-holding-inputs em { color: var(--light); font-size: 9px; font-style: normal; }
+.paper-setting-note { display: flex; align-items: center; gap: 6px; margin: 0; color: #15803d; font-size: 9px; }
+.paper-simulation-field { display: flex; flex-direction: column; gap: 8px; padding: 13px 14px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.paper-simulation-label { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.paper-duration-options { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; }
+.paper-duration-options button,.paper-practice-options button { min-width: 0; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); background: #fafafa; font-family: inherit; text-align: left; cursor: pointer; }
+.paper-duration-options button { display: flex; align-items: baseline; justify-content: space-between; gap: 4px; padding: 10px; }
+.paper-duration-options button.active,.paper-practice-options button.active { border-color: var(--ink); color: var(--ink); background: #f4f4f5; box-shadow: inset 0 0 0 1px var(--ink); }
+.paper-duration-options strong,.paper-practice-options strong { font-size: 10px; }
+.paper-duration-options small,.paper-practice-options small { color: var(--light); font-size: 8px; }
+.paper-practice-options { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 6px; }
+.paper-practice-options button { display: flex; flex-direction: column; gap: 4px; padding: 10px 11px; }
+.paper-practice-options button > span { display: flex; align-items: center; gap: 5px; }
+.paper-practice-options button.active svg { color: #16a34a; }
 .paper-start-button { width: 100%; min-height: 52px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; border: 0; border-radius: 11px; color: #fff; background: var(--ink); font-family: inherit; font-size: 14px; font-weight: 750; cursor: pointer; }
 .paper-start-button:disabled { cursor: not-allowed; opacity: .45; }
 .paper-start-note { margin: -10px 0 0; color: var(--light); font-size: 10px; text-align: center; }
@@ -1400,6 +1435,9 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
   .paper-setup { padding: 20px 18px 24px; }
   .paper-run-header,.paper-run-overview,.paper-run-grid { padding-left: 16px; padding-right: 16px; }
   .paper-setting-row { flex-direction: column; align-items: flex-start; }
+  .paper-money-panel { grid-template-columns: minmax(0,1fr); }
+  .paper-money-presets { grid-column: 1; }
+  .paper-holding-inputs { grid-template-columns: minmax(0,1fr); }
   .paper-collection-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .paper-collection-status { align-items: flex-start; flex-direction: column; }
   .paper-holdings { grid-template-columns: repeat(2,minmax(0,1fr)); }

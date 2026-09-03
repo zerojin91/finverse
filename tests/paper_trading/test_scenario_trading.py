@@ -4,6 +4,8 @@ from services.paper_trading.scenario_trading import (
     submit_scenario_order,
 )
 from services.paper_trading.kospi_paper_trading import TradingError
+from services.paper_trading.api import _fit_scenario_duration
+from services.paper_trading.ontology_scenario_events import pick_events
 import pytest
 
 
@@ -34,6 +36,43 @@ def test_scenario_return_uses_robust_historical_quantiles_not_single_extreme():
     assert round(_empirical_return(model, 1), 1) == 15.7
     assert round(_empirical_return(model, -1), 1) == -13.0
     assert _empirical_return(model, 0) == 0
+
+
+def test_duration_schedule_spans_exact_selected_trading_days():
+    events = [{"title": f"사건 {index}"} for index in range(3)]
+    scheduled = _fit_scenario_duration(events, 20)
+    assert sum(event["trading_days_until"] + 1 for event in scheduled) == 20
+    assert [event["trading_days_until"] for event in scheduled] == [6, 6, 5]
+
+
+def test_existing_holding_starts_from_mark_to_market_equity():
+    game = new_scenario_game(
+        "005930", "삼성전자", 10200, HISTORY,
+        [{"pre_brief": "일정", "title": "발표", "description": "내용"}],
+        initial_cash=5_000_000,
+        initial_position={"quantity": 10, "average_price": 9000},
+        persona_counts={"retail": 1, "foreign": 1, "institution": 1, "pension": 1},
+    )
+    portfolio = public_scenario_game(game)["portfolio"]
+    assert game["position"] == {"quantity": 10, "average_price": 9000}
+    assert game["initial_equity"] == 5_102_000
+    assert portfolio["unrealized_pnl"] == 12_000
+    assert portfolio["total_return_pct"] == 0
+
+
+def test_practice_mode_prioritizes_matching_event_direction():
+    candidates = [
+        {"event_date": "2026-01-01", "severity": .5, "origin": "macro",
+         "source_score": 5, "direction": 1},
+        {"event_date": "2026-01-05", "severity": .5, "origin": "macro",
+         "source_score": 5, "direction": -1},
+        {"event_date": "2026-01-12", "severity": .5, "origin": "macro",
+         "source_score": 5, "direction": 1},
+        {"event_date": "2026-01-16", "severity": .5, "origin": "macro",
+         "source_score": 5, "direction": -1},
+    ]
+    assert all(item["direction"] < 0 for item in pick_events(candidates, 2, "stress"))
+    assert all(item["direction"] > 0 for item in pick_events(candidates, 2, "opportunity"))
 
 
 def test_event_pre_and_post_decisions_with_autonomous_market_rounds():

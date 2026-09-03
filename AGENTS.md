@@ -40,11 +40,15 @@
 - DB는 원격 서버의 Docker 컨테이너 `finverse-db`, 데이터베이스 `finverse`다. 수집 원본과 AI 분석 결과의 중심 저장소는 `lake.records`다.
 - 대시보드·KOSPI·장중지수·모의투자·MiroFish A2A의 DB 접근은 모두 `FINVERSE_DATABASE_URL`을 사용한다. 이 값은 `.env`에만 두며, 코드·문서·로그에는 값 자체를 기록하지 않는다.
 - 모의투자 종목 선택 화면은 `GET /api/paper-trading/securities/:ticker/candles`로 선택 종목의 최근 36거래일 실제 OHLC를 읽어 시작 전 캔들 미리보기를 표시한다. 이 미리보기에는 시뮬레이션·미래 가격을 섞지 않는다.
+- 모의투자 설정 흐름은 `종목 선택 → 자료 수집 → 투자 상태 → 시뮬레이션 설정` 순서다. 사용자는 신규 투자/기존 보유, 실제 투자 가능 금액, 기존 보유 시 평단·수량, 10·20·60거래일 기간, 균형·위기 대응·기회 포착·무작위 연습 유형을 선택한다.
+- 사건 개수와 시장 참여자 수는 사용자 설정이 아니다. 백엔드가 기간별로 `10일=2개`, `20일=3개`, `60일=5개` 사건을 고르고, 개인 8·외국인 4·기관 4·연기금 2 에이전트를 내부 구성한다. 사건 사이 거래일을 재배치해 선택한 전체 기간과 일치시킨다.
+- 기존 보유로 시작하면 `initial_position.quantity`와 `initial_position.average_price`가 게임에 반영된다. 미실현 손익은 평단 기준으로 보여주며 시뮬레이션 수익률은 시작 시점의 현금+현재가 평가액(`initial_equity`)을 기준으로 0%에서 시작한다.
 - 모의투자 2단계 `자료 수집`은 `GET /api/paper-trading/securities/:ticker/scenario-context`로 시나리오 엔진과 동일한 종목별 DB 조회를 미리 수행한다. 시장·경제·사건·커뮤니티 네 도메인의 건수·최신 시점을 표시하며, 결과는 로컬 이력 캐시에 남아 시나리오 생성 시 재사용된다. 이 단계는 OpenRouter·온톨로지·MiroFish를 실행하지 않는다.
 
 ### 데이터·AI 흐름
 
 - 시장·경제·뉴스·커뮤니티 수집기는 `collectors/`에 있다. `scripts/run_ingest.sh`가 수집과 PostgreSQL 적재를 묶는다.
+- 모의투자는 `GET /api/paper-trading/securities/:ticker/scenario-context`로 선택 종목의 시장·경제·사건·커뮤니티 준비 상태를 먼저 확인한다. 시나리오 생성 시 같은 PostgreSQL 이력을 사용하며 연습 유형에 따라 전체 사건, 악재, 호재, 무작위 사건을 우선 선별한다.
 - 대시보드는 `app/api/dashboard/route.ts`에서 KOSPI·거시지표·뉴스·수급을 읽고, 최신 `market_signal_analysis` 레코드의 OpenRouter 분석을 사용한다.
 - AI 요약 레코드가 없으면 UI는 “요약을 불러오고 있다” 기본 문구를 표시한다. 레코드 형식은 `record_type='market_signal_analysis'`, `source='openrouter'`이다.
 - `scripts/bedrock_signal_update.py`라는 파일명은 과거 호환 이름일 뿐, 현재 구현은 AWS Bedrock이 아니라 OpenRouter Chat Completions API를 사용한다.
@@ -78,6 +82,13 @@ scripts/run_bedrock_signal_update.sh --dry-run
 - UI 이상은 다음 순서로 본다: `GET /api/dashboard` 응답 → `FINVERSE_DATABASE_URL` 연결 상태 → `lake.records` 데이터/배치 로그 → OpenRouter 키·모델 설정.
 
 ### 운영 변경·사고 기록
+
+#### 2026-09-03 — 이미 실행 중인 로컬 서비스와 통합 실행 충돌·이전 API 응답
+
+- 증상: `npm run dev`를 다시 실행하자 3000·5440 포트가 이미 사용 중이었고, 5055에는 여러 Python 프로세스가 동시에 남아 새 기간 검증 대신 이전 API가 응답했다.
+- 원인: 이전 로컬 서비스가 정상 실행 중인 상태에서 통합 실행기를 중복 실행했고, Flask 상위·하위 프로세스 일부가 5055 포트를 공유했다.
+- 조치: 3000·5440 서비스는 유지하고 5055를 점유한 PID를 모두 종료한 뒤, 프로젝트 루트에서 `.venv\\Scripts\\python.exe -u -m services.paper_trading_api`로 하나만 실행했다. 이전 API 확인 과정에서 생성된 로컬 테스트 게임 2개도 정확한 파일을 확인해 제거했다.
+- 재발 방지: 통합 실행 전 3000·5055·5440 포트 상태를 확인하고, 일부만 재시작해야 할 때는 해당 서비스를 단독 실행한다.
 
 #### 2026-09-02 — Windows 모의투자 API 재시작 시 이전 라우트 상태 유지
 

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from datetime import date
 import json
+import random
 import re
 import statistics
 from typing import Any, Callable
@@ -349,7 +350,8 @@ def record_price_reaction(events: list[dict[str, Any]],
     return events
 
 
-def pick_events(candidates: list[dict[str, Any]], event_count: int) -> list[dict[str, Any]]:
+def pick_events(candidates: list[dict[str, Any]], event_count: int,
+                practice_mode: str = "balanced") -> list[dict[str, Any]]:
     """Choose events that are both consequential and spread across the window.
 
     Ranking by impact alone clusters every pick into the loudest week, which
@@ -357,9 +359,12 @@ def pick_events(candidates: list[dict[str, Any]], event_count: int) -> list[dict
     """
     if not candidates:
         raise TradingError("선택한 기간의 온톨로지에 사용할 이벤트가 없습니다.")
+    if practice_mode not in {"balanced", "stress", "opportunity", "random"}:
+        raise TradingError("지원하지 않는 연습 유형입니다.")
     ordered = sorted(candidates, key=lambda item: item["event_date"])
-    dates = [item["event_date"] for item in ordered]
-    first, last = dates[0], dates[-1]
+    randomizer = random.SystemRandom()
+    random_scores = ({id(item): randomizer.random() for item in ordered}
+                     if practice_mode == "random" else {})
 
     def weight(item: dict[str, Any]) -> float:
         # 종목 고유 사건을 우대한다. 이 종목에 대한 뉴스가 매크로보다 배우기
@@ -371,7 +376,14 @@ def pick_events(candidates: list[dict[str, Any]], event_count: int) -> list[dict
         if item["severity"] < .05:
             return -1.0
         micro_bonus = .6 if item.get("origin") == "micro" else 0
-        return item["source_score"] / 7 + item["severity"] * .8 + micro_bonus
+        base = item["source_score"] / 7 + item["severity"] * .8 + micro_bonus
+        if practice_mode == "stress" and item["direction"] < -.05:
+            return base + 1.1
+        if practice_mode == "opportunity" and item["direction"] > .05:
+            return base + 1.1
+        if practice_mode == "random":
+            return base * .2 + random_scores[id(item)] * 2
+        return base
 
     picked: list[dict[str, Any]] = []
     buckets = max(1, event_count)
@@ -498,6 +510,7 @@ def narrate_events(security_name: str, ticker: str, events: list[dict[str, Any]]
 def build_ontology_scenario(history: dict[str, Any], event_count: int = 3,
                             window_days: int = DEFAULT_SCENARIO_WINDOW_DAYS,
                             chat: Callable[..., str] | None = None,
+                            practice_mode: str = "balanced",
                             ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
     """Return (calibration_days, scenario_events, provenance).
 
@@ -519,7 +532,7 @@ def build_ontology_scenario(history: dict[str, Any], event_count: int = 3,
         _name_tokens(history.get("name"), history.get("english_name")))
     candidates = attach_narrative(macro + micro, market_days)
     candidates = record_price_reaction(candidates, market_days)
-    picked = pick_events(candidates, event_count)
+    picked = pick_events(candidates, event_count, practice_mode)
     events = narrate_events(history["name"], history["ticker"], picked, chat=chat)
     provenance = {
         "mode": "ontology_events",
@@ -533,6 +546,7 @@ def build_ontology_scenario(history: dict[str, Any], event_count: int = 3,
                                    if row.get("series_name") in GLOBAL_MACRO_RULES),
         "micro_candidates": len(micro),
         "selected_events": len(events),
+        "practice_mode": practice_mode,
         "direction_basis": "macro_indicator_moves_and_news_keywords",
     }
     return market_days, events, provenance

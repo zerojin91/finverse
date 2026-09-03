@@ -167,6 +167,7 @@ def _real_candles(history: list[dict[str, Any]], limit: int = 60) -> list[dict[s
 def new_scenario_game(
     ticker: str, name: str, previous_close: int, impact_history: list[dict[str, Any]],
     events: list[dict[str, Any]], *, initial_cash: int = 100_000_000,
+    initial_position: dict[str, Any] | None = None,
     persona_counts: dict[str, int] | None = None, fee_rate: float = .00015,
     sell_tax_rate: float = .0018, slippage_bps: float = 5.0,
     scenario_start_date: str | None = None,
@@ -174,8 +175,22 @@ def new_scenario_game(
     ticker = str(ticker).zfill(6)
     if not ticker.isdigit() or len(ticker) != 6:
         raise TradingError("KOSPI 종목 코드는 6자리 숫자여야 합니다.")
-    if int(previous_close) <= 0 or int(initial_cash) <= 0:
-        raise TradingError("기준 가격과 초기 자본은 0보다 커야 합니다.")
+    if int(previous_close) <= 0 or int(initial_cash) < 0:
+        raise TradingError("기준 가격은 0보다 크고 투자 가능 금액은 0 이상이어야 합니다.")
+    if int(initial_cash) > 100_000_000_000:
+        raise TradingError("투자 가능 금액은 1,000억원 이하로 입력해주세요.")
+    initial_position = initial_position or {}
+    initial_quantity = int(initial_position.get("quantity") or 0)
+    initial_average_price = int(initial_position.get("average_price") or 0)
+    if initial_quantity < 0 or initial_average_price < 0:
+        raise TradingError("보유 수량과 평균 매입가는 0 이상이어야 합니다.")
+    if bool(initial_quantity) != bool(initial_average_price):
+        raise TradingError("보유 중인 경우 평균 매입가와 수량을 모두 입력해주세요.")
+    if initial_quantity > 100_000_000:
+        raise TradingError("보유 수량이 허용 범위를 초과했습니다.")
+    initial_equity = int(initial_cash) + initial_quantity * int(previous_close)
+    if initial_equity <= 0:
+        raise TradingError("투자 가능 금액이나 보유 종목 중 하나는 입력해주세요.")
     game_id = f"scenario_{uuid.uuid4().hex[:12]}"
     personas = build_personas(persona_counts, game_id, int(previous_close))
     if len(personas) > 80:
@@ -203,7 +218,10 @@ def new_scenario_game(
         "phase": PHASE_INTER_EVENT, "current_event_index": 0,
         "created_at": now, "updated_at": now,
         "initial_cash": int(initial_cash), "cash": int(initial_cash),
-        "position": {"quantity": 0, "average_price": 0}, "realized_pnl": 0,
+        "initial_equity": initial_equity,
+        "position": {"quantity": initial_quantity,
+                     "average_price": initial_average_price},
+        "realized_pnl": 0,
         "current_price": int(previous_close), "initial_reference_price": int(previous_close),
         "events": normalized_events, "revealed_events": [],
         "scenario_start_date": scenario_start.isoformat(),
@@ -736,4 +754,5 @@ def scenario_portfolio(game: dict[str, Any]) -> dict[str, Any]:
             "mark_price": game["current_price"], "market_value": market_value,
             "equity": equity, "realized_pnl": game["realized_pnl"],
             "unrealized_pnl": (game["current_price"] - game["position"]["average_price"]) * quantity,
-            "total_return_pct": round((equity / game["initial_cash"] - 1) * 100, 4)}
+            "total_return_pct": round(
+                (equity / game.get("initial_equity", game["initial_cash"]) - 1) * 100, 4)}

@@ -18,7 +18,8 @@ def analyze_scenario_investor(game: dict[str, Any]) -> dict[str, Any]:
         peak = max(peak, price)
         if peak:
             max_drawdown = min(max_drawdown, (price / peak - 1) * 100)
-    turnover = sum(fill["gross_amount"] for fill in fills) / max(game["initial_cash"], 1)
+    turnover = sum(fill["gross_amount"] for fill in fills) / max(
+        game.get("initial_equity", game["initial_cash"]), 1)
     confidence_values = [fill["confidence"] for fill in fills if fill.get("confidence") is not None]
     completed_events = len({row["event_id"] for row in game.get("decision_log", [])})
     autonomous_market_days = sum(
