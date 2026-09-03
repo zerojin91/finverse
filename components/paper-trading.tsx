@@ -117,6 +117,16 @@ type HistoryCandle = {
   real?: boolean;
 };
 
+type CollectionSource = {
+  key: "market" | "economy" | "events" | "community";
+  label: string;
+  status: "ready" | "missing";
+  count: number;
+  unit: string;
+  updated_at: string | null;
+  detail: string;
+};
+
 type Observation = {
   investor_group: string;
   platform: string;
@@ -948,8 +958,6 @@ function SetupScreen({
   onClose: () => void;
 }) {
   const [saved, setSaved] = useState<GameSummary[]>([]);
-  // 기본은 온톨로지의 실제 사건이다. 전제 입력은 명시적으로 선택했을 때만 쓴다.
-  const [manualPremise, setManualPremise] = useState(false);
   const [marketSize, setMarketSize] = useState(MARKET_SIZES[1]);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Security[]>([]);
@@ -958,7 +966,8 @@ function SetupScreen({
   const [picked, setPicked] = useState<Security | null>(null);
   const [previewCandles, setPreviewCandles] = useState<HistoryCandle[] | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
-  const [premise, setPremise] = useState("");
+  const [collectionSources, setCollectionSources] = useState<CollectionSource[] | null>(null);
+  const [collectionError, setCollectionError] = useState<string | null>(null);
   const [eventCount, setEventCount] = useState(3);
   const [initialCash, setInitialCash] = useState(100_000_000);
 
@@ -1029,13 +1038,32 @@ function SetupScreen({
     return () => { cancelled = true; };
   }, [picked?.ticker]);
 
+  useEffect(() => {
+    if (!picked) {
+      setCollectionSources(null);
+      setCollectionError(null);
+      return;
+    }
+    let cancelled = false;
+    setCollectionSources(null);
+    setCollectionError(null);
+    callApi<{ data: { sources: CollectionSource[] } }>(`/securities/${encodeURIComponent(picked.ticker)}/scenario-context`)
+      .then((payload) => {
+        if (!cancelled) setCollectionSources(payload.data?.sources ?? []);
+      })
+      .catch((cause) => {
+        if (!cancelled) setCollectionError(cause instanceof Error ? cause.message : "시나리오 자료를 수집하지 못했습니다.");
+      });
+    return () => { cancelled = true; };
+  }, [picked?.ticker]);
+
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!picked || starting) return;
     onStart({
       ticker: picked.ticker, name: picked.name,
-      premise: manualPremise ? premise.trim() : "",
-      eventSource: manualPremise ? "premise" : "ontology",
+      premise: "",
+      eventSource: "ontology",
       eventCount, initialCash, personaCounts: marketSize.counts,
     });
   };
@@ -1048,6 +1076,7 @@ function SetupScreen({
   };
 
   const isQuickPicked = Boolean(picked && RECOMMENDED_SECURITIES.some((item) => item.ticker === picked.ticker));
+  const collectionReady = Boolean(collectionSources?.every((source) => source.status === "ready"));
 
   return (
     <form className="paper-setup" onSubmit={submit}>
@@ -1175,46 +1204,31 @@ function SetupScreen({
       </section>
 
       <section className="paper-setup-block">
-        <div className="paper-setup-heading"><span>02 · EVENT SOURCE</span><h3>어떤 사건을 마주할까요?</h3></div>
-        <div className="paper-source-card">
-          <div className="paper-source-head">
-            <Landmark size={15} />
-            <div>
-              <strong>실제로 일어난 사건</strong>
-              <span>기본값</span>
-            </div>
+        <div className="paper-setup-heading"><span>02 · 자료 수집</span><h3>{picked ? `${picked.name} 시나리오 자료를 준비하고 있어요` : "먼저 종목을 선택해주세요"}</h3></div>
+        <div className={`paper-collection-status ${collectionReady ? "ready" : ""}`} aria-live="polite">
+          <div>
+            {collectionSources ? <CheckCircle2 size={15} /> : <LoaderCircle size={15} className={picked ? "spin" : ""} />}
+            <strong>{collectionSources ? (collectionReady ? "시나리오 자료 준비가 완료되었습니다." : "일부 자료가 부족합니다.") : picked ? "선택 종목과 연결된 자료를 수집하고 있습니다." : "종목을 선택하면 자료 수집을 시작합니다."}</strong>
           </div>
-          <p>
-            조회 기간에 실제로 있었던 한국은행 기준금리 변경, 원달러 환율 급변,
-            국고채 금리 변동과 이 종목 관련 뉴스를 골라 시나리오를 만듭니다.
-            <b>날짜와 방향은 실제 지표에서 옵니다.</b>
-          </p>
-          <div className="paper-source-tags">
-            <span>기준금리</span><span>환율</span><span>국고채</span><span>종목 뉴스</span>
-          </div>
+          <span>시나리오 시작에 같은 자료를 사용합니다</span>
         </div>
-
-        {manualPremise ? (
-          <>
-            <textarea
-              className="paper-premise"
-              value={premise}
-              onChange={(event) => setPremise(event.target.value)}
-              rows={3}
-              placeholder="예: HBM 수요가 급증하는 가운데 환율 변동성이 확대되는 국면"
-            />
-            <div className="paper-hint">
-              <Sparkles size={13} /> 이 전제로 가상의 사건을 지어냅니다. 실제 사건 기반이 아닙니다.
-            </div>
-            <button type="button" className="paper-source-toggle" onClick={() => setManualPremise(false)}>
-              실제 사건으로 되돌리기
-            </button>
-          </>
-        ) : (
-          <button type="button" className="paper-source-toggle" onClick={() => setManualPremise(true)}>
-            직접 국면을 가정하고 싶다면
-          </button>
-        )}
+        <div className="paper-collection-grid">
+          {collectionSources ? collectionSources.map((source) => (
+            <article key={source.key} className={`paper-collection-source ${source.status}`}>
+              <header>
+                {source.key === "market" ? <CandlestickChart size={15} /> : source.key === "economy" ? <Landmark size={15} /> : source.key === "events" ? <CalendarClock size={15} /> : <Users size={15} />}
+                <strong>{source.label}</strong>
+                <em>{source.status === "ready" ? "READY" : "MISSING"}</em>
+              </header>
+              <b>{source.count.toLocaleString("ko-KR")}<small>{source.unit}</small></b>
+              <p>{source.detail}</p>
+              <span>{source.updated_at ? `${source.updated_at} 기준` : "기준 시점 없음"}</span>
+            </article>
+          )) : ["시장", "경제", "사건", "커뮤니티"].map((label) => (
+            <article key={label} className="paper-collection-source waiting"><header><LoaderCircle size={15} /><strong>{label}</strong><em>WAITING</em></header><b>—</b><p>종목 선택 후 준비</p></article>
+          ))}
+        </div>
+        {collectionError && <p className="paper-inline-error">{collectionError}</p>}
       </section>
 
       <section className="paper-setup-block">
@@ -1261,16 +1275,14 @@ function SetupScreen({
 
       {error && <p className="paper-error"><AlertTriangle size={14} /> {error}</p>}
 
-      <button className="paper-start-button" type="submit" disabled={!picked || starting}>
+      <button className="paper-start-button" type="submit" disabled={!picked || !collectionReady || starting}>
         {starting
-          ? <><LoaderCircle size={17} className="spin" /> {manualPremise ? "가상 이벤트를 생성하고 있습니다" : "실제 사건을 찾아 시나리오를 만들고 있습니다"}</>
+          ? <><LoaderCircle size={17} className="spin" /> 수집한 자료로 시나리오를 만들고 있습니다</>
           : <><CircleDollarSign size={17} /> 모의 투자 시작하기 <ArrowRight size={16} /></>}
       </button>
       {starting && (
         <p className="paper-start-note">
-          {manualPremise
-            ? "AI가 전제에 맞는 가상 이벤트를 만드는 중입니다."
-            : "실제 지표와 뉴스에서 사건을 고르는 중입니다."} 최초 조회는 30초 정도 걸릴 수 있습니다.
+          수집한 시장·경제·사건·커뮤니티 자료를 바탕으로 시나리오를 구성합니다. 최초 조회는 30초 정도 걸릴 수 있습니다.
         </p>
       )}
     </form>

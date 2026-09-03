@@ -40,6 +40,7 @@
 - DB는 원격 서버의 Docker 컨테이너 `finverse-db`, 데이터베이스 `finverse`다. 수집 원본과 AI 분석 결과의 중심 저장소는 `lake.records`다.
 - 대시보드·KOSPI·장중지수·모의투자·MiroFish A2A의 DB 접근은 모두 `FINVERSE_DATABASE_URL`을 사용한다. 이 값은 `.env`에만 두며, 코드·문서·로그에는 값 자체를 기록하지 않는다.
 - 모의투자 종목 선택 화면은 `GET /api/paper-trading/securities/:ticker/candles`로 선택 종목의 최근 36거래일 실제 OHLC를 읽어 시작 전 캔들 미리보기를 표시한다. 이 미리보기에는 시뮬레이션·미래 가격을 섞지 않는다.
+- 모의투자 2단계 `자료 수집`은 `GET /api/paper-trading/securities/:ticker/scenario-context`로 시나리오 엔진과 동일한 종목별 DB 조회를 미리 수행한다. 시장·경제·사건·커뮤니티 네 도메인의 건수·최신 시점을 표시하며, 결과는 로컬 이력 캐시에 남아 시나리오 생성 시 재사용된다. 이 단계는 OpenRouter·온톨로지·MiroFish를 실행하지 않는다.
 
 ### 데이터·AI 흐름
 

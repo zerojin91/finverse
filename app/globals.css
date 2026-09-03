@@ -1288,19 +1288,29 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-fills strong { color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
 .paper-fills em { margin-left: auto; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9px; font-style: normal; }
 
-/* event source */
-.paper-source-card { padding: 14px 15px; border: 1px solid #bfdbfe; border-radius: 11px; background: #f5f9ff; }
-.paper-source-head { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; }
-.paper-source-head svg { color: #1d4ed8; }
-.paper-source-head > div { display: flex; align-items: center; gap: 7px; }
-.paper-source-head strong { color: var(--ink); font-size: 13px; }
-.paper-source-head span { padding: 2px 6px; border-radius: 5px; color: #1d4ed8; background: #dbeafe; font-size: 8px; font-weight: 900; letter-spacing: .05em; }
-.paper-source-card p { margin: 0; color: #3f3f46; font-size: 11px; line-height: 1.75; }
-.paper-source-card p b { color: var(--ink); font-weight: 700; }
-.paper-source-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
-.paper-source-tags span { padding: 4px 8px; border: 1px solid #bfdbfe; border-radius: 999px; color: #1d4ed8; background: #fff; font-size: 9px; font-weight: 700; }
-.paper-source-toggle { align-self: flex-start; margin-top: 2px; padding: 0; border: 0; color: var(--muted); background: transparent; font-family: inherit; font-size: 10px; font-weight: 700; text-decoration: underline; cursor: pointer; }
-.paper-source-toggle:hover { color: var(--ink); }
+/* collection */
+.paper-collection-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: #fafafa; }
+.paper-collection-status > div { display: flex; align-items: center; gap: 7px; color: var(--muted); }
+.paper-collection-status svg { color: #71717a; }
+.paper-collection-status strong { color: var(--ink); font-size: 11px; }
+.paper-collection-status > span { color: var(--light); font-size: 9px; }
+.paper-collection-status.ready { border-color: #bbf7d0; background: #f0fdf4; }
+.paper-collection-status.ready svg { color: #16a34a; }
+.paper-collection-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 7px; }
+.paper-collection-source { min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 9px; background: #fff; }
+.paper-collection-source header { display: flex; align-items: center; gap: 5px; }
+.paper-collection-source header svg { color: #71717a; }
+.paper-collection-source header strong { color: var(--ink); font-size: 10px; }
+.paper-collection-source header em { margin-left: auto; color: #16a34a; font-size: 7px; font-style: normal; font-weight: 900; letter-spacing: .06em; }
+.paper-collection-source > b { display: block; margin-top: 10px; color: var(--ink); font-size: 17px; letter-spacing: -.03em; }
+.paper-collection-source > b small { margin-left: 3px; color: var(--muted); font-size: 9px; font-weight: 600; }
+.paper-collection-source > p { min-height: 25px; margin: 4px 0 6px; color: var(--muted); font-size: 9px; line-height: 1.4; }
+.paper-collection-source > span { display: block; overflow: hidden; color: var(--light); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.paper-collection-source.missing { border-style: dashed; background: #fafafa; }
+.paper-collection-source.missing header em { color: #a1a1aa; }
+.paper-collection-source.waiting { background: #fafafa; }
+.paper-collection-source.waiting header svg { color: #a1a1aa; }
+.paper-collection-source.waiting header em { color: #a1a1aa; }
 
 /* resume list */
 .paper-resume-list { display: grid; gap: 7px; }
@@ -1390,6 +1400,8 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
   .paper-setup { padding: 20px 18px 24px; }
   .paper-run-header,.paper-run-overview,.paper-run-grid { padding-left: 16px; padding-right: 16px; }
   .paper-setting-row { flex-direction: column; align-items: flex-start; }
+  .paper-collection-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .paper-collection-status { align-items: flex-start; flex-direction: column; }
   .paper-holdings { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
 

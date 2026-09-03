@@ -79,6 +79,11 @@ def security_candles(ticker: str):
     return jsonify({"success": True, "data": {"ticker": str(ticker).zfill(6), "candles": candles}})
 
 
+@paper_trading_bp.route("/securities/<ticker>/scenario-context", methods=["GET"])
+def security_scenario_context(ticker: str):
+    return jsonify({"success": True, "data": _market_data().collect_scenario_context(ticker)})
+
+
 @paper_trading_bp.route("/data-source/status", methods=["GET"])
 def data_source_status():
     return jsonify({"success": True, "data": _market_data().healthcheck()})

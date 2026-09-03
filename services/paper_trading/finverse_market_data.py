@@ -183,6 +183,46 @@ class FinverseMarketData:
                 "volume": int(row["volume"] or 0), "real": True,
             } for row in cursor.fetchall()]
 
+    def collect_scenario_context(self, ticker: str) -> dict[str, Any]:
+        """Load the four evidence domains used by a paper-trading scenario.
+
+        This deliberately reuses ``load_game_data``: the picker warms the same
+        local history cache that scenario creation consumes, without starting
+        an LLM, ontology, or MiroFish run.
+        """
+        history = self.load_game_data(ticker, "", "")
+        market_days = history["market_days"]
+        latest_market_day = market_days[-1]["trade_date"] if market_days else None
+        event_count = sum(len(day.get("events") or []) for day in market_days)
+
+        def latest(rows: list[dict[str, Any]], field: str = "trade_date") -> str | None:
+            values = [str(row[field]) for row in rows if row.get(field)]
+            return max(values) if values else None
+
+        sources = [
+            {
+                "key": "market", "label": "시장", "status": "ready" if market_days else "missing",
+                "count": len(market_days), "unit": "거래일", "updated_at": latest_market_day,
+                "detail": "종목 시세·거래량·투자자 수급",
+            },
+            {
+                "key": "economy", "label": "경제", "status": "ready" if history["macro_observations"] else "missing",
+                "count": len(history["macro_observations"]), "unit": "지표", "updated_at": latest(history["macro_observations"]),
+                "detail": "금리·환율·국채 등 거시 지표",
+            },
+            {
+                "key": "events", "label": "사건", "status": "ready" if event_count else "missing",
+                "count": event_count, "unit": "건", "updated_at": latest_market_day,
+                "detail": "종목·시장 관련 뉴스와 이벤트",
+            },
+            {
+                "key": "community", "label": "커뮤니티", "status": "ready" if history["social_signals"] else "missing",
+                "count": len(history["social_signals"]), "unit": "일", "updated_at": latest(history["social_signals"]),
+                "detail": "투자 심리와 온라인 언급 추이",
+            },
+        ]
+        return {"ticker": history["ticker"], "name": history["name"], "sources": sources}
+
     def healthcheck(self) -> dict[str, Any]:
         with self._connection() as connection, connection.cursor() as cursor:
             cursor.execute("SELECT current_database() AS database, current_user AS user, now() AS checked_at")
