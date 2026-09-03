@@ -984,7 +984,8 @@ function SetupScreen({
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [collectionSources, setCollectionSources] = useState<CollectionSource[] | null>(null);
   const [collectionError, setCollectionError] = useState<string | null>(null);
-  const [investmentMode, setInvestmentMode] = useState<InvestmentMode>("new");
+  const [collectionConfirmed, setCollectionConfirmed] = useState(false);
+  const [investmentMode, setInvestmentMode] = useState<InvestmentMode | null>(null);
   const [initialCash, setInitialCash] = useState(50_000_000);
   const [averagePrice, setAveragePrice] = useState(0);
   const [holdingQuantity, setHoldingQuantity] = useState(0);
@@ -1064,7 +1065,7 @@ function SetupScreen({
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!picked || starting || initialCash < 0) return;
+    if (!picked || !investmentMode || starting || initialCash < 0) return;
     if (investmentMode === "new" && initialCash <= 0) return;
     if (investmentMode === "holding" && (!averagePrice || !holdingQuantity)) return;
     onStart({
@@ -1078,6 +1079,12 @@ function SetupScreen({
   };
 
   const selectSecurity = (item: Security) => {
+    if (picked?.ticker !== item.ticker) {
+      setCollectionConfirmed(false);
+      setInvestmentMode(null);
+      setAveragePrice(0);
+      setHoldingQuantity(0);
+    }
     setPreviewCandles(null);
     setPreviewError(null);
     setCollectionSources(null);
@@ -1092,7 +1099,7 @@ function SetupScreen({
   const collectionReady = Boolean(collectionSources?.every((source) => source.status === "ready"));
   const investmentReady = investmentMode === "new"
     ? initialCash > 0
-    : averagePrice > 0 && holdingQuantity > 0;
+    : investmentMode === "holding" && averagePrice > 0 && holdingQuantity > 0;
 
   return (
     <form className="paper-setup" onSubmit={submit}>
@@ -1229,8 +1236,9 @@ function SetupScreen({
         )}
       </section>
 
-      <section className="paper-setup-block">
-        <div className="paper-setup-heading"><span>02 · 자료 수집</span><h3>{picked ? `${picked.name} 시나리오 자료를 준비하고 있어요` : "먼저 종목을 선택해주세요"}</h3></div>
+      {picked && (
+      <section className="paper-setup-block paper-setup-reveal">
+        <div className="paper-setup-heading"><span>02 · 자료 수집</span><h3>{picked.name} 시나리오 자료를 준비하고 있어요</h3></div>
         <div className={`paper-collection-status ${collectionReady ? "ready" : ""}`} aria-live="polite">
           <div>
             {collectionSources ? <CheckCircle2 size={15} /> : <LoaderCircle size={15} className={picked ? "spin" : ""} />}
@@ -1255,9 +1263,16 @@ function SetupScreen({
           ))}
         </div>
         {collectionError && <p className="paper-inline-error">{collectionError}</p>}
+        {collectionReady && !collectionConfirmed && (
+          <button className="paper-step-next" type="button" onClick={() => setCollectionConfirmed(true)}>
+            자료 확인하고 계속 <ChevronRight size={14} />
+          </button>
+        )}
       </section>
+      )}
 
-      <section className="paper-setup-block">
+      {collectionReady && collectionConfirmed && (
+      <section className="paper-setup-block paper-setup-reveal">
         <div className="paper-setup-heading"><span>03 · 투자 상태</span><h3>지금 내 투자 조건을 입력해주세요</h3></div>
         <div className="paper-investment-mode" aria-label="투자 상태">
           <button type="button" className={investmentMode === "new" ? "active" : ""} aria-pressed={investmentMode === "new"} onClick={() => setInvestmentMode("new")}>
@@ -1290,10 +1305,12 @@ function SetupScreen({
             <label htmlFor="paper-holding-quantity"><span>보유 수량</span><div><input id="paper-holding-quantity" inputMode="numeric" value={holdingQuantity ? holdingQuantity.toLocaleString("ko-KR") : ""} onChange={(event) => setHoldingQuantity(parsePositiveInteger(event.target.value))} /><em>주</em></div></label>
           </div>
         )}
-        <p className="paper-setting-note"><CheckCircle2 size={13} /> {investmentMode === "holding" ? "입력한 보유 종목만으로 시작하며 추가 투자금은 사용하지 않습니다." : "실제 주문이나 계좌 연결 없이 입력한 조건으로만 연습합니다."}</p>
+        {investmentMode && <p className="paper-setting-note"><CheckCircle2 size={13} /> {investmentMode === "holding" ? "입력한 보유 종목만으로 시작하며 추가 투자금은 사용하지 않습니다." : "실제 주문이나 계좌 연결 없이 입력한 조건으로만 연습합니다."}</p>}
       </section>
+      )}
 
-      <section className="paper-setup-block">
+      {investmentReady && (
+      <section className="paper-setup-block paper-setup-reveal">
         <div className="paper-setup-heading"><span>04 · 시뮬레이션 설정</span><h3>어떤 방식으로 연습할까요?</h3></div>
         <div className="paper-simulation-field">
           <div className="paper-simulation-label"><span>연습 기간</span><small>거래일 기준</small></div>
@@ -1317,24 +1334,29 @@ function SetupScreen({
           </div>
         </div>
       </section>
+      )}
 
-      <div className="paper-hint">
-        <CalendarClock size={13} />
-        사건 수와 시장 참여자는 선택한 기간과 수집 자료에 맞춰 자동으로 구성됩니다. 거래일 하나를 넘기는 데 15~25초 정도 걸립니다.
-      </div>
+      {investmentReady && (
+        <>
+          <div className="paper-hint paper-setup-reveal">
+            <CalendarClock size={13} />
+            사건 수와 시장 참여자는 선택한 기간과 수집 자료에 맞춰 자동으로 구성됩니다. 거래일 하나를 넘기는 데 15~25초 정도 걸립니다.
+          </div>
+
+          <button className="paper-start-button paper-setup-reveal" type="submit" disabled={starting}>
+            {starting
+              ? <><LoaderCircle size={17} className="spin" /> 수집한 자료로 시나리오를 만들고 있습니다</>
+              : <><CircleDollarSign size={17} /> 모의 투자 시작하기 <ArrowRight size={16} /></>}
+          </button>
+          {starting && (
+            <p className="paper-start-note">
+              수집한 시장·경제·사건·커뮤니티 자료를 바탕으로 시나리오를 구성합니다. 최초 조회는 30초 정도 걸릴 수 있습니다.
+            </p>
+          )}
+        </>
+      )}
 
       {error && <p className="paper-error"><AlertTriangle size={14} /> {error}</p>}
-
-      <button className="paper-start-button" type="submit" disabled={!picked || !collectionReady || !investmentReady || starting}>
-        {starting
-          ? <><LoaderCircle size={17} className="spin" /> 수집한 자료로 시나리오를 만들고 있습니다</>
-          : <><CircleDollarSign size={17} /> 모의 투자 시작하기 <ArrowRight size={16} /></>}
-      </button>
-      {starting && (
-        <p className="paper-start-note">
-          수집한 시장·경제·사건·커뮤니티 자료를 바탕으로 시나리오를 구성합니다. 최초 조회는 30초 정도 걸릴 수 있습니다.
-        </p>
-      )}
     </form>
   );
 }

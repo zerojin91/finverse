@@ -923,6 +923,10 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 
 /* setup */
 .paper-setup { display: flex; flex-direction: column; gap: 20px; padding: 26px 28px 28px; }
+.paper-setup-reveal { animation: paperStepReveal .28s ease-out both; }
+@keyframes paperStepReveal { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.paper-step-next { align-self: flex-end; display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 34px; padding: 0 13px; border: 1px solid var(--ink); border-radius: 8px; color: #fff; background: var(--ink); font-family: inherit; font-size: 10px; font-weight: 750; cursor: pointer; }
+.paper-step-next:hover { background: #27272a; }
 .paper-setup-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
 .paper-setup-header > div:first-child { min-width: 0; }
 .paper-setup-header > div:first-child > span { color: #ef4444; font-size: 9px; font-weight: 900; letter-spacing: .12em; }
