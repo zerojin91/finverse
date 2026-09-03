@@ -1069,7 +1069,8 @@ function SetupScreen({
     if (investmentMode === "holding" && (!averagePrice || !holdingQuantity)) return;
     onStart({
       ticker: picked.ticker, name: picked.name,
-      initialCash, investmentMode, simulationDays, practiceMode,
+      initialCash: investmentMode === "new" ? initialCash : 0,
+      investmentMode, simulationDays, practiceMode,
       initialPosition: investmentMode === "holding"
         ? { quantity: holdingQuantity, averagePrice }
         : undefined,
@@ -1266,28 +1267,30 @@ function SetupScreen({
             <Wallet size={15} /><span><strong>이미 보유 중</strong><small>내 평단과 수량 반영</small></span>
           </button>
         </div>
-        <div className="paper-money-panel">
-          <label htmlFor="paper-initial-cash">
-            <span>{investmentMode === "holding" ? "추가 투자 가능 금액" : "투자할 금액"}</span>
-            <small>실제 연습에 사용할 수 있는 현금</small>
-          </label>
-          <div className="paper-money-input">
-            <input id="paper-initial-cash" inputMode="numeric" value={initialCash ? initialCash.toLocaleString("ko-KR") : ""} onChange={(event) => setInitialCash(parsePositiveInteger(event.target.value))} aria-label="투자 가능 금액" />
-            <span>원</span>
+        {investmentMode === "new" && (
+          <div className="paper-money-panel">
+            <label htmlFor="paper-initial-cash">
+              <span>투자할 금액</span>
+              <small>실제 연습에 사용할 수 있는 현금</small>
+            </label>
+            <div className="paper-money-input">
+              <input id="paper-initial-cash" inputMode="numeric" value={initialCash ? initialCash.toLocaleString("ko-KR") : ""} onChange={(event) => setInitialCash(parsePositiveInteger(event.target.value))} aria-label="투자할 금액" />
+              <span>원</span>
+            </div>
+            <div className="paper-money-presets" aria-label="투자 금액 빠른 선택">
+              {CASH_PRESETS.map((cash) => (
+                <button key={cash} type="button" className={initialCash === cash ? "active" : ""} aria-pressed={initialCash === cash} onClick={() => setInitialCash(cash)}>+ {compactWon(cash)}원</button>
+              ))}
+            </div>
           </div>
-          <div className="paper-money-presets" aria-label="투자 금액 빠른 선택">
-            {CASH_PRESETS.map((cash) => (
-              <button key={cash} type="button" className={initialCash === cash ? "active" : ""} aria-pressed={initialCash === cash} onClick={() => setInitialCash(cash)}>+ {compactWon(cash)}원</button>
-            ))}
-          </div>
-        </div>
+        )}
         {investmentMode === "holding" && (
           <div className="paper-holding-inputs">
             <label htmlFor="paper-average-price"><span>평균 매입가</span><div><input id="paper-average-price" inputMode="numeric" value={averagePrice ? averagePrice.toLocaleString("ko-KR") : ""} onChange={(event) => setAveragePrice(parsePositiveInteger(event.target.value))} /><em>원</em></div></label>
             <label htmlFor="paper-holding-quantity"><span>보유 수량</span><div><input id="paper-holding-quantity" inputMode="numeric" value={holdingQuantity ? holdingQuantity.toLocaleString("ko-KR") : ""} onChange={(event) => setHoldingQuantity(parsePositiveInteger(event.target.value))} /><em>주</em></div></label>
           </div>
         )}
-        <p className="paper-setting-note"><CheckCircle2 size={13} /> 실제 주문이나 계좌 연결 없이 입력한 조건으로만 연습합니다.</p>
+        <p className="paper-setting-note"><CheckCircle2 size={13} /> {investmentMode === "holding" ? "입력한 보유 종목만으로 시작하며 추가 투자금은 사용하지 않습니다." : "실제 주문이나 계좌 연결 없이 입력한 조건으로만 연습합니다."}</p>
       </section>
 
       <section className="paper-setup-block">
