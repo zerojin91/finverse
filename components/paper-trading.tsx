@@ -943,6 +943,7 @@ type InvestmentMode = "new" | "holding";
 type PracticeMode = "balanced" | "stress" | "opportunity" | "random";
 
 const CASH_PRESETS = [10_000_000, 50_000_000, 100_000_000];
+const COLLECTION_STEP_MIN_MS = 1_500;
 const DURATION_OPTIONS = [
   { days: 10, label: "10거래일", caption: "단기 흐름" },
   { days: 20, label: "20거래일", caption: "한 달 연습" },
@@ -984,6 +985,7 @@ function SetupScreen({
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [collectionSources, setCollectionSources] = useState<CollectionSource[] | null>(null);
   const [collectionError, setCollectionError] = useState<string | null>(null);
+  const [collectionDwellComplete, setCollectionDwellComplete] = useState(false);
   const [investmentMode, setInvestmentMode] = useState<InvestmentMode | null>(null);
   const [initialCash, setInitialCash] = useState(50_000_000);
   const [averagePrice, setAveragePrice] = useState(0);
@@ -995,10 +997,11 @@ function SetupScreen({
   const step3Ref = useRef<HTMLElement | null>(null);
   const step4Ref = useRef<HTMLElement | null>(null);
   const collectionReady = Boolean(collectionSources?.every((source) => source.status === "ready"));
+  const collectionStepComplete = collectionReady && collectionDwellComplete;
   const investmentReady = investmentMode === "new"
     ? initialCash > 0
     : investmentMode === "holding" && averagePrice > 0 && holdingQuantity > 0;
-  const activeStep = investmentReady ? 4 : collectionReady ? 3 : pickedTicker ? 2 : 1;
+  const activeStep = investmentReady ? 4 : collectionStepComplete ? 3 : pickedTicker ? 2 : 1;
 
   useEffect(() => {
     let cancelled = false;
@@ -1059,6 +1062,14 @@ function SetupScreen({
 
   useEffect(() => {
     if (!pickedTicker) return;
+    const timer = window.setTimeout(() => {
+      setCollectionDwellComplete(true);
+    }, COLLECTION_STEP_MIN_MS);
+    return () => window.clearTimeout(timer);
+  }, [pickedTicker]);
+
+  useEffect(() => {
+    if (!pickedTicker) return;
     let cancelled = false;
     callApi<{ data: { sources: CollectionSource[] } }>(`/securities/${encodeURIComponent(pickedTicker)}/scenario-context`)
       .then((payload) => {
@@ -1095,6 +1106,7 @@ function SetupScreen({
     setPreviewError(null);
     setCollectionSources(null);
     setCollectionError(null);
+    setCollectionDwellComplete(false);
     setPicked(item);
     setQuery(item.name);
     setResults([]);
@@ -1279,7 +1291,7 @@ function SetupScreen({
       </section>
       )}
 
-      {collectionReady && (
+      {collectionStepComplete && (
       <section ref={step3Ref} className="paper-setup-block paper-setup-reveal">
         <div className="paper-setup-heading"><span>03 · 투자 상태</span><h3>지금 내 투자 조건을 입력해주세요</h3></div>
         <div className="paper-investment-mode" aria-label="투자 상태">
