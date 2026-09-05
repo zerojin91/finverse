@@ -16,7 +16,7 @@ from .kospi_paper_trading import TradingError
 from .llm_client import LLMClient
 
 
-CONTEXT_SCHEMA_VERSION = "initial-context-v3"
+CONTEXT_SCHEMA_VERSION = "initial-context-v4"
 CONTEXT_CACHE_TTL_SECONDS = 12 * 60 * 60
 
 
@@ -198,6 +198,12 @@ def _normalize(value: dict[str, Any]) -> dict[str, Any]:
     return normalized
 
 
+def _document_preview(content: str) -> str:
+    """Return a short readable excerpt without exposing Markdown table noise."""
+    lines = [line.strip() for line in content.splitlines() if line.strip() and not line.startswith("#") and not line.startswith("|")]
+    return " ".join(lines)[:280].rstrip() + ("…" if len(" ".join(lines)) > 280 else "")
+
+
 def get_initial_context(history: dict[str, Any]) -> dict[str, Any]:
     """Return a cached, LLM-generated context grounded in one history snapshot."""
     source = _compact_input(history)
@@ -232,6 +238,10 @@ def get_initial_context(history: dict[str, Any]) -> dict[str, Any]:
             "community_days": source["community"]["observed_days"],
             "as_of": source["provenance"],
             "documents": list(document_files.values()),
+            "document_previews": {
+                key: _document_preview((document_dir / filename).read_text(encoding="utf-8"))
+                for key, filename in document_files.items()
+            },
         },
     }
     _write_cache(path, result)

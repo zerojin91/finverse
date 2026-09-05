@@ -150,6 +150,7 @@ type InitialContext = {
     events: number;
     community_days: number;
     as_of?: { latest_market_date?: string | null };
+    document_previews?: Record<string, string>;
   };
 };
 
@@ -1063,6 +1064,10 @@ function SetupScreen({
   const collectionReady = Boolean(collectionSources?.every((source) => source.status === "ready"));
   const collectionStepComplete = collectionReady && collectionDwellComplete;
   const initialContextReady = Boolean(initialContext?.analysis?.summary);
+  const openContextDocument = (domain: ContextDocumentProgress["key"]) => {
+    if (!pickedTicker) return;
+    window.open(`/api/paper-trading/securities/${encodeURIComponent(pickedTicker)}/initial-context/documents/${domain}`, `_blank`, "noopener,noreferrer");
+  };
   const investmentReady = investmentMode === "new"
     ? initialCash > 0
     : investmentMode === "holding" && averagePrice > 0 && holdingQuantity > 0;
@@ -1473,8 +1478,11 @@ function SetupScreen({
             {contextDocuments.map((document) => (
               <article key={document.key} className={`paper-context-document ${document.status}`}>
                 {document.status === "ready" ? <CheckCircle2 size={14} /> : <LoaderCircle size={14} className="spin" />}
-                <div><strong>{document.label}</strong><small>{document.status === "ready" ? "문서 준비 완료" : document.status === "generating" ? "문서 생성 중" : "생성 대기 중"}</small></div>
-                <code>{document.file}</code>
+                <div className="paper-context-document-body">
+                  <header><strong>{document.label}</strong><small>{document.status === "ready" ? "문서 준비 완료" : document.status === "generating" ? "문서 생성 중" : "생성 대기 중"}</small></header>
+                  <p>{initialContext?.source_summary.document_previews?.[document.key] || (document.status === "waiting" ? "자료를 확인하고 있습니다." : "수집된 자료를 문서로 정리하고 있습니다…")}</p>
+                  {document.status === "ready" && <button type="button" onClick={() => openContextDocument(document.key)}>MD 전체 보기 <ArrowRight size={11} /></button>}
+                </div>
               </article>
             ))}
           </div>

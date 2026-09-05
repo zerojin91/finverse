@@ -7,7 +7,7 @@ back them.
 
 from __future__ import annotations
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, Response, current_app, jsonify, request
 import json
 from pathlib import Path
 
@@ -16,6 +16,7 @@ from .paper_game_store import PaperGameStore
 from .finverse_market_data import FinverseMarketData, FinverseUnavailable
 from .llm_market_simulator import LLMMarketUnavailable
 from .initial_context_analyzer import InitialContextUnavailable, get_initial_context
+from .evidence_documents import DOCUMENT_FILES
 from .llm_scenario_simulator import generate_scenario_events, run_scenario_agent_round
 from .scenario_trading import (
     advance_inter_event_market, finish_event, new_scenario_game, public_scenario_game,
@@ -124,6 +125,21 @@ def security_scenario_context(ticker: str):
 def security_initial_context(ticker: str):
     history = _market_data().load_game_data(ticker, "", "")
     return jsonify({"success": True, "data": get_initial_context(history)})
+
+
+@paper_trading_bp.route("/securities/<ticker>/initial-context/documents/<domain>", methods=["GET"])
+def security_initial_context_document(ticker: str, domain: str):
+    """Open one target-specific Evidence Markdown document in a new browser tab."""
+    filename = DOCUMENT_FILES.get(domain)
+    if not filename:
+        return jsonify({"success": False, "error": "지원하지 않는 Evidence 문서입니다."}), 404
+    history = _market_data().load_game_data(ticker, "", "")
+    context = get_initial_context(history)
+    context_id = context["context_id"].removeprefix("ctx_")
+    path = Path(Config.UPLOAD_FOLDER) / "market_cache" / f"initial-context-{context_id}" / filename
+    if not path.is_file():
+        return jsonify({"success": False, "error": "Evidence 문서를 찾을 수 없습니다."}), 404
+    return Response(path.read_text(encoding="utf-8"), mimetype="text/markdown; charset=utf-8")
 
 
 @paper_trading_bp.route("/data-source/status", methods=["GET"])
