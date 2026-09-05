@@ -1,16 +1,26 @@
 # YouTube 국내 주식 댓글 수집기
 
-`collectors/youtube_comment_ingest.py`는 국내 주식 관련 YouTube 채널 30개를 고정하고, 각 채널의 공개 업로드 영상 전체와 YouTube Data API v3에서 조회 가능한 공개 댓글·답글 전체를 수집한다. 실행용 셸은 `scripts/youtube_comment_ingest.sh`다.
+`collectors/youtube_comment_ingest.py`는 국내 주식 관련 YouTube 채널 30개를 고정하고, 기본적으로 제목·설명·태그가 반도체와 관련된 공개 영상마다 좋아요 수 상위 댓글·답글 5개만 유지한다. 실행용 셸은 `scripts/youtube_comment_ingest.sh`다.
 
-“전체”는 API 키로 접근 가능한 공개 데이터 전체다. 비공개·삭제 영상, 검토 대기·스팸 댓글, API가 반환하지 않는 댓글은 수집할 수 없다.
+비공개·삭제 영상, 검토 대기·스팸 댓글, API가 반환하지 않는 댓글은 수집할 수 없다.
 
 ## 수집 데이터
 
 - 채널: 채널 ID, 이름, 국가, 누적 조회수, 구독자 수, 영상 수, 업로드 플레이리스트, 선정 순위
-- 영상: 영상 ID, 채널 ID, 제목, 게시 시각, 공개 영상 URL, 마지막 댓글 전체 스캔 상태
-- 댓글과 답글: 가명화된 댓글·부모·스레드 ID, 채널·영상 ID, 본문, 좋아요·답글 수, 게시·수정 시각, ETag
+- 영상: 영상 ID, 채널 ID, 제목, 게시 시각, 공개 영상 URL, 적용한 영상 필터와 일치 키워드, 마지막 댓글 전체 스캔 상태
+- 댓글과 답글: 영상별 좋아요 수 상위 5개, 가명화된 댓글·부모·스레드 ID, 채널·영상 ID, 본문, 좋아요·답글 수, 게시·수정 시각, ETag
 - 변경 기록: 신규·수정·삭제 상태, 이전/현재 레코드 해시, 관측 시각
 - 실행 상태: 업로드·댓글·답글별 다음 페이지 토큰, 남은 영상 수, 호출 수와 종료 사유
+
+모든 YouTube 채널·영상·댓글 레코드에는 데이터 영역과 원천을 명시하는 다음 필드가 들어간다.
+
+```json
+{"category":"community_v2","tags":{"source":"youtube"}}
+```
+
+YouTube API 원본의 `source=youtube_data_api`는 수집 방식 식별용으로 유지하고, `tags.source=youtube`는 여러 커뮤니티 원천을 같은 `community_v2` 영역에서 구분하는 조회 태그로 사용한다.
+
+`--comments-per-video`의 기본값은 5다. 정확한 상위 댓글을 고르기 위해 영상의 공개 댓글과 답글 전체 페이지를 조회한 뒤 `like_count` 내림차순으로 선택하며, 동률이면 최신 게시 댓글을 우선한다. 선택된 댓글에는 `video_like_rank`와 `comments_per_video`가 기록된다. 제외된 댓글은 최신 데이터에서 본문을 제거한 tombstone으로 바뀌고 변경 이력만 남는다.
 
 작성자 이름, 작성자 채널 ID, 프로필 URL은 API 응답 필드에서 제외한다. 원본 댓글 ID와 댓글 deep-link도 저장하지 않는다. 댓글·부모·스레드 ID는 `YOUTUBE_ID_HASH_SALT`를 사용한 HMAC-SHA256으로 가명화한다. 본문의 이메일, 국내 휴대전화 번호와 IPv4 주소는 대체 문자열로 가린다.
 
@@ -56,15 +66,58 @@ cp config/youtube_channels.example.json config/youtube_channels.json
 vi config/youtube_channels.json
 ```
 
+## 회사명 검색으로 영상과 댓글 수집
+
+채널 업로드 대신 회사별 YouTube 검색 결과를 수집하려면 `--company-file`을 사용한다. 기본 설정인 `config/youtube_companies.json`에는 삼성전자, SK하이닉스, 현대차, 삼성전기, LG에너지솔루션, 삼성바이오로직스, KB금융, 삼성물산, 삼성전자우, SK스퀘어의 회사명·종목코드·검색어가 들어 있다.
+
+```json
+{
+  "companies": [
+    {
+      "company_name": "삼성전자",
+      "stock_code": "005930",
+      "search_query": "삼성전자 주식"
+    }
+  ]
+}
+```
+
+```bash
+./scripts/youtube_comment_ingest.sh backfill \
+  --company-file config/youtube_companies.json \
+  --start 2025-01-01 \
+  --search-pages-per-company 5 \
+  --search-order date \
+  --comments-per-video 5 \
+  --quota-budget 4000
+```
+
+`search.list` 한 페이지는 회사당 최대 50개 영상을 반환한다. `--search-pages-per-company`는 회사당 1~10페이지이며 기본값은 1이다. `--search-order`는 `date`, `relevance`, `viewCount` 중 하나다. 날짜 범위는 기존 `--start`, `--end`를 그대로 사용한다.
+
+검색된 영상에는 회사명 문자열 목록인 `search_tags`와 회사명·종목코드·실제 검색어의 대응표인 `search_matches`를 저장한다. 같은 영상이 여러 회사 검색에 나오면 영상과 댓글은 한 번만 저장하고 태그만 합친다.
+
+```json
+{
+  "search_tags": ["SK하이닉스", "삼성전자"],
+  "search_matches": [
+    {"company_name":"SK하이닉스","stock_code":"000660","search_query":"SK하이닉스 주식"},
+    {"company_name":"삼성전자","stock_code":"005930","search_query":"삼성전자 주식"}
+  ]
+}
+```
+
+채널 수집과 회사 검색 수집은 같은 JSONL과 중복 제거 인덱스를 사용하지만 체크포인트와 댓글 큐는 분리된다. 따라서 긴 채널 backfill을 중단하지 않고 회사 검색 update를 별도로 실행할 수 있다.
+
 ## 사용하는 API와 환경변수
 
 Google Cloud 프로젝트에서 **YouTube Data API v3**를 활성화한 API 키가 필요하다.
 
 | API | 용도 |
 | --- | --- |
-| `search.list` | 최초 채널 후보 생성 |
+| `search.list` | 최초 채널 후보 생성, 회사명·종목 검색으로 영상 발견 |
 | `channels.list` | 채널 통계와 업로드 플레이리스트 조회 |
 | `playlistItems.list` | 공개 업로드 영상 전체 페이지 순회 |
+| `videos.list` | 제목·설명·태그를 조회해 반도체 영상 여부 판정 |
 | `commentThreads.list` | 영상별 최상위 댓글 전체 페이지 순회, update의 최신 댓글 빠른 확인 |
 | `comments.list` | 각 최상위 댓글의 답글 전체 페이지 순회 |
 
@@ -93,14 +146,18 @@ vi .env
 
 ## backfill 실행 방법
 
-기본값은 채널 30개, 과거 공개 업로드 전체, 공개 최상위 댓글과 모든 공개 답글이다. `--start`가 없으므로 최초 공개 업로드까지 거슬러 올라간다. `--end`를 생략하면 작업을 처음 시작한 날짜로 고정되므로 여러 날 걸리는 backfill도 같은 범위에서 이어진다.
+기본값은 채널 30개, 과거 공개 업로드 중 반도체 관련 영상, 해당 영상의 공개 최상위 댓글과 모든 공개 답글이다. `--start`가 없으므로 최초 공개 업로드까지 거슬러 올라간다. `--end`를 생략하면 작업을 처음 시작한 날짜로 고정되므로 여러 날 걸리는 backfill도 같은 범위에서 이어진다.
 
 ```bash
 cd /home/ubuntu/finverse
 ./scripts/youtube_comment_ingest.sh backfill \
   --channel-file config/youtube_channels.json \
+  --video-filter semiconductor \
+  --comments-per-video 5 \
   --quota-budget 9000
 ```
+
+`--video-filter semiconductor`는 기본값이다. 수집기는 `videos.list`의 제목·설명·태그에서 반도체, HBM, DRAM, NAND, 파운드리, 팹리스, GPU, 주요 반도체 기업 등의 용어를 찾아 통과시킨다. 판정에 사용된 용어는 영상 레코드의 `video_filter_terms`에 저장된다. 이 방식은 영상 음성이나 자막 자체를 분석하는 방식은 아니므로, 메타데이터가 부실한 관련 영상은 제외될 수 있다. 필터 없이 과거 동작처럼 모든 영상을 수집할 때만 `--video-filter all`을 명시한다.
 
 영상 게시일 범위를 제한하려면 다음처럼 실행한다.
 
@@ -122,11 +179,26 @@ cd /home/ubuntu/finverse
 
 진행 중인 작업과 다른 기간·명령·채널 목록으로 실행하면 안전을 위해 거부한다. 의도적으로 체크포인트를 버리고 새 범위로 시작할 때만 `--restart`를 사용한다. 이미 확정된 JSONL 데이터는 `--restart`로 삭제되지 않는다.
 
+영상 필터도 작업 파라미터에 포함된다. 기존의 필터 없는 작업에서 반도체 필터로 전환할 때는 다음처럼 체크포인트를 새로 시작한다.
+
+```bash
+./scripts/youtube_comment_ingest.sh backfill \
+  --channel-file config/youtube_channels.json \
+  --video-filter semiconductor \
+  --restart
+```
+
+기존 비반도체 영상과 댓글은 한 번의 필터 스캔만으로 즉시 삭제하지 않는다. 서로 다른 두 번의 정상적인 전체 업로드 스캔에서 연속으로 필터를 통과하지 못한 경우에만 기존 삭제 안전 규칙에 따라 tombstone으로 전환한다.
+
+첫 정상 스캔에서 반도체 영상 레코드가 갱신되면 PostgreSQL의 `psychology.youtube_comment` 뷰와 대시보드 조회는 즉시 `video_filter=semiconductor`인 영상의 댓글만 노출한다. 따라서 안전 삭제가 확정되기 전에도 DBeaver와 UI에는 기존 비반도체 댓글이 섞이지 않는다. DBeaver에서는 `psychology` 스키마의 `youtube_comment` 뷰에서 영상 제목과 `video_filter_terms`도 함께 확인할 수 있다.
+
 ## update 실행 방법
 
 ```bash
 ./scripts/youtube_comment_ingest.sh update \
-  --channel-file config/youtube_channels.json
+  --channel-file config/youtube_channels.json \
+  --video-filter semiconductor \
+  --comments-per-video 5
 ```
 
 `update`는 다음 작업을 한다.
@@ -145,6 +217,17 @@ cd /home/ubuntu/finverse
 ./scripts/youtube_comment_ingest.sh update --quick-pages 2
 ```
 
+회사별 최신 검색 영상과 댓글은 다음처럼 갱신한다.
+
+```bash
+./scripts/youtube_comment_ingest.sh update \
+  --company-file config/youtube_companies.json \
+  --search-pages-per-company 1 \
+  --search-order date
+```
+
+회사 검색은 검색 페이지마다 쿼터 100단위를 사용하므로 기본 10개 회사의 1페이지 갱신만으로 약 1,000단위를 사용한다. backfill 페이지 수를 늘릴 때는 댓글 수집에 남길 쿼터를 고려한다.
+
 YouTube 댓글 API에는 `updated_since` 필터가 없다. 최신 최상위 댓글은 매 실행 먼저 반영하지만, 오래된 스레드의 새 답글·수정·삭제는 해당 영상의 전체 스캔 때 확인된다. 매일 모든 과거 변경을 즉시 반영해야 한다면 30개 채널 전체를 매일 완주할 만큼의 쿼터가 필요하다.
 
 ## 중복 방지, 변경 이력, 삭제 안전성
@@ -155,6 +238,7 @@ YouTube 댓글 API에는 `updated_since` 필터가 없다. 최신 최상위 댓�
 - 같은 ID와 같은 해시는 새 이력·변경 이벤트를 만들지 않고 최신 만료 시각만 갱신한다.
 - 오래된 체크포인트 페이지가 최신 빠른 업데이트보다 늦게 처리돼도 `refreshed_at` 비교로 최신 값을 되돌리지 않는다.
 - 신규·수정 데이터는 `records.jsonl`과 `changes.jsonl`에 기록한다.
+- 영상 전체 스캔이 끝나면 좋아요 수 상위 `--comments-per-video`개만 활성 상태로 유지한다. 정확한 순위를 확인하지 못한 중단 상태에서는 마지막으로 확정된 순위를 유지한다.
 - 영상·댓글 삭제는 서로 다른 두 번의 오류 없는 전체 스캔에서 연속으로 보이지 않을 때 확정한다.
 - 삭제가 확정되면 과거 댓글 본문 버전은 즉시 물리 제거하고, 본문이 없는 tombstone과 해시 변경 기록만 유지한다.
 - `commentsDisabled`, 접근 거부, 답글 조회 중 삭제 경합은 완전한 삭제 근거로 사용하지 않는다.
@@ -176,6 +260,7 @@ data/youtube_comments/
 ├── channel_manifest.json
 ├── index.sqlite3
 └── work/
+    ├── company_thread_page.json
     ├── thread_page.json
     └── salt_fingerprint.json
 ```
@@ -191,13 +276,30 @@ data/youtube_comments/
 | `channel_manifest.json` | 현재 고정 채널 목록과 선정 방식 |
 | `index.sqlite3` | 대용량 중복 제거와 체크포인트용 내부 디스크 인덱스 |
 | `work/thread_page.json` | 답글 중단 재개에 필요한 현재 댓글 페이지 한 장 |
+| `work/company_thread_page.json` | 회사 검색 댓글 작업의 별도 중단 재개 페이지 |
 
 `index.sqlite3`는 PostgreSQL을 대신하는 업무 데이터 출력이 아니라 2GB 서버에서도 전체 JSONL을 메모리에 올리지 않기 위한 내부 인덱스다. 각 실행 종료 시 SQLite cursor로 JSONL 5종을 한 세대 디렉터리에 스트리밍한 뒤 하나의 심볼릭 링크를 교체해 같은 스냅샷으로 공개한다. 다른 시스템으로 전달할 기본 형식은 JSONL이다.
 
-댓글 레코드 예시:
+영상과 댓글 레코드 예시:
 
 ```json
-{"record_id":"youtube:comment:hmac-sha256:...","record_type":"youtube_comment","channel_id":"UC...","video_id":"VIDEO_ID","comment_id":"hmac-sha256:...","parent_comment_id":null,"thread_id":"hmac-sha256:...","text":"댓글 본문","like_count":3,"reply_count":1,"published_at":"2026-08-01T01:02:03Z","updated_at":"2026-08-02T01:02:03Z","refreshed_at":"...","expires_at":"...","record_hash":"..."}
+{"record_id":"youtube:video:VIDEO_ID","record_type":"youtube_video","video_id":"VIDEO_ID","channel_id":"UC...","title":"HBM 시장 전망","video_filter":"semiconductor","video_filter_terms":["hbm"],"published_at":"2026-08-01T00:00:00+00:00","record_hash":"..."}
+```
+
+회사 검색으로 발견된 영상과 댓글에는 같은 `search_tags`, `search_matches`가 추가된다. PostgreSQL 적재 후에는 `psychology.community_v2`에서 다음처럼 회사별 YouTube 댓글을 확인할 수 있다. 기존 소비자를 위한 `psychology.youtube_comment`는 같은 데이터의 호환 뷰로 유지된다.
+
+```sql
+SELECT published_at, video_title, comment_text, like_count,
+       video_like_rank, search_tags
+FROM psychology.community_v2
+WHERE search_tags ? '삼성전자'
+  AND tags->>'source' = 'youtube'
+ORDER BY video_id, video_like_rank
+LIMIT 100;
+```
+
+```json
+{"record_id":"youtube:comment:hmac-sha256:...","record_type":"youtube_comment","category":"community_v2","tags":{"source":"youtube"},"channel_id":"UC...","video_id":"VIDEO_ID","comment_id":"hmac-sha256:...","parent_comment_id":null,"thread_id":"hmac-sha256:...","text":"댓글 본문","like_count":3,"video_like_rank":1,"comments_per_video":5,"reply_count":1,"published_at":"2026-08-01T01:02:03Z","updated_at":"2026-08-02T01:02:03Z","refreshed_at":"...","expires_at":"...","record_hash":"..."}
 ```
 
 ## 29일 보관과 쿼터 조건
@@ -228,9 +330,11 @@ chmod 600 .env
 ./scripts/youtube_comment_ingest.sh backfill \
   --channel-count 1 \
   --channel-id UCxxxxxxxxxxxxxxxxxxxxxx \
+  --video-filter semiconductor \
   --quota-budget 20
 ./scripts/youtube_comment_ingest.sh backfill \
-  --channel-file config/youtube_channels.json
+  --channel-file config/youtube_channels.json \
+  --video-filter semiconductor
 ```
 
 기존 backfill을 다른 컴퓨터에서 이어가려면 코드뿐 아니라 `.env`의 동일 salt와 `data/youtube_comments/` 전체를 함께 옮긴다. 새로 시작하려면 데이터 폴더를 복사하지 않는다.

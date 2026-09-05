@@ -98,6 +98,12 @@ JOBS = [
         provider="youtube",
         requires=("YOUTUBE_API_KEY",),
         note="심리. Quota limited; a full backfill spans several days."),
+    Job("youtube_company_comment_ingest", "youtube_comment_ingest.py",
+        provider="youtube",
+        requires=("YOUTUBE_API_KEY",),
+        backfill=("--company-file", "config/youtube_companies.json"),
+        update=("--company-file", "config/youtube_companies.json"),
+        note="심리. Company-name video search and tagged comments."),
 ]
 
 

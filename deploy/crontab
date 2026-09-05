@@ -15,10 +15,18 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 30 20 * * * cd /home/ubuntu/finverse && scripts/run_ingest.sh update --skip market_ingest --load >> logs/cron.log 2>&1
 
 # 18:00 UTC 토요일 = 03:00 KST 일요일 — Naver 시세 정정분.
-0 18 * * 6 cd /home/ubuntu/finverse && flock -n data/.ingest_all.lock python3 collectors/market_ingest.py update --source naver --lookback-days 30 --no-flows >> logs/cron.log 2>&1
+0 18 * * 6 cd /home/ubuntu/finverse && flock -n data/.ingest_all.lock python3 collectors/market_ingest.py update --source naver --lookback-days 30 --no-flows --no-materialize >> logs/cron.log 2>&1
 
 # 19:00 UTC = 04:00 KST, 매일 — 30일 지난 로그 정리.
 0 19 * * * find /home/ubuntu/finverse/logs -name '*.log' -mtime +30 -delete
 
 # 22:00 UTC = 07:00 KST, 매일 — lake 데이터를 core·graph로 동기화한다.
 0 22 * * * cd /home/ubuntu/finverse && scripts/sync_ontology.sh >> logs/cron.log 2>&1
+
+# 재부팅 직후 — DB 컨테이너를 다시 올린다.
+# DB는 tailscale 주소(POSTGRES_BIND)에 바인딩하는데, 부팅 시 docker가 tailscaled보다
+# 먼저 뜨면 그 주소가 아직 없어 "cannot assign requested address"로 기동에 실패한다.
+# restart=unless-stopped 는 기동 실패에는 재시도하지 않으므로 컨테이너가 내려간 채
+# 남는다. 8/30 재부팅 때 실제로 그렇게 됐고 DB가 5일 가까이 tailnet에서 사라졌다.
+# 주소가 붙을 때까지 최대 60초 기다렸다가 올린다.
+@reboot cd /home/ubuntu/finverse && for i in $(seq 30); do ip -4 addr show tailscale0 2>/dev/null | grep -q "inet " && break; sleep 2; done; docker compose up -d db >> logs/cron.log 2>&1

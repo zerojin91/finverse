@@ -7,6 +7,7 @@ import argparse
 from contextlib import closing
 from datetime import UTC, date, datetime, time as wall_time, timedelta
 import hashlib
+import heapq
 import hmac
 import json
 import os
@@ -33,15 +34,21 @@ OUTPUT_ROOT = ROOT / "data" / "youtube_comments"
 WORK_ROOT = OUTPUT_ROOT / "work"
 MANIFEST_PATH = OUTPUT_ROOT / "channel_manifest.json"
 CANDIDATE_PATH = OUTPUT_ROOT / "channel_candidates.json"
-THREAD_PAGE_PATH = WORK_ROOT / "thread_page.json"
+CHANNEL_THREAD_PAGE_PATH = WORK_ROOT / "thread_page.json"
+COMPANY_THREAD_PAGE_PATH = WORK_ROOT / "company_thread_page.json"
+THREAD_PAGE_PATH = CHANNEL_THREAD_PAGE_PATH
 SALT_FINGERPRINT_PATH = WORK_ROOT / "salt_fingerprint.json"
 STORE = IndexedJsonlStore(OUTPUT_ROOT)
 API_ROOT = "https://www.googleapis.com/youtube/v3"
 DEFAULT_QUERY = "국내주식|코스피|코스닥|한국증시"
 RETENTION_DAYS = 29
 REFRESH_CYCLE_DAYS = 28
+COMMUNITY_FIELDS = {"category": "community_v2", "tags": {"source": "youtube"}}
 
 SEARCH_FIELDS = "nextPageToken,items(id/channelId,snippet/channelId)"
+VIDEO_SEARCH_FIELDS = (
+    "nextPageToken,items(id/videoId,snippet(channelId,channelTitle,title,publishedAt))"
+)
 CHANNEL_FIELDS = (
     "items(id,snippet(title,country),contentDetails/relatedPlaylists/uploads,"
     "statistics(viewCount,subscriberCount,hiddenSubscriberCount,videoCount))"
@@ -50,6 +57,7 @@ PLAYLIST_FIELDS = (
     "nextPageToken,items(contentDetails(videoId,videoPublishedAt),"
     "snippet(title),status/privacyStatus)"
 )
+VIDEO_FIELDS = "items(id,snippet(title,description,tags))"
 THREAD_FIELDS = (
     "nextPageToken,items(etag,id,snippet(videoId,totalReplyCount,"
     "topLevelComment(etag,id,snippet(textDisplay,likeCount,publishedAt,updatedAt))))"
@@ -57,6 +65,48 @@ THREAD_FIELDS = (
 REPLY_FIELDS = (
     "nextPageToken,items(etag,id,snippet(parentId,textDisplay,likeCount,publishedAt,updatedAt))"
 )
+
+VIDEO_FILTER_TERMS = {
+    "semiconductor": (
+        "반도체",
+        "semiconductor",
+        "칩",
+        "chip",
+        "hbm",
+        "dram",
+        "d램",
+        "디램",
+        "nand",
+        "낸드",
+        "파운드리",
+        "foundry",
+        "팹리스",
+        "fabless",
+        "웨이퍼",
+        "wafer",
+        "euv",
+        "칩렛",
+        "chiplet",
+        "gpu",
+        "npu",
+        "asic",
+        "엔비디아",
+        "nvidia",
+        "tsmc",
+        "하이닉스",
+        "sk hynix",
+        "마이크론",
+        "micron",
+        "asml",
+        "인텔",
+        "intel",
+        "퀄컴",
+        "qualcomm",
+        "브로드컴",
+        "broadcom",
+        "db하이텍",
+    )
+}
 
 EMAIL_RE = re.compile(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b")
 PHONE_RE = re.compile(r"(?<!\d)01[016789][ -]?\d{3,4}[ -]?\d{4}(?!\d)")
@@ -231,8 +281,15 @@ def unlink_thread_page() -> None:
 class WorkState:
     """Small resumable state machine stored beside the on-disk latest index."""
 
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, namespace: str = "youtube"):
+        if not re.fullmatch(r"[a-z_]+", namespace):
+            raise ValueError("invalid state namespace")
         self.path = path
+        self.state_table = f"{namespace}_state"
+        self.channel_table = f"{namespace}_channel_queue"
+        self.upload_seen_table = f"{namespace}_upload_seen"
+        self.video_queue_table = f"{namespace}_video_queue"
+        self.comment_seen_table = f"{namespace}_comment_seen"
         self._initialize()
 
     def connect(self) -> sqlite3.Connection:
@@ -245,30 +302,30 @@ class WorkState:
     def _initialize(self) -> None:
         with closing(self.connect()) as connection, connection:
             connection.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS youtube_state (
+                f"""
+                CREATE TABLE IF NOT EXISTS {self.state_table} (
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL
                 );
-                CREATE TABLE IF NOT EXISTS youtube_channel_queue (
+                CREATE TABLE IF NOT EXISTS {self.channel_table} (
                     position INTEGER PRIMARY KEY,
                     channel_id TEXT NOT NULL,
                     uploads_playlist_id TEXT NOT NULL
                 );
-                CREATE TABLE IF NOT EXISTS youtube_upload_seen (
+                CREATE TABLE IF NOT EXISTS {self.upload_seen_table} (
                     channel_id TEXT NOT NULL,
                     video_id TEXT NOT NULL,
                     PRIMARY KEY (channel_id, video_id)
                 );
-                CREATE TABLE IF NOT EXISTS youtube_video_queue (
+                CREATE TABLE IF NOT EXISTS {self.video_queue_table} (
                     video_id TEXT PRIMARY KEY,
                     channel_id TEXT NOT NULL,
                     priority INTEGER NOT NULL,
                     position INTEGER NOT NULL
                 );
-                CREATE INDEX IF NOT EXISTS youtube_video_queue_order
-                    ON youtube_video_queue(priority, position);
-                CREATE TABLE IF NOT EXISTS youtube_comment_seen (
+                CREATE INDEX IF NOT EXISTS {self.video_queue_table}_order
+                    ON {self.video_queue_table}(priority, position);
+                CREATE TABLE IF NOT EXISTS {self.comment_seen_table} (
                     record_id TEXT PRIMARY KEY
                 );
                 """
@@ -277,14 +334,14 @@ class WorkState:
     def operation(self) -> dict[str, Any]:
         with closing(self.connect()) as connection, connection:
             row = connection.execute(
-                "SELECT value FROM youtube_state WHERE key = 'operation'"
+                f"SELECT value FROM {self.state_table} WHERE key = 'operation'"
             ).fetchone()
         return json.loads(row["value"]) if row else {}
 
     def save_operation(self, operation: dict[str, Any]) -> None:
         with closing(self.connect()) as connection, connection:
             connection.execute(
-                "INSERT INTO youtube_state(key, value) VALUES('operation', ?) "
+                f"INSERT INTO {self.state_table}(key, value) VALUES('operation', ?) "
                 "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
                 (canonical_json(operation),),
             )
@@ -292,20 +349,21 @@ class WorkState:
     def reset(self) -> None:
         with closing(self.connect()) as connection, connection:
             for table in (
-                "youtube_state",
-                "youtube_channel_queue",
-                "youtube_upload_seen",
-                "youtube_video_queue",
-                "youtube_comment_seen",
+                self.state_table,
+                self.channel_table,
+                self.upload_seen_table,
+                self.video_queue_table,
+                self.comment_seen_table,
             ):
                 connection.execute(f"DELETE FROM {table}")
         unlink_thread_page()
 
     def set_channels(self, channels: list[dict[str, Any]]) -> None:
         with closing(self.connect()) as connection, connection:
-            connection.execute("DELETE FROM youtube_channel_queue")
+            connection.execute(f"DELETE FROM {self.channel_table}")
             connection.executemany(
-                "INSERT INTO youtube_channel_queue(position, channel_id, uploads_playlist_id) "
+                f"INSERT INTO {self.channel_table}"
+                "(position, channel_id, uploads_playlist_id) "
                 "VALUES(?, ?, ?)",
                 [
                     (index, row["channel_id"], row["uploads_playlist_id"])
@@ -316,7 +374,7 @@ class WorkState:
     def channel_at(self, position: int) -> dict[str, str] | None:
         with closing(self.connect()) as connection, connection:
             row = connection.execute(
-                "SELECT channel_id, uploads_playlist_id FROM youtube_channel_queue "
+                f"SELECT channel_id, uploads_playlist_id FROM {self.channel_table} "
                 "WHERE position = ?",
                 (position,),
             ).fetchone()
@@ -325,13 +383,14 @@ class WorkState:
     def clear_upload_seen(self, channel: str) -> None:
         with closing(self.connect()) as connection, connection:
             connection.execute(
-                "DELETE FROM youtube_upload_seen WHERE channel_id = ?", (channel,)
+                f"DELETE FROM {self.upload_seen_table} WHERE channel_id = ?", (channel,)
             )
 
     def mark_upload_seen(self, channel: str, video_ids: Iterable[str]) -> None:
         with closing(self.connect()) as connection, connection:
             connection.executemany(
-                "INSERT OR IGNORE INTO youtube_upload_seen(channel_id, video_id) VALUES(?, ?)",
+                f"INSERT OR IGNORE INTO {self.upload_seen_table}"
+                "(channel_id, video_id) VALUES(?, ?)",
                 ((channel, identity) for identity in video_ids),
             )
 
@@ -344,7 +403,7 @@ class WorkState:
             "l.channel_id = ?",
             "l.is_deleted = 0",
             "l.published_at <= ?",
-            "NOT EXISTS (SELECT 1 FROM youtube_upload_seen s "
+            f"NOT EXISTS (SELECT 1 FROM {self.upload_seen_table} s "
             "WHERE s.channel_id = l.channel_id AND s.video_id = l.video_id)",
         ]
         values: list[Any] = [channel, upper]
@@ -363,6 +422,7 @@ class WorkState:
         start: date | None,
         end: date,
         stale_before: str,
+        video_filter: str = "all",
     ) -> int:
         lower, upper = date_bounds(start, end)
         conditions = [
@@ -380,17 +440,21 @@ class WorkState:
             )
             values.append(stale_before)
         query = (
-            "SELECT video_id, channel_id FROM latest WHERE "
+            "SELECT video_id, channel_id, record_json FROM latest WHERE "
             + " AND ".join(conditions)
             + " ORDER BY CASE WHEN last_full_comment_scan_at IS NULL THEN 0 ELSE 1 END, "
             "last_full_comment_scan_at, published_at DESC, video_id"
         )
         count = 0
         with closing(self.connect()) as connection, connection:
-            connection.execute("DELETE FROM youtube_video_queue")
-            for count, row in enumerate(connection.execute(query, values), 1):
+            connection.execute(f"DELETE FROM {self.video_queue_table}")
+            for row in connection.execute(query, values):
+                if not video_matches_filter(json.loads(row["record_json"]), video_filter):
+                    continue
+                count += 1
                 connection.execute(
-                    "INSERT INTO youtube_video_queue(video_id, channel_id, priority, position) "
+                    f"INSERT INTO {self.video_queue_table}"
+                    "(video_id, channel_id, priority, position) "
                     "VALUES(?, ?, 1, ?)",
                     (row["video_id"], row["channel_id"], count),
                 )
@@ -400,10 +464,11 @@ class WorkState:
         with closing(self.connect()) as connection, connection:
             row = connection.execute(
                 "SELECT COALESCE(MAX(position), 0) + 1 AS position "
-                "FROM youtube_video_queue WHERE priority = 0"
+                f"FROM {self.video_queue_table} WHERE priority = 0"
             ).fetchone()
             connection.execute(
-                "INSERT INTO youtube_video_queue(video_id, channel_id, priority, position) "
+                f"INSERT INTO {self.video_queue_table}"
+                "(video_id, channel_id, priority, position) "
                 "VALUES(?, ?, 0, ?) ON CONFLICT(video_id) DO NOTHING",
                 (video_id, channel, int(row["position"])),
             )
@@ -412,42 +477,47 @@ class WorkState:
         with closing(self.connect()) as connection, connection:
             if current_video_id:
                 row = connection.execute(
-                    "SELECT video_id, channel_id FROM youtube_video_queue WHERE video_id = ?",
+                    f"SELECT video_id, channel_id FROM {self.video_queue_table} "
+                    "WHERE video_id = ?",
                     (current_video_id,),
                 ).fetchone()
                 if row:
                     return dict(row)
             row = connection.execute(
-                "SELECT video_id, channel_id FROM youtube_video_queue "
+                f"SELECT video_id, channel_id FROM {self.video_queue_table} "
                 "ORDER BY priority, position LIMIT 1"
             ).fetchone()
         return dict(row) if row else None
 
     def complete_video(self, video_id: str) -> None:
         with closing(self.connect()) as connection, connection:
-            connection.execute("DELETE FROM youtube_video_queue WHERE video_id = ?", (video_id,))
+            connection.execute(
+                f"DELETE FROM {self.video_queue_table} WHERE video_id = ?", (video_id,)
+            )
 
     def remaining_videos(self) -> int:
         with closing(self.connect()) as connection, connection:
             return int(
-                connection.execute("SELECT COUNT(*) FROM youtube_video_queue").fetchone()[0]
+                connection.execute(
+                    f"SELECT COUNT(*) FROM {self.video_queue_table}"
+                ).fetchone()[0]
             )
 
     def clear_comment_seen(self) -> None:
         with closing(self.connect()) as connection, connection:
-            connection.execute("DELETE FROM youtube_comment_seen")
+            connection.execute(f"DELETE FROM {self.comment_seen_table}")
 
     def mark_comment_seen(self, record_ids: Iterable[str]) -> None:
         with closing(self.connect()) as connection, connection:
             connection.executemany(
-                "INSERT OR IGNORE INTO youtube_comment_seen(record_id) VALUES(?)",
+                f"INSERT OR IGNORE INTO {self.comment_seen_table}(record_id) VALUES(?)",
                 ((identity,) for identity in record_ids),
             )
 
     def preserve_thread(self, video_id: str, thread_id: str) -> None:
         with closing(self.connect()) as connection, connection:
             connection.execute(
-                "INSERT OR IGNORE INTO youtube_comment_seen(record_id) "
+                f"INSERT OR IGNORE INTO {self.comment_seen_table}(record_id) "
                 "SELECT record_id FROM latest WHERE record_type = 'youtube_comment' "
                 "AND video_id = ? AND thread_id = ? AND is_deleted = 0",
                 (video_id, thread_id),
@@ -458,7 +528,20 @@ class WorkState:
             cursor = connection.execute(
                 "SELECT l.record_json FROM latest l WHERE l.record_type = 'youtube_comment' "
                 "AND l.video_id = ? AND l.is_deleted = 0 AND NOT EXISTS "
-                "(SELECT 1 FROM youtube_comment_seen s WHERE s.record_id = l.record_id)",
+                f"(SELECT 1 FROM {self.comment_seen_table} s "
+                "WHERE s.record_id = l.record_id)",
+                (video_id,),
+            )
+            for row in cursor:
+                yield json.loads(row["record_json"])
+
+    def seen_comments(self, video_id: str) -> Iterator[dict[str, Any]]:
+        with closing(self.connect()) as connection, connection:
+            cursor = connection.execute(
+                "SELECT l.record_json FROM latest l "
+                f"JOIN {self.comment_seen_table} s ON s.record_id = l.record_id "
+                "WHERE l.record_type = 'youtube_comment' AND l.video_id = ? "
+                "AND l.is_deleted = 0",
                 (video_id,),
             )
             for row in cursor:
@@ -474,7 +557,13 @@ class WorkState:
             for row in cursor:
                 yield json.loads(row["record_json"])
 
-    def stale_video_count(self, start: date | None, end: date, cutoff: str) -> int:
+    def stale_video_count(
+        self,
+        start: date | None,
+        end: date,
+        cutoff: str,
+        video_filter: str = "all",
+    ) -> int:
         lower, upper = date_bounds(start, end)
         conditions = [
             "record_type = 'youtube_video'",
@@ -487,15 +576,18 @@ class WorkState:
             conditions.append("published_at >= ?")
             values.append(lower)
         with closing(self.connect()) as connection, connection:
-            return int(
-                connection.execute(
-                    "SELECT COUNT(*) FROM latest WHERE " + " AND ".join(conditions),
+            return sum(
+                video_matches_filter(json.loads(row["record_json"]), video_filter)
+                for row in connection.execute(
+                    "SELECT record_json FROM latest WHERE " + " AND ".join(conditions),
                     values,
-                ).fetchone()[0]
+                )
             )
 
 
-STATE = WorkState(STORE.index_path)
+CHANNEL_STATE = WorkState(STORE.index_path)
+COMPANY_STATE = WorkState(STORE.index_path, "youtube_company")
+STATE = CHANNEL_STATE
 
 
 def merge_rows(
@@ -540,6 +632,7 @@ def tombstone(record: dict[str, Any], reason: str) -> dict[str, Any]:
             "record_id": record["record_id"],
             "record_type": record.get("record_type"),
             "source": "youtube_data_api",
+            **COMMUNITY_FIELDS,
             "channel_id": record.get("channel_id"),
             "video_id": record.get("video_id"),
             "comment_id": record.get("comment_id"),
@@ -583,6 +676,38 @@ def apply_absence(
     return deleted
 
 
+def apply_comment_limit(
+    video_id: str, limit: int, mode: str, totals: dict[str, int]
+) -> None:
+    rank = lambda row: (
+        int(row.get("like_count") or 0),
+        str(row.get("published_at") or ""),
+        str(row["record_id"]),
+    )
+    ranked = heapq.nlargest(limit, STATE.seen_comments(video_id), key=rank)
+    kept = {row["record_id"] for row in ranked}
+    merge_rows(
+        [
+            record_without_store_fields(row)
+            | {"video_like_rank": position, "comments_per_video": limit}
+            for position, row in enumerate(ranked, 1)
+        ],
+        mode,
+        totals,
+    )
+    for block in chunks(
+        row for row in STATE.seen_comments(video_id) if row["record_id"] not in kept
+    ):
+        tombstones = [tombstone(row, "outside_top_liked_comments") for row in block]
+        merge_rows(tombstones, mode, totals)
+        STORE.purge_versions(
+            (row["record_id"] for row in tombstones), materialize=False
+        )
+        totals["limited_comments"] = totals.get("limited_comments", 0) + len(
+            tombstones
+        )
+
+
 def load_channel_ids(path: Path) -> list[str]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -595,6 +720,35 @@ def load_channel_ids(path: Path) -> list[str]:
         return [channel_id(value) for value in values]
     except argparse.ArgumentTypeError as exc:
         raise SystemExit(str(exc)) from None
+
+
+def load_companies(path: Path) -> list[dict[str, str]]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"cannot read company file {path}: {exc}") from None
+    values = payload.get("companies") if isinstance(payload, dict) else None
+    if not isinstance(values, list) or not values:
+        raise SystemExit("company file must contain a non-empty companies list")
+    companies: list[dict[str, str]] = []
+    seen_codes: set[str] = set()
+    for value in values:
+        if not isinstance(value, dict):
+            raise SystemExit("each company must be an object")
+        name = str(value.get("company_name", "")).strip()
+        code = str(value.get("stock_code", "")).strip()
+        query = str(value.get("search_query") or name).strip()
+        if not name or not re.fullmatch(r"\d{6}", code) or not query:
+            raise SystemExit(
+                "each company needs company_name, a 6-digit stock_code, and search_query"
+            )
+        if code in seen_codes:
+            raise SystemExit(f"duplicate stock_code in company file: {code}")
+        seen_codes.add(code)
+        companies.append(
+            {"company_name": name, "stock_code": code, "search_query": query}
+        )
+    return companies
 
 
 def read_manifest() -> dict[str, Any]:
@@ -723,6 +877,9 @@ def ranked_channel_candidates(
 
 
 def discover(args: argparse.Namespace) -> int:
+    global STATE, THREAD_PAGE_PATH
+    STATE = CHANNEL_STATE
+    THREAD_PAGE_PATH = CHANNEL_THREAD_PAGE_PATH
     load_dotenv(ROOT)
     pruned = STORE.prune_expired(materialize=False)
     purge_deleted_versions()
@@ -852,6 +1009,7 @@ def select_channels(
                 "record_id": f"youtube:channel:{row['channel_id']}",
                 "record_type": "youtube_channel",
                 "source": "youtube_data_api",
+                **COMMUNITY_FIELDS,
                 **row,
                 "rank": rank,
                 "selection_method": method,
@@ -882,23 +1040,139 @@ def normalize_video(
         return None
     previous = STORE.get_latest(f"youtube:video:{identity}") or {}
     refreshed_at = now_iso()
-    return timestamped(
+    record = {
+        "record_id": f"youtube:video:{identity}",
+        "record_type": "youtube_video",
+        "source": "youtube_data_api",
+        **COMMUNITY_FIELDS,
+        "video_id": identity,
+        "channel_id": channel["channel_id"],
+        "channel_title": channel["channel_title"],
+        "title": str(snippet.get("title", "")),
+        "published_at": published.isoformat() if published else None,
+        "last_full_comment_scan_at": previous.get("last_full_comment_scan_at"),
+        "comment_scan_status": previous.get("comment_scan_status"),
+        "source_url": f"https://www.youtube.com/watch?v={identity}",
+        "is_deleted": False,
+    }
+    for field in ("search_tags", "search_matches"):
+        if previous.get(field):
+            record[field] = previous[field]
+    return timestamped(record, refreshed_at)
+
+
+def matched_video_terms(snippet: dict[str, Any], video_filter: str) -> list[str]:
+    if video_filter == "all":
+        return []
+    tags = snippet.get("tags", [])
+    tag_text = " ".join(str(tag) for tag in tags) if isinstance(tags, list) else ""
+    searchable = " ".join(
+        (str(snippet.get("title", "")), str(snippet.get("description", "")), tag_text)
+    ).casefold()
+    matches: list[str] = []
+    for term in VIDEO_FILTER_TERMS[video_filter]:
+        folded = term.casefold()
+        if term.isascii():
+            pattern = rf"(?<![a-z0-9]){re.escape(folded)}(?:s)?(?![a-z])"
+            matched = re.search(pattern, searchable) is not None
+        else:
+            matched = folded in searchable
+        if matched:
+            matches.append(term)
+    return matches
+
+
+def video_matches_filter(record: dict[str, Any], video_filter: str) -> bool:
+    return video_filter == "all" or record.get("video_filter") == video_filter
+
+
+def filter_videos(
+    client: YouTubeClient,
+    rows: list[dict[str, Any]],
+    video_filter: str,
+) -> list[dict[str, Any]]:
+    if video_filter == "all" or not rows:
+        return rows
+    payload = client.get(
+        "videos",
         {
-            "record_id": f"youtube:video:{identity}",
-            "record_type": "youtube_video",
-            "source": "youtube_data_api",
-            "video_id": identity,
-            "channel_id": channel["channel_id"],
-            "channel_title": channel["channel_title"],
-            "title": str(snippet.get("title", "")),
-            "published_at": published.isoformat() if published else None,
-            "last_full_comment_scan_at": previous.get("last_full_comment_scan_at"),
-            "comment_scan_status": previous.get("comment_scan_status"),
-            "source_url": f"https://www.youtube.com/watch?v={identity}",
-            "is_deleted": False,
+            "part": "snippet",
+            "id": ",".join(str(row["video_id"]) for row in rows),
+            "maxResults": 50,
+            "fields": VIDEO_FIELDS,
         },
-        refreshed_at,
     )
+    snippets = {
+        str(item.get("id", "")): item.get("snippet", {})
+        for item in payload.get("items", [])
+    }
+    accepted: list[dict[str, Any]] = []
+    for row in rows:
+        snippet = snippets.get(str(row["video_id"]))
+        if not isinstance(snippet, dict):
+            continue
+        terms = matched_video_terms(snippet, video_filter)
+        if not terms:
+            continue
+        accepted.append(
+            {
+                **row,
+                "title": str(snippet.get("title", row.get("title", ""))),
+                "video_filter": video_filter,
+                "video_filter_terms": terms,
+            }
+        )
+    return accepted
+
+
+def normalize_company_video(
+    item: dict[str, Any], company: dict[str, str]
+) -> dict[str, Any] | None:
+    identity = str(item.get("id", {}).get("videoId", ""))
+    snippet = item.get("snippet", {})
+    published = parse_time(str(snippet.get("publishedAt", "")))
+    channel = str(snippet.get("channelId", ""))
+    if not identity or not channel or published is None:
+        return None
+    previous = STORE.get_latest(f"youtube:video:{identity}") or {}
+    matches = {
+        (
+            str(match.get("company_name", "")),
+            str(match.get("stock_code", "")),
+            str(match.get("search_query", "")),
+        )
+        for match in previous.get("search_matches", [])
+        if isinstance(match, dict)
+    }
+    matches.add(
+        (company["company_name"], company["stock_code"], company["search_query"])
+    )
+    search_matches = [
+        {"company_name": name, "stock_code": code, "search_query": query}
+        for name, code, query in sorted(matches, key=lambda value: (value[1], value[0]))
+    ]
+    record = {
+        "record_id": f"youtube:video:{identity}",
+        "record_type": "youtube_video",
+        "source": "youtube_data_api",
+        **COMMUNITY_FIELDS,
+        "video_id": identity,
+        "channel_id": channel,
+        "channel_title": str(snippet.get("channelTitle", "")),
+        "title": str(snippet.get("title", "")),
+        "published_at": published.isoformat(),
+        "search_tags": [match["company_name"] for match in search_matches],
+        "search_matches": search_matches,
+        "selection_method": "youtube_search_company_query",
+        "last_full_comment_scan_at": previous.get("last_full_comment_scan_at"),
+        "comment_scan_status": previous.get("comment_scan_status"),
+        "source_url": f"https://www.youtube.com/watch?v={identity}",
+        "is_deleted": False,
+    }
+    for field in ("video_filter", "video_filter_terms"):
+        if previous.get(field):
+            record[field] = previous[field]
+    return timestamped(record)
 
 
 def fetch_upload_page(
@@ -907,6 +1181,7 @@ def fetch_upload_page(
     page_token: str | None,
     start: date | None,
     end: date,
+    video_filter: str = "all",
 ) -> tuple[list[dict[str, Any]], str | None]:
     params: dict[str, Any] = {
         "part": "snippet,contentDetails,status",
@@ -930,7 +1205,7 @@ def fetch_upload_page(
         for item in payload.get("items", [])
         if (record := normalize_video(item, channel, start, end)) is not None
     ]
-    return rows, payload.get("nextPageToken")
+    return filter_videos(client, rows, video_filter), payload.get("nextPageToken")
 
 
 def normalize_comment(
@@ -943,6 +1218,8 @@ def normalize_comment(
     reply_count: int | None,
     salt: str,
     refreshed_at: str,
+    search_tags: list[str] | None = None,
+    search_matches: list[dict[str, str]] | None = None,
 ) -> dict[str, Any] | None:
     snippet = item.get("snippet", {})
     raw_id = str(item.get("id", ""))
@@ -950,29 +1227,32 @@ def normalize_comment(
     if not raw_id or not text:
         return None
     comment_identity = private_id("comment", raw_id, salt)
-    return timestamped(
-        {
-            "record_id": f"youtube:comment:{comment_identity}",
-            "record_type": "youtube_comment",
-            "source": "youtube_data_api",
-            "comment_id": comment_identity,
-            "parent_comment_id": (
-                private_id("comment", parent_raw_id, salt) if parent_raw_id else None
-            ),
-            "thread_id": private_id("thread", thread_raw_id, salt),
-            "channel_id": channel,
-            "video_id": video_id,
-            "text": text,
-            "like_count": int(snippet.get("likeCount", 0)),
-            "reply_count": reply_count,
-            "published_at": snippet.get("publishedAt"),
-            "updated_at": snippet.get("updatedAt") or snippet.get("publishedAt"),
-            "etag": item.get("etag"),
-            "is_deleted": False,
-            "source_url": f"https://www.youtube.com/watch?v={video_id}",
-        },
-        refreshed_at,
-    )
+    record = {
+        "record_id": f"youtube:comment:{comment_identity}",
+        "record_type": "youtube_comment",
+        "source": "youtube_data_api",
+        **COMMUNITY_FIELDS,
+        "comment_id": comment_identity,
+        "parent_comment_id": (
+            private_id("comment", parent_raw_id, salt) if parent_raw_id else None
+        ),
+        "thread_id": private_id("thread", thread_raw_id, salt),
+        "channel_id": channel,
+        "video_id": video_id,
+        "text": text,
+        "like_count": int(snippet.get("likeCount", 0)),
+        "reply_count": reply_count,
+        "published_at": snippet.get("publishedAt"),
+        "updated_at": snippet.get("updatedAt") or snippet.get("publishedAt"),
+        "etag": item.get("etag"),
+        "is_deleted": False,
+        "source_url": f"https://www.youtube.com/watch?v={video_id}",
+    }
+    if search_tags:
+        record["search_tags"] = search_tags
+    if search_matches:
+        record["search_matches"] = search_matches
+    return timestamped(record, refreshed_at)
 
 
 def comment_record_id(raw_id: str, salt: str) -> str:
@@ -988,8 +1268,74 @@ def operation_signature(
             "start": args.start.isoformat() if args.start else None,
             "end": args.end.isoformat(),
             "channel_ids": sorted(channel_ids),
+            "video_filter": args.video_filter,
+            "comments_per_video": args.comments_per_video,
         }
     )
+
+
+def company_operation_signature(
+    args: argparse.Namespace, companies: list[dict[str, str]]
+) -> str:
+    return sha256(
+        {
+            "command": args.command,
+            "start": args.start.isoformat() if args.start else None,
+            "end": args.end.isoformat(),
+            "companies": companies,
+            "search_order": args.search_order,
+            "search_pages_per_company": args.search_pages_per_company,
+            "comments_per_video": args.comments_per_video,
+        }
+    )
+
+
+def begin_or_resume_company_operation(
+    args: argparse.Namespace, companies: list[dict[str, str]]
+) -> dict[str, Any]:
+    signature = company_operation_signature(args, companies)
+    operation = STATE.operation()
+    started = parse_time(operation.get("started_at"))
+    if started and started <= datetime.now(UTC) - timedelta(days=RETENTION_DAYS):
+        STATE.reset()
+        operation = {}
+    if args.restart and operation:
+        STATE.reset()
+        operation = {}
+    if operation and operation.get("signature") != signature:
+        raise SystemExit(
+            "an unfinished collection has different parameters; resume it or pass --restart"
+        )
+    if operation:
+        return operation
+    STATE.reset()
+    operation = {
+        "operation_id": sha256({"signature": signature, "started_at": now_iso()}),
+        "signature": signature,
+        "command": args.command,
+        "source_mode": "company_search",
+        "effective_end": args.end.isoformat(),
+        "phase": "company_search",
+        "started_at": now_iso(),
+        "companies": companies,
+        "company_position": 0,
+        "company_page_token": None,
+        "company_pages_done": 0,
+        "company_failed_page_token": None,
+        "current_video_id": None,
+        "current_channel_id": None,
+        "video_started": False,
+        "thread_page_token": None,
+        "thread_index": 0,
+        "reply_page_token": None,
+        "thread_failed_page_token": None,
+        "reply_failed_page_token": None,
+        "video_scan_id": None,
+        "current_search_tags": None,
+        "current_search_matches": None,
+    }
+    STATE.save_operation(operation)
+    return operation
 
 
 def resolve_effective_end(args: argparse.Namespace) -> None:
@@ -1032,6 +1378,7 @@ def begin_or_resume_operation(
         "operation_id": sha256({"signature": signature, "started_at": now_iso()}),
         "signature": signature,
         "command": args.command,
+        "video_filter": args.video_filter,
         "effective_end": args.end.isoformat(),
         "phase": "uploads",
         "started_at": now_iso(),
@@ -1068,7 +1415,7 @@ def remove_replaced_channels(
         (
             row
             for row in STORE.iter_latest(is_deleted=False)
-            if row.get("channel_id") in removed
+            if row.get("channel_id") in removed and not row.get("search_tags")
         )
     ):
         tombstones = [tombstone(row, "channel_manifest_replaced") for row in block]
@@ -1110,7 +1457,9 @@ def run_upload_phase(
         current = STATE.channel_at(int(operation["upload_position"]))
         if current is None:
             cutoff = (datetime.now(UTC) - timedelta(days=args.refresh_cycle_days)).isoformat()
-            STATE.fill_video_queue(args.command, args.start, args.end, cutoff)
+            STATE.fill_video_queue(
+                args.command, args.start, args.end, cutoff, args.video_filter
+            )
             operation |= {
                 "phase": "comments",
                 "current_video_id": None,
@@ -1143,6 +1492,7 @@ def run_upload_phase(
                 operation.get("upload_page_token"),
                 args.start,
                 args.end,
+                args.video_filter,
             )
         except ApiError as exc:
             failed_token = str(requested_token or "__first_page__")
@@ -1169,6 +1519,8 @@ def run_upload_phase(
             STATE.save_operation(operation)
             continue
         for video in STATE.unseen_videos(channel["channel_id"], args.start, args.end):
+            if video.get("search_tags"):
+                continue
             finalize_missing_video(
                 video,
                 f"{args.command}_uploads",
@@ -1181,6 +1533,99 @@ def run_upload_phase(
         operation["upload_started"] = False
         operation["upload_failed_page_token"] = None
         operation["upload_scan_id"] = None
+        STATE.save_operation(operation)
+    return operation
+
+
+def rfc3339(value: datetime) -> str:
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
+
+def run_company_search_phase(
+    client: YouTubeClient,
+    args: argparse.Namespace,
+    totals: dict[str, int],
+) -> dict[str, Any]:
+    operation = STATE.operation()
+    companies = operation.get("companies", [])
+    while operation.get("phase") == "company_search":
+        position = int(operation.get("company_position", 0))
+        if position >= len(companies):
+            operation["phase"] = "comments"
+            STATE.save_operation(operation)
+            return operation
+        if int(operation.get("company_pages_done", 0)) >= args.search_pages_per_company:
+            operation |= {
+                "company_position": position + 1,
+                "company_page_token": None,
+                "company_pages_done": 0,
+                "company_failed_page_token": None,
+            }
+            STATE.save_operation(operation)
+            continue
+        company = companies[position]
+        params: dict[str, Any] = {
+            "part": "snippet",
+            "type": "video",
+            "q": company["search_query"],
+            "order": args.search_order,
+            "maxResults": 50,
+            "regionCode": "KR",
+            "relevanceLanguage": "ko",
+            "safeSearch": "moderate",
+            "fields": VIDEO_SEARCH_FIELDS,
+        }
+        if args.start:
+            params["publishedAfter"] = rfc3339(
+                datetime.combine(args.start, wall_time.min, tzinfo=UTC)
+                - timedelta(microseconds=1)
+            )
+        params["publishedBefore"] = rfc3339(
+            datetime.combine(args.end + timedelta(days=1), wall_time.min, tzinfo=UTC)
+        )
+        requested_token = operation.get("company_page_token")
+        if requested_token:
+            params["pageToken"] = requested_token
+        try:
+            payload = client.get("search", params)
+        except ApiError as exc:
+            failed_token = str(requested_token or "__first_page__")
+            if (
+                exc.reason == "invalidPageToken"
+                and operation.get("company_failed_page_token") != failed_token
+            ):
+                operation |= {
+                    "company_page_token": None,
+                    "company_pages_done": 0,
+                    "company_failed_page_token": failed_token,
+                }
+                STATE.save_operation(operation)
+                continue
+            raise
+        rows = [
+            row
+            for item in payload.get("items", [])
+            if (row := normalize_company_video(item, company)) is not None
+        ]
+        merge_rows(rows, f"{args.command}_company_search", totals)
+        for row in rows:
+            STATE.add_priority_video(row["video_id"], row["channel_id"])
+        operation["company_pages_done"] = int(
+            operation.get("company_pages_done", 0)
+        ) + 1
+        next_page = payload.get("nextPageToken")
+        if next_page and str(next_page) == requested_token:
+            raise ApiError(500, "repeatedPageToken")
+        if next_page and operation["company_pages_done"] < args.search_pages_per_company:
+            operation["company_page_token"] = str(next_page)
+            operation["company_failed_page_token"] = None
+        else:
+            operation |= {
+                "company_position": position + 1,
+                "company_page_token": None,
+                "company_pages_done": 0,
+                "company_failed_page_token": None,
+            }
         STATE.save_operation(operation)
     return operation
 
@@ -1200,7 +1645,12 @@ def quick_update(
         page_token: str | None = None
         for _ in range(args.quick_pages):
             rows, page_token = fetch_upload_page(
-                client, channel, page_token, args.start, current_end
+                client,
+                channel,
+                page_token,
+                args.start,
+                current_end,
+                args.video_filter,
             )
             priority_ids = [
                 row["video_id"]
@@ -1237,7 +1687,11 @@ def quick_update(
             snippet = thread.get("snippet", {})
             video_id = str(snippet.get("videoId", ""))
             video = STORE.get_latest(f"youtube:video:{video_id}")
-            if not video or not video_in_range(video, args.start, current_end):
+            if (
+                not video
+                or not video_matches_filter(video, args.video_filter)
+                or not video_in_range(video, args.start, current_end)
+            ):
                 continue
             top = snippet.get("topLevelComment", {})
             record = normalize_comment(
@@ -1249,6 +1703,8 @@ def quick_update(
                 reply_count=int(snippet.get("totalReplyCount", 0)),
                 salt=salt,
                 refreshed_at=refreshed_at,
+                search_tags=video.get("search_tags"),
+                search_matches=video.get("search_matches"),
             )
             if record:
                 comments.append(record)
@@ -1268,6 +1724,8 @@ def reset_current_video(operation: dict[str, Any]) -> dict[str, Any]:
         "thread_failed_page_token": None,
         "reply_failed_page_token": None,
         "video_scan_id": None,
+        "current_search_tags": None,
+        "current_search_matches": None,
     }
     return operation
 
@@ -1275,6 +1733,7 @@ def reset_current_video(operation: dict[str, Any]) -> dict[str, Any]:
 def begin_video(operation: dict[str, Any], video: dict[str, str]) -> dict[str, Any]:
     STATE.clear_comment_seen()
     unlink_thread_page()
+    stored_video = STORE.get_latest(f"youtube:video:{video['video_id']}") or {}
     operation |= {
         "current_video_id": video["video_id"],
         "current_channel_id": video["channel_id"],
@@ -1284,6 +1743,8 @@ def begin_video(operation: dict[str, Any], video: dict[str, str]) -> dict[str, A
         "reply_page_token": None,
         "thread_failed_page_token": None,
         "reply_failed_page_token": None,
+        "current_search_tags": stored_video.get("search_tags"),
+        "current_search_matches": stored_video.get("search_matches"),
         "video_scan_id": sha256(
             {
                 "operation_id": operation["operation_id"],
@@ -1394,6 +1855,8 @@ def process_reply_pages(
                 reply_count=None,
                 salt=salt,
                 refreshed_at=refreshed_at,
+                search_tags=operation.get("current_search_tags"),
+                search_matches=operation.get("current_search_matches"),
             )
             if record:
                 rows.append(record)
@@ -1409,10 +1872,12 @@ def process_reply_pages(
 
 
 def complete_video_scan(
-    operation: dict[str, Any], mode: str, totals: dict[str, int], status: str
+    operation: dict[str, Any], mode: str, totals: dict[str, int], status: str,
+    comments_per_video: int,
 ) -> dict[str, Any]:
     video_id = str(operation["current_video_id"])
     if status == "complete":
+        apply_comment_limit(video_id, comments_per_video, mode, totals)
         apply_absence(
             STATE.unseen_comments(video_id),
             "not_returned_by_complete_video_scan",
@@ -1443,11 +1908,16 @@ def run_comment_phase(
     while operation.get("phase") == "comments":
         video = STATE.next_video(operation.get("current_video_id"))
         if video is None:
+            if operation.get("source_mode") == "company_search":
+                STATE.reset()
+                return {}, True
             cutoff = (datetime.now(UTC) - timedelta(days=args.refresh_cycle_days)).isoformat()
-            stale = STATE.stale_video_count(args.start, args.end, cutoff)
+            stale = STATE.stale_video_count(
+                args.start, args.end, cutoff, args.video_filter
+            )
             if stale:
                 queued = STATE.fill_video_queue(
-                    "backfill", args.start, args.end, cutoff
+                    "backfill", args.start, args.end, cutoff, args.video_filter
                 )
                 operation = reset_current_video(operation)
                 STATE.save_operation(operation)
@@ -1471,7 +1941,11 @@ def run_comment_phase(
             except ApiError as exc:
                 if exc.reason in {"commentsDisabled", "forbidden", "videoNotFound"}:
                     operation = complete_video_scan(
-                        operation, f"{args.command}_comments", totals, "unavailable"
+                        operation,
+                        f"{args.command}_comments",
+                        totals,
+                        "unavailable",
+                        args.comments_per_video,
                     )
                     continue
                 if (
@@ -1506,7 +1980,11 @@ def run_comment_phase(
                 STATE.save_operation(operation)
                 continue
             operation = complete_video_scan(
-                operation, f"{args.command}_comments", totals, "complete"
+                operation,
+                f"{args.command}_comments",
+                totals,
+                "complete",
+                args.comments_per_video,
             )
             continue
         thread = items[index]
@@ -1525,6 +2003,8 @@ def run_comment_phase(
             reply_count=int(snippet.get("totalReplyCount", 0)),
             salt=salt,
             refreshed_at=str(page["fetched_at"]),
+            search_tags=operation.get("current_search_tags"),
+            search_matches=operation.get("current_search_matches"),
         )
         if record:
             merge_rows([record], f"{args.command}_comments", totals)
@@ -1570,6 +2050,11 @@ def purge_deleted_versions() -> None:
 
 
 def collect(args: argparse.Namespace) -> int:
+    global STATE, THREAD_PAGE_PATH
+    STATE = COMPANY_STATE if args.company_file else CHANNEL_STATE
+    THREAD_PAGE_PATH = (
+        COMPANY_THREAD_PAGE_PATH if args.company_file else CHANNEL_THREAD_PAGE_PATH
+    )
     load_dotenv(ROOT)
     pruned = STORE.prune_expired(materialize=False)
     purge_deleted_versions()
@@ -1600,16 +2085,22 @@ def collect(args: argparse.Namespace) -> int:
     completed = False
 
     try:
-        channels, old_ids, method, query = select_channels(client, args)
-        selected_ids = {row["channel_id"] for row in channels}
-        operation = begin_or_resume_operation(args, channels)
-        save_manifest([row["channel_id"] for row in channels], method, query)
-        merge_rows(channels, f"{args.command}_channels", totals)
-        remove_replaced_channels(
-            selected_ids, old_ids, f"{args.command}_channels", totals
-        )
-        quick_update(client, args, channels, salt, totals)
-        operation = run_upload_phase(client, args, channel_map(channels), totals)
+        if args.company_file:
+            companies = load_companies(args.company_file)
+            operation = begin_or_resume_company_operation(args, companies)
+            operation = run_company_search_phase(client, args, totals)
+        else:
+            companies = []
+            channels, old_ids, method, query = select_channels(client, args)
+            selected_ids = {row["channel_id"] for row in channels}
+            operation = begin_or_resume_operation(args, channels)
+            save_manifest([row["channel_id"] for row in channels], method, query)
+            merge_rows(channels, f"{args.command}_channels", totals)
+            remove_replaced_channels(
+                selected_ids, old_ids, f"{args.command}_channels", totals
+            )
+            quick_update(client, args, channels, salt, totals)
+            operation = run_upload_phase(client, args, channel_map(channels), totals)
         if operation.get("phase") == "comments":
             _, completed = run_comment_phase(client, args, salt, totals)
         if not completed:
@@ -1648,6 +2139,8 @@ def collect(args: argparse.Namespace) -> int:
             "reason": reason,
             "api_calls": client.calls,
             "quota_budget": client.max_calls,
+            "video_filter": None if args.company_file else args.video_filter,
+            "source_mode": "company_search" if args.company_file else "channel_uploads",
             "remaining_video_scans": STATE.remaining_videos(),
             **totals,
             "failures": failures,
@@ -1679,11 +2172,33 @@ def build_parser() -> argparse.ArgumentParser:
         source = child.add_mutually_exclusive_group()
         source.add_argument("--channel-id", action="append", type=channel_id)
         source.add_argument("--channel-file", type=Path)
+        source.add_argument("--company-file", type=Path)
         child.add_argument("--restart", action="store_true")
         child.add_argument("--query", default=DEFAULT_QUERY)
         child.add_argument("--candidate-pages", type=int, default=10)
         child.add_argument("--quota-budget", type=int, default=9000)
         child.add_argument("--quick-pages", type=int, default=1)
+        child.add_argument("--search-pages-per-company", type=int, default=1)
+        child.add_argument(
+            "--comments-per-video",
+            type=int,
+            default=5,
+            help="keep only this many highest-like comments per video (default: 5)",
+        )
+        child.add_argument(
+            "--search-order",
+            choices=("date", "relevance", "viewCount"),
+            default="date",
+        )
+        child.add_argument(
+            "--video-filter",
+            choices=("semiconductor", "all"),
+            default="semiconductor",
+            help=(
+                "channel-upload metadata topic filter; ignored with --company-file "
+                "(default: semiconductor)"
+            ),
+        )
         child.add_argument("--refresh-cycle-days", type=int, default=REFRESH_CYCLE_DAYS)
         child.add_argument("--timeout", type=int, default=30)
     return parser
@@ -1701,6 +2216,10 @@ def main() -> int:
         return discover(args)
     if not 0 <= args.quick_pages <= 10:
         raise SystemExit("--quick-pages must be between 0 and 10")
+    if not 1 <= args.search_pages_per_company <= 10:
+        raise SystemExit("--search-pages-per-company must be between 1 and 10")
+    if args.comments_per_video < 1:
+        raise SystemExit("--comments-per-video must be positive")
     if not 1 <= args.refresh_cycle_days < RETENTION_DAYS:
         raise SystemExit(f"--refresh-cycle-days must be between 1 and {RETENTION_DAYS - 1}")
     return collect(args)

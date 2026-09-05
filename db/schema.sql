@@ -307,23 +307,49 @@ GROUP BY source, series_name, series_id, cycle, unit;
 -- original comment payloads.  Sentiment is a transparent keyword proxy, not
 -- an LLM-generated label; consumers must use it as an auxiliary signal only.
 
+CREATE OR REPLACE VIEW psychology.community_v2 AS
+SELECT
+    nullif(c.payload->>'published_at', '')::timestamptz AS published_at,
+    nullif(c.payload->>'updated_at', '')::timestamptz   AS updated_at,
+    c.payload->>'channel_id'                            AS channel_id,
+    c.payload->>'video_id'                              AS video_id,
+    c.payload->>'text'                                  AS comment_text,
+    coalesce(nullif(c.payload->>'like_count', '')::integer, 0) AS like_count,
+    coalesce(nullif(c.payload->>'reply_count', '')::integer, 0) AS reply_count,
+    c.payload->>'source_url'                            AS source_url,
+    c.collected_at,
+    c.record_id,
+    v.payload->>'title'                                 AS video_title,
+    v.payload->'video_filter_terms'                     AS video_filter_terms,
+    v.payload->'search_tags'                            AS search_tags,
+    v.payload->'search_matches'                         AS search_matches,
+    c.payload->>'category'                              AS category,
+    c.payload->'tags'                                   AS tags,
+    nullif(c.payload->>'video_like_rank', '')::integer  AS video_like_rank,
+    nullif(c.payload->>'comments_per_video', '')::integer AS comments_per_video
+FROM lake.records AS c
+JOIN lake.records AS v
+  ON v.record_type = 'youtube_video'
+ AND v.payload->>'video_id' = c.payload->>'video_id'
+ AND (v.payload->>'video_filter' = 'semiconductor' OR v.payload ? 'search_tags')
+ AND coalesce(nullif(v.payload->>'is_deleted', '')::boolean, false) = false
+WHERE c.record_type = 'youtube_comment'
+  AND c.payload->>'category' = 'community_v2'
+  AND c.payload->'tags'->>'source' = 'youtube'
+  AND nullif(c.payload->>'video_like_rank', '')::integer BETWEEN 1
+      AND nullif(c.payload->>'comments_per_video', '')::integer
+  AND coalesce(nullif(c.payload->>'is_deleted', '')::boolean, false) = false
+  AND nullif(c.payload->>'published_at', '') IS NOT NULL
+  AND nullif(c.payload->>'text', '') IS NOT NULL;
+
+-- Backward-compatible name for existing UI and analysis queries.
 CREATE OR REPLACE VIEW psychology.youtube_comment AS
 SELECT
-    nullif(payload->>'published_at', '')::timestamptz AS published_at,
-    nullif(payload->>'updated_at', '')::timestamptz   AS updated_at,
-    payload->>'channel_id'                            AS channel_id,
-    payload->>'video_id'                              AS video_id,
-    payload->>'text'                                  AS comment_text,
-    coalesce(nullif(payload->>'like_count', '')::integer, 0) AS like_count,
-    coalesce(nullif(payload->>'reply_count', '')::integer, 0) AS reply_count,
-    payload->>'source_url'                            AS source_url,
-    collected_at,
-    record_id
-FROM lake.records
-WHERE record_type = 'youtube_comment'
-  AND coalesce(nullif(payload->>'is_deleted', '')::boolean, false) = false
-  AND nullif(payload->>'published_at', '') IS NOT NULL
-  AND nullif(payload->>'text', '') IS NOT NULL;
+    published_at, updated_at, channel_id, video_id, comment_text,
+    like_count, reply_count, source_url, collected_at, record_id,
+    video_title, video_filter_terms, search_tags, search_matches,
+    video_like_rank, comments_per_video
+FROM psychology.community_v2;
 
 CREATE OR REPLACE VIEW psychology.sentiment_daily AS
 WITH classified AS (

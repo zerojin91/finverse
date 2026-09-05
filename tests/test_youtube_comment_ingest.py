@@ -28,11 +28,16 @@ def collector_args(command: str = "backfill", **overrides: object) -> argparse.N
         "channel_count": 30,
         "channel_id": None,
         "channel_file": None,
+        "company_file": None,
         "restart": False,
         "query": "국내주식",
         "candidate_pages": 1,
         "quota_budget": 100,
         "quick_pages": 0,
+        "search_pages_per_company": 1,
+        "search_order": "date",
+        "comments_per_video": 5,
+        "video_filter": "all",
         "refresh_cycle_days": 28,
         "timeout": 1,
     }
@@ -46,15 +51,20 @@ def isolated_collector(root: Path):
     work = output / "work"
     store = IndexedJsonlStore(output)
     state = youtube.WorkState(store.index_path)
+    company_state = youtube.WorkState(store.index_path, "youtube_company")
     names = {
         "ROOT": root,
         "OUTPUT_ROOT": output,
         "WORK_ROOT": work,
         "MANIFEST_PATH": output / "channel_manifest.json",
         "CANDIDATE_PATH": output / "channel_candidates.json",
+        "CHANNEL_THREAD_PAGE_PATH": work / "thread_page.json",
+        "COMPANY_THREAD_PAGE_PATH": work / "company_thread_page.json",
         "THREAD_PAGE_PATH": work / "thread_page.json",
         "SALT_FINGERPRINT_PATH": work / "salt_fingerprint.json",
         "STORE": store,
+        "CHANNEL_STATE": state,
+        "COMPANY_STATE": company_state,
         "STATE": state,
     }
     previous = {name: getattr(youtube, name) for name in names}
@@ -227,6 +237,39 @@ class EndToEndClient:
         raise AssertionError(resource)
 
 
+class CompanySearchClient:
+    queries: list[str] = []
+
+    def __init__(self, api_key: str, max_calls: int, timeout: int):
+        self.api_key = api_key
+        self.max_calls = max_calls
+        self.timeout = timeout
+        self.calls = 0
+
+    def get(self, resource: str, params: dict[str, object]) -> dict[str, object]:
+        self.calls += 1
+        if resource == "search":
+            self.queries.append(str(params["q"]))
+            return {
+                "items": [
+                    {
+                        "id": {"videoId": "video000001"},
+                        "snippet": {
+                            "channelId": channel_id(9),
+                            "channelTitle": "stock channel",
+                            "title": "삼성전자와 SK하이닉스 전망",
+                            "publishedAt": "2025-01-01T00:00:00Z",
+                        },
+                    }
+                ]
+            }
+        if resource == "commentThreads":
+            thread = CommentClient.thread()
+            thread["snippet"]["totalReplyCount"] = 0
+            return {"items": [thread]}
+        raise AssertionError(resource)
+
+
 class YouTubeCollectorTest(unittest.TestCase):
     def test_selects_top_30_channels_from_31_candidates(self) -> None:
         with tempfile.TemporaryDirectory() as directory, isolated_collector(
@@ -276,6 +319,177 @@ class YouTubeCollectorTest(unittest.TestCase):
             self.assertEqual("comments", operation["phase"])
             self.assertIsNotNone(store.get_latest("youtube:video:video000002"))
             self.assertEqual(2, state.remaining_videos())
+
+    def test_semiconductor_filter_uses_video_title_description_and_tags(self) -> None:
+        class FilterClient:
+            def __init__(self) -> None:
+                self.resources: list[str] = []
+
+            def get(self, resource: str, params: dict[str, object]) -> dict[str, object]:
+                self.resources.append(resource)
+                if resource == "playlistItems":
+                    return {
+                        "items": [
+                            UploadClient.video(
+                                "video000001", "2025-01-01T00:00:00Z"
+                            ),
+                            UploadClient.video(
+                                "video000002", "2025-01-02T00:00:00Z"
+                            ),
+                            UploadClient.video(
+                                "video000003", "2025-01-03T00:00:00Z"
+                            ),
+                            UploadClient.video(
+                                "video000004", "2025-01-04T00:00:00Z"
+                            ),
+                        ]
+                    }
+                if resource == "videos":
+                    self.assert_video_ids(params)
+                    return {
+                        "items": [
+                            {
+                                "id": "video000001",
+                                "snippet": {
+                                    "title": "반도체 산업 전망",
+                                    "description": "수요와 공급을 분석합니다.",
+                                    "tags": [],
+                                },
+                            },
+                            {
+                                "id": "video000002",
+                                "snippet": {
+                                    "title": "오늘의 산업 전망",
+                                    "description": "HBM 수요와 공급을 분석합니다.",
+                                    "tags": [],
+                                },
+                            },
+                            {
+                                "id": "video000003",
+                                "snippet": {
+                                    "title": "기술주 전망",
+                                    "description": "기업 실적 분석",
+                                    "tags": ["GPU"],
+                                },
+                            },
+                            {
+                                "id": "video000004",
+                                "snippet": {
+                                    "title": "배당주 전망",
+                                    "description": "은행 업종 basic 분석",
+                                    "tags": ["금융"],
+                                },
+                            },
+                        ]
+                    }
+                raise AssertionError(resource)
+
+            @staticmethod
+            def assert_video_ids(params: dict[str, object]) -> None:
+                expected = ",".join(f"video00000{number}" for number in range(1, 5))
+                if params.get("id") != expected:
+                    raise AssertionError(params)
+
+        with tempfile.TemporaryDirectory() as directory, isolated_collector(
+            Path(directory)
+        ):
+            client = FilterClient()
+            rows, _ = youtube.fetch_upload_page(
+                client,
+                {
+                    "channel_id": channel_id(1),
+                    "channel_title": "channel",
+                    "uploads_playlist_id": "UU" + channel_id(1)[2:],
+                },
+                None,
+                None,
+                date(2026, 1, 1),
+                "semiconductor",
+            )
+
+        self.assertEqual(["playlistItems", "videos"], client.resources)
+        self.assertEqual(
+            ["video000001", "video000002", "video000003"],
+            [row["video_id"] for row in rows],
+        )
+        self.assertTrue(all(row["video_filter"] == "semiconductor" for row in rows))
+        self.assertEqual(
+            [["반도체"], ["hbm"], ["gpu"]],
+            [row["video_filter_terms"] for row in rows],
+        )
+
+    def test_semiconductor_queue_excludes_legacy_unfiltered_videos(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, isolated_collector(
+            Path(directory)
+        ) as (_, state):
+            records = [
+                youtube.timestamped(
+                    {
+                        "record_id": f"youtube:video:video00000{number}",
+                        "record_type": "youtube_video",
+                        "video_id": f"video00000{number}",
+                        "channel_id": channel_id(1),
+                        "published_at": f"2025-01-0{number}T00:00:00Z",
+                        "video_filter": filter_name,
+                        "is_deleted": False,
+                    }
+                )
+                for number, filter_name in ((1, "semiconductor"), (2, None))
+            ]
+            totals = {"inserted": 0, "changed": 0, "unchanged": 0, "stale": 0}
+            youtube.merge_rows(records, "seed", totals)
+
+            queued = state.fill_video_queue(
+                "update",
+                None,
+                date(2026, 1, 1),
+                youtube.now_iso(),
+                "semiconductor",
+            )
+
+            self.assertEqual(1, queued)
+            self.assertEqual("video000001", state.next_video()["video_id"])
+
+    def test_video_filter_is_part_of_resume_signature(self) -> None:
+        args = collector_args(video_filter="all")
+        all_signature = youtube.operation_signature(args, [channel_id(1)])
+        args.video_filter = "semiconductor"
+
+        self.assertNotEqual(
+            all_signature, youtube.operation_signature(args, [channel_id(1)])
+        )
+
+    def test_comment_limit_is_part_of_resume_signatures(self) -> None:
+        args = collector_args(comments_per_video=5)
+        channel_signature = youtube.operation_signature(args, [channel_id(1)])
+        company_signature = youtube.company_operation_signature(
+            args,
+            [
+                {
+                    "company_name": "삼성전자",
+                    "stock_code": "005930",
+                    "search_query": "삼성전자 주식",
+                }
+            ],
+        )
+        args.comments_per_video = 10
+
+        self.assertNotEqual(
+            channel_signature, youtube.operation_signature(args, [channel_id(1)])
+        )
+        self.assertNotEqual(
+            company_signature,
+            youtube.company_operation_signature(
+                args,
+                [
+                    {
+                        "company_name": "삼성전자",
+                        "stock_code": "005930",
+                        "search_query": "삼성전자 주식",
+                    }
+                ],
+            ),
+        )
 
     def test_missing_playlist_is_empty_only_for_zero_video_channel(self) -> None:
         class MissingPlaylistClient:
@@ -568,12 +782,64 @@ class YouTubeCollectorTest(unittest.TestCase):
             youtube.apply_absence([retry], "missing", "scan", totals, "scan-2")
             deleted = store.get_latest(record["record_id"])
             self.assertTrue(deleted["is_deleted"])
+            self.assertEqual("community_v2", deleted["category"])
+            self.assertEqual({"source": "youtube"}, deleted["tags"])
             with closing(store.connect()) as connection, connection:
                 versions = connection.execute(
                     "SELECT COUNT(*) FROM versions WHERE record_id = ?",
                     (record["record_id"],),
                 ).fetchone()[0]
             self.assertEqual(1, versions)
+
+    def test_comment_limit_keeps_five_highest_likes_per_video(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, isolated_collector(
+            Path(directory)
+        ) as (store, state):
+            records = []
+            for number, likes in enumerate((1, 9, 5, 9, 2, 8, 7), 1):
+                records.append(
+                    youtube.timestamped(
+                        {
+                            "record_id": f"youtube:comment:{number}",
+                            "record_type": "youtube_comment",
+                            "comment_id": str(number),
+                            "video_id": "video",
+                            "channel_id": channel_id(1),
+                            "text": str(number),
+                            "like_count": likes,
+                            "published_at": f"2025-01-{number:02d}T00:00:00Z",
+                            "is_deleted": False,
+                        }
+                    )
+                )
+            totals = {"inserted": 0, "changed": 0, "unchanged": 0, "stale": 0}
+            youtube.merge_rows(records, "seed", totals)
+            state.mark_comment_seen(row["record_id"] for row in records)
+
+            youtube.apply_comment_limit("video", 5, "scan", totals)
+
+            active = list(
+                store.iter_latest(
+                    record_type="youtube_comment", video_id="video", is_deleted=False
+                )
+            )
+            deleted = list(
+                store.iter_latest(
+                    record_type="youtube_comment", video_id="video", is_deleted=True
+                )
+            )
+            self.assertEqual([5, 7, 8, 9, 9], sorted(row["like_count"] for row in active))
+            self.assertEqual([1, 2, 3, 4, 5], sorted(row["video_like_rank"] for row in active))
+            self.assertEqual(
+                ["4", "2", "6", "7", "3"],
+                [row["text"] for row in sorted(active, key=lambda row: row["video_like_rank"])],
+            )
+            self.assertTrue(all(row["comments_per_video"] == 5 for row in active))
+            self.assertEqual(2, len(deleted))
+            self.assertTrue(
+                all(row["deletion_reason"] == "outside_top_liked_comments" for row in deleted)
+            )
+            self.assertEqual(2, totals["limited_comments"])
 
     def test_redacts_personal_data_and_pseudonymizes_comment_ids(self) -> None:
         record = youtube.normalize_comment(
@@ -684,6 +950,67 @@ class YouTubeCollectorTest(unittest.TestCase):
                 1,
                 len(list(store.iter_latest(record_type="youtube_comment"))),
             )
+
+    def test_company_search_tags_duplicate_video_and_comment_once(self) -> None:
+        CompanySearchClient.queries = []
+        with tempfile.TemporaryDirectory() as directory, isolated_collector(
+            Path(directory)
+        ) as (store, channel_state):
+            channel_state.save_operation({"sentinel": "channel-checkpoint"})
+            company_file = Path(directory) / "companies.json"
+            company_file.write_text(
+                json.dumps(
+                    {
+                        "companies": [
+                            {
+                                "company_name": "삼성전자",
+                                "stock_code": "005930",
+                                "search_query": "삼성전자 주식",
+                            },
+                            {
+                                "company_name": "SK하이닉스",
+                                "stock_code": "000660",
+                                "search_query": "SK하이닉스 주식",
+                            },
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            args = collector_args(company_file=company_file)
+            with (
+                patch.dict(
+                    os.environ,
+                    {
+                        "YOUTUBE_API_KEY": "test-key",
+                        "YOUTUBE_ID_HASH_SALT": "s" * 32,
+                    },
+                ),
+                patch.object(youtube, "YouTubeClient", CompanySearchClient),
+                redirect_stdout(io.StringIO()),
+            ):
+                exit_code = youtube.collect(args)
+
+            video = store.get_latest("youtube:video:video000001")
+            comments = list(
+                store.iter_latest(record_type="youtube_comment", is_deleted=False)
+            )
+            channel_operation = channel_state.operation()
+
+        self.assertEqual(0, exit_code)
+        self.assertEqual("channel-checkpoint", channel_operation["sentinel"])
+        self.assertEqual(["삼성전자 주식", "SK하이닉스 주식"], CompanySearchClient.queries)
+        self.assertEqual(["SK하이닉스", "삼성전자"], video["search_tags"])
+        self.assertEqual("community_v2", video["category"])
+        self.assertEqual({"source": "youtube"}, video["tags"])
+        self.assertEqual(1, len(comments))
+        self.assertEqual("community_v2", comments[0]["category"])
+        self.assertEqual({"source": "youtube"}, comments[0]["tags"])
+        self.assertEqual(video["search_tags"], comments[0]["search_tags"])
+        self.assertEqual(
+            ["000660", "005930"],
+            [match["stock_code"] for match in comments[0]["search_matches"]],
+        )
 
     def test_materialize_failure_keeps_previous_atomic_generation(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

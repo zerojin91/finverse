@@ -249,10 +249,20 @@ export async function GET() {
       `,
       sql<RawCommunity[]>`
         with recent_comments as (
-          select payload
-          from lake.records
-          where record_type = 'youtube_comment'
-          order by collected_at desc nulls last
+          select c.payload
+          from lake.records as c
+          where c.record_type = 'youtube_comment'
+            and c.payload->>'category' = 'community_v2'
+            and c.payload->'tags'->>'source' = 'youtube'
+            and exists (
+              select 1
+              from lake.records as v
+              where v.record_type = 'youtube_video'
+                and v.payload->>'video_id' = c.payload->>'video_id'
+                and (v.payload->>'video_filter' = 'semiconductor' or v.payload ? 'search_tags')
+                and coalesce(nullif(v.payload->>'is_deleted', '')::boolean, false) = false
+            )
+          order by c.collected_at desc nulls last
           limit 5000
         ), categorized as (
           select
