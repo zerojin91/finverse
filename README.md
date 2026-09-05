@@ -47,6 +47,8 @@ AWS 리전, Bedrock 토큰, Anthropic 모델 설정은 필요하지 않습니다
 
 `npm run dev`는 웹 앱, 모의투자 API, MiroFish 로컬 게이트웨이를 함께 실행합니다. 대시보드·KOSPI·장중지수·모의투자 데이터는 모두 `FINVERSE_DATABASE_URL`을 통해 `lake.records`를 직접 조회합니다.
 
+로컬에서 DB를 SSH 터널로 연결하는 경우 `.env`에 `FINVERSE_DATABASE_TUNNEL=1`과 `FINVERSE_DATABASE_TUNNEL_PORT=15432`를 설정하고, 먼저 `docs/access.md`의 SSH 터널 명령을 실행합니다. `npm run dev`가 두 서버에 터널 주소를 자동 적용합니다. 작업 방향과 누적 결정은 [AGENTS.md](AGENTS.md)와 [docs/project-history.md](docs/project-history.md)를 먼저 확인합니다.
+
 ### MiroFish 직접 실행 파이프라인
 
 시나리오 화면은 Evidence 문서 수집이 끝난 뒤 `agents/mirofish_pipeline.py`를 `uv`로 직접 실행합니다. MiroFish의 Flask API를 거치지 않고, 로컬 `MiroFish-Offline` 소스의 Python 서비스 클래스로 온톨로지 생성, Neo4j GraphRAG 구축, 에이전트 프로필, 시뮬레이션 설정과 초기 활성화 계획을 차례로 만듭니다. 결과는 각 실행의 Evidence 폴더 아래 `mirofish/`에 저장됩니다.

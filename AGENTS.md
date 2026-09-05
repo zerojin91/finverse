@@ -37,6 +37,7 @@
 
 - 프론트엔드 진입점은 `app/page.tsx`이고, Next.js API 라우트는 `app/api/`에 있다.
 - 로컬 개발은 `npm run dev`로 시작한다. Next.js, MiroFish 로컬 게이트웨이, 모의 투자 Flask API를 함께 띄운다.
+- 로컬 DB 연결은 SSH 터널을 표준으로 한다. `.env`에 `FINVERSE_DATABASE_TUNNEL=1`, `FINVERSE_DATABASE_TUNNEL_PORT=15432`를 설정하면 `scripts/dev_local.mjs`가 Next.js와 Flask 양쪽의 `FINVERSE_DATABASE_URL`을 실행 시점에 `127.0.0.1:15432`로 통일한다. 터널은 별도 터미널에서 `ssh -i "$FINVERSE_SSH_KEY" -N -L 15432:<DB_TAILSCALE_HOST>:5432 "$FINVERSE_SSH_HOST"`로 먼저 띄운다. 비밀번호·전체 URL은 문서나 로그에 기록하지 않는다.
 - DB는 원격 서버의 Docker 컨테이너 `finverse-db`, 데이터베이스 `finverse`다. 수집 원본과 AI 분석 결과의 중심 저장소는 `lake.records`다.
 - 대시보드·KOSPI·장중지수·모의투자·MiroFish A2A의 DB 접근은 모두 `FINVERSE_DATABASE_URL`을 사용한다. 이 값은 `.env`에만 두며, 코드·문서·로그에는 값 자체를 기록하지 않는다.
 - 모의투자 종목 선택 화면은 `GET /api/paper-trading/securities/:ticker/candles`로 선택 종목의 최근 36거래일 실제 OHLC를 읽어 시작 전 캔들 미리보기를 표시한다. 이 미리보기에는 시뮬레이션·미래 가격을 섞지 않는다.
@@ -81,6 +82,7 @@ scripts/run_bedrock_signal_update.sh --dry-run
 - 2026-08-30 기준 원격 코드는 `origin/main`의 `df294d8`로 배포됐다. 이후 로컬에서 만든 커밋은 사용자의 푸시 요청 전까지 원격 GitHub에는 올리지 않는다.
 - 원격에는 배포 전 상태 백업과 stash가 있을 수 있다. 복구가 필요할 때만 해당 백업을 사용하며, 일상 작업에서는 건드리지 않는다.
 - UI 이상은 다음 순서로 본다: `GET /api/dashboard` 응답 → `FINVERSE_DATABASE_URL` 연결 상태 → `lake.records` 데이터/배치 로그 → OpenRouter 키·모델 설정.
+- 작업 시작 전 방향 점검: 이 프로젝트의 핵심은 실제 Finverse 데이터로 근거를 만들고, LLM은 해석·시나리오 보조로만 사용하며, 미래 결과를 사실처럼 단정하지 않는 금융 판단 연습이다. UI·API·에이전트 동작을 바꿀 때는 [프로젝트 히스토리](docs/project-history.md)를 먼저 읽고, 기존의 실제 데이터·4개 참여자 범주·순차 설정 흐름·캐시 재사용 원칙에서 벗어나지 않는지 확인한다. 큰 방향이 바뀌면 구현 전에 히스토리에 결정과 이유를 기록한다.
 
 ### 운영 변경·사고 기록
 

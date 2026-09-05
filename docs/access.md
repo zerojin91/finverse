@@ -38,6 +38,21 @@ psql "postgresql://<DB_USER>:<DB_PASSWORD>@<DB_HOST>:5432/<DB_NAME>"
 
 GUI 도구(DBeaver, TablePlus, DataGrip 등)도 같은 정보로 붙습니다.
 
+### 로컬 FINVERSE 앱에서 SSH 터널 사용
+
+로컬 앱은 `.env`의 DB URL을 직접 사용하지 않고, SSH 서버를 경유해 Tailscale 내부 DB로 연결할 수 있습니다. 먼저 `.env`에 아래 두 값을 추가하고, 별도 터미널에서 터널을 실행합니다.
+
+```env
+FINVERSE_DATABASE_TUNNEL=1
+FINVERSE_DATABASE_TUNNEL_PORT=15432
+```
+
+```bash
+ssh -i "$FINVERSE_SSH_KEY" -N -L 15432:<DB_TAILSCALE_HOST>:5432 "$FINVERSE_SSH_HOST"
+```
+
+그 다음 `npm run dev`를 실행하면 `scripts/dev_local.mjs`가 Next.js와 Flask 모의투자 API 모두에 `127.0.0.1:15432`를 사용하게 합니다. 터널이 닫혔거나 15432 포트가 열려 있지 않으면 종목 조회·대시보드가 PostgreSQL 연결 타임아웃을 반환하므로, 재시작 직후 `/health`와 캔들 API를 확인합니다.
+
 | 항목 | 값 |
 | --- | --- |
 | 호스트 | `100.89.226.42` |
