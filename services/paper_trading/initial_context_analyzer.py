@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import tempfile
 import time
 from typing import Any
@@ -33,6 +34,12 @@ def _cache_path(cache_key: str) -> Path:
     root = Path(Config.UPLOAD_FOLDER) / "market_cache"
     root.mkdir(parents=True, exist_ok=True)
     return root / f"initial-context-{cache_key}.json"
+
+
+def _context_fingerprint(history: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    source = _compact_input(history)
+    fingerprint = hashlib.sha256(_json({"schema": CONTEXT_SCHEMA_VERSION, "source": source}).encode()).hexdigest()[:24]
+    return source, fingerprint
 
 
 def _read_cache(path: Path) -> dict[str, Any] | None:
@@ -278,8 +285,7 @@ def _document_preview(content: str) -> str:
 
 def prepare_initial_context_documents(history: dict[str, Any]) -> dict[str, Any]:
     """Build the four auditable documents before any LLM call."""
-    source = _compact_input(history)
-    fingerprint = hashlib.sha256(_json({"schema": CONTEXT_SCHEMA_VERSION, "source": source}).encode()).hexdigest()[:24]
+    source, fingerprint = _context_fingerprint(history)
     path = _cache_path(fingerprint)
     document_dir = path.parent / f"initial-context-{fingerprint}"
     document_files = build_target_documents(history, document_dir)
@@ -304,6 +310,23 @@ def prepare_initial_context_documents(history: dict[str, Any]) -> dict[str, Any]
                 for key, filename in document_files.items()
             },
         },
+    }
+
+
+def clear_initial_context_cache(history: dict[str, Any]) -> dict[str, Any]:
+    """Remove one exact source snapshot so the setup flow can regenerate it."""
+    _, fingerprint = _context_fingerprint(history)
+    path = _cache_path(fingerprint)
+    document_dir = path.parent / f"initial-context-{fingerprint}"
+    analysis_removed = path.exists()
+    documents_removed = document_dir.is_dir()
+    path.unlink(missing_ok=True)
+    if documents_removed:
+        shutil.rmtree(document_dir)
+    return {
+        "context_id": f"ctx_{fingerprint}",
+        "analysis_removed": analysis_removed,
+        "documents_removed": documents_removed,
     }
 
 

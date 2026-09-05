@@ -16,6 +16,7 @@ CALLED_BY_UI = [
     ("GET", "/api/paper-trading/securities?q=삼성&limit=3"),
     ("GET", "/api/paper-trading/data-source/status"),
     ("GET", "/api/paper-trading/securities/005930/initial-context/documents"),
+    ("DELETE", "/api/paper-trading/securities/005930/initial-context/cache"),
     ("GET", "/api/paper-trading/games?summary=1&limit=3"),
     ("GET", "/api/paper-trading/games"),
     ("GET", "/api/paper-trading/games/scenario_missing0000"),

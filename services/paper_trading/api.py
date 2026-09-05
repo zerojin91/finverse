@@ -17,6 +17,7 @@ from .finverse_market_data import FinverseMarketData, FinverseUnavailable
 from .llm_market_simulator import LLMMarketUnavailable
 from .initial_context_analyzer import (
     InitialContextUnavailable,
+    clear_initial_context_cache,
     get_initial_context,
     get_initial_context_documents,
 )
@@ -136,6 +137,13 @@ def security_initial_context_documents(ticker: str):
     """Prepare the four Evidence documents before the aggregate LLM request."""
     history = _market_data().load_game_data(ticker, "", "")
     return jsonify({"success": True, "data": get_initial_context_documents(history)})
+
+
+@paper_trading_bp.route("/securities/<ticker>/initial-context/cache", methods=["DELETE"])
+def clear_security_initial_context_cache(ticker: str):
+    """Allow the setup screen to explicitly regenerate its source documents and analysis."""
+    history = _market_data().load_game_data(ticker, "", "")
+    return jsonify({"success": True, "data": clear_initial_context_cache(history)})
 
 
 @paper_trading_bp.route("/securities/<ticker>/initial-context/documents/<domain>", methods=["GET"])

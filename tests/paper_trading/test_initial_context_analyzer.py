@@ -2,6 +2,7 @@ from services.paper_trading.config import Config
 from services.paper_trading.initial_context_analyzer import (
     _mark_direct_event_evidence,
     _normalize,
+    clear_initial_context_cache,
     get_initial_context_documents,
 )
 
@@ -37,6 +38,21 @@ def test_document_preparation_returns_four_target_evidence_previews(tmp_path, mo
     assert result["context_id"].startswith("ctx_")
     assert set(result["source_summary"]["document_previews"]) == {"market", "economy", "events", "community"}
     assert (tmp_path / "market_cache" / f"initial-context-{result['context_id'][4:]}" / "market-evidence.md").is_file()
+
+
+def test_clear_initial_context_cache_removes_only_the_selected_snapshot(tmp_path, monkeypatch):
+    monkeypatch.setattr(Config, "UPLOAD_FOLDER", str(tmp_path))
+    prepared = get_initial_context_documents(_history())
+    cache_root = tmp_path / "market_cache"
+    analysis_path = cache_root / f"initial-context-{prepared['context_id'][4:]}.json"
+    analysis_path.write_text("{}", encoding="utf-8")
+
+    result = clear_initial_context_cache(_history())
+
+    assert result["analysis_removed"] is True
+    assert result["documents_removed"] is True
+    assert not analysis_path.exists()
+    assert not (cache_root / f"initial-context-{prepared['context_id'][4:]}").exists()
 
 
 def test_event_sequence_is_normalized_and_preserves_evidence_basis():
