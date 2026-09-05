@@ -27,10 +27,12 @@ def enforce_verified_report_metrics(report: dict[str, Any],
             "verified_value_pct": total,
         })
     # A verified deterministic line always takes precedence over narrative text.
+    activity_label = "사용자 판단" if metrics.get("world_decision_count") is not None else "사용자 거래"
+    activity_count = int(metrics.get("world_decision_count", metrics["trade_count"]))
     report["quantitative_summary"] = (
         f"검증된 총 수익률 {total:.4f}%, "
         f"최대 가격 낙폭 {float(metrics['max_price_drawdown_pct']):.4f}%, "
-        f"사용자 거래 {int(metrics['trade_count'])}회"
+        f"{activity_label} {activity_count}회"
     )
     return report
 
@@ -75,6 +77,9 @@ def generate_llm_scenario_report(game: dict[str, Any],
                         ("event_id", "phase", "side", "quantity", "price",
                          "rationale", "confidence", "realized_pnl")}
                        for fill in game.get("fills", [])],
+        "daily_reflections": [{key: row.get(key) for key in
+                               ("market_date", "event_id", "stance", "label", "market_return_pct", "market_summary")}
+                              for row in game.get("daily_reflections", [])],
         "agent_rounds": [{"label": row["label"], "market_date": row.get("market_date"),
                           "phase": row.get("phase"), "return_pct": row["return_pct"],
                           "order_imbalance": row["order_imbalance"],
@@ -86,7 +91,7 @@ def generate_llm_scenario_report(game: dict[str, Any],
         "quantitative_assessment": base,
     }
     messages = [
-        {"role": "system", "content": "한국 주식 교육용 시뮬레이션 분석가다. 결과론적 비난과 투자 권유를 피하고, 이벤트 전후 의사결정 과정을 근거 중심으로 평가한다. 추격 매수, 손실 회피, 확증 편향, 과신, 과도한 매매는 기록에서 확인되는 경우에만 교육적 가설로 설명하고 단정하지 않는다. 입력의 백분율은 이미 % 단위이므로 100을 곱하거나 나누지 말고 그대로 인용한다. 수치를 재계산하지 않는다. 반드시 JSON 객체만 반환한다."},
+        {"role": "system", "content": "한국 주식 교육용 시뮬레이션 분석가다. 결과론적 비난과 투자 권유를 피하고, 이벤트 전후 의사결정 과정을 근거 중심으로 평가한다. World 모드의 사용자는 주문을 내지 않고 매수 고려·관찰 계속·매도 고려 판단만 기록하므로, daily_reflections의 판단과 다음 시장 결과를 중심으로 분석한다. 추격 매수, 손실 회피, 확증 편향, 과신, 과도한 매매는 기록에서 확인되는 경우에만 교육적 가설로 설명하고 단정하지 않는다. 입력의 백분율은 이미 % 단위이므로 100을 곱하거나 나누지 말고 그대로 인용한다. 수치를 재계산하지 않는다. 반드시 JSON 객체만 반환한다."},
         {"role": "user", "content": f"""다음 완료된 가상 시나리오를 분석하라.
 {json.dumps(context, ensure_ascii=False)}
 반환 형식:

@@ -339,6 +339,7 @@ type ScenarioGame = {
 
 type DailyReflection = {
   market_date: string;
+  event_id?: string | null;
   stance: "BUY_WATCH" | "HOLD_WATCH" | "SELL_WATCH";
   label: string;
   market_return_pct?: number;
@@ -460,23 +461,23 @@ const PHASE_META: Record<Phase, {
     eyebrow: "WORLD EVENT DECISION",
     action: "resolve",
     cta: "판단 반영하고 시장 진행",
-    guide: "중요 사건이 공개됐습니다. 사용자와 59개 에이전트가 같은 공개 정보를 보고 각각 판단한 뒤 시장이 체결됩니다.",
+    guide: "중요 사건이 공개됐습니다. 같은 공개 정보를 확인하고 세 가지 방향성 중 하나를 선택하면 시장이 진행됩니다.",
     todo: [
       "공개된 사건과 과거 유사 사례의 관계를 확인합니다.",
-      "내 판단에서 매수·매도 또는 관망을 기록하고 판단 근거를 남깁니다.",
-      "판단 반영 후 에이전트 주문과 시장 체결 결과가 다음 WorldState에 기록됩니다.",
+      "매수 고려·관찰 계속·매도 고려 중 하나를 선택합니다. 수량이나 주문은 필요하지 않습니다.",
+      "선택한 판단은 학습 기록으로 남고, 59개 에이전트의 반응과 시장 결과가 이어집니다.",
     ],
-    canOrder: true,
+    canOrder: false,
   },
   completed: {
     label: "시나리오 종료",
     eyebrow: "SCENARIO COMPLETE",
     action: "report",
     cta: "AI 투자 리포트 생성",
-    guide: "모든 이벤트가 끝났습니다. 매 판단의 근거와 결과를 묶어 교육용 리포트를 만들 수 있습니다.",
+    guide: "모든 이벤트가 끝났습니다. 매일 남긴 방향성 판단과 시장 결과를 묶어 교육용 리포트를 만들 수 있습니다.",
     todo: [
       "모든 이벤트가 끝났습니다. 최종 수익률과 캔들 전체 경로를 확인하세요.",
-      "*AI 투자 리포트 생성*을 누르면 매 판단의 근거와 결과를 묶어 회고를 만듭니다.",
+      "*AI 투자 리포트 생성*을 누르면 매일의 판단과 결과를 묶어 회고를 만듭니다.",
     ],
     canOrder: false,
   },
@@ -517,7 +518,7 @@ const PRICE_H = 210;
 const VOLUME_H = 42;
 
 /** 실제 이력 봉과 시뮬레이션 봉을 하나의 시계열로 합친다. */
-type CandleChartData = Pick<ScenarioGame, "history_candles" | "price_history" | "initial_reference_price" | "revealed_events" | "fills" | "simulation_days">;
+type CandleChartData = Pick<ScenarioGame, "history_candles" | "price_history" | "initial_reference_price" | "revealed_events" | "fills" | "daily_reflections" | "simulation_days">;
 
 function buildBars(game: CandleChartData, preview = false): Bar[] {
   const history: Bar[] = [];
@@ -612,7 +613,7 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
   const eventBars = bars.reduce<number[]>(
     (acc, bar, index) => (bar.event ? [...acc, index] : acc), []);
   const eventOrder = (game.revealed_events ?? []).map((item) => item.event_id);
-  const markers = (game.fills ?? []).flatMap((fill, index) => {
+  const fillMarkers = (game.fills ?? []).flatMap((fill, index) => {
     const position = eventOrder.indexOf(fill.event_id ?? "");
     const barIndex = eventBars[position >= 0 ? position : eventBars.length - 1];
     if (barIndex === undefined) return [];
@@ -623,8 +624,27 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
       price: fill.price,
       x: cx(barIndex) + (fill.phase === "pre_event_decision" ? -bodyW : bodyW),
       y: y(fill.price),
+      title: `내 ${fill.side === "BUY" ? "매수" : "매도"} ${fill.quantity.toLocaleString("ko-KR")}주 · ${won(fill.price)}`,
     }];
   });
+  const reflectionMarkers = (game.daily_reflections ?? [])
+    .filter((reflection) => reflection.stance !== "HOLD_WATCH")
+    .flatMap((reflection, index) => {
+      const barIndex = bars.findIndex((bar) => !bar.real && bar.date === reflection.market_date);
+      if (barIndex < 0) return [];
+      const side = reflection.stance === "BUY_WATCH" ? "BUY" : "SELL";
+      const price = bars[barIndex].close;
+      return [{
+        key: `reflection-${reflection.market_date}-${index}`,
+        side,
+        quantity: 0,
+        price,
+        x: cx(barIndex) + (side === "BUY" ? -bodyW : bodyW),
+        y: y(price),
+        title: `${reflection.label} · ${reflection.market_date}`,
+      }];
+    });
+  const markers = [...fillMarkers, ...reflectionMarkers];
 
   const active = hovered !== null ? bars[hovered] : bars[bars.length - 1];
 
@@ -722,7 +742,7 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
 
         {markers.map((marker) => (
           <g key={marker.key} className={`paper-fill-marker ${marker.side === "BUY" ? "buy" : "sell"}`}>
-            <title>{`내 ${marker.side === "BUY" ? "매수" : "매도"} ${marker.quantity.toLocaleString("ko-KR")}주 · ${won(marker.price)}`}</title>
+            <title>{marker.title}</title>
             <path d={marker.side === "BUY"
               ? `M ${marker.x} ${marker.y - 7} l 5 8 l -10 0 z`
               : `M ${marker.x} ${marker.y + 7} l 5 -8 l -10 0 z`} />
@@ -742,7 +762,7 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
         {preview ? (
           <><span className="up">양봉</span><span className="down">음봉</span><span className="real">실제 일봉</span></>
         ) : (
-          <><span className="real">실제 이력</span><span className="up">상승 캔들</span><span className="down">하락 캔들</span><span className="future">앞으로의 거래일</span><span className="event">이벤트 공개일</span><span className="buy">내 매수</span><span className="sell">내 매도</span></>
+          <><span className="real">실제 이력</span><span className="up">상승 캔들</span><span className="down">하락 캔들</span><span className="future">앞으로의 거래일</span><span className="event">이벤트 공개일</span><span className="buy">내 매수 판단</span><span className="sell">내 매도 판단</span></>
         )}
       </div>
     </div>
@@ -804,14 +824,15 @@ const DAILY_SUMMARY_GROUPS = [
 ] as const;
 
 function DailyPracticeCard({
-  round, reflection, disabled, onSelect,
+  round, event, reflection, disabled, onSelect,
 }: {
   round?: AgentRound;
+  event?: ScenarioEvent | null;
   reflection?: DailyReflection;
   disabled: boolean;
   onSelect: (stance: DailyReflection["stance"]) => void;
 }) {
-  if (!round) {
+  if (!round && !event) {
     return (
       <div className="paper-daily-practice waiting">
         <span>오늘의 시장 요약</span>
@@ -822,30 +843,39 @@ function DailyPracticeCard({
   return (
     <div className="paper-daily-practice">
       <div className="paper-daily-practice-head">
-        <span>오늘의 시장 요약</span>
-        <em>{round.market_date}</em>
+        <span>{event ? "중요 사건 판단" : "오늘의 시장 요약"}</span>
+        <em>{event?.event_date ?? round?.market_date}</em>
       </div>
-      <p>{round.market_summary_detail?.summary || round.market_summary || "오늘의 공개 정보와 시장 참여자 반응을 확인하세요."}</p>
-      {round.market_summary_detail?.group_actions && (
+      {event ? (
+        <div className="paper-daily-event">
+          <b>{event.title || "공개된 중요 사건"}</b>
+          <span>{event.description || event.public_signal || "공개된 사건의 내용을 확인하고 다음 방향을 선택하세요."}</span>
+        </div>
+      ) : (
+        <p>{round?.market_summary_detail?.summary || round?.market_summary || "오늘의 공개 정보와 시장 참여자 반응을 확인하세요."}</p>
+      )}
+      {!event && round?.market_summary_detail?.group_actions && (
         <div className="paper-daily-summary-groups" aria-label="수급 주체별 오늘의 행동 요약">
           {DAILY_SUMMARY_GROUPS.map(([key, label]) => (
             <div className="paper-daily-summary-group" key={key}>
               <b>{label}</b>
-              <span>{round.market_summary_detail?.group_actions?.[key]}</span>
+              <span>{round?.market_summary_detail?.group_actions?.[key]}</span>
             </div>
           ))}
         </div>
       )}
-      {round.market_summary_detail?.price_reason && (
+      {!event && round?.market_summary_detail?.price_reason && (
         <div className="paper-daily-reason">
           <b>주가 변동 이유 추론</b>
-          <span>{round.market_summary_detail.price_reason}</span>
+          <span>{round?.market_summary_detail?.price_reason}</span>
         </div>
       )}
-      <div className="paper-daily-practice-flow">
-        <b className={toneOf(round.return_pct)}>{signedPct(round.return_pct)}</b>
-        <span>59개 에이전트 반응 후 형성된 오늘의 종가</span>
-      </div>
+      {round && (
+        <div className="paper-daily-practice-flow">
+          <b className={toneOf(round.return_pct)}>{signedPct(round.return_pct)}</b>
+          <span>59개 에이전트 반응 후 형성된 오늘의 종가</span>
+        </div>
+      )}
       <div className="paper-daily-choices" role="group" aria-label="오늘의 방향성 판단">
         {DAILY_STANCES.map((item) => (
           <button
@@ -1728,7 +1758,7 @@ function SetupScreen({
                   history_candles: previewCandles,
                   price_history: [],
                   initial_reference_price: previewCandles[previewCandles.length - 1].close,
-                  revealed_events: [], fills: [],
+                  revealed_events: [], fills: [], daily_reflections: [],
                 }}
               />
             )}
@@ -2115,8 +2145,8 @@ function CoachOverlay({ onDone, worldMode = false }: { onDone: () => void; world
         {worldMode ? (
           <ol>
             <li><b>오늘의 시장 확인</b><p className="paper-coach-lines"><span>‘하루 진행’을 누르면 오늘의 시황과 새로 공개된 정보를 확인합니다.</span><span>평소 거래일에는 내 포트폴리오 변화와 시장 흐름을 읽는 데 집중하면 됩니다.</span></p></li>
-            <li><b>중요 사건에서 직접 판단</b><p className="paper-coach-lines"><span>가격에 큰 영향을 줄 사건이 오면 게임이 멈추고 판단 화면이 열립니다.</span><span>그때 매수·매도·관망 중 하나를 고르고 이유와 확신도를 남겨주세요.</span></p></li>
-            <li><b>내 선택은 내 포트폴리오에 반영</b><p className="paper-coach-lines"><span>내 주문은 현재 시장 가격으로 체결돼 내 보유·손익에 반영됩니다.</span><span>일반 개인 투자자인 내 주문은 시장 가격·수급·분위기를 직접 움직이지 않습니다.</span><span>시장 변화는 중요한 사건과 59개 에이전트의 전체 반응으로 만들어집니다.</span></p></li>
+            <li><b>중요 사건에서 직접 판단</b><p className="paper-coach-lines"><span>가격에 큰 영향을 줄 사건이 오면 게임이 멈추고 판단 화면이 열립니다.</span><span>그때 매수 고려·관찰 계속·매도 고려 중 하나를 선택합니다. 수량이나 주문은 필요하지 않습니다.</span></p></li>
+            <li><b>내 선택은 기록으로 남음</b><p className="paper-coach-lines"><span>내 판단은 학습 기록으로 저장되고 시장 가격이나 수급을 직접 움직이지 않습니다.</span><span>시장 변화는 중요한 사건과 59개 에이전트의 전체 반응으로 만들어집니다.</span></p></li>
             <li><b>다음 거래일로 이어가기</b><p className="paper-coach-lines"><span>각 거래일에는 개인·외국인·기관·연기금이 각자 다른 방식으로 반응합니다.</span><span>결과를 확인한 뒤 다음 거래일을 열어 변화가 이어지는 모습을 관찰하세요.</span></p></li>
             <li><b>마지막에 내 판단 돌아보기</b><p className="paper-coach-lines"><span>연습이 끝나면 수익률과 함께 기록한 판단을 분석합니다.</span><span>추격 매수, 손실 회피, 과신, 과도한 매매 같은 패턴을 확인할 수 있습니다.</span></p></li>
           </ol>
@@ -2174,10 +2204,12 @@ function TradingScreen({
     : (game.phase === "completed" ? game.total_events : game.current_event_index);
   const eventProgress = totalProgressUnits ? Math.min(100, (currentProgressUnits / totalProgressUnits) * 100) : 0;
   const latestRound = game.agent_rounds?.[game.agent_rounds.length - 1];
+  const reflectionMarketDate = game.phase === "world_decision"
+    ? game.current_event?.event_date
+    : latestRound?.market_date;
   const latestReflection = useMemo(() => {
-    const marketDate = latestRound?.market_date;
-    return (game.daily_reflections ?? []).find((item) => item.market_date === marketDate);
-  }, [game.daily_reflections, latestRound?.market_date]);
+    return (game.daily_reflections ?? []).find((item) => item.market_date === reflectionMarketDate);
+  }, [game.daily_reflections, reflectionMarketDate]);
   const startFromCoach = useCallback(() => {
     dismissCoach();
     if (worldMode && game.phase === "world_market" && (game.current_day_index ?? 0) === 0 && !busy) {
@@ -2226,8 +2258,9 @@ function TradingScreen({
             {worldMode && (
               <DailyPracticeCard
                 round={latestRound}
+                event={game.phase === "world_decision" ? game.current_event : null}
                 reflection={latestReflection}
-                disabled={busy || game.phase !== "world_market"}
+                disabled={busy || !["world_market", "world_decision"].includes(game.phase)}
                 onSelect={onDailyReflection}
               />
             )}
@@ -2238,14 +2271,14 @@ function TradingScreen({
               <div><span>실현손익</span><strong className={toneOf(portfolio.realized_pnl)}>{portfolio.realized_pnl ? compactWon(portfolio.realized_pnl) : "—"}</strong></div>
             </div>
 
-            {meta.canOrder
+            {meta.canOrder && !worldMode
               ? <OrderDesk game={game} disabled={busy} onSubmit={onOrder} submitting={orderSubmitting} />
-              : (
+              : (!worldMode && (
                 <div className="paper-locked-note">
                   <strong>{meta.label}에는 주문할 수 없습니다</strong>
                   <p>{meta.guide}</p>
                 </div>
-              )}
+              ))}
 
             {Boolean(game.pending_orders?.length) && (
               <div className="paper-pending">
@@ -2478,10 +2511,18 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
         body: JSON.stringify({ stance }),
       });
       setGame(payload.game);
+      if (payload.game.phase === "world_decision") {
+        const actionPayload = await callApi<{ data: Job }>(`/scenarios/${game.game_id}/actions`, {
+          method: "POST",
+          body: JSON.stringify({ action: "resolve" }),
+        });
+        setJob(actionPayload.data);
+        pollJob(actionPayload.data.job_id, game.game_id);
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "오늘의 판단을 기록하지 못했습니다.");
     }
-  }, [busy, game]);
+  }, [busy, game, pollJob]);
 
   return (
     <div className="modal-backdrop paper-trading-backdrop" onMouseDown={onClose}>

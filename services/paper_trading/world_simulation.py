@@ -159,24 +159,26 @@ def record_world_daily_reflection(game: dict[str, Any], stance: str) -> dict[str
     """Save a daily learning note without placing or simulating a user order."""
     if game.get("mode") != "world":
         raise TradingError("일일 판단 기록은 World Agent 모의투자에서만 지원합니다.")
-    if game.get("phase") not in (PHASE_WORLD_MARKET, PHASE_COMPLETED):
-        raise TradingError("중요 사건 판단 중에는 일일 메모 대신 주문 판단을 기록해주세요.")
+    if game.get("phase") not in (PHASE_WORLD_MARKET, PHASE_WORLD_DECISION, PHASE_COMPLETED):
+        raise TradingError("현재 거래일에는 일일 판단을 기록할 수 없습니다.")
     stance = str(stance or "").upper()
     if stance not in DAILY_REFLECTION_LABELS:
         raise TradingError("매수 고려, 관찰, 매도 고려 중 하나를 선택해주세요.")
     rounds = game.get("agent_rounds") or []
-    if not rounds:
+    event = (game.get("world") or {}).get("active_event") if game.get("phase") == PHASE_WORLD_DECISION else None
+    if not rounds and not event:
         raise TradingError("첫 거래일이 열린 뒤 오늘의 판단을 기록할 수 있습니다.")
-    latest = rounds[-1]
-    market_date = str(latest.get("market_date") or "")
+    latest = rounds[-1] if rounds else {}
+    market_date = str((event or {}).get("event_date") or latest.get("market_date") or "")
     if not market_date:
         raise TradingError("오늘의 시장 날짜를 확인하지 못했습니다.")
     reflection = {
         "market_date": market_date,
         "stance": stance,
         "label": DAILY_REFLECTION_LABELS[stance],
-        "market_return_pct": latest.get("return_pct"),
-        "market_summary": latest.get("market_summary"),
+        "market_return_pct": latest.get("return_pct") if latest.get("market_date") == market_date else None,
+        "market_summary": latest.get("market_summary") if latest.get("market_date") == market_date else None,
+        "event_id": (event or {}).get("event_id"),
         "recorded_at": datetime.now().isoformat(),
         "source": "user",
     }
@@ -270,10 +272,14 @@ def resolve_world_decision(game: dict[str, Any], *, progress: Callable[[int, str
             progress(10 + round(78 * done / max(total, 1)), f"{market_date} 개별 에이전트 판단 {done}/{total} · {agent_id}")
     round_data = _run_market_agents(game, market_date, information, "event_reaction", agent_progress)
     result = apply_agent_round(game, round_data, phase="event_reaction", label=f"{market_date} · WORLD EVENT {event['sequence']} · {event['title']}", market_date=market_date)
-    game["decision_log"].append({"event_id": event["event_id"], "phase": PHASE_WORLD_DECISION, "user_fills": user_fills, "price_before": result["previous_price"], "price_after": result["price"]})
+    daily_reflection = next(
+        (row for row in game.get("daily_reflections", []) if row.get("market_date") == market_date),
+        None,
+    )
+    game["decision_log"].append({"event_id": event["event_id"], "phase": PHASE_WORLD_DECISION, "user_fills": user_fills, "user_stance": (daily_reflection or {}).get("stance"), "price_before": result["previous_price"], "price_after": result["price"]})
     game["user_decision_memory"].append({
         "event_id": event["event_id"], "event_title": event["title"], "market_date": market_date,
-        "public_signal": event.get("public_signal"), "user_fills": user_fills,
+        "public_signal": event.get("public_signal"), "user_stance": (daily_reflection or {}).get("stance"), "user_fills": user_fills,
         "orders": [dict(row) for row in game.get("fills", [])[-len(user_fills):]] if user_fills else [],
         "world_state": information.get("world_state"),
     })
