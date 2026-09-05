@@ -153,6 +153,16 @@ type InitialContext = {
   };
 };
 
+type ContextDocumentProgress = { key: "market" | "economy" | "events" | "community"; label: string; file: string; status: "waiting" | "generating" | "ready" };
+
+const INITIAL_CONTEXT_DOCUMENTS: ContextDocumentProgress[] = [
+  { key: "market", label: "시장", file: "market-evidence.md", status: "waiting" },
+  { key: "economy", label: "경제", file: "economic-evidence.md", status: "waiting" },
+  { key: "events", label: "사건", file: "external-event-evidence.md", status: "waiting" },
+  { key: "community", label: "커뮤니티", file: "community-evidence.md", status: "waiting" },
+];
+const CONTEXT_DOCUMENT_MIN_MS = 4_800;
+
 type Observation = {
   investor_group: string;
   platform: string;
@@ -1043,6 +1053,7 @@ function SetupScreen({
   const [initialContext, setInitialContext] = useState<InitialContext | null>(null);
   const [initialContextLoading, setInitialContextLoading] = useState(false);
   const [initialContextError, setInitialContextError] = useState<string | null>(null);
+  const [contextDocuments, setContextDocuments] = useState<ContextDocumentProgress[]>(INITIAL_CONTEXT_DOCUMENTS);
   const pickedTicker = picked?.ticker;
   const step2Ref = useRef<HTMLElement | null>(null);
   const step3Ref = useRef<HTMLElement | null>(null);
@@ -1134,14 +1145,30 @@ function SetupScreen({
     if (!pickedTicker || !collectionStepComplete) return;
     let cancelled = false;
     const loadInitialContext = async () => {
+      const startedAt = Date.now();
       setInitialContextLoading(true);
       setInitialContextError(null);
+      setContextDocuments(INITIAL_CONTEXT_DOCUMENTS.map((document, index) => ({ ...document, status: index === 0 ? "generating" : "waiting" })));
+      let nextDocument = 0;
+      const documentTimer = window.setInterval(() => {
+        setContextDocuments((documents) => documents.map((document, index) => ({
+          ...document,
+          status: index < nextDocument ? "ready" : index === nextDocument ? "generating" : "waiting",
+        })));
+        nextDocument = Math.min(nextDocument + 1, INITIAL_CONTEXT_DOCUMENTS.length - 1);
+      }, 1_200);
       try {
         const payload = await callApi<{ data: InitialContext }>(`/securities/${encodeURIComponent(pickedTicker)}/initial-context`);
-        if (!cancelled) setInitialContext(payload.data);
+        const remaining = Math.max(0, CONTEXT_DOCUMENT_MIN_MS - (Date.now() - startedAt));
+        if (remaining) await new Promise((resolve) => window.setTimeout(resolve, remaining));
+        if (!cancelled) {
+          setInitialContext(payload.data);
+          setContextDocuments(INITIAL_CONTEXT_DOCUMENTS.map((document) => ({ ...document, status: "ready" })));
+        }
       } catch (cause) {
         if (!cancelled) setInitialContextError(cause instanceof Error ? cause.message : "초기 상황을 분석하지 못했습니다.");
       } finally {
+        window.clearInterval(documentTimer);
         if (!cancelled) setInitialContextLoading(false);
       }
     };
@@ -1194,6 +1221,7 @@ function SetupScreen({
     setInitialContext(null);
     setInitialContextError(null);
     setInitialContextLoading(false);
+    setContextDocuments(INITIAL_CONTEXT_DOCUMENTS);
     setPicked(item);
     setQuery(item.name);
     setResults([]);
@@ -1292,6 +1320,7 @@ function SetupScreen({
                 setCollectionError(null);
                 setInitialContext(null);
                 setInitialContextError(null);
+                setContextDocuments(INITIAL_CONTEXT_DOCUMENTS);
               }
             }}
             placeholder="종목명 또는 티커로 검색 (예: 삼성전자, 005930)"
@@ -1443,6 +1472,15 @@ function SetupScreen({
           <div className="paper-simulation-label">
             <span>초기 상황 · 현재까지의 맥락</span>
             <small>실제 4종 자료를 OpenRouter로 분석</small>
+          </div>
+          <div className="paper-context-documents" aria-label="초기 맥락 문서 생성 상태">
+            {contextDocuments.map((document) => (
+              <article key={document.key} className={`paper-context-document ${document.status}`}>
+                {document.status === "ready" ? <CheckCircle2 size={14} /> : <LoaderCircle size={14} className="spin" />}
+                <div><strong>{document.label}</strong><small>{document.status === "ready" ? "문서 준비 완료" : document.status === "generating" ? "문서 생성 중" : "생성 대기 중"}</small></div>
+                <code>{document.file}</code>
+              </article>
+            ))}
           </div>
           {initialContextLoading && <div className="paper-context-loading"><LoaderCircle size={15} className="spin" /> 수집된 자료에서 현재 상황을 분석하고 있습니다.</div>}
           {initialContextError && <p className="paper-inline-error">{initialContextError}</p>}

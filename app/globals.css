@@ -1010,6 +1010,17 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-simulation-field { width: 100%; display: flex; flex-direction: column; gap: 8px; padding: 13px 14px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
 .paper-context-field { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid #dbeafe; border-radius: 10px; background: #f8fbff; }
 .paper-context-loading { display: flex; align-items: center; gap: 7px; min-height: 62px; color: var(--muted); font-size: 10px; }
+.paper-context-documents { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 6px; }
+.paper-context-document { min-width: 0; display: flex; align-items: center; gap: 6px; padding: 8px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; }
+.paper-context-document > svg { flex: 0 0 auto; color: #a1a1aa; }
+.paper-context-document.generating { border-color: #93c5fd; background: #eff6ff; }
+.paper-context-document.generating > svg { color: #2563eb; }
+.paper-context-document.ready { border-color: #bbf7d0; }
+.paper-context-document.ready > svg { color: #16a34a; }
+.paper-context-document div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.paper-context-document strong { color: var(--ink); font-size: 9px; }
+.paper-context-document small { color: var(--muted); font-size: 8px; }
+.paper-context-document code { overflow: hidden; margin-left: auto; color: var(--light); font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
 .paper-context-summary { display: flex; align-items: flex-start; gap: 8px; padding: 11px 12px; border: 1px solid #bfdbfe; border-radius: 8px; color: #1e3a8a; background: #eff6ff; }
 .paper-context-summary svg { flex: 0 0 auto; margin-top: 1px; color: #2563eb; }
 .paper-context-summary p { margin: 0; font-size: 10px; line-height: 1.6; }
@@ -1479,7 +1490,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
   .paper-collection-status { align-items: flex-start; flex-direction: column; }
   .paper-investment-actions { align-items: flex-start; flex-direction: column; }
   .paper-agent-grid { grid-template-columns: minmax(0,1fr); }
-  .paper-context-grid,.paper-context-points { grid-template-columns: minmax(0,1fr); }
+  .paper-context-documents,.paper-context-grid,.paper-context-points { grid-template-columns: minmax(0,1fr); }
   .paper-holdings { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
 
