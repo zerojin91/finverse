@@ -1059,6 +1059,7 @@ function SetupScreen({
   const step2Ref = useRef<HTMLElement | null>(null);
   const step3Ref = useRef<HTMLElement | null>(null);
   const step4Ref = useRef<HTMLElement | null>(null);
+  const initialContextRef = useRef<HTMLElement | null>(null);
   const previewReady = Boolean(previewCandles && previewCandles.length >= 2 && !previewError);
   const previewStepVisible = previewReady && previewDwellComplete;
   const collectionReady = Boolean(collectionSources?.every((source) => source.status === "ready"));
@@ -1240,7 +1241,7 @@ function SetupScreen({
     const timer = window.setTimeout(() => {
       const target = activeStep === 2 ? step2Ref.current
         : activeStep === 3 ? step3Ref.current
-          : step4Ref.current;
+          : initialContextRef.current ?? step4Ref.current;
       target?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 220);
     return () => window.clearTimeout(timer);
@@ -1473,7 +1474,7 @@ function SetupScreen({
             ))}
           </div>
         </div>
-        <section className="paper-context-field" aria-live="polite">
+        <section ref={initialContextRef} className="paper-context-field" aria-live="polite">
           <div className="paper-context-documents" aria-label="초기 맥락 문서 생성 상태">
             {contextDocuments.map((document) => (
               <article key={document.key} className={`paper-context-document ${document.status}`}>
