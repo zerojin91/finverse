@@ -63,6 +63,13 @@ def test_summary_points_are_limited_to_five_without_list_marker():
     assert result["summary_points"] == ["첫째임", "둘째임", "셋째임", "넷째임", "다섯째임"]
 
 
+def test_summary_points_keep_full_sentence_detail():
+    point = "최근 30거래일 종가가 하락했고 외국인 수급 변화가 함께 관측돼 단기 변동성을 계속 살필 필요 있음"
+    result = _normalize({"summary": "요약", "summary_points": [point] * 5})
+
+    assert result["summary_points"][0] == point
+
+
 def test_source_news_marks_matching_inferred_timeline_item_as_observed():
     analysis = _normalize({
         "summary": "요약",

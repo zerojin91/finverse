@@ -17,7 +17,7 @@ from .kospi_paper_trading import TradingError
 from .llm_client import LLMClient
 
 
-CONTEXT_SCHEMA_VERSION = "initial-context-v8"
+CONTEXT_SCHEMA_VERSION = "initial-context-v9"
 CONTEXT_CACHE_TTL_SECONDS = 12 * 60 * 60
 
 
@@ -151,7 +151,7 @@ def _messages(source: dict[str, Any], evidence_documents: dict[str, str]) -> lis
 반환 형식:
 {{
   "summary": "초기 상황을 설명하는 짧은 문단",
-  "summary_points": ["사람이 바로 읽을 수 있는 음슴체 1줄 요약"],
+  "summary_points": ["수치·사건·의미를 함께 담은 읽기 쉬운 음슴체 1문장 요약"],
   "market": {{"trend": "상승|하락|횡보|혼조", "assessment": "시장·가격·수급 해석", "signals": ["근거"]}},
   "economy": {{"condition": "우호적|중립|부담|혼조", "assessment": "거시 환경 해석", "signals": ["근거"]}},
   "events": {{"assessment": "최근 사건 흐름 해석", "themes": ["주요 이슈"], "signals": ["근거"]}},
@@ -174,7 +174,7 @@ def _messages(source: dict[str, Any], evidence_documents: dict[str, str]) -> lis
 }}
 
 이벤트 시퀀스는 최근 한 달 내 문서로 확인되는 실제 흐름 3~6개만 날짜순으로 반환한다.
-`summary_points`는 정확히 5개를 반환하고, 각 줄은 45자 이내의 한국어 음슴체로 쓴다. 앞에 `-` 기호는 붙이지 않는다.
+`summary_points`는 정확히 5개를 반환한다. 각 줄은 55~105자의 한국어 음슴체 1문장으로 쓰고, 시장·경제·사건·커뮤니티·향후 관찰 지점을 각각 하나씩 다룬다. 각 줄에는 문서에서 확인되는 수치·사건·영향 중 최소 두 가지를 자연스럽게 넣는다. 앞에 `-` 기호는 붙이지 않는다.
 `observed`는 문서에 직접 기록된 사건·수치이고, `inferred`는 여러 문서 근거를 묶은 해석이다.
 미래 사건이나 미래 가격은 이벤트 시퀀스에 절대 넣지 않는다.""",
         },
