@@ -52,6 +52,7 @@ if (process.env.FINVERSE_SIMULATION_TUNNEL_ENABLED === "1") {
 // 페이퍼 트레이딩 엔진. 예전에는 FinSimulation을 따로 띄워야 했다.
 const paperPython = process.env.FINVERSE_PYTHON?.trim()
   || (existsSync(resolve(root, ".venv-paper/bin/python")) ? resolve(root, ".venv-paper/bin/python")
+    : existsSync(resolve(root, ".venv/bin/python")) ? resolve(root, ".venv/bin/python")
     : process.platform === "win32" && existsSync(resolve(root, ".venv", "Scripts", "python.exe"))
       ? resolve(root, ".venv", "Scripts", "python.exe")
       : "python3");

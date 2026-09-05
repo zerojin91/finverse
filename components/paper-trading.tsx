@@ -457,7 +457,7 @@ const PHASE_META: Record<Phase, {
     todo: [
       "다음 거래일을 열면 World Agent가 외부 환경을 갱신합니다.",
       "59명의 개별 에이전트는 같은 공개 정보와 각자의 기억으로 독립 판단합니다.",
-      "중요 사건이 발생하면 시장 반응 전에 주문 티켓이 열립니다.",
+      "중요 사건이 발생하면 시장 반응 전에 내 판단을 기록하는 화면이 열립니다.",
     ],
     canOrder: false,
   },
@@ -469,7 +469,7 @@ const PHASE_META: Record<Phase, {
     guide: "중요 사건이 공개됐습니다. 사용자와 59개 에이전트가 같은 공개 정보를 보고 각각 판단한 뒤 시장이 체결됩니다.",
     todo: [
       "공개된 사건과 과거 유사 사례의 관계를 확인합니다.",
-      "주문 티켓에서 매수·매도 또는 관망을 기록하고 판단 근거를 남깁니다.",
+      "내 판단에서 매수·매도 또는 관망을 기록하고 판단 근거를 남깁니다.",
       "판단 반영 후 에이전트 주문과 시장 체결 결과가 다음 WorldState에 기록됩니다.",
     ],
     canOrder: true,
@@ -541,16 +541,17 @@ const PRICE_H = 210;
 const VOLUME_H = 42;
 
 /** 실제 이력 봉과 시뮬레이션 봉을 하나의 시계열로 합친다. */
-type CandleChartData = Pick<ScenarioGame, "history_candles" | "price_history" | "initial_reference_price" | "revealed_events" | "fills">;
+type CandleChartData = Pick<ScenarioGame, "history_candles" | "price_history" | "initial_reference_price" | "revealed_events" | "fills" | "simulation_days">;
 
-function buildBars(game: CandleChartData, limit = 46): Bar[] {
-  const bars: Bar[] = [];
+function buildBars(game: CandleChartData, preview = false): Bar[] {
+  const history: Bar[] = [];
+  const simulation: Bar[] = [];
   const seen = new Set<string>();
 
   for (const row of game.history_candles ?? []) {
     if (!row.close || seen.has(row.market_date)) continue;
     seen.add(row.market_date);
-    bars.push({
+    history.push({
       key: `real-${row.market_date}`,
       date: row.market_date,
       label: "시나리오 이전 실제 이력",
@@ -564,7 +565,7 @@ function buildBars(game: CandleChartData, limit = 46): Bar[] {
     if (!close) continue;
     // 시작 봉은 실제 이력의 마지막 날과 같은 날짜다. 두 번 그리지 않는다.
     if (point.step === 0 && seen.has(point.market_date ?? "")) continue;
-    bars.push({
+    simulation.push({
       key: `sim-${point.step}`,
       date: point.market_date ?? "",
       label: point.label,
@@ -579,11 +580,16 @@ function buildBars(game: CandleChartData, limit = 46): Bar[] {
     });
   }
 
-  return bars.slice(-limit);
+  if (preview) return [...history, ...simulation].slice(-36);
+
+  // 실제 이력은 방향을 읽을 수 있는 만큼만 남기고, 선택한 연습 기간은 오른쪽의
+  // 빈 슬롯으로 확보한다. 진행될 때마다 그 슬롯이 시뮬레이션 캔들로 채워진다.
+  const historyLimit = Math.max(8, Math.min(14, Math.ceil((game.simulation_days ?? 20) * 0.6)));
+  return [...history.slice(-historyLimit), ...simulation];
 }
 
 function CandleChart({ game, preview = false }: { game: CandleChartData; preview?: boolean }) {
-  const bars = useMemo(() => buildBars(game), [game]);
+  const bars = useMemo(() => buildBars(game, preview), [game, preview]);
   const [hovered, setHovered] = useState<number | null>(null);
 
   const layout = useMemo(() => {
@@ -595,16 +601,23 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
     const top = rawTop + pad;
     const bottom = Math.max(rawBottom - pad, 0);
     const span = top - bottom || 1;
-    const slot = (CHART_W - AXIS_W) / bars.length;
+    const simStart = bars.findIndex((bar) => !bar.real);
+    const historicalCount = simStart < 0 ? bars.length : simStart;
+    const simulatedCount = bars.length - historicalCount;
+    const futureSlots = preview ? 0 : Math.max(0, (game.simulation_days ?? 20) - simulatedCount);
+    const totalSlots = bars.length + futureSlots;
+    const slot = (CHART_W - AXIS_W) / totalSlots;
     return {
       top, bottom, span, slot,
       bodyW: Math.max(2, Math.min(13, slot * 0.6)),
       maxVolume: Math.max(...bars.map((bar) => bar.volume), 1),
-      simStart: bars.findIndex((bar) => !bar.real),
+      simStart: historicalCount,
+      futureSlots,
+      totalSlots,
       y: (value: number) => ((top - value) / span) * PRICE_H,
       cx: (index: number) => index * slot + slot / 2,
     };
-  }, [bars, game.initial_reference_price]);
+  }, [bars, game.initial_reference_price, game.simulation_days, preview]);
 
   if (!layout) {
     return (
@@ -616,7 +629,7 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
     );
   }
 
-  const { top, span, slot, bodyW, maxVolume, simStart, y, cx } = layout;
+  const { top, span, slot, bodyW, maxVolume, simStart, futureSlots, totalSlots, y, cx } = layout;
   const gridValues = [0, 0.25, 0.5, 0.75, 1].map((ratio) => top - span * ratio);
 
   // 사용자 체결은 해당 이벤트가 반응한 봉 위에 표시한다. 사전 판단은 왼쪽,
@@ -689,14 +702,28 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
           </g>
         )}
 
+        {!preview && futureSlots > 0 && Array.from({ length: futureSlots }, (_, index) => {
+          const slotIndex = bars.length + index;
+          return (
+            <rect
+              key={`future-${slotIndex}`}
+              className="paper-candle-future"
+              x={slotIndex * slot + 1}
+              y={8}
+              width={Math.max(1, slot - 2)}
+              height={PRICE_H + VOLUME_H - 3}
+            />
+          );
+        })}
+
         {bars.map((bar, index) => {
           const rising = bar.close >= bar.open;
           const flat = bar.high === bar.low && bar.open === bar.close;
           const bodyTop = y(Math.max(bar.open, bar.close));
           const bodyHeight = Math.max(1.4, Math.abs(y(bar.open) - y(bar.close)));
-          const tone = preview ? (rising ? "up" : "down") : (bar.real ? "real" : rising ? "up" : "down");
+          const tone = rising ? "up" : "down";
           return (
-            <g key={bar.key} className={`paper-candle ${tone} ${hovered === index ? "hovered" : ""}`}>
+            <g key={bar.key} className={`paper-candle ${tone} ${bar.real ? "historical" : "simulated"} ${hovered === index ? "hovered" : ""}`}>
               {bar.event && <line className="paper-candle-event" x1={cx(index)} x2={cx(index)} y1={0} y2={PRICE_H} />}
               {flat
                 // 캐시 이력은 종가만 있어 봉을 그릴 수 없다. 종가선으로 표시한다.
@@ -736,14 +763,14 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
       <div className="paper-chart-dates">
         <span>{bars[0].date}</span>
         {simStart > 0 && <span>{bars[simStart]?.date}</span>}
-        <span>{bars[bars.length - 1].date}</span>
+        <span>{preview ? bars[bars.length - 1].date : `${totalSlots - simStart}거래일 구간`}</span>
       </div>
 
       <div className="paper-chart-legend">
         {preview ? (
           <><span className="up">양봉</span><span className="down">음봉</span><span className="real">실제 일봉</span></>
         ) : (
-          <><span className="real">시나리오 이전 이력</span><span className="up">양봉</span><span className="down">음봉</span><span className="event">이벤트 공개일</span><span className="buy">내 매수</span><span className="sell">내 매도</span></>
+          <><span className="real">실제 이력</span><span className="up">상승 캔들</span><span className="down">하락 캔들</span><span className="future">앞으로의 거래일</span><span className="event">이벤트 공개일</span><span className="buy">내 매수</span><span className="sell">내 매도</span></>
         )}
       </div>
     </div>
@@ -800,8 +827,14 @@ function PsychologyStrip({ round }: { round?: AgentRound }) {
     <div className="paper-psych">
       <div className="paper-psych-title">
         <Users size={12} />
-        <span>투자자별 심리</span>
+        <div><span>오늘의 시장 참여자 반응</span><small>59개 에이전트의 독립 판단이 위 캔들을 만듭니다</small></div>
         <em>{round?.market_date ?? round?.label}</em>
+      </div>
+      <div className="paper-psych-result">
+        <span>집단 주문</span>
+        <b className="up">매수 {compactWon(round?.buy_notional ?? 0)}</b>
+        <b className="down">매도 {compactWon(round?.sell_notional ?? 0)}</b>
+        <em>수급 압력 {signedPct((round?.market_pressure ?? 0) * 100)}</em>
       </div>
       <div className="paper-psych-rows">
         {Object.entries(GROUP_LABEL).map(([key, label]) => {
@@ -2163,15 +2196,15 @@ function TradingScreen({
           <PsychologyStrip round={latestRound} />
         </section>
 
-        <section className="paper-panel paper-desk-panel" aria-label="주문">
+        <section className="paper-panel paper-desk-panel" aria-label="사용자 연습">
           <div className="paper-panel-heading">
-            <div><CircleDollarSign size={15} /><span>주문 티켓</span></div>
+            <div><CircleDollarSign size={15} /><span>오늘의 연습</span></div>
             <em>{meta.eyebrow}</em>
           </div>
 
           <div className="paper-now">
             <div className="paper-now-head">
-              <span>지금 할 일</span>
+              <span>현재 단계</span>
               <b>{meta.label}</b>
             </div>
             <ol>

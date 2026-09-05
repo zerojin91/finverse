@@ -48,6 +48,8 @@
 - MiroFish에서 독립 에이전트·기억·라운드·활성화 패턴만 차용한다. OASIS의 SNS 게시물/댓글 행동은 모의투자에 사용하지 않고, FINVERSE 전용 금융 액션(관망·매수·축소·청산·리밸런싱·헤지 및 그룹별 확장)을 사용한다. 행동 판단은 활성 에이전트별 독립 LLM 호출이며, 워커 큐는 동시 실행 수만 조절한다. 엔진은 자금·보유 수량·최대 주문량·거래 빈도·시장 영향력을 강제 검증한다.
 - 기존 보유로 시작하면 `initial_position.quantity`와 `initial_position.average_price`가 게임에 반영된다. 미실현 손익은 평단 기준으로 보여주며 시뮬레이션 수익률은 시작 시점의 현금+현재가 평가액(`initial_equity`)을 기준으로 0%에서 시작한다.
 - World Agent 모의투자 최초 안내창의 `시작하기`는 안내창만 닫지 않고 0일차에서 첫 거래일 진행 작업을 즉시 시작한다. 사용자가 진행 도중 안내를 다시 열어 확인한 경우에는 거래일을 자동으로 넘기지 않는다.
+- 게임 화면의 차트는 실제 이력을 선택 기간에 비례한 짧은 구간으로만 보이고, 선택한 10·20·60거래일 전체 폭은 미래 슬롯으로 미리 확보한다. 실제 이력도 양봉·음봉 색을 유지하되 투명도로 현재 시뮬레이션과 구분하며, 진행된 거래일만 오른쪽 슬롯을 채운다.
+- 게임 화면의 우측 패널은 주문 기능만 뜻하는 `주문 티켓`이 아니라 `오늘의 연습`이다. 평소에는 World Agent의 환경 갱신과 59명 반응을 관찰하고, 중요한 사건일에만 사용자 판단·주문·근거·확신도를 기록하게 안내한다. 에이전트 반응 로그는 전체 폭에서 캔들 형성과의 연결을 읽을 수 있게 표시한다.
 - 모의투자 2단계 `자료 수집`은 `GET /api/paper-trading/securities/:ticker/scenario-context`로 시나리오 엔진과 동일한 종목별 DB 조회를 미리 수행한다. 시장·경제·사건·커뮤니티 네 도메인의 건수·최신 시점을 표시하며, 결과는 로컬 이력 캐시에 남아 시나리오 생성 시 재사용된다. 이 단계는 OpenRouter·온톨로지·MiroFish를 실행하지 않는다.
 - 모의투자 4단계는 먼저 `GET /api/paper-trading/securities/:ticker/initial-context/documents`로 같은 실제 이력에서 종목 타깃형 `market/economy/events/community` Evidence Markdown 4종을 준비한다. 네 문서가 모두 준비된 뒤에만 `GET /api/paper-trading/securities/:ticker/initial-context`가 이 문서 묶음을 OpenRouter에 전달해 근거·의미를 함께 담은 음슴체 5줄 요약·종목 전체 현황·최근 한 달 이벤트 시퀀스·위험 요인·관찰 포인트를 생성한다. 문서와 분석 결과는 `var/market_cache/initial-context-<지문>/` 및 `initial-context-<지문>.json`에 12시간 캐시되며, 시나리오 시작 시 동일 분석을 게임에 `initial_context`로 저장한다. 이벤트 시퀀스는 문서에 있는 실제 관측 흐름만 표시하고 미래 사건·가격 예측을 섞지 않는다.
 - 이어서 `POST /api/paper-trading/securities/:ticker/agent-profiles/prepare`가 동일 `context_id` 기준으로 총 59개 개별 프로필 생성을 백그라운드 작업으로 시작한다. `GET /agent-profiles`는 UI 카드용 범주 요약을, `GET /agent-profiles/:group`은 클릭한 범주의 UI 안전 개별 프로필(관점·편향·신호·반응·위험 규칙)을 반환한다. 자금·보유·개인 기억·LLM 프롬프트는 게임 생성 전까지 서버 파일 캐시에만 둔다. 게임 생성 `POST /scenarios`는 준비된 59개 프로필이 없으면 거부한다.
@@ -112,6 +114,13 @@ scripts/run_bedrock_signal_update.sh --dry-run
 - 원인: 이전 로컬 서비스가 정상 실행 중인 상태에서 통합 실행기를 중복 실행했고, Flask 상위·하위 프로세스 일부가 5055 포트를 공유했다.
 - 조치: 3000·5440 서비스는 유지하고 5055를 점유한 PID를 모두 종료한 뒤, 프로젝트 루트에서 `.venv\\Scripts\\python.exe -u -m services.paper_trading_api`로 하나만 실행했다. 이전 API 확인 과정에서 생성된 로컬 테스트 게임 2개도 정확한 파일을 확인해 제거했다.
 - 재발 방지: 통합 실행 전 3000·5055·5440 포트 상태를 확인하고, 일부만 재시작해야 할 때는 해당 서비스를 단독 실행한다.
+
+#### 2026-09-05 — macOS 통합 실행기가 기본 Python으로 Flask를 실행
+
+- 증상: `npm run dev` 재시작 시 macOS 기본 `python3`가 선택돼 `ModuleNotFoundError: flask`가 출력됐지만, 별도로 실행한 `.venv` Flask API만 정상 동작했다.
+- 원인: 통합 실행기의 Python 탐색이 macOS `.venv/bin/python`을 후보에 넣지 않아 시스템 Python으로 폴백했다.
+- 조치: `.venv-paper/bin/python` 다음에 `.venv/bin/python`을 확인하도록 실행기를 보완했다.
+- 재발 방지: 로컬 통합 실행 후 5055 `/health`와 3000 응답을 함께 확인한다.
 
 #### 2026-09-02 — Windows 모의투자 API 재시작 시 이전 라우트 상태 유지
 
