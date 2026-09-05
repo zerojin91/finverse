@@ -2210,42 +2210,41 @@ function TradingScreen({
           <button className="paper-reset" type="button" onClick={onReset} disabled={busy}>새 시나리오</button>
           <button className="scenario-modal-close" type="button" onClick={onClose} aria-label="모의 투자 닫기"><X size={20} /></button>
         </div>
+        <div className="paper-header-dashboard" aria-label="시나리오 진행 현황">
+          <div className="paper-header-progress">
+            <PhaseStepper phase={game.phase} worldMode={worldMode} />
+            <strong>{worldMode
+              ? `${currentProgressUnits} / ${totalProgressUnits} 거래일`
+              : `${game.phase === "completed" ? game.total_events : game.current_event_index + 1} / ${game.total_events} 이벤트`}</strong>
+            <div className="paper-progress"><i style={{ width: `${busy && job ? job.progress : eventProgress}%` }} className={busy ? "busy" : ""} /></div>
+          </div>
+          <div className="paper-header-metrics">
+            <div>
+              <Wallet size={14} /><span>총자산</span>
+              <strong>{compactWon(portfolio.equity)}</strong>
+            </div>
+            <div>
+              {returnTone === "down" ? <TrendingDown size={14} /> : <TrendingUp size={14} />}<span>수익률</span>
+              <strong className={returnTone}>{signedPct(portfolio.total_return_pct)}</strong>
+            </div>
+            <div>
+              <CircleDollarSign size={14} /><span>현금</span>
+              <strong>{compactWon(portfolio.cash)}</strong>
+            </div>
+            <div>
+              <Flag size={14} /><span>보유</span>
+              <strong>{portfolio.quantity.toLocaleString("ko-KR")} <em>주</em></strong>
+            </div>
+          </div>
+          {error && <div className="paper-run-error"><AlertTriangle size={14} /> <span>{error}</span></div>}
+          {stalled && !error && (
+            <div className="paper-run-warning">
+              <AlertTriangle size={14} />
+              <span>응답이 8분 넘게 갱신되지 않았습니다. 백엔드가 재시작되었을 수 있습니다. 창을 닫았다 다시 열면 최신 상태를 불러옵니다.</span>
+            </div>
+          )}
+        </div>
       </header>
-
-      <section className="paper-run-overview" aria-label="시나리오 진행 현황">
-        <div className="paper-progress-copy">
-          <PhaseStepper phase={game.phase} worldMode={worldMode} />
-          <strong>{worldMode
-            ? `${currentProgressUnits} / ${totalProgressUnits} 거래일`
-            : `${game.phase === "completed" ? game.total_events : game.current_event_index + 1} / ${game.total_events} 이벤트`}</strong>
-        </div>
-        <div className="paper-progress"><i style={{ width: `${busy && job ? job.progress : eventProgress}%` }} className={busy ? "busy" : ""} /></div>
-        <div className="paper-metrics">
-          <div>
-            <Wallet size={16} /><span>총자산</span>
-            <strong>{compactWon(portfolio.equity)}</strong>
-          </div>
-          <div>
-            {returnTone === "down" ? <TrendingDown size={16} /> : <TrendingUp size={16} />}<span>수익률</span>
-            <strong className={returnTone}>{signedPct(portfolio.total_return_pct)}</strong>
-          </div>
-          <div>
-            <CircleDollarSign size={16} /><span>현금</span>
-            <strong>{compactWon(portfolio.cash)}</strong>
-          </div>
-          <div>
-            <Flag size={16} /><span>보유</span>
-            <strong>{portfolio.quantity.toLocaleString("ko-KR")} <em>주</em></strong>
-          </div>
-        </div>
-        {error && <div className="paper-run-error"><AlertTriangle size={14} /> <span>{error}</span></div>}
-        {stalled && !error && (
-          <div className="paper-run-warning">
-            <AlertTriangle size={14} />
-            <span>응답이 8분 넘게 갱신되지 않았습니다. 백엔드가 재시작되었을 수 있습니다. 창을 닫았다 다시 열면 최신 상태를 불러옵니다.</span>
-          </div>
-        )}
-      </section>
 
       <div className="paper-run-grid">
         <section className="paper-panel paper-chart-panel" aria-label="가격 차트">
