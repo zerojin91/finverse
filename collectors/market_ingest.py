@@ -666,7 +666,8 @@ MERGE_BATCH = 50_000
 MERGE_INTERVAL_SECONDS = 60
 
 
-def merge_batched(stream: Iterable[dict], *, mode: str, state: dict) -> dict[str, int]:
+def merge_batched(stream: Iterable[dict], *, mode: str, state: dict,
+                  materialize: bool = True) -> dict[str, int]:
     totals = {"inserted": 0, "changed": 0, "unchanged": 0}
     batch: list[dict] = []
     last_flush = time.monotonic()
@@ -677,7 +678,7 @@ def merge_batched(stream: Iterable[dict], *, mode: str, state: dict) -> dict[str
         if not batch and not final:
             return
         summary = STORE.merge(batch, collector="market_ingest", mode=mode,
-                              log_run=final, materialize=final)
+                              log_run=final, materialize=final and materialize)
         for key in totals:
             totals[key] += summary.get(key, 0)
         batch.clear()
@@ -695,7 +696,8 @@ def merge_batched(stream: Iterable[dict], *, mode: str, state: dict) -> dict[str
 
 
 def collect(mode: str, sources: list[str], start: date, end: date, *,
-            with_flows: bool, flow_universe: int, resume: bool) -> int:
+            with_flows: bool, flow_universe: int, resume: bool,
+            materialize: bool = True) -> int:
     state = read_state() if resume else {}
     report: dict[str, Any] = {"mode": mode, "sources": sources,
                               "start": start.isoformat(), "end": end.isoformat()}
@@ -714,7 +716,8 @@ def collect(mode: str, sources: list[str], start: date, end: date, *,
                 stream = naver_stream(start, end, state, report,
                                       with_flows=with_flows,
                                       flow_universe=flow_universe)
-            summary = merge_batched(stream, mode=mode, state=state)
+            summary = merge_batched(stream, mode=mode, state=state,
+                                    materialize=materialize)
             for key in totals:
                 totals[key] += summary.get(key, 0)
         except AuthError as exc:
@@ -750,6 +753,11 @@ def main() -> int:
                            help="how many tickers to collect investor flows for")
         child.add_argument("--no-flows", action="store_true")
         child.add_argument("--no-resume", action="store_true")
+        child.add_argument("--no-materialize", action="store_true",
+                           help="skip rewriting the portable JSONL exports. The "
+                                "loader reads index.sqlite3, so a daily update "
+                                "does not need them, and rewriting 38 GB to add "
+                                "a few thousand rows costs about five hours")
     args = parser.parse_args()
 
     sources = ["krx", "naver"] if args.source == "all" else [args.source]
@@ -765,7 +773,8 @@ def main() -> int:
     resume = not args.no_resume and args.command == "backfill"
     return collect(args.command, sources, start, args.end,
                    with_flows=not args.no_flows,
-                   flow_universe=args.flow_universe, resume=resume)
+                   flow_universe=args.flow_universe, resume=resume,
+                   materialize=not args.no_materialize)
 
 
 if __name__ == "__main__":
