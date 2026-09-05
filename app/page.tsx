@@ -2780,11 +2780,103 @@ export default function Home() {
                 </aside>
                 <div className="market-content">
               <header className="page-heading">
-                <div><span>MARKET INSIGHT</span><h1>오늘의 시장을 이해하고, 다음 움직임을 미리 살펴보세요.</h1></div>
+                <div><span>MARKET INSIGHT</span><h1>시장의 주요 지표는 다음과 같이 움직였습니다.</h1></div>
                 <div className="market-stamp"><CalendarDays size={15} />{kospiAsOfLabel} 최신 기준</div>
               </header>
 
-              <section className="market-dashboard">
+              <section className="market-indicators" aria-label="시장 주요 지표">
+                <div className="indicator-grid">
+                  {marketOverview.map((item) => {
+                    const isKospi = item.key === "KOSPI";
+                    const live = intradayIndices.find((index) => index.name === item.name);
+                    const latest = live?.points.at(-1);
+                    const values = isKospi ? undefined : (live?.points.map((point) => point.close) ?? item.points);
+                    const rate = isKospi ? kospiRate : latest?.changePct;
+                    const previousClose = !isKospi && latest && typeof rate === "number" && rate !== -100 ? latest.close / (1 + rate / 100) : latest?.close;
+                    const change = isKospi ? kospiChange : (latest && previousClose !== undefined ? latest.close - previousClose : undefined);
+                    const tone = rate === undefined ? item.tone : rate >= 0 ? "up" : "down";
+                    return (
+                      <article className="indicator-tile" data-tone={tone} key={item.key}>
+                        <header>
+                          <h3>{item.name}</h3>
+                          <strong>{isKospi ? formatIndexValue(kospiValue) : latest ? formatIndexValue(latest.close) : item.value}</strong>
+                        </header>
+                        <div className="indicator-change">
+                          {change === undefined || rate === undefined ? (
+                            <><b className={tone}>{item.change}</b><span>{item.rate}</span></>
+                          ) : (
+                            <><b className={tone}>{formatSignedIndex(change)}</b><span>{Math.abs(rate).toFixed(2)}%</span></>
+                          )}
+                        </div>
+                        <div className="indicator-spark"><MarketLineChart values={isKospi ? actualPath.slice(-20) : values ?? []} name={`${item.name} 당일`} /></div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+
+              <div className="page-heading stock-condition-heading">
+                <div><h1><span className="stock-heading-symbol">{selectedSymbol.name}</span>, 당신이 선택한 조건에서 어떻게 움직일까요?</h1></div>
+              </div>
+              <section className="scenario-section">
+                <div className="scenario-grid">
+                  {scenarios.map((scenario, index) => (
+                    <article key={scenario.id} className={`scenario-card ${scenario.tone} ${selectedScenario.id === scenario.id ? "active" : ""}`} onMouseDown={(event) => event.preventDefault()} onClick={() => selectScenario(scenario)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") selectScenario(scenario); }} role="button" tabIndex={0} aria-pressed={selectedScenario.id === scenario.id}>
+                      <div className="scenario-card-head">
+                        <span className="scenario-card-index">{String(index + 1).padStart(2, "0")}</span>
+                        <span className="scenario-card-meta"><i>{scenario.duration}</i><em className={scenario.tone}>{scenario.forecast.replace(/^KOSPI\s*/, "")}</em></span>
+                      </div>
+                      <div className="scenario-card-body">
+                        <strong>{scenario.title}</strong>
+                        <small>{scenario.tags.join(" · ")}</small>
+                      </div>
+                      <div className={`scenario-card-action ${scenario.tone}`}>
+                        <button type="button" onClick={(event) => { event.stopPropagation(); openScenarioDetail(scenario); }}>시나리오 상세</button>
+                      </div>
+                    </article>
+                  ))}
+                  <article className="custom-scenario-card">
+                    <button type="button" onClick={() => setPaperTradingOpen(true)}>
+                      <Plus size={26} />
+                      <span>내가 생각한<br />시나리오로 보기</span>
+                    </button>
+                  </article>
+                </div>
+
+                <section className="panel chart-panel conditional-chart">
+                  <header className="chart-title-row">
+                    <div><h2>시나리오 - <span>{selectedSymbol.name} {selectedScenario.title}</span></h2></div>
+                    <div className={`chart-meta ${selectedScenario.tone}`}><span>{selectedScenario.duration}</span><strong>{selectedScenario.forecast.replace(/^KOSPI\s*/, "")}</strong></div>
+                  </header>
+                  <div className="chart-content">
+                    <div className="chart-wrap"><ForecastChart scenario={selectedScenario} marketData={kospiData} liveSeries={liveKospi} /></div>
+                    <aside className="event-rail" aria-label="발생 가능 이벤트">
+                      <header><h2>발생 가능 이벤트</h2><span>{selectedScenario.duration}</span></header>
+                      <div className="event-timeline">
+                        {selectedScenario.events.map((event) => (
+                          <article key={event.title}>
+                            <div className="event-week">{event.week}</div>
+                            <div className="event-dot" />
+                            <div className="event-copy">
+                              <span>{event.category}</span>
+                              <h3>{event.title}</h3>
+                              <p>{event.body}</p>
+                              <div className="event-impact">
+                                <span>예상 영향</span>
+                                <strong className={event.impact.startsWith("+") ? "up" : "down"}>{event.impact}</strong>
+                              </div>
+                              <button type="button" aria-label={`${event.title} 시나리오에 포함됨`}>
+                                <span>시나리오에 포함됨</span>
+                                <Bookmark size={14} />
+                              </button>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    </aside>
+                  </div>
+                </section>
+
                 <section className="panel connection-panel market-signal-panel">
                   <div className="panel-title">
                     <div><span>MARKET PULSE</span><h2>시장 연결</h2></div>
@@ -2814,54 +2906,6 @@ export default function Home() {
                       );
                     })}
                   </div>
-                </section>
-
-                <section className="panel chart-panel">
-                  <div className="market-overview">
-                    <article className="market-overview-primary kospi-classic-primary">
-                      <div className="kospi-head">
-                        <div>
-                          <div className="kospi-title-line"><span>코스피</span></div>
-                          <div className="kospi-value-line"><b>{formatIndexValue(kospiValue)}</b><strong className={kospiTone}>{formatSignedIndex(kospiChange)} ({Math.abs(kospiRate).toFixed(2)}%)</strong></div>
-                        </div>
-                        <div className="scenario-preview-meta">
-                          <span>선택 시나리오</span>
-                          <button className="scenario-preview-card" type="button" onClick={() => openScenarioDetail(selectedScenario)} aria-label={`${selectedScenario.title} 상세 보기`}>
-                            <strong>{selectedScenario.title}</strong>
-                            <b className={selectedScenario.tone}>{selectedScenario.forecast}</b>
-                          </button>
-                        </div>
-                      </div>
-                      <ForecastChart scenario={selectedScenario} marketData={kospiData} liveSeries={liveKospi} />
-                    </article>
-                    <div className="market-overview-side">
-                      {marketOverview.slice(1).map((item) => {
-                        const live = intradayIndices.find((index) => index.name === item.name);
-                        const latest = live?.points.at(-1);
-                        const values = live?.points.map((point) => point.close) ?? item.points;
-                        const rate = latest?.changePct;
-                        const previousClose = latest && typeof rate === "number" && rate !== -100 ? latest.close / (1 + rate / 100) : latest?.close;
-                        const change = latest && previousClose !== undefined ? latest.close - previousClose : undefined;
-                        const tone = rate === undefined ? item.tone : rate >= 0 ? "up" : "down";
-                        return (
-                          <article className="market-overview-mini" key={item.key}>
-                            <MarketLineChart values={values} name={`${item.name} 당일`} />
-                            <div>
-                              <header><span>{item.name}</span></header>
-                              <div className="market-overview-mini-value">
-                                <b>{latest ? formatIndexValue(latest.close) : item.value}</b>
-                                <span className={tone}>
-                                  {change === undefined || rate === undefined
-                                    ? `${item.change} (${item.rate})`
-                                    : `${formatSignedIndex(change)} (${Math.abs(rate).toFixed(2)}%)`}
-                                </span>
-                              </div>
-                            </div>
-                          </article>
-                        );
-                      })}
-                    </div>
-                  </div>
                   <div className={`ai-summary ${marketBriefExpanded ? "expanded" : ""}`}>
                     <Sparkles size={17} />
                     <button className="ai-summary-copy" type="button" aria-expanded={marketBriefExpanded} aria-label={`AI 요약 전문 ${marketBriefExpanded ? "접기" : "보기"}`} onClick={() => setMarketBriefExpanded((expanded) => !expanded)}>
@@ -2871,57 +2915,6 @@ export default function Home() {
                   </div>
                 </section>
 
-                <aside className="panel event-panel">
-                  <div className="panel-title"><div><span>가상 시뮬레이션</span><h2>발생 가능 이벤트</h2></div><span className="scenario-period">{selectedScenario.duration}</span></div>
-                  <div className="event-timeline">
-                    {selectedScenario.events.map((event) => (
-                      <article key={event.title}>
-                        <div className="event-week">{event.week}</div>
-                        <div className="event-dot" />
-                        <div className="event-copy">
-                          <span>{event.category}</span>
-                          <h3>{event.title}</h3>
-                          <p>{event.body}</p>
-                          <div className="event-impact">
-                            <span>예상 영향</span>
-                            <strong className={event.impact.startsWith("+") ? "up" : "down"}>{event.impact}</strong>
-                          </div>
-                          <button type="button" aria-label={`${event.title} 시나리오에 포함됨`}>
-                            <span>시나리오에 포함됨</span>
-                            <Bookmark size={14} />
-                          </button>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                </aside>
-              </section>
-
-              <section className="scenario-section">
-                <div className="scenario-heading"><div><span>SCENARIO LIBRARY</span><h2>시나리오별 KOSPI 경로를 비교하세요</h2><p>준비된 시장 환경을 선택하면 발생 가능 이벤트와 조건부 예상 경로가 열립니다.</p></div><span><CircleDollarSign size={15} />가상 시뮬레이션</span></div>
-                <div className="scenario-grid">
-                  {scenarios.map((scenario, index) => (
-                    <article key={scenario.id} className={`scenario-card ${scenario.tone} ${selectedScenario.id === scenario.id ? "active" : ""}`} onMouseDown={(event) => event.preventDefault()} onClick={() => selectScenario(scenario)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") selectScenario(scenario); }} role="button" tabIndex={0} aria-pressed={selectedScenario.id === scenario.id}>
-                      <div className="scenario-card-head">
-                        <span className="scenario-card-index">{String(index + 1).padStart(2, "0")}</span>
-                        <span className="scenario-card-meta"><i>{scenario.duration}</i><em className={scenario.tone}>{scenario.forecast.replace(/^KOSPI\s*/, "")}</em></span>
-                      </div>
-                      <div className="scenario-card-body">
-                        <strong>{scenario.title}</strong>
-                        <small>{scenario.tags.join(" · ")}</small>
-                      </div>
-                      <div className={`scenario-card-action ${scenario.tone}`}>
-                        <button type="button" onClick={(event) => { event.stopPropagation(); openScenarioDetail(scenario); }}>시나리오 상세</button>
-                      </div>
-                    </article>
-                  ))}
-                  <article className="custom-scenario-card">
-                    <button type="button" onClick={() => setPaperTradingOpen(true)}>
-                      <Plus size={26} />
-                      <span>내가 생각한<br />시나리오로 보기</span>
-                    </button>
-                  </article>
-                </div>
                 <span className="visually-hidden">SELECTED SCENARIO · 시나리오 전제 · 예상 전개</span>
 
                 {false && <section className="scenario-detail" id="scenario-detail" aria-live="polite" aria-label="선택한 시나리오 상세 내용">
