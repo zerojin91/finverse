@@ -1437,9 +1437,9 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-assessment p { margin: 0; color: #14532d; font-size: 10px; line-height: 1.65; white-space: pre-wrap; }
 .paper-advance-row { display: flex; gap: 8px; margin: 0 14px 14px; }
 .paper-advance-row .paper-advance { flex: 1; margin: 0; }
-.paper-advance-fast { min-height: 50px; flex: 1.15; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 13px; border: 1px solid #c7d2fe; border-radius: 10px; color: #3730a3; background: #f5f7ff; font-family: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
+.paper-advance-fast { min-height: 50px; flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 13px; border: 1px solid #c7d2fe; border-radius: 10px; color: #3730a3; background: #f5f7ff; font-family: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
 .paper-advance-fast:hover { border-color: #818cf8; background: #eef2ff; }
-.paper-advance-day { min-height: 50px; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: #fff; font-family: inherit; font-size: 12px; font-weight: 700; white-space: nowrap; cursor: pointer; }
+.paper-advance-day { min-height: 50px; flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 14px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: #fff; font-family: inherit; font-size: 12px; font-weight: 700; white-space: nowrap; cursor: pointer; }
 .paper-advance-day:hover { border-color: #a1a1aa; background: #fafafa; }
 .paper-advance { min-height: 50px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; margin: 0 14px 14px; border: 0; border-radius: 10px; color: #fff; background: var(--ink); font-family: inherit; font-size: 13px; font-weight: 750; cursor: pointer; }
 .paper-advance:disabled { cursor: wait; opacity: .55; }
