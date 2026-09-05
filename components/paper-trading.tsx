@@ -1143,6 +1143,8 @@ function SetupScreen({
   const step2Ref = useRef<HTMLElement | null>(null);
   const step3Ref = useRef<HTMLElement | null>(null);
   const step4Ref = useRef<HTMLElement | null>(null);
+  const agentStepRef = useRef<HTMLDivElement | null>(null);
+  const readyStepRef = useRef<HTMLElement | null>(null);
   const agentProfileRequestedContextRef = useRef<string | null>(null);
   const previewReady = Boolean(previewCandles && previewCandles.length >= 2 && !previewError);
   const previewStepVisible = previewReady && previewDwellComplete;
@@ -1341,6 +1343,13 @@ function SetupScreen({
     const timer = window.setTimeout(() => setSimulationSetupStage(3), remaining);
     return () => window.clearTimeout(timer);
   }, [investmentConfirmed, agentProfilesReady, agentProfileStartedAt]);
+
+  useEffect(() => {
+    if (simulationSetupStage < 2) return;
+    const target = simulationSetupStage >= 3 ? readyStepRef.current : agentStepRef.current;
+    const timer = window.setTimeout(() => target?.scrollIntoView({ behavior: "smooth", block: "start" }), 220);
+    return () => window.clearTimeout(timer);
+  }, [simulationSetupStage]);
 
   useEffect(() => {
     if (!pickedTicker || !initialContext || !contextDwellComplete || agentProfileRequestedContextRef.current === initialContext.context_id) return;
@@ -1737,7 +1746,7 @@ function SetupScreen({
             </>
           )}
         </section>
-        {simulationSetupStage >= 2 && <div className="paper-agent-field paper-setup-reveal">
+        {simulationSetupStage >= 2 && <div ref={agentStepRef} className="paper-agent-field paper-setup-reveal">
           <div className="paper-simulation-label">
             <span>시장 참여 에이전트</span>
             <small>{agentProfilesReady ? "총 59명 · 개별 프로필 준비 완료" : agentProfileJob ? `개별 프로필 생성 ${agentProfileJob.progress}%` : "초기 맥락을 바탕으로 개별 프로필 준비 중"}</small>
@@ -1783,7 +1792,7 @@ function SetupScreen({
       )}
 
       {investmentConfirmed && simulationSetupStage >= 3 && (
-        <section className="paper-setup-block paper-setup-reveal">
+        <section ref={readyStepRef} className="paper-setup-block paper-setup-reveal">
           <div className="paper-setup-heading"><span>05 · 시작 준비</span><h3>연습 기간을 정하고 모의 투자를 시작하세요</h3></div>
           <section className="paper-ready-block">
             <div className="paper-ready-duration">
