@@ -28,11 +28,14 @@ def collector_args(command: str = "backfill", **overrides: object) -> argparse.N
         "channel_count": 30,
         "channel_id": None,
         "channel_file": None,
+        "company_file": None,
         "restart": False,
         "query": "국내주식",
         "candidate_pages": 1,
         "quota_budget": 100,
         "quick_pages": 0,
+        "search_pages_per_company": 1,
+        "search_order": "date",
         "video_filter": "all",
         "refresh_cycle_days": 28,
         "timeout": 1,
@@ -47,15 +50,20 @@ def isolated_collector(root: Path):
     work = output / "work"
     store = IndexedJsonlStore(output)
     state = youtube.WorkState(store.index_path)
+    company_state = youtube.WorkState(store.index_path, "youtube_company")
     names = {
         "ROOT": root,
         "OUTPUT_ROOT": output,
         "WORK_ROOT": work,
         "MANIFEST_PATH": output / "channel_manifest.json",
         "CANDIDATE_PATH": output / "channel_candidates.json",
+        "CHANNEL_THREAD_PAGE_PATH": work / "thread_page.json",
+        "COMPANY_THREAD_PAGE_PATH": work / "company_thread_page.json",
         "THREAD_PAGE_PATH": work / "thread_page.json",
         "SALT_FINGERPRINT_PATH": work / "salt_fingerprint.json",
         "STORE": store,
+        "CHANNEL_STATE": state,
+        "COMPANY_STATE": company_state,
         "STATE": state,
     }
     previous = {name: getattr(youtube, name) for name in names}
@@ -220,6 +228,39 @@ class EndToEndClient:
         if resource == "playlistItems":
             return {
                 "items": [UploadClient.video("video000001", "2025-01-01T00:00:00Z")]
+            }
+        if resource == "commentThreads":
+            thread = CommentClient.thread()
+            thread["snippet"]["totalReplyCount"] = 0
+            return {"items": [thread]}
+        raise AssertionError(resource)
+
+
+class CompanySearchClient:
+    queries: list[str] = []
+
+    def __init__(self, api_key: str, max_calls: int, timeout: int):
+        self.api_key = api_key
+        self.max_calls = max_calls
+        self.timeout = timeout
+        self.calls = 0
+
+    def get(self, resource: str, params: dict[str, object]) -> dict[str, object]:
+        self.calls += 1
+        if resource == "search":
+            self.queries.append(str(params["q"]))
+            return {
+                "items": [
+                    {
+                        "id": {"videoId": "video000001"},
+                        "snippet": {
+                            "channelId": channel_id(9),
+                            "channelTitle": "stock channel",
+                            "title": "삼성전자와 SK하이닉스 전망",
+                            "publishedAt": "2025-01-01T00:00:00Z",
+                        },
+                    }
+                ]
             }
         if resource == "commentThreads":
             thread = CommentClient.thread()
@@ -824,6 +865,63 @@ class YouTubeCollectorTest(unittest.TestCase):
                 1,
                 len(list(store.iter_latest(record_type="youtube_comment"))),
             )
+
+    def test_company_search_tags_duplicate_video_and_comment_once(self) -> None:
+        CompanySearchClient.queries = []
+        with tempfile.TemporaryDirectory() as directory, isolated_collector(
+            Path(directory)
+        ) as (store, channel_state):
+            channel_state.save_operation({"sentinel": "channel-checkpoint"})
+            company_file = Path(directory) / "companies.json"
+            company_file.write_text(
+                json.dumps(
+                    {
+                        "companies": [
+                            {
+                                "company_name": "삼성전자",
+                                "stock_code": "005930",
+                                "search_query": "삼성전자 주식",
+                            },
+                            {
+                                "company_name": "SK하이닉스",
+                                "stock_code": "000660",
+                                "search_query": "SK하이닉스 주식",
+                            },
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            args = collector_args(company_file=company_file)
+            with (
+                patch.dict(
+                    os.environ,
+                    {
+                        "YOUTUBE_API_KEY": "test-key",
+                        "YOUTUBE_ID_HASH_SALT": "s" * 32,
+                    },
+                ),
+                patch.object(youtube, "YouTubeClient", CompanySearchClient),
+                redirect_stdout(io.StringIO()),
+            ):
+                exit_code = youtube.collect(args)
+
+            video = store.get_latest("youtube:video:video000001")
+            comments = list(
+                store.iter_latest(record_type="youtube_comment", is_deleted=False)
+            )
+            channel_operation = channel_state.operation()
+
+        self.assertEqual(0, exit_code)
+        self.assertEqual("channel-checkpoint", channel_operation["sentinel"])
+        self.assertEqual(["삼성전자 주식", "SK하이닉스 주식"], CompanySearchClient.queries)
+        self.assertEqual(["SK하이닉스", "삼성전자"], video["search_tags"])
+        self.assertEqual(1, len(comments))
+        self.assertEqual(video["search_tags"], comments[0]["search_tags"])
+        self.assertEqual(
+            ["000660", "005930"],
+            [match["stock_code"] for match in comments[0]["search_matches"]],
+        )
 
     def test_materialize_failure_keeps_previous_atomic_generation(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

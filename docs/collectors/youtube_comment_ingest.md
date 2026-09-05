@@ -56,13 +56,54 @@ cp config/youtube_channels.example.json config/youtube_channels.json
 vi config/youtube_channels.json
 ```
 
+## 회사명 검색으로 영상과 댓글 수집
+
+채널 업로드 대신 회사별 YouTube 검색 결과를 수집하려면 `--company-file`을 사용한다. 기본 설정인 `config/youtube_companies.json`에는 삼성전자, SK하이닉스, 현대차, 삼성전기, LG에너지솔루션, 삼성바이오로직스, KB금융, 삼성물산, 삼성전자우, SK스퀘어의 회사명·종목코드·검색어가 들어 있다.
+
+```json
+{
+  "companies": [
+    {
+      "company_name": "삼성전자",
+      "stock_code": "005930",
+      "search_query": "삼성전자 주식"
+    }
+  ]
+}
+```
+
+```bash
+./scripts/youtube_comment_ingest.sh backfill \
+  --company-file config/youtube_companies.json \
+  --start 2025-01-01 \
+  --search-pages-per-company 5 \
+  --search-order date \
+  --quota-budget 4000
+```
+
+`search.list` 한 페이지는 회사당 최대 50개 영상을 반환한다. `--search-pages-per-company`는 회사당 1~10페이지이며 기본값은 1이다. `--search-order`는 `date`, `relevance`, `viewCount` 중 하나다. 날짜 범위는 기존 `--start`, `--end`를 그대로 사용한다.
+
+검색된 영상에는 회사명 문자열 목록인 `search_tags`와 회사명·종목코드·실제 검색어의 대응표인 `search_matches`를 저장한다. 같은 영상이 여러 회사 검색에 나오면 영상과 댓글은 한 번만 저장하고 태그만 합친다.
+
+```json
+{
+  "search_tags": ["SK하이닉스", "삼성전자"],
+  "search_matches": [
+    {"company_name":"SK하이닉스","stock_code":"000660","search_query":"SK하이닉스 주식"},
+    {"company_name":"삼성전자","stock_code":"005930","search_query":"삼성전자 주식"}
+  ]
+}
+```
+
+채널 수집과 회사 검색 수집은 같은 JSONL과 중복 제거 인덱스를 사용하지만 체크포인트와 댓글 큐는 분리된다. 따라서 긴 채널 backfill을 중단하지 않고 회사 검색 update를 별도로 실행할 수 있다.
+
 ## 사용하는 API와 환경변수
 
 Google Cloud 프로젝트에서 **YouTube Data API v3**를 활성화한 API 키가 필요하다.
 
 | API | 용도 |
 | --- | --- |
-| `search.list` | 최초 채널 후보 생성 |
+| `search.list` | 최초 채널 후보 생성, 회사명·종목 검색으로 영상 발견 |
 | `channels.list` | 채널 통계와 업로드 플레이리스트 조회 |
 | `playlistItems.list` | 공개 업로드 영상 전체 페이지 순회 |
 | `videos.list` | 제목·설명·태그를 조회해 반도체 영상 여부 판정 |
@@ -163,6 +204,17 @@ cd /home/ubuntu/finverse
 ./scripts/youtube_comment_ingest.sh update --quick-pages 2
 ```
 
+회사별 최신 검색 영상과 댓글은 다음처럼 갱신한다.
+
+```bash
+./scripts/youtube_comment_ingest.sh update \
+  --company-file config/youtube_companies.json \
+  --search-pages-per-company 1 \
+  --search-order date
+```
+
+회사 검색은 검색 페이지마다 쿼터 100단위를 사용하므로 기본 10개 회사의 1페이지 갱신만으로 약 1,000단위를 사용한다. backfill 페이지 수를 늘릴 때는 댓글 수집에 남길 쿼터를 고려한다.
+
 YouTube 댓글 API에는 `updated_since` 필터가 없다. 최신 최상위 댓글은 매 실행 먼저 반영하지만, 오래된 스레드의 새 답글·수정·삭제는 해당 영상의 전체 스캔 때 확인된다. 매일 모든 과거 변경을 즉시 반영해야 한다면 30개 채널 전체를 매일 완주할 만큼의 쿼터가 필요하다.
 
 ## 중복 방지, 변경 이력, 삭제 안전성
@@ -194,6 +246,7 @@ data/youtube_comments/
 ├── channel_manifest.json
 ├── index.sqlite3
 └── work/
+    ├── company_thread_page.json
     ├── thread_page.json
     └── salt_fingerprint.json
 ```
@@ -209,6 +262,7 @@ data/youtube_comments/
 | `channel_manifest.json` | 현재 고정 채널 목록과 선정 방식 |
 | `index.sqlite3` | 대용량 중복 제거와 체크포인트용 내부 디스크 인덱스 |
 | `work/thread_page.json` | 답글 중단 재개에 필요한 현재 댓글 페이지 한 장 |
+| `work/company_thread_page.json` | 회사 검색 댓글 작업의 별도 중단 재개 페이지 |
 
 `index.sqlite3`는 PostgreSQL을 대신하는 업무 데이터 출력이 아니라 2GB 서버에서도 전체 JSONL을 메모리에 올리지 않기 위한 내부 인덱스다. 각 실행 종료 시 SQLite cursor로 JSONL 5종을 한 세대 디렉터리에 스트리밍한 뒤 하나의 심볼릭 링크를 교체해 같은 스냅샷으로 공개한다. 다른 시스템으로 전달할 기본 형식은 JSONL이다.
 
@@ -216,6 +270,16 @@ data/youtube_comments/
 
 ```json
 {"record_id":"youtube:video:VIDEO_ID","record_type":"youtube_video","video_id":"VIDEO_ID","channel_id":"UC...","title":"HBM 시장 전망","video_filter":"semiconductor","video_filter_terms":["hbm"],"published_at":"2026-08-01T00:00:00+00:00","record_hash":"..."}
+```
+
+회사 검색으로 발견된 영상과 댓글에는 같은 `search_tags`, `search_matches`가 추가된다. PostgreSQL 적재 후에는 다음처럼 회사별 댓글을 확인할 수 있다.
+
+```sql
+SELECT published_at, video_title, comment_text, search_tags
+FROM psychology.youtube_comment
+WHERE search_tags ? '삼성전자'
+ORDER BY published_at DESC
+LIMIT 100;
 ```
 
 ```json

@@ -320,12 +320,14 @@ SELECT
     c.collected_at,
     c.record_id,
     v.payload->>'title'                                 AS video_title,
-    v.payload->'video_filter_terms'                     AS video_filter_terms
+    v.payload->'video_filter_terms'                     AS video_filter_terms,
+    v.payload->'search_tags'                            AS search_tags,
+    v.payload->'search_matches'                         AS search_matches
 FROM lake.records AS c
 JOIN lake.records AS v
   ON v.record_type = 'youtube_video'
  AND v.payload->>'video_id' = c.payload->>'video_id'
- AND v.payload->>'video_filter' = 'semiconductor'
+ AND (v.payload->>'video_filter' = 'semiconductor' OR v.payload ? 'search_tags')
  AND coalesce(nullif(v.payload->>'is_deleted', '')::boolean, false) = false
 WHERE c.record_type = 'youtube_comment'
   AND coalesce(nullif(c.payload->>'is_deleted', '')::boolean, false) = false

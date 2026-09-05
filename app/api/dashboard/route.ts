@@ -257,7 +257,7 @@ export async function GET() {
               from lake.records as v
               where v.record_type = 'youtube_video'
                 and v.payload->>'video_id' = c.payload->>'video_id'
-                and v.payload->>'video_filter' = 'semiconductor'
+                and (v.payload->>'video_filter' = 'semiconductor' or v.payload ? 'search_tags')
                 and coalesce(nullif(v.payload->>'is_deleted', '')::boolean, false) = false
             )
           order by c.collected_at desc nulls last
