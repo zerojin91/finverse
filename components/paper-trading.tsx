@@ -1634,8 +1634,8 @@ function SetupScreen({
         <section className="paper-setup-block paper-setup-reveal">
           <div className="paper-setup-heading"><span>05 · 시작 준비</span><h3>연습 기간을 정하고 모의 투자를 시작하세요</h3></div>
           <section className="paper-ready-block">
-            <div className="paper-simulation-field">
-              <div className="paper-simulation-label"><span>연습 기간</span><small>거래일 기준</small></div>
+            <div className="paper-ready-duration">
+              <div className="paper-ready-duration-head"><strong>연습 기간</strong><small>거래일 기준</small></div>
               <div className="paper-duration-options">
                 {DURATION_OPTIONS.map((option) => (
                   <button key={option.days} type="button" className={simulationDays === option.days ? "active" : ""} aria-pressed={simulationDays === option.days} onClick={() => setSimulationDays(option.days)}>
@@ -1644,7 +1644,7 @@ function SetupScreen({
                 ))}
               </div>
             </div>
-            <div className="paper-hint paper-setup-reveal">
+            <div className="paper-ready-hint">
               <CalendarClock size={13} />
               초기 맥락과 실제 자료를 바탕으로 시장 참여자와 사건을 구성합니다. 거래일 하나를 넘기는 데 15~25초 정도 걸립니다.
             </div>
