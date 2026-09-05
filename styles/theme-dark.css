@@ -1,0 +1,79 @@
+/* FINVERSE dark scheme.
+   NOTE (intentional addition): the shipped product runs light-only; app/globals.css hardcodes light
+   surfaces. This layer remaps the app palette variables and the most common hardcoded surfaces so the
+   same class vocabulary renders in dark. Source .dark shadcn tokens are in tokens/colors.css. */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --ink: #f4f4f5;
+  --text: #d4d4d8;
+  --muted: #a1a1aa;
+  --light: #71717a;
+  --line: #27272a;
+  --soft: #1c1c1f;
+  --ui-muted: #232326;
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+}
+[data-theme="dark"] body,
+[data-theme="dark"] .finverse-app { background: #101012; color: var(--text); }
+[data-theme="dark"] .sidebar,
+[data-theme="dark"] .mobile-header,
+[data-theme="dark"] .mobile-tabs { background: #141416; }
+[data-theme="dark"] .panel,
+[data-theme="dark"] .scenario-section,
+[data-theme="dark"] .scenario-card,
+[data-theme="dark"] .market-stamp,
+[data-theme="dark"] .twin-scenario-card,
+[data-theme="dark"] .market-overview-mini,
+[data-theme="dark"] .scenario-milestone,
+[data-theme="dark"] .scenario-narrative-card,
+[data-theme="dark"] .ai-summary,
+[data-theme="dark"] .market-event,
+[data-theme="dark"] .scenario-preview-card,
+[data-theme="dark"] .scenario-modal,
+[data-theme="dark"] .market-signal-modal,
+[data-theme="dark"] .event-copy > button,
+[data-theme="dark"] .scenario-card-detail-button,
+[data-theme="dark"] .builder-period-options button,
+[data-theme="dark"] .builder-group button,
+[data-theme="dark"] .scenario-prompt { background: #18181b; border-color: var(--line); color: inherit; }
+[data-theme="dark"] .market-overview { background: #151518; }
+[data-theme="dark"] .signal-group,
+[data-theme="dark"] .event-impact,
+[data-theme="dark"] .scenario-detail,
+[data-theme="dark"] .scenario-detail-lead,
+[data-theme="dark"] .builder-period-row { background: #1c1c1f; border-color: var(--line); }
+[data-theme="dark"] .event-dot { background: #18181b; box-shadow: 0 0 0 3px #18181b; }
+[data-theme="dark"] .side-tabs button.active,
+[data-theme="dark"] .side-tabs button:hover { background: #232326; }
+[data-theme="dark"] .brand-mark { background: #f4f4f5; color: #111113; }
+[data-theme="dark"] .custom-scenario-card { background: #f4f4f5; color: #111113; border-color: #f4f4f5; }
+[data-theme="dark"] .custom-scenario-card p { color: #52525b; }
+[data-theme="dark"] .builder-period-options button.active,
+[data-theme="dark"] .builder-group button.active,
+[data-theme="dark"] .run-custom-button,
+[data-theme="dark"] .scenario-chat-form button,
+[data-theme="dark"] .scenario-chat-message .scenario-chat-user { background: #f4f4f5; color: #111113; }
+[data-theme="dark"] .run-custom-button:hover { background: #e4e4e7; }
+[data-theme="dark"] .market-overview-value b,
+[data-theme="dark"] .kospi-value-line > b,
+[data-theme="dark"] .market-overview-mini-value b { color: #e4e4e7; }
+[data-theme="dark"] .twin-progress { background: #27272a; }
+[data-theme="dark"] .twin-progress i,
+[data-theme="dark"] .twin-holding-symbol { background: #e4e4e7; color: #111113; }
+[data-theme="dark"] .modal-backdrop { background: rgba(0,0,0,.62); }
+
+/* The generic [data-theme="dark"] a rule in globals.css (0-1-1) outranks .lp-solid's own
+   color (0-1-0), leaving dark text-on-white buttons as white-on-white. The solid CTA keeps a
+   white face in both themes — it always sits on a dark hero/close card — so restore its ink. */
+[data-theme="dark"] .lp-solid { color: #111113; }
+[data-theme="dark"] .lp-solid:hover { color: #111113; }

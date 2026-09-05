@@ -1,0 +1,22 @@
+/* Theme toggle — an addition to the design system (the source product is light-only). */
+.fv-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--muted);
+  font-family: var(--app-font);
+  font-size: 10px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: color .15s ease, border-color .15s ease, background .15s ease;
+}
+.fv-theme-toggle:hover { color: var(--ink); border-color: var(--ink); }
+[data-theme="dark"] .fv-theme-toggle { background: #18181b; }
+.lp-nav .fv-theme-toggle { border-color: rgba(255,255,255,.28); background: transparent; color: rgba(255,255,255,.72); }
+.lp-nav .fv-theme-toggle:hover { border-color: #fff; color: #fff; background: rgba(255,255,255,.08); }
+.sidebar .fv-theme-toggle { width: 100%; justify-content: center; margin-top: 10px; }
