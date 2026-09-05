@@ -1106,7 +1106,6 @@ function SetupScreen({
   const [agentProfiles, setAgentProfiles] = useState<AgentProfiles | null>(null);
   const [agentProfileJob, setAgentProfileJob] = useState<Job | null>(null);
   const [agentProfileError, setAgentProfileError] = useState<string | null>(null);
-  const [agentProfileRequestContextId, setAgentProfileRequestContextId] = useState<string | null>(null);
   const [agentProfileStartedAt, setAgentProfileStartedAt] = useState<number | null>(null);
   const [simulationSetupStage, setSimulationSetupStage] = useState(0);
   const [resettingSetup, setResettingSetup] = useState(false);
@@ -1117,6 +1116,7 @@ function SetupScreen({
   const step2Ref = useRef<HTMLElement | null>(null);
   const step3Ref = useRef<HTMLElement | null>(null);
   const step4Ref = useRef<HTMLElement | null>(null);
+  const agentProfileRequestedContextRef = useRef<string | null>(null);
   const previewReady = Boolean(previewCandles && previewCandles.length >= 2 && !previewError);
   const previewStepVisible = previewReady && previewDwellComplete;
   const collectionReady = Boolean(collectionSources?.every((source) => source.status === "ready"));
@@ -1157,7 +1157,7 @@ function SetupScreen({
       setAgentProfiles(null);
       setAgentProfileJob(null);
       setAgentProfileError(null);
-      setAgentProfileRequestContextId(null);
+      agentProfileRequestedContextRef.current = null;
       setAgentProfileStartedAt(null);
       setSimulationSetupStage(0);
       setInvestmentConfirmed(false);
@@ -1306,9 +1306,9 @@ function SetupScreen({
   }, [investmentConfirmed, agentProfilesReady, agentProfileStartedAt]);
 
   useEffect(() => {
-    if (!pickedTicker || !initialContext || !contextDwellComplete || agentProfileRequestContextId === initialContext.context_id) return;
+    if (!pickedTicker || !initialContext || !contextDwellComplete || agentProfileRequestedContextRef.current === initialContext.context_id) return;
     let cancelled = false;
-    setAgentProfileRequestContextId(initialContext.context_id);
+    agentProfileRequestedContextRef.current = initialContext.context_id;
     setAgentProfileStartedAt(Date.now());
     setAgentProfiles(null);
     setAgentProfileError(null);
@@ -1329,7 +1329,7 @@ function SetupScreen({
     };
     void prepare();
     return () => { cancelled = true; };
-  }, [pickedTicker, initialContext, contextDwellComplete, agentProfileRequestContextId]);
+  }, [pickedTicker, initialContext, contextDwellComplete]);
 
   useEffect(() => {
     if (!pickedTicker || !agentProfileJob || agentProfileJob.status === "completed" || agentProfileJob.status === "failed") return;
@@ -1407,7 +1407,7 @@ function SetupScreen({
     setAgentProfiles(null);
     setAgentProfileJob(null);
     setAgentProfileError(null);
-    setAgentProfileRequestContextId(null);
+    agentProfileRequestedContextRef.current = null;
     setAgentProfileStartedAt(null);
     setSimulationSetupStage(0);
     setPicked(item);
