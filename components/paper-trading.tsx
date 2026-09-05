@@ -934,11 +934,17 @@ function DailyPracticeCard({
               step="1"
               value={draftQuantity}
               onChange={(input) => setDraftQuantity(input.target.value)}
+              onBlur={submitDecision}
+              onKeyDown={(input) => {
+                if (input.key === "Enter") {
+                  input.preventDefault();
+                  submitDecision();
+                }
+              }}
               placeholder="수량 입력"
               disabled={disabled}
             />
             <span>주</span>
-            <button type="button" onClick={submitDecision} disabled={disabled || !draftQuantity}>판단 기록</button>
           </div>
           <small>{draftStance === "BUY_WATCH"
             ? `현재 현금 기준 약 ${Math.floor(portfolio.cash / Math.max(portfolio.mark_price, 1)).toLocaleString("ko-KR")}주까지 가능`
