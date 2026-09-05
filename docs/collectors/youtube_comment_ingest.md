@@ -1,13 +1,13 @@
 # YouTube 국내 주식 댓글 수집기
 
-`collectors/youtube_comment_ingest.py`는 국내 주식 관련 YouTube 채널 30개를 고정하고, 각 채널의 공개 업로드 영상 전체와 YouTube Data API v3에서 조회 가능한 공개 댓글·답글 전체를 수집한다. 실행용 셸은 `scripts/youtube_comment_ingest.sh`다.
+`collectors/youtube_comment_ingest.py`는 국내 주식 관련 YouTube 채널 30개를 고정하고, 기본적으로 제목·설명·태그가 반도체와 관련된 공개 영상의 댓글·답글만 수집한다. 실행용 셸은 `scripts/youtube_comment_ingest.sh`다.
 
-“전체”는 API 키로 접근 가능한 공개 데이터 전체다. 비공개·삭제 영상, 검토 대기·스팸 댓글, API가 반환하지 않는 댓글은 수집할 수 없다.
+비공개·삭제 영상, 검토 대기·스팸 댓글, API가 반환하지 않는 댓글은 수집할 수 없다.
 
 ## 수집 데이터
 
 - 채널: 채널 ID, 이름, 국가, 누적 조회수, 구독자 수, 영상 수, 업로드 플레이리스트, 선정 순위
-- 영상: 영상 ID, 채널 ID, 제목, 게시 시각, 공개 영상 URL, 마지막 댓글 전체 스캔 상태
+- 영상: 영상 ID, 채널 ID, 제목, 게시 시각, 공개 영상 URL, 적용한 영상 필터와 일치 키워드, 마지막 댓글 전체 스캔 상태
 - 댓글과 답글: 가명화된 댓글·부모·스레드 ID, 채널·영상 ID, 본문, 좋아요·답글 수, 게시·수정 시각, ETag
 - 변경 기록: 신규·수정·삭제 상태, 이전/현재 레코드 해시, 관측 시각
 - 실행 상태: 업로드·댓글·답글별 다음 페이지 토큰, 남은 영상 수, 호출 수와 종료 사유
@@ -65,6 +65,7 @@ Google Cloud 프로젝트에서 **YouTube Data API v3**를 활성화한 API 키�
 | `search.list` | 최초 채널 후보 생성 |
 | `channels.list` | 채널 통계와 업로드 플레이리스트 조회 |
 | `playlistItems.list` | 공개 업로드 영상 전체 페이지 순회 |
+| `videos.list` | 제목·설명·태그를 조회해 반도체 영상 여부 판정 |
 | `commentThreads.list` | 영상별 최상위 댓글 전체 페이지 순회, update의 최신 댓글 빠른 확인 |
 | `comments.list` | 각 최상위 댓글의 답글 전체 페이지 순회 |
 
@@ -93,14 +94,17 @@ vi .env
 
 ## backfill 실행 방법
 
-기본값은 채널 30개, 과거 공개 업로드 전체, 공개 최상위 댓글과 모든 공개 답글이다. `--start`가 없으므로 최초 공개 업로드까지 거슬러 올라간다. `--end`를 생략하면 작업을 처음 시작한 날짜로 고정되므로 여러 날 걸리는 backfill도 같은 범위에서 이어진다.
+기본값은 채널 30개, 과거 공개 업로드 중 반도체 관련 영상, 해당 영상의 공개 최상위 댓글과 모든 공개 답글이다. `--start`가 없으므로 최초 공개 업로드까지 거슬러 올라간다. `--end`를 생략하면 작업을 처음 시작한 날짜로 고정되므로 여러 날 걸리는 backfill도 같은 범위에서 이어진다.
 
 ```bash
 cd /home/ubuntu/finverse
 ./scripts/youtube_comment_ingest.sh backfill \
   --channel-file config/youtube_channels.json \
+  --video-filter semiconductor \
   --quota-budget 9000
 ```
+
+`--video-filter semiconductor`는 기본값이다. 수집기는 `videos.list`의 제목·설명·태그에서 반도체, HBM, DRAM, NAND, 파운드리, 팹리스, GPU, 주요 반도체 기업 등의 용어를 찾아 통과시킨다. 판정에 사용된 용어는 영상 레코드의 `video_filter_terms`에 저장된다. 이 방식은 영상 음성이나 자막 자체를 분석하는 방식은 아니므로, 메타데이터가 부실한 관련 영상은 제외될 수 있다. 필터 없이 과거 동작처럼 모든 영상을 수집할 때만 `--video-filter all`을 명시한다.
 
 영상 게시일 범위를 제한하려면 다음처럼 실행한다.
 
@@ -122,11 +126,25 @@ cd /home/ubuntu/finverse
 
 진행 중인 작업과 다른 기간·명령·채널 목록으로 실행하면 안전을 위해 거부한다. 의도적으로 체크포인트를 버리고 새 범위로 시작할 때만 `--restart`를 사용한다. 이미 확정된 JSONL 데이터는 `--restart`로 삭제되지 않는다.
 
+영상 필터도 작업 파라미터에 포함된다. 기존의 필터 없는 작업에서 반도체 필터로 전환할 때는 다음처럼 체크포인트를 새로 시작한다.
+
+```bash
+./scripts/youtube_comment_ingest.sh backfill \
+  --channel-file config/youtube_channels.json \
+  --video-filter semiconductor \
+  --restart
+```
+
+기존 비반도체 영상과 댓글은 한 번의 필터 스캔만으로 즉시 삭제하지 않는다. 서로 다른 두 번의 정상적인 전체 업로드 스캔에서 연속으로 필터를 통과하지 못한 경우에만 기존 삭제 안전 규칙에 따라 tombstone으로 전환한다.
+
+첫 정상 스캔에서 반도체 영상 레코드가 갱신되면 PostgreSQL의 `psychology.youtube_comment` 뷰와 대시보드 조회는 즉시 `video_filter=semiconductor`인 영상의 댓글만 노출한다. 따라서 안전 삭제가 확정되기 전에도 DBeaver와 UI에는 기존 비반도체 댓글이 섞이지 않는다. DBeaver에서는 `psychology` 스키마의 `youtube_comment` 뷰에서 영상 제목과 `video_filter_terms`도 함께 확인할 수 있다.
+
 ## update 실행 방법
 
 ```bash
 ./scripts/youtube_comment_ingest.sh update \
-  --channel-file config/youtube_channels.json
+  --channel-file config/youtube_channels.json \
+  --video-filter semiconductor
 ```
 
 `update`는 다음 작업을 한다.
@@ -194,7 +212,11 @@ data/youtube_comments/
 
 `index.sqlite3`는 PostgreSQL을 대신하는 업무 데이터 출력이 아니라 2GB 서버에서도 전체 JSONL을 메모리에 올리지 않기 위한 내부 인덱스다. 각 실행 종료 시 SQLite cursor로 JSONL 5종을 한 세대 디렉터리에 스트리밍한 뒤 하나의 심볼릭 링크를 교체해 같은 스냅샷으로 공개한다. 다른 시스템으로 전달할 기본 형식은 JSONL이다.
 
-댓글 레코드 예시:
+영상과 댓글 레코드 예시:
+
+```json
+{"record_id":"youtube:video:VIDEO_ID","record_type":"youtube_video","video_id":"VIDEO_ID","channel_id":"UC...","title":"HBM 시장 전망","video_filter":"semiconductor","video_filter_terms":["hbm"],"published_at":"2026-08-01T00:00:00+00:00","record_hash":"..."}
+```
 
 ```json
 {"record_id":"youtube:comment:hmac-sha256:...","record_type":"youtube_comment","channel_id":"UC...","video_id":"VIDEO_ID","comment_id":"hmac-sha256:...","parent_comment_id":null,"thread_id":"hmac-sha256:...","text":"댓글 본문","like_count":3,"reply_count":1,"published_at":"2026-08-01T01:02:03Z","updated_at":"2026-08-02T01:02:03Z","refreshed_at":"...","expires_at":"...","record_hash":"..."}
@@ -228,9 +250,11 @@ chmod 600 .env
 ./scripts/youtube_comment_ingest.sh backfill \
   --channel-count 1 \
   --channel-id UCxxxxxxxxxxxxxxxxxxxxxx \
+  --video-filter semiconductor \
   --quota-budget 20
 ./scripts/youtube_comment_ingest.sh backfill \
-  --channel-file config/youtube_channels.json
+  --channel-file config/youtube_channels.json \
+  --video-filter semiconductor
 ```
 
 기존 backfill을 다른 컴퓨터에서 이어가려면 코드뿐 아니라 `.env`의 동일 salt와 `data/youtube_comments/` 전체를 함께 옮긴다. 새로 시작하려면 데이터 폴더를 복사하지 않는다.

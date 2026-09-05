@@ -50,6 +50,7 @@ PLAYLIST_FIELDS = (
     "nextPageToken,items(contentDetails(videoId,videoPublishedAt),"
     "snippet(title),status/privacyStatus)"
 )
+VIDEO_FIELDS = "items(id,snippet(title,description,tags))"
 THREAD_FIELDS = (
     "nextPageToken,items(etag,id,snippet(videoId,totalReplyCount,"
     "topLevelComment(etag,id,snippet(textDisplay,likeCount,publishedAt,updatedAt))))"
@@ -57,6 +58,48 @@ THREAD_FIELDS = (
 REPLY_FIELDS = (
     "nextPageToken,items(etag,id,snippet(parentId,textDisplay,likeCount,publishedAt,updatedAt))"
 )
+
+VIDEO_FILTER_TERMS = {
+    "semiconductor": (
+        "반도체",
+        "semiconductor",
+        "칩",
+        "chip",
+        "hbm",
+        "dram",
+        "d램",
+        "디램",
+        "nand",
+        "낸드",
+        "파운드리",
+        "foundry",
+        "팹리스",
+        "fabless",
+        "웨이퍼",
+        "wafer",
+        "euv",
+        "칩렛",
+        "chiplet",
+        "gpu",
+        "npu",
+        "asic",
+        "엔비디아",
+        "nvidia",
+        "tsmc",
+        "하이닉스",
+        "sk hynix",
+        "마이크론",
+        "micron",
+        "asml",
+        "인텔",
+        "intel",
+        "퀄컴",
+        "qualcomm",
+        "브로드컴",
+        "broadcom",
+        "db하이텍",
+    )
+}
 
 EMAIL_RE = re.compile(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b")
 PHONE_RE = re.compile(r"(?<!\d)01[016789][ -]?\d{3,4}[ -]?\d{4}(?!\d)")
@@ -363,6 +406,7 @@ class WorkState:
         start: date | None,
         end: date,
         stale_before: str,
+        video_filter: str = "all",
     ) -> int:
         lower, upper = date_bounds(start, end)
         conditions = [
@@ -380,7 +424,7 @@ class WorkState:
             )
             values.append(stale_before)
         query = (
-            "SELECT video_id, channel_id FROM latest WHERE "
+            "SELECT video_id, channel_id, record_json FROM latest WHERE "
             + " AND ".join(conditions)
             + " ORDER BY CASE WHEN last_full_comment_scan_at IS NULL THEN 0 ELSE 1 END, "
             "last_full_comment_scan_at, published_at DESC, video_id"
@@ -388,7 +432,10 @@ class WorkState:
         count = 0
         with closing(self.connect()) as connection, connection:
             connection.execute("DELETE FROM youtube_video_queue")
-            for count, row in enumerate(connection.execute(query, values), 1):
+            for row in connection.execute(query, values):
+                if not video_matches_filter(json.loads(row["record_json"]), video_filter):
+                    continue
+                count += 1
                 connection.execute(
                     "INSERT INTO youtube_video_queue(video_id, channel_id, priority, position) "
                     "VALUES(?, ?, 1, ?)",
@@ -474,7 +521,13 @@ class WorkState:
             for row in cursor:
                 yield json.loads(row["record_json"])
 
-    def stale_video_count(self, start: date | None, end: date, cutoff: str) -> int:
+    def stale_video_count(
+        self,
+        start: date | None,
+        end: date,
+        cutoff: str,
+        video_filter: str = "all",
+    ) -> int:
         lower, upper = date_bounds(start, end)
         conditions = [
             "record_type = 'youtube_video'",
@@ -487,11 +540,12 @@ class WorkState:
             conditions.append("published_at >= ?")
             values.append(lower)
         with closing(self.connect()) as connection, connection:
-            return int(
-                connection.execute(
-                    "SELECT COUNT(*) FROM latest WHERE " + " AND ".join(conditions),
+            return sum(
+                video_matches_filter(json.loads(row["record_json"]), video_filter)
+                for row in connection.execute(
+                    "SELECT record_json FROM latest WHERE " + " AND ".join(conditions),
                     values,
-                ).fetchone()[0]
+                )
             )
 
 
@@ -901,12 +955,77 @@ def normalize_video(
     )
 
 
+def matched_video_terms(snippet: dict[str, Any], video_filter: str) -> list[str]:
+    if video_filter == "all":
+        return []
+    tags = snippet.get("tags", [])
+    tag_text = " ".join(str(tag) for tag in tags) if isinstance(tags, list) else ""
+    searchable = " ".join(
+        (str(snippet.get("title", "")), str(snippet.get("description", "")), tag_text)
+    ).casefold()
+    matches: list[str] = []
+    for term in VIDEO_FILTER_TERMS[video_filter]:
+        folded = term.casefold()
+        if term.isascii():
+            pattern = rf"(?<![a-z0-9]){re.escape(folded)}(?:s)?(?![a-z])"
+            matched = re.search(pattern, searchable) is not None
+        else:
+            matched = folded in searchable
+        if matched:
+            matches.append(term)
+    return matches
+
+
+def video_matches_filter(record: dict[str, Any], video_filter: str) -> bool:
+    return video_filter == "all" or record.get("video_filter") == video_filter
+
+
+def filter_videos(
+    client: YouTubeClient,
+    rows: list[dict[str, Any]],
+    video_filter: str,
+) -> list[dict[str, Any]]:
+    if video_filter == "all" or not rows:
+        return rows
+    payload = client.get(
+        "videos",
+        {
+            "part": "snippet",
+            "id": ",".join(str(row["video_id"]) for row in rows),
+            "maxResults": 50,
+            "fields": VIDEO_FIELDS,
+        },
+    )
+    snippets = {
+        str(item.get("id", "")): item.get("snippet", {})
+        for item in payload.get("items", [])
+    }
+    accepted: list[dict[str, Any]] = []
+    for row in rows:
+        snippet = snippets.get(str(row["video_id"]))
+        if not isinstance(snippet, dict):
+            continue
+        terms = matched_video_terms(snippet, video_filter)
+        if not terms:
+            continue
+        accepted.append(
+            {
+                **row,
+                "title": str(snippet.get("title", row.get("title", ""))),
+                "video_filter": video_filter,
+                "video_filter_terms": terms,
+            }
+        )
+    return accepted
+
+
 def fetch_upload_page(
     client: YouTubeClient,
     channel: dict[str, Any],
     page_token: str | None,
     start: date | None,
     end: date,
+    video_filter: str = "all",
 ) -> tuple[list[dict[str, Any]], str | None]:
     params: dict[str, Any] = {
         "part": "snippet,contentDetails,status",
@@ -930,7 +1049,7 @@ def fetch_upload_page(
         for item in payload.get("items", [])
         if (record := normalize_video(item, channel, start, end)) is not None
     ]
-    return rows, payload.get("nextPageToken")
+    return filter_videos(client, rows, video_filter), payload.get("nextPageToken")
 
 
 def normalize_comment(
@@ -988,6 +1107,7 @@ def operation_signature(
             "start": args.start.isoformat() if args.start else None,
             "end": args.end.isoformat(),
             "channel_ids": sorted(channel_ids),
+            "video_filter": args.video_filter,
         }
     )
 
@@ -1032,6 +1152,7 @@ def begin_or_resume_operation(
         "operation_id": sha256({"signature": signature, "started_at": now_iso()}),
         "signature": signature,
         "command": args.command,
+        "video_filter": args.video_filter,
         "effective_end": args.end.isoformat(),
         "phase": "uploads",
         "started_at": now_iso(),
@@ -1110,7 +1231,9 @@ def run_upload_phase(
         current = STATE.channel_at(int(operation["upload_position"]))
         if current is None:
             cutoff = (datetime.now(UTC) - timedelta(days=args.refresh_cycle_days)).isoformat()
-            STATE.fill_video_queue(args.command, args.start, args.end, cutoff)
+            STATE.fill_video_queue(
+                args.command, args.start, args.end, cutoff, args.video_filter
+            )
             operation |= {
                 "phase": "comments",
                 "current_video_id": None,
@@ -1143,6 +1266,7 @@ def run_upload_phase(
                 operation.get("upload_page_token"),
                 args.start,
                 args.end,
+                args.video_filter,
             )
         except ApiError as exc:
             failed_token = str(requested_token or "__first_page__")
@@ -1200,7 +1324,12 @@ def quick_update(
         page_token: str | None = None
         for _ in range(args.quick_pages):
             rows, page_token = fetch_upload_page(
-                client, channel, page_token, args.start, current_end
+                client,
+                channel,
+                page_token,
+                args.start,
+                current_end,
+                args.video_filter,
             )
             priority_ids = [
                 row["video_id"]
@@ -1237,7 +1366,11 @@ def quick_update(
             snippet = thread.get("snippet", {})
             video_id = str(snippet.get("videoId", ""))
             video = STORE.get_latest(f"youtube:video:{video_id}")
-            if not video or not video_in_range(video, args.start, current_end):
+            if (
+                not video
+                or not video_matches_filter(video, args.video_filter)
+                or not video_in_range(video, args.start, current_end)
+            ):
                 continue
             top = snippet.get("topLevelComment", {})
             record = normalize_comment(
@@ -1444,10 +1577,12 @@ def run_comment_phase(
         video = STATE.next_video(operation.get("current_video_id"))
         if video is None:
             cutoff = (datetime.now(UTC) - timedelta(days=args.refresh_cycle_days)).isoformat()
-            stale = STATE.stale_video_count(args.start, args.end, cutoff)
+            stale = STATE.stale_video_count(
+                args.start, args.end, cutoff, args.video_filter
+            )
             if stale:
                 queued = STATE.fill_video_queue(
-                    "backfill", args.start, args.end, cutoff
+                    "backfill", args.start, args.end, cutoff, args.video_filter
                 )
                 operation = reset_current_video(operation)
                 STATE.save_operation(operation)
@@ -1648,6 +1783,7 @@ def collect(args: argparse.Namespace) -> int:
             "reason": reason,
             "api_calls": client.calls,
             "quota_budget": client.max_calls,
+            "video_filter": args.video_filter,
             "remaining_video_scans": STATE.remaining_videos(),
             **totals,
             "failures": failures,
@@ -1684,6 +1820,12 @@ def build_parser() -> argparse.ArgumentParser:
         child.add_argument("--candidate-pages", type=int, default=10)
         child.add_argument("--quota-budget", type=int, default=9000)
         child.add_argument("--quick-pages", type=int, default=1)
+        child.add_argument(
+            "--video-filter",
+            choices=("semiconductor", "all"),
+            default="semiconductor",
+            help="video metadata topic filter (default: semiconductor)",
+        )
         child.add_argument("--refresh-cycle-days", type=int, default=REFRESH_CYCLE_DAYS)
         child.add_argument("--timeout", type=int, default=30)
     return parser

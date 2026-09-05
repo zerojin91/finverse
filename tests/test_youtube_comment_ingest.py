@@ -33,6 +33,7 @@ def collector_args(command: str = "backfill", **overrides: object) -> argparse.N
         "candidate_pages": 1,
         "quota_budget": 100,
         "quick_pages": 0,
+        "video_filter": "all",
         "refresh_cycle_days": 28,
         "timeout": 1,
     }
@@ -276,6 +277,145 @@ class YouTubeCollectorTest(unittest.TestCase):
             self.assertEqual("comments", operation["phase"])
             self.assertIsNotNone(store.get_latest("youtube:video:video000002"))
             self.assertEqual(2, state.remaining_videos())
+
+    def test_semiconductor_filter_uses_video_title_description_and_tags(self) -> None:
+        class FilterClient:
+            def __init__(self) -> None:
+                self.resources: list[str] = []
+
+            def get(self, resource: str, params: dict[str, object]) -> dict[str, object]:
+                self.resources.append(resource)
+                if resource == "playlistItems":
+                    return {
+                        "items": [
+                            UploadClient.video(
+                                "video000001", "2025-01-01T00:00:00Z"
+                            ),
+                            UploadClient.video(
+                                "video000002", "2025-01-02T00:00:00Z"
+                            ),
+                            UploadClient.video(
+                                "video000003", "2025-01-03T00:00:00Z"
+                            ),
+                            UploadClient.video(
+                                "video000004", "2025-01-04T00:00:00Z"
+                            ),
+                        ]
+                    }
+                if resource == "videos":
+                    self.assert_video_ids(params)
+                    return {
+                        "items": [
+                            {
+                                "id": "video000001",
+                                "snippet": {
+                                    "title": "반도체 산업 전망",
+                                    "description": "수요와 공급을 분석합니다.",
+                                    "tags": [],
+                                },
+                            },
+                            {
+                                "id": "video000002",
+                                "snippet": {
+                                    "title": "오늘의 산업 전망",
+                                    "description": "HBM 수요와 공급을 분석합니다.",
+                                    "tags": [],
+                                },
+                            },
+                            {
+                                "id": "video000003",
+                                "snippet": {
+                                    "title": "기술주 전망",
+                                    "description": "기업 실적 분석",
+                                    "tags": ["GPU"],
+                                },
+                            },
+                            {
+                                "id": "video000004",
+                                "snippet": {
+                                    "title": "배당주 전망",
+                                    "description": "은행 업종 basic 분석",
+                                    "tags": ["금융"],
+                                },
+                            },
+                        ]
+                    }
+                raise AssertionError(resource)
+
+            @staticmethod
+            def assert_video_ids(params: dict[str, object]) -> None:
+                expected = ",".join(f"video00000{number}" for number in range(1, 5))
+                if params.get("id") != expected:
+                    raise AssertionError(params)
+
+        with tempfile.TemporaryDirectory() as directory, isolated_collector(
+            Path(directory)
+        ):
+            client = FilterClient()
+            rows, _ = youtube.fetch_upload_page(
+                client,
+                {
+                    "channel_id": channel_id(1),
+                    "channel_title": "channel",
+                    "uploads_playlist_id": "UU" + channel_id(1)[2:],
+                },
+                None,
+                None,
+                date(2026, 1, 1),
+                "semiconductor",
+            )
+
+        self.assertEqual(["playlistItems", "videos"], client.resources)
+        self.assertEqual(
+            ["video000001", "video000002", "video000003"],
+            [row["video_id"] for row in rows],
+        )
+        self.assertTrue(all(row["video_filter"] == "semiconductor" for row in rows))
+        self.assertEqual(
+            [["반도체"], ["hbm"], ["gpu"]],
+            [row["video_filter_terms"] for row in rows],
+        )
+
+    def test_semiconductor_queue_excludes_legacy_unfiltered_videos(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, isolated_collector(
+            Path(directory)
+        ) as (_, state):
+            records = [
+                youtube.timestamped(
+                    {
+                        "record_id": f"youtube:video:video00000{number}",
+                        "record_type": "youtube_video",
+                        "video_id": f"video00000{number}",
+                        "channel_id": channel_id(1),
+                        "published_at": f"2025-01-0{number}T00:00:00Z",
+                        "video_filter": filter_name,
+                        "is_deleted": False,
+                    }
+                )
+                for number, filter_name in ((1, "semiconductor"), (2, None))
+            ]
+            totals = {"inserted": 0, "changed": 0, "unchanged": 0, "stale": 0}
+            youtube.merge_rows(records, "seed", totals)
+
+            queued = state.fill_video_queue(
+                "update",
+                None,
+                date(2026, 1, 1),
+                youtube.now_iso(),
+                "semiconductor",
+            )
+
+            self.assertEqual(1, queued)
+            self.assertEqual("video000001", state.next_video()["video_id"])
+
+    def test_video_filter_is_part_of_resume_signature(self) -> None:
+        args = collector_args(video_filter="all")
+        all_signature = youtube.operation_signature(args, [channel_id(1)])
+        args.video_filter = "semiconductor"
+
+        self.assertNotEqual(
+            all_signature, youtube.operation_signature(args, [channel_id(1)])
+        )
 
     def test_missing_playlist_is_empty_only_for_zero_video_channel(self) -> None:
         class MissingPlaylistClient:

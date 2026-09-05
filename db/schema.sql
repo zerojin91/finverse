@@ -309,21 +309,28 @@ GROUP BY source, series_name, series_id, cycle, unit;
 
 CREATE OR REPLACE VIEW psychology.youtube_comment AS
 SELECT
-    nullif(payload->>'published_at', '')::timestamptz AS published_at,
-    nullif(payload->>'updated_at', '')::timestamptz   AS updated_at,
-    payload->>'channel_id'                            AS channel_id,
-    payload->>'video_id'                              AS video_id,
-    payload->>'text'                                  AS comment_text,
-    coalesce(nullif(payload->>'like_count', '')::integer, 0) AS like_count,
-    coalesce(nullif(payload->>'reply_count', '')::integer, 0) AS reply_count,
-    payload->>'source_url'                            AS source_url,
-    collected_at,
-    record_id
-FROM lake.records
-WHERE record_type = 'youtube_comment'
-  AND coalesce(nullif(payload->>'is_deleted', '')::boolean, false) = false
-  AND nullif(payload->>'published_at', '') IS NOT NULL
-  AND nullif(payload->>'text', '') IS NOT NULL;
+    nullif(c.payload->>'published_at', '')::timestamptz AS published_at,
+    nullif(c.payload->>'updated_at', '')::timestamptz   AS updated_at,
+    c.payload->>'channel_id'                            AS channel_id,
+    c.payload->>'video_id'                              AS video_id,
+    c.payload->>'text'                                  AS comment_text,
+    coalesce(nullif(c.payload->>'like_count', '')::integer, 0) AS like_count,
+    coalesce(nullif(c.payload->>'reply_count', '')::integer, 0) AS reply_count,
+    c.payload->>'source_url'                            AS source_url,
+    c.collected_at,
+    c.record_id,
+    v.payload->>'title'                                 AS video_title,
+    v.payload->'video_filter_terms'                     AS video_filter_terms
+FROM lake.records AS c
+JOIN lake.records AS v
+  ON v.record_type = 'youtube_video'
+ AND v.payload->>'video_id' = c.payload->>'video_id'
+ AND v.payload->>'video_filter' = 'semiconductor'
+ AND coalesce(nullif(v.payload->>'is_deleted', '')::boolean, false) = false
+WHERE c.record_type = 'youtube_comment'
+  AND coalesce(nullif(c.payload->>'is_deleted', '')::boolean, false) = false
+  AND nullif(c.payload->>'published_at', '') IS NOT NULL
+  AND nullif(c.payload->>'text', '') IS NOT NULL;
 
 CREATE OR REPLACE VIEW psychology.sentiment_daily AS
 WITH classified AS (
