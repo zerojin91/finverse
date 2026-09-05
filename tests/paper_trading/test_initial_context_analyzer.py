@@ -42,6 +42,15 @@ def _history():
         ],
         "macro_observations": [{"trade_date": "2026-08-28", "series_name": "한국은행 기준금리", "value": 3.0, "unit": "%", "source": "bok"}],
         "social_signals": [{"trade_date": "2026-08-28", "sentiment": 0.2, "post_count": 30, "engagement": 90}],
+        "community_comments": [{
+            "published_at": "2026-08-30T10:00:00+09:00",
+            "trade_date": "2026-08-30",
+            "video_title": "삼성전자 실적과 반도체 업황 점검",
+            "text": "메모리 업황 회복 속도를 계속 확인해야 한다",
+            "like_count": 42,
+            "reply_count": 5,
+            "video_like_rank": 1,
+        }],
         "quality": {},
     }
 
@@ -57,6 +66,20 @@ def test_document_preparation_returns_four_target_evidence_previews(tmp_path, mo
     market_document = tmp_path / "market_cache" / f"initial-context-{result['context_id'][4:]}" / "market-evidence.md"
     assert market_document.is_file()
     assert "## AI Interpretation" in market_document.read_text(encoding="utf-8")
+
+
+def test_community_document_keeps_target_video_comment_evidence(tmp_path, monkeypatch):
+    monkeypatch.setattr(Config, "UPLOAD_FOLDER", str(tmp_path))
+    monkeypatch.setattr("services.paper_trading.evidence_documents.LLMClient", _FakeLLMClient)
+
+    result = get_initial_context_documents(_history())
+    community_document = tmp_path / "market_cache" / f"initial-context-{result['context_id'][4:]}" / "community-evidence.md"
+    content = community_document.read_text(encoding="utf-8")
+
+    assert "## Target Video Comments" in content
+    assert "삼성전자 실적과 반도체 업황 점검" in content
+    assert "메모리 업황 회복 속도를 계속 확인해야 한다" in content
+    assert result["source_summary"]["target_video_comments"] == 1
 
 
 def test_clear_initial_context_cache_removes_only_the_selected_snapshot(tmp_path, monkeypatch):

@@ -18,7 +18,7 @@ from .kospi_paper_trading import TradingError
 from .llm_client import LLMClient
 
 
-CONTEXT_SCHEMA_VERSION = "initial-context-v10-domain-grounded"
+CONTEXT_SCHEMA_VERSION = "initial-context-v11-community-comments"
 CONTEXT_CACHE_TTL_SECONDS = 12 * 60 * 60
 
 
@@ -98,6 +98,7 @@ def _compact_input(history: dict[str, Any]) -> dict[str, Any]:
     social = history.get("social_signals") or []
     social_recent = social[-30:]
     sentiment_values = [float(row["sentiment"]) for row in social_recent if row.get("sentiment") is not None]
+    target_comments = (history.get("community_comments") or [])[:12]
 
     return {
         "ticker": history.get("ticker"),
@@ -127,6 +128,11 @@ def _compact_input(history: dict[str, Any]) -> dict[str, Any]:
             "average_sentiment": round(sum(sentiment_values) / len(sentiment_values), 4) if sentiment_values else None,
             "total_comments": sum(int(row.get("post_count") or 0) for row in social_recent),
             "total_engagement": sum(int(row.get("engagement") or 0) for row in social_recent),
+            "target_video_comment_count": len(history.get("community_comments") or []),
+            "top_target_comments": [{
+                key: row.get(key)
+                for key in ("published_at", "video_title", "text", "like_count", "reply_count", "video_like_rank")
+            } for row in target_comments],
         },
         "provenance": {
             "history_start": history.get("start_date"),
@@ -303,6 +309,7 @@ def prepare_initial_context_documents(history: dict[str, Any]) -> dict[str, Any]
             "macro_observations": source["economy"]["observation_count"],
             "events": source["events"]["event_count"],
             "community_days": source["community"]["observed_days"],
+            "target_video_comments": source["community"]["target_video_comment_count"],
             "as_of": source["provenance"],
             "documents": list(document_files.values()),
             "document_previews": {

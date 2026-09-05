@@ -44,8 +44,9 @@ DOMAIN_GUIDANCE = {
         "분리하고 관련성이 약한 시장 전체 사건은 과장하지 말라."
     ),
     "community": (
-        "집계 심리·게시량·참여도만 해석하라. 개별 투자자의 의도나 실제 매매를 추정하지 말고, "
-        "심리가 가격과 충돌할 때 확인할 신호를 제시하라."
+        "일별 집계 심리·게시량·참여도와 종목 태그가 일치한 YouTube 영상의 고반응 댓글을 함께 읽어라. "
+        "댓글은 일부 고반응 참여자의 질적 논점일 뿐 전체 투자자 의견이나 실제 매매 의도가 아니다. "
+        "댓글에서 반복되는 논점은 사실과 분리해 '언급된 관점'으로만 정리하고, 심리가 가격과 충돌할 때 확인할 신호를 제시하라."
     ),
 }
 
@@ -58,8 +59,8 @@ def _json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, default=str, separators=(",", ":"))
 
 
-def _evidence_row(index: int, claim: str, observed_at: Any, source: str) -> str:
-    return f"| {source.upper()}-{index:03d} | {_line(claim)} | {_line(observed_at)} | {_line(source)} | paper-trading-history |"
+def _evidence_row(index: int, claim: str, observed_at: Any, source: str, reference: Any = None) -> str:
+    return f"| {source.upper()}-{index:03d} | {_line(claim)} | {_line(observed_at)} | {_line(source)} | {_line(reference or 'paper-trading-history')} |"
 
 
 def _change_pct(start: Any, end: Any) -> str:
@@ -113,8 +114,23 @@ def _domain_input(domain: str, history: dict[str, Any]) -> tuple[dict[str, Any],
         ]
         rows = sorted(rows, key=lambda item: str(item.get("trade_date") or ""), reverse=True)[:40]
         return {**common, "observations": rows}, rows
-    rows = (history.get("social_signals") or [])[-30:]
-    return {**common, "observations": rows}, rows
+    aggregate_rows = [
+        {**row, "evidence_kind": "daily_aggregate"}
+        for row in (history.get("social_signals") or [])[-30:]
+    ]
+    comment_rows = [
+        {**row, "evidence_kind": "target_top_comment"}
+        for row in (history.get("community_comments") or [])[:12]
+    ]
+    rows = aggregate_rows + comment_rows
+    return {
+        **common,
+        "observations": rows,
+        "community_scope": (
+            "daily aggregate signals plus top-liked comments collected from "
+            "YouTube videos matched to the selected ticker"
+        ),
+    }, rows
 
 
 def _source_id(domain: str, index: int) -> str:
@@ -239,11 +255,35 @@ def _render(domain: str, history: dict[str, Any], rows: list[dict[str, Any]], an
         lines += ["| " + " | ".join(_line(row.get(key)) for key in ("trade_date", "scope", "title", "summary")) + " |" for row in rows]
         claims = [_line(row.get("title") or "실제 적재 이벤트") for row in rows]
     else:
+        aggregate_rows = [row for row in rows if row.get("evidence_kind") == "daily_aggregate"]
+        comment_rows = [row for row in rows if row.get("evidence_kind") == "target_top_comment"]
         lines += ["## Raw Community Signals", "| trade_date | sentiment | post_count | engagement |", "|---|---:|---:|---:|"]
-        lines += ["| " + " | ".join(_line(row.get(key)) for key in ("trade_date", "sentiment", "post_count", "engagement")) + " |" for row in rows]
-        claims = [f"일별 커뮤니티 감성 {_line(row.get('sentiment'))}, 게시물 {_line(row.get('post_count'))}개" for row in rows]
+        lines += ["| " + " | ".join(_line(row.get(key)) for key in ("trade_date", "sentiment", "post_count", "engagement")) + " |" for row in aggregate_rows]
+        if not aggregate_rows:
+            lines += ["| 관측값 없음 | - | - | - |"]
+        lines += ["## Target Video Comments", "- 선택 종목 태그로 수집한 영상별 좋아요 상위 댓글이다. 고반응 댓글은 전체 투자자 의견을 대표하지 않는다.", "| published_at | video_title | likes | replies | comment |", "|---|---|---:|---:|---|"]
+        lines += ["| " + " | ".join(_line(row.get(key)) for key in ("published_at", "video_title", "like_count", "reply_count", "text")) + " |" for row in comment_rows]
+        if not comment_rows:
+            lines += ["| 관측값 없음 | - | - | - | - |"]
+        claims = []
+        for row in rows:
+            if row.get("evidence_kind") == "target_top_comment":
+                title = _line(row.get("video_title") or "종목 검색 영상")
+                claims.append(f"{title}의 고반응 댓글(좋아요 {_line(row.get('like_count'))}): {_line(row.get('text'))}")
+            else:
+                claims.append(f"일별 커뮤니티 감성 {_line(row.get('sentiment'))}, 게시물 {_line(row.get('post_count'))}개")
+    references = [row.get("source_url") or row.get("url") for row in rows]
     lines += ["## Evidence Register", "| evidence_id | claim | observed_at | source | record_id_or_url |", "|---|---|---|---|---|"]
-    lines += [_evidence_row(index, claim, row.get("trade_date"), domain) for index, (row, claim) in enumerate(zip(rows, claims), 1)]
+    lines += [
+        _evidence_row(
+            index,
+            claim,
+            evidence_row.get("published_at") or evidence_row.get("trade_date"),
+            domain,
+            references[index - 1],
+        )
+        for index, (evidence_row, claim) in enumerate(zip(rows, claims), 1)
+    ]
     lines += ["## Limitations", "- 이 문서의 AI 해석은 관측 원자료를 정리한 시나리오 입력이며, 미래 가격이나 사건의 예측이 아니다."]
     return "\n".join(lines) + "\n"
 
