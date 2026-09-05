@@ -1341,6 +1341,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-coach-card li::before { position: absolute; top: 0; left: 0; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; color: #fff; background: var(--ink); content: counter(coach); font-size: 10px; font-weight: 800; }
 .paper-coach-card li b { display: block; margin-bottom: 3px; color: var(--ink); font-size: 12px; }
 .paper-coach-card li p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.65; }
+.paper-coach-card li p.paper-coach-lines { display: flex; flex-direction: column; gap: 2px; }
 .paper-coach-card > button { width: 100%; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; margin-top: 20px; border: 0; border-radius: 10px; color: #fff; background: var(--ink); font-family: inherit; font-size: 13px; font-weight: 750; cursor: pointer; }
 
 .paper-now { margin: 12px 14px 0; padding: 12px 13px; border: 1px solid #fed7aa; border-radius: 9px; background: #fffbf5; }
