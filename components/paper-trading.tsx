@@ -943,6 +943,7 @@ type InvestmentMode = "new" | "holding";
 type PracticeMode = "balanced" | "stress" | "opportunity" | "random";
 
 const CASH_PRESETS = [10_000_000, 50_000_000, 100_000_000];
+const PREVIEW_STEP_MIN_MS = 1_500;
 const COLLECTION_STEP_MIN_MS = 1_500;
 const DURATION_OPTIONS = [
   { days: 10, label: "10거래일", caption: "단기 흐름" },
@@ -985,6 +986,7 @@ function SetupScreen({
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [collectionSources, setCollectionSources] = useState<CollectionSource[] | null>(null);
   const [collectionError, setCollectionError] = useState<string | null>(null);
+  const [previewDwellComplete, setPreviewDwellComplete] = useState(false);
   const [collectionDwellComplete, setCollectionDwellComplete] = useState(false);
   const [investmentMode, setInvestmentMode] = useState<InvestmentMode | null>(null);
   const [investmentConfirmed, setInvestmentConfirmed] = useState(false);
@@ -998,12 +1000,13 @@ function SetupScreen({
   const step3Ref = useRef<HTMLElement | null>(null);
   const step4Ref = useRef<HTMLElement | null>(null);
   const previewReady = Boolean(previewCandles && previewCandles.length >= 2 && !previewError);
+  const previewStepVisible = previewReady && previewDwellComplete;
   const collectionReady = Boolean(collectionSources?.every((source) => source.status === "ready"));
   const collectionStepComplete = collectionReady && collectionDwellComplete;
   const investmentReady = investmentMode === "new"
     ? initialCash > 0
     : investmentMode === "holding" && averagePrice > 0 && holdingQuantity > 0;
-  const activeStep = investmentConfirmed ? 4 : collectionStepComplete ? 3 : previewReady ? 2 : 1;
+  const activeStep = investmentConfirmed ? 4 : collectionStepComplete ? 3 : previewStepVisible ? 2 : 1;
 
   useEffect(() => {
     let cancelled = false;
@@ -1065,13 +1068,21 @@ function SetupScreen({
   useEffect(() => {
     if (!pickedTicker || !previewReady) return;
     const timer = window.setTimeout(() => {
-      setCollectionDwellComplete(true);
-    }, COLLECTION_STEP_MIN_MS);
+      setPreviewDwellComplete(true);
+    }, PREVIEW_STEP_MIN_MS);
     return () => window.clearTimeout(timer);
   }, [pickedTicker, previewReady]);
 
   useEffect(() => {
-    if (!pickedTicker || !previewReady) return;
+    if (!pickedTicker || !previewStepVisible) return;
+    const timer = window.setTimeout(() => {
+      setCollectionDwellComplete(true);
+    }, COLLECTION_STEP_MIN_MS);
+    return () => window.clearTimeout(timer);
+  }, [pickedTicker, previewStepVisible]);
+
+  useEffect(() => {
+    if (!pickedTicker || !previewStepVisible) return;
     let cancelled = false;
     callApi<{ data: { sources: CollectionSource[] } }>(`/securities/${encodeURIComponent(pickedTicker)}/scenario-context`)
       .then((payload) => {
@@ -1081,7 +1092,7 @@ function SetupScreen({
         if (!cancelled) setCollectionError(cause instanceof Error ? cause.message : "시나리오 자료를 수집하지 못했습니다.");
       });
     return () => { cancelled = true; };
-  }, [pickedTicker, previewReady]);
+  }, [pickedTicker, previewStepVisible]);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1107,6 +1118,7 @@ function SetupScreen({
     }
     setPreviewCandles(null);
     setPreviewError(null);
+    setPreviewDwellComplete(false);
     setCollectionSources(null);
     setCollectionError(null);
     setCollectionDwellComplete(false);
@@ -1203,6 +1215,7 @@ function SetupScreen({
                 setPicked(null);
                 setPreviewCandles(null);
                 setPreviewError(null);
+                setPreviewDwellComplete(false);
                 setCollectionSources(null);
                 setCollectionError(null);
               }
@@ -1264,7 +1277,7 @@ function SetupScreen({
         )}
       </section>
 
-      {picked && previewReady && (
+      {picked && previewStepVisible && (
       <section ref={step2Ref} className="paper-setup-block paper-setup-reveal">
         <div className="paper-setup-heading"><span>02 · 자료 수집</span><h3>{picked.name} 시나리오 자료를 준비하고 있어요</h3></div>
         <div className={`paper-collection-status ${collectionReady ? "ready" : ""}`} aria-live="polite">
