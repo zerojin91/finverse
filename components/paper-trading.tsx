@@ -1469,10 +1469,6 @@ function SetupScreen({
           </div>
         </div>
         <section className="paper-context-field" aria-live="polite">
-          <div className="paper-simulation-label">
-            <span>현재까지의 맥락</span>
-            <small>실제 4종 자료를 OpenRouter로 분석</small>
-          </div>
           <div className="paper-context-documents" aria-label="초기 맥락 문서 생성 상태">
             {contextDocuments.map((document) => (
               <article key={document.key} className={`paper-context-document ${document.status}`}>
