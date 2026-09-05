@@ -240,6 +240,8 @@ type PersonaOrder = {
   strategy?: string;
   side: "BUY" | "SELL" | "HOLD";
   quantity: number;
+  fill_price?: number;
+  notional?: number;
   rationale?: string;
   filled_quantity?: number;
 };
@@ -323,6 +325,7 @@ type ScenarioGame = {
   fills?: Fill[];
   revealed_events?: ScenarioEvent[];
   daily_reflections?: DailyReflection[];
+  world?: { memory?: { event_ledger?: ScenarioEvent[] } };
 };
 
 type DailyReflection = {
@@ -374,6 +377,12 @@ const toneOf = (value: number) => (value > 0 ? "up" : value < 0 ? "down" : "flat
 const GROUP_LABEL: Record<string, string> = {
   retail: "개인", foreign: "외국인", institution: "기관", pension: "연기금",
 };
+const AGENT_GROUPS = [
+  { key: "retail", label: "개인" },
+  { key: "foreign", label: "외국인" },
+  { key: "institution", label: "기관" },
+  { key: "pension", label: "연기금" },
+] as const;
 const PLATFORM_LABEL: Record<string, string> = { reddit: "커뮤니티", x: "X" };
 
 const PHASE_META: Record<Phase, {
@@ -825,7 +834,7 @@ function DailyPracticeCard({
 
 /* ---------------------------------------------------------- reaction feed */
 
-function EventLog({
+function LegacyEventLog({
   currentEvent,
   revealedEvents,
   worldMode,
@@ -879,7 +888,7 @@ function EventLog({
   );
 }
 
-function ReactionFeed({ game, busy, job }: { game: ScenarioGame; busy: boolean; job: Job | null }) {
+function LegacyReactionFeed({ game, busy, job }: { game: ScenarioGame; busy: boolean; job: Job | null }) {
   const rounds = useMemo(
     () => [...(game.agent_rounds ?? [])].reverse(), [game.agent_rounds]);
   const signalsByDate = useMemo(() => {
@@ -980,6 +989,181 @@ function ReactionFeed({ game, busy, job }: { game: ScenarioGame; busy: boolean; 
         </article>
       ))}
     </div>
+  );
+}
+
+function eventTypeLabel(event: ScenarioEvent) {
+  return event.event_type === "seasonal" ? "계절성" : event.event_type === "surprise" ? "서프라이즈" : "모멘텀";
+}
+
+// 이전 게임 데이터와의 호환을 위해 구현을 남겨 둔다. 새 화면은 아래의
+// EventTimeline과 AgentActivityFeed를 사용한다.
+void LegacyEventLog;
+void LegacyReactionFeed;
+
+function EventTimeline({ game, worldMode }: { game: ScenarioGame; worldMode: boolean }) {
+  const events = useMemo(() => {
+    const byId = new Map<string, ScenarioEvent>();
+    for (const event of game.world?.memory?.event_ledger ?? []) byId.set(event.event_id, event);
+    for (const event of game.revealed_events ?? []) byId.set(event.event_id, event);
+    if (game.current_event && (worldMode || game.current_event.status !== "hidden")) {
+      byId.set(game.current_event.event_id, game.current_event);
+    }
+    return [...byId.values()].sort((left, right) => right.sequence - left.sequence);
+  }, [game.current_event, game.revealed_events, game.world?.memory?.event_ledger, worldMode]);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+
+  const selectedEvent = events.find((event) => event.event_id === selectedEventId) ?? events[0] ?? null;
+  const visible = selectedEvent ? selectedEvent.status !== "hidden" || worldMode : false;
+
+  return (
+    <section className="paper-record-column paper-event-column" aria-label="시나리오 이벤트 기록">
+      <header className="paper-record-heading">
+        <div><CalendarClock size={14} /><strong>이벤트 기록</strong></div>
+        <em>{events.length ? events.length + "건 누적" : "발생 전"}</em>
+      </header>
+      {!events.length ? (
+        <div className="paper-record-empty">
+          <CalendarClock size={20} />
+          <strong>아직 발생한 이벤트가 없습니다</strong>
+          <p>시뮬레이션 중 중요한 이벤트가 발생하면 이곳에 계속 쌓입니다.</p>
+        </div>
+      ) : (
+        <>
+          <div className="paper-event-timeline">
+            {events.map((event) => {
+              const eventVisible = event.status !== "hidden" || worldMode;
+              return (
+                <button
+                  className={"paper-event-item " + (event.event_id === selectedEvent?.event_id ? "active" : "")}
+                  type="button"
+                  key={event.event_id}
+                  onClick={() => setSelectedEventId(event.event_id)}
+                >
+                  <i />
+                  <span>
+                    <small>{event.event_date} · {eventTypeLabel(event)}</small>
+                    <b>{eventVisible && event.title ? event.title : "공개 예정 이벤트"}</b>
+                  </span>
+                  <ChevronRight size={13} />
+                </button>
+              );
+            })}
+          </div>
+          {selectedEvent && (
+            <article className={"paper-event-detail " + selectedEvent.status}>
+              <div className="paper-event-detail-top">
+                <span>이벤트 {selectedEvent.sequence}</span>
+                <em>{selectedEvent.event_date} · {visible ? "공개" : "예정"}</em>
+              </div>
+              <h4>{visible && selectedEvent.title ? selectedEvent.title : "아직 공개되지 않은 이벤트"}</h4>
+              <p>{visible && selectedEvent.description ? selectedEvent.description : selectedEvent.pre_brief || "발생 시 공개되는 이벤트입니다."}</p>
+              {visible && selectedEvent.public_signal && <div className="paper-event-signal"><Landmark size={13} /><span>{selectedEvent.public_signal}</span></div>}
+              {selectedEvent.analogue_title && <div className="paper-event-source"><Landmark size={13} /><span>실제 유사 사례 기반 · {selectedEvent.analogue_title}</span></div>}
+              {visible && selectedEvent.ontology_source && <EventProvenanceStrip source={selectedEvent.ontology_source} />}
+            </article>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+function AgentActivityFeed({ game, busy, job }: { game: ScenarioGame; busy: boolean; job: Job | null }) {
+  const rounds = useMemo(() => [...(game.agent_rounds ?? [])].reverse(), [game.agent_rounds]);
+  const [selectedGroup, setSelectedGroup] = useState<(typeof AGENT_GROUPS)[number]["key"]>("retail");
+  const [expandedRoundId, setExpandedRoundId] = useState<string | null>(null);
+
+  const groupCounts = useMemo(() => {
+    const counts = new Map<string, Set<string>>();
+    for (const round of rounds) {
+      for (const order of round.persona_orders ?? []) {
+        if (!counts.has(order.group)) counts.set(order.group, new Set());
+        counts.get(order.group)?.add(order.persona_id);
+      }
+    }
+    return counts;
+  }, [rounds]);
+  const totalAgentCount = [...groupCounts.values()].reduce((sum, ids) => sum + ids.size, 0);
+
+  return (
+    <section className="paper-record-column paper-agent-column" aria-label="거래일별 에이전트 활동">
+      <header className="paper-record-heading">
+        <div><Users size={14} /><strong>에이전트 활동</strong></div>
+        <em>{rounds.length ? totalAgentCount + "명 기록" : "거래일 대기"}</em>
+      </header>
+      <p className="paper-agent-intro">범주를 선택하면 해당 거래일에 그 그룹의 개별 에이전트가 내린 판단을 확인할 수 있습니다.</p>
+      <div className="paper-agent-tabs" role="tablist" aria-label="시장 참여자 범주">
+        {AGENT_GROUPS.map((group) => (
+          <button
+            className={selectedGroup === group.key ? "active" : ""}
+            type="button"
+            role="tab"
+            aria-selected={selectedGroup === group.key}
+            key={group.key}
+            onClick={() => setSelectedGroup(group.key)}
+          >
+            <span>{group.label}</span><em>{groupCounts.get(group.key)?.size ?? 0}명</em>
+          </button>
+        ))}
+      </div>
+      {busy && (
+        <div className="paper-feed-live"><i /><i /><i /><span>{job?.message ?? "에이전트들이 오늘 장을 판단하는 중"}</span></div>
+      )}
+      {!rounds.length && !busy ? (
+        <div className="paper-record-empty compact">
+          <MessageSquare size={20} />
+          <strong>아직 거래일 기록이 없습니다</strong>
+          <p>하루가 진행되면 4개 범주의 판단이 날짜별로 기록됩니다.</p>
+        </div>
+      ) : (
+        <div className="paper-agent-days">
+          {rounds.map((round) => {
+            const orders = (round.persona_orders ?? []).filter((order) => order.group === selectedGroup);
+            const buyOrders = orders.filter((order) => order.side === "BUY");
+            const sellOrders = orders.filter((order) => order.side === "SELL");
+            const holdOrders = orders.filter((order) => order.side === "HOLD");
+            const buyQuantity = buyOrders.reduce((sum, order) => sum + order.quantity, 0);
+            const sellQuantity = sellOrders.reduce((sum, order) => sum + order.quantity, 0);
+            const expanded = expandedRoundId === round.round_id;
+            return (
+              <article className={"paper-agent-day " + (expanded ? "expanded" : "")} key={round.round_id}>
+                <button className="paper-agent-day-summary" type="button" aria-expanded={expanded} onClick={() => setExpandedRoundId(expanded ? null : round.round_id)}>
+                  <span>
+                    <small>{round.phase === "event_reaction" ? "이벤트 반응" : "자율 거래"}</small>
+                    <b>{round.market_date || round.label}</b>
+                  </span>
+                  <span className="paper-agent-day-stats">
+                    <em className="up">매수 {buyOrders.length}</em>
+                    <em className="down">매도 {sellOrders.length}</em>
+                    <em>관망 {holdOrders.length}</em>
+                  </span>
+                  <ChevronRight size={14} />
+                </button>
+                {expanded && (
+                  <div className="paper-agent-day-body">
+                    {round.market_summary && <p className="paper-agent-market-summary">{round.market_summary}</p>}
+                    <div className="paper-agent-flow"><span>매수 {buyQuantity.toLocaleString("ko-KR")}주</span><span>매도 {sellQuantity.toLocaleString("ko-KR")}주</span><b className={toneOf(buyQuantity - sellQuantity)}>순 {Math.abs(buyQuantity - sellQuantity).toLocaleString("ko-KR")}주 {buyQuantity >= sellQuantity ? "매수 우위" : "매도 우위"}</b></div>
+                    {!orders.length ? <p className="paper-record-empty compact">이 거래일에는 선택한 범주의 기록이 없습니다.</p> : (
+                      <div className="paper-agent-order-grid">
+                        {orders.map((order) => (
+                          <div className={"paper-agent-order " + (order.side === "BUY" ? "up" : order.side === "SELL" ? "down" : "flat")} key={order.persona_id}>
+                            <header><b>{order.persona_id}</b><span>{order.strategy ? agentStrategyLabel(order.strategy) : "개별 판단"}</span><em>{order.side === "BUY" ? "매수" : order.side === "SELL" ? "매도" : "관망"}</em></header>
+                            <strong>{order.side === "HOLD" ? "포지션 유지" : order.quantity.toLocaleString("ko-KR") + "주"}</strong>
+                            {order.fill_price && <small>체결 기준 {order.fill_price.toLocaleString("ko-KR")}원</small>}
+                            <p>{order.rationale || "공개 정보와 개인 기억을 바탕으로 판단함"}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -1965,7 +2149,6 @@ function TradingScreen({
     const marketDate = latestRound?.market_date;
     return (game.daily_reflections ?? []).find((item) => item.market_date === marketDate);
   }, [game.daily_reflections, latestRound?.market_date]);
-  const event = game.current_event;
   const startFromCoach = useCallback(() => {
     dismissCoach();
     if (worldMode && game.phase === "world_market" && (game.current_day_index ?? 0) === 0 && !busy) {
@@ -2086,15 +2269,17 @@ function TradingScreen({
           </div>
         </section>
 
-        <section className="paper-panel paper-feed-panel" aria-label="시장 반응">
+        <section className="paper-panel paper-feed-panel" aria-label="시장 기록">
           <div className="paper-panel-heading">
-            <div><Radio size={13} /><span>시장 반응과 이벤트 기록</span></div>
-            <em>{game.agent_rounds?.length ? `${game.agent_rounds.length}개 거래일` : "대기"}</em>
+            <div><Radio size={13} /><span>시장 기록</span></div>
+            <em>{game.agent_rounds?.length ? game.agent_rounds.length + "개 거래일" : "대기"}</em>
           </div>
 
           <div className="paper-feed-scroll">
-            <EventLog currentEvent={event} revealedEvents={game.revealed_events} worldMode={worldMode} />
-            <ReactionFeed game={game} busy={busy} job={job} />
+            <div className="paper-record-layout">
+              <EventTimeline game={game} worldMode={worldMode} />
+              <AgentActivityFeed game={game} busy={busy} job={job} />
+            </div>
           </div>
         </section>
       </div>
