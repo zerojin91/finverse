@@ -279,8 +279,10 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .chart-meta.up strong { color: var(--up); }
 .chart-meta.down strong { color: var(--down); }
 .chart-content { display: grid; grid-template-columns: minmax(0,1.7fr) minmax(280px,1fr); align-items: stretch; }
-.chart-wrap { min-width: 0; padding: 18px 12px 18px 22px; border-right: 1px solid var(--line); }
+.chart-wrap { position: relative; min-width: 0; padding: 18px 12px 18px 22px; border-right: 1px solid var(--line); }
 .chart-wrap .forecast-canvas { height: 320px; }
+.chart-wrap.loading .forecast-canvas { opacity: .35; filter: grayscale(.4); transition: opacity .15s ease; }
+.chart-loading-overlay { position: absolute; inset: 18px 12px 18px 22px; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--muted); font-size: 12px; pointer-events: none; }
 .event-rail { min-width: 0; display: flex; flex-direction: column; }
 .event-rail > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 20px 22px 0; }
 .event-rail > header h2 { margin: 0; color: var(--ink); font-size: 15px; font-weight: 650; }

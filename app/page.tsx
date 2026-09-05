@@ -2204,7 +2204,7 @@ export default function Home() {
   const [symbolSearching, setSymbolSearching] = useState(false);
   const [tickerSources, setTickerSources] = useState<TickerSource[] | null>(null);
   const [tickerSourcesError, setTickerSourcesError] = useState<string | null>(null);
-  const [symbolCandles, setSymbolCandles] = useState<KospiMarketData | null>(null);
+  const [symbolCandles, setSymbolCandles] = useState<{ ticker: string; data: KospiMarketData } | null>(null);
   const [selectedScenario, setSelectedScenario] = useState(scenarios[0]);
   const [scenarioDetailOpen, setScenarioDetailOpen] = useState(false);
   const [scenarioEditorial, setScenarioEditorial] = useState<ScenarioEditorial>(() => fallbackEditorial(scenarios[0]));
@@ -2321,10 +2321,10 @@ export default function Home() {
 
   useEffect(() => {
     let active = true;
-    setSymbolCandles(null);
+    const ticker = selectedSymbol.ticker;
     const loadSymbolCandles = async () => {
       try {
-        const response = await fetch(`/api/paper-trading/securities/${encodeURIComponent(selectedSymbol.ticker)}/candles?limit=40`, { cache: "no-store" });
+        const response = await fetch(`/api/paper-trading/securities/${encodeURIComponent(ticker)}/candles?limit=40`, { cache: "no-store" });
         const payload = await response.json().catch(() => null) as { data?: { candles?: Array<{ market_date: string; open: number; high: number; low: number; close: number }> } } | null;
         const rows = payload?.data?.candles ?? [];
         if (!response.ok || !rows.length || !active) return;
@@ -2335,13 +2335,16 @@ export default function Home() {
         const last = candles[candles.length - 1];
         const prev = candles[candles.length - 2];
         setSymbolCandles({
-          latestDate: last.date, latestLabel: last.label, value: last.close,
-          change: prev ? last.close - prev.close : 0,
-          rate: prev ? ((last.close - prev.close) / prev.close) * 100 : 0,
-          candles,
+          ticker,
+          data: {
+            latestDate: last.date, latestLabel: last.label, value: last.close,
+            change: prev ? last.close - prev.close : 0,
+            rate: prev ? ((last.close - prev.close) / prev.close) * 100 : 0,
+            candles,
+          },
         });
       } catch {
-        // keep null; ForecastChart falls back to the KOSPI placeholder while a symbol has no real candles yet
+        // keep the previous symbol's chart on screen (dimmed via the "불러오는 중" state below) rather than flashing the unrelated KOSPI placeholder
       }
     };
     loadSymbolCandles();
@@ -2883,7 +2886,10 @@ export default function Home() {
                     <div className={`chart-meta ${selectedScenario.tone}`}><span>{selectedScenario.duration}</span><strong>{selectedScenario.forecast.replace(/^KOSPI\s*/, "")}</strong></div>
                   </header>
                   <div className="chart-content">
-                    <div className="chart-wrap"><ForecastChart scenario={selectedScenario} marketData={symbolCandles ?? kospiData} /></div>
+                    <div className={`chart-wrap ${symbolCandles?.ticker === selectedSymbol.ticker ? "" : "loading"}`}>
+                      <ForecastChart scenario={selectedScenario} marketData={symbolCandles?.ticker === selectedSymbol.ticker ? symbolCandles.data : symbolCandles?.data ?? kospiData} />
+                      {symbolCandles?.ticker !== selectedSymbol.ticker && <div className="chart-loading-overlay"><LoaderCircle size={18} className="spin" /><span>{selectedSymbol.name} 데이터 불러오는 중…</span></div>}
+                    </div>
                     <aside className="event-rail" aria-label="발생 가능 이벤트">
                       <header><h2>발생 가능 이벤트</h2><span>{selectedScenario.duration}</span></header>
                       <div className="event-timeline">
