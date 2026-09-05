@@ -54,6 +54,15 @@ def test_event_sequence_is_normalized_and_preserves_evidence_basis():
     assert result["event_sequence"][1]["basis"] == "inferred"
 
 
+def test_summary_points_are_limited_to_five_without_list_marker():
+    result = _normalize({
+        "summary": "요약",
+        "summary_points": ["- 첫째임", "둘째임", "셋째임", "넷째임", "다섯째임", "여섯째임"],
+    })
+
+    assert result["summary_points"] == ["첫째임", "둘째임", "셋째임", "넷째임", "다섯째임"]
+
+
 def test_source_news_marks_matching_inferred_timeline_item_as_observed():
     analysis = _normalize({
         "summary": "요약",

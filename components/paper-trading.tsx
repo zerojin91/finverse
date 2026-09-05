@@ -129,6 +129,7 @@ type CollectionSource = {
 
 type InitialContextAnalysis = {
   summary: string;
+  summary_points: string[];
   market: { trend?: string; assessment?: string; signals?: string[] };
   economy: { condition?: string; assessment?: string; signals?: string[] };
   events: { assessment?: string; themes?: string[]; signals?: string[] };
@@ -1554,7 +1555,10 @@ function SetupScreen({
           {initialContextError && <p className="paper-inline-error">{initialContextError}</p>}
           {initialContext && (
             <>
-              <div className="paper-context-summary"><Sparkles size={15} /><p>{initialContext.analysis.summary}</p></div>
+              <section className="paper-context-summary" aria-label="초기 상황 5줄 요약">
+                <h4>5줄 요약</h4>
+                <ul>{initialContext.analysis.summary_points.slice(0, 5).map((point, index) => <li key={`${index}-${point}`}>{point}</li>)}</ul>
+              </section>
               <section className="paper-event-sequence" aria-label="종목 이벤트 시퀀스">
                 <header><strong>종목 이벤트 시퀀스</strong><small>최근 한 달 · 실제 근거 문서 기반</small></header>
                 {initialContext.analysis.event_sequence.length ? (

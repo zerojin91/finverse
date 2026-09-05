@@ -17,7 +17,7 @@ from .kospi_paper_trading import TradingError
 from .llm_client import LLMClient
 
 
-CONTEXT_SCHEMA_VERSION = "initial-context-v7"
+CONTEXT_SCHEMA_VERSION = "initial-context-v8"
 CONTEXT_CACHE_TTL_SECONDS = 12 * 60 * 60
 
 
@@ -150,7 +150,8 @@ def _messages(source: dict[str, Any], evidence_documents: dict[str, str]) -> lis
 
 반환 형식:
 {{
-  "summary": "현재 상황을 설명하는 3~5문장",
+  "summary": "초기 상황을 설명하는 짧은 문단",
+  "summary_points": ["사람이 바로 읽을 수 있는 음슴체 1줄 요약"],
   "market": {{"trend": "상승|하락|횡보|혼조", "assessment": "시장·가격·수급 해석", "signals": ["근거"]}},
   "economy": {{"condition": "우호적|중립|부담|혼조", "assessment": "거시 환경 해석", "signals": ["근거"]}},
   "events": {{"assessment": "최근 사건 흐름 해석", "themes": ["주요 이슈"], "signals": ["근거"]}},
@@ -173,6 +174,7 @@ def _messages(source: dict[str, Any], evidence_documents: dict[str, str]) -> lis
 }}
 
 이벤트 시퀀스는 최근 한 달 내 문서로 확인되는 실제 흐름 3~6개만 날짜순으로 반환한다.
+`summary_points`는 정확히 5개를 반환하고, 각 줄은 45자 이내의 한국어 음슴체로 쓴다. 앞에 `-` 기호는 붙이지 않는다.
 `observed`는 문서에 직접 기록된 사건·수치이고, `inferred`는 여러 문서 근거를 묶은 해석이다.
 미래 사건이나 미래 가격은 이벤트 시퀀스에 절대 넣지 않는다.""",
         },
@@ -211,6 +213,16 @@ def _normalize(value: dict[str, Any]) -> dict[str, Any]:
             normalized[key]["assessment"] = signals[0] if signals else "관측된 자료가 충분하지 않습니다."
     for key in ("positive_factors", "risk_factors", "tensions", "uncertainties", "watch_points"):
         normalized[key] = items(value, key)
+    summary_points = items(value, "summary_points")[:5]
+    if not summary_points:
+        summary_points = [
+            normalized["summary"],
+            normalized["market"].get("assessment", ""),
+            normalized["economy"].get("assessment", ""),
+            normalized["events"].get("assessment", ""),
+            normalized["community"].get("assessment", ""),
+        ]
+    normalized["summary_points"] = [point.removeprefix("-").strip() for point in summary_points if point.strip()][:5]
     sequence = value.get("event_sequence")
     normalized["event_sequence"] = []
     if isinstance(sequence, list):
