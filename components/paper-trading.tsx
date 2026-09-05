@@ -577,12 +577,14 @@ function buildBars(game: CandleChartData, preview = false): Bar[] {
     });
   }
 
-  if (preview) return [...history, ...simulation].slice(-36);
+  if (preview) return [...history, ...simulation].slice(-20);
 
   // 실제 이력은 방향을 읽을 수 있는 만큼만 남기고, 선택한 연습 기간은 오른쪽의
   // 빈 슬롯으로 확보한다. 진행될 때마다 그 슬롯이 시뮬레이션 캔들로 채워진다.
   const historyLimit = Math.max(8, Math.min(14, Math.ceil((game.simulation_days ?? 20) * 0.6)));
-  return [...history.slice(-historyLimit), ...simulation];
+  // 차트는 항상 최대 20칸만 사용한다. 20일을 넘기면 가장 오래된 봉을
+  // 왼쪽에서 제거하고 새 봉을 오른쪽에 붙여, 봉 너비가 계속 좁아지지 않게 한다.
+  return [...history.slice(-historyLimit), ...simulation].slice(-20);
 }
 
 function CandleChart({ game, preview = false }: { game: CandleChartData; preview?: boolean }) {
@@ -601,8 +603,8 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
     const simStart = bars.findIndex((bar) => !bar.real);
     const historicalCount = simStart < 0 ? bars.length : simStart;
     const simulatedCount = bars.length - historicalCount;
-    const futureSlots = preview ? 0 : Math.max(0, (game.simulation_days ?? 20) - simulatedCount);
-    const totalSlots = bars.length + futureSlots;
+    const futureSlots = preview ? 0 : Math.max(0, 20 - bars.length);
+    const totalSlots = Math.max(20, bars.length + futureSlots);
     const slot = (CHART_W - AXIS_W) / totalSlots;
     return {
       top, bottom, span, slot,
@@ -610,6 +612,7 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
       maxVolume: Math.max(...bars.map((bar) => bar.volume), 1),
       simStart: historicalCount,
       futureSlots,
+      remainingSimulationDays: Math.max(0, (game.simulation_days ?? 20) - simulatedCount),
       y: (value: number) => ((top - value) / span) * PRICE_H,
       cx: (index: number) => index * slot + slot / 2,
     };
@@ -625,7 +628,7 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
     );
   }
 
-  const { top, span, slot, bodyW, maxVolume, simStart, futureSlots, y, cx } = layout;
+  const { top, span, slot, bodyW, maxVolume, simStart, futureSlots, remainingSimulationDays, y, cx } = layout;
   const gridValues = [0, 0.25, 0.5, 0.75, 1].map((ratio) => top - span * ratio);
 
   // 사용자 체결은 해당 이벤트가 반응한 봉 위에 표시한다. 사전 판단은 왼쪽,
@@ -773,7 +776,7 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
       <div className="paper-chart-dates">
         <span>{bars[0].date}</span>
         {simStart > 0 && <span>{bars[simStart]?.date}</span>}
-        <span>{preview ? bars[bars.length - 1].date : futureSlots ? `남은 ${futureSlots}거래일` : "연습 완료"}</span>
+        <span>{preview ? bars[bars.length - 1].date : remainingSimulationDays ? `남은 ${remainingSimulationDays}거래일` : "연습 완료"}</span>
       </div>
 
       {!preview && simStart > 0 && <span className="paper-chart-start-label">시뮬레이션 시작</span>}
