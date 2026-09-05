@@ -33,7 +33,7 @@ from .scenario_trading import (
 )
 from .world_simulation import (
     PHASE_COMPLETED as WORLD_PHASE_COMPLETED, PHASE_WORLD_DECISION, PHASE_WORLD_MARKET,
-    advance_world_market, new_world_game, resolve_world_decision, submit_world_order,
+    advance_world_market, new_world_game, record_world_daily_reflection, resolve_world_decision, submit_world_order,
 )
 from .scenario_investor_analyzer import analyze_scenario_investor
 from .scenario_job_manager import ScenarioJobManager
@@ -323,6 +323,20 @@ def create_event_scenario_order(game_id: str):
     return jsonify({"success": True, "data": order, "game": public_scenario_game(game)}), 201
 
 
+@paper_trading_bp.route("/scenarios/<game_id>/daily-reflections", methods=["POST"])
+def create_world_daily_reflection(game_id: str):
+    data, store = request.get_json(silent=True) or {}, _store()
+
+    def record(game):
+        return record_world_daily_reflection(game, data.get("stance", ""))
+
+    updated = store.update(game_id, record)
+    if not updated:
+        return _not_found(game_id)
+    game, reflection = updated
+    return jsonify({"success": True, "data": reflection, "game": public_scenario_game(game)})
+
+
 @paper_trading_bp.route("/scenarios/<game_id>/assessment", methods=["GET"])
 def get_event_scenario_assessment(game_id: str):
     game = _store().get(game_id)
@@ -357,7 +371,7 @@ def start_event_scenario_action(game_id: str):
             if action == "advance":
                 def advance(game):
                     report(4, "World Agent가 다음 거래일의 외부 환경을 열고 있습니다.")
-                    return advance_world_market(game, progress=report)
+                    return advance_world_market(game, days=data.get("days", 1), progress=report)
                 store.update(game_id, advance)
             elif action == "resolve":
                 def resolve(game):

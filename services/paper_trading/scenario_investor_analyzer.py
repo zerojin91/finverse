@@ -12,6 +12,7 @@ def analyze_scenario_investor(game: dict[str, Any]) -> dict[str, Any]:
     pre = [fill for fill in fills if fill.get("phase") == "pre_event_decision"]
     post = [fill for fill in fills if fill.get("phase") == "post_event_decision"]
     world_decisions = [fill for fill in fills if fill.get("phase") == "world_decision"]
+    daily_reflections = game.get("daily_reflections", [])
     equity = scenario_portfolio(game)
     prices = [row["price"] for row in game.get("price_history", [])]
     peak, max_drawdown = prices[0] if prices else 0, 0.0
@@ -34,6 +35,8 @@ def analyze_scenario_investor(game: dict[str, Any]) -> dict[str, Any]:
                        if float(fill.get("confidence") or 0) >= 80]
     loss_avoidance_sells = [fill for fill in world_decisions
                             if fill.get("side") == "SELL" and float(fill.get("realized_pnl") or 0) < 0]
+    daily_buy_bias = sum(row.get("stance") == "BUY_WATCH" for row in daily_reflections)
+    daily_sell_bias = sum(row.get("stance") == "SELL_WATCH" for row in daily_reflections)
     findings, lessons = [], []
     if post_chases:
         findings.append(f"이벤트 공개 후 추가 매수가 {post_chases}회 있었습니다.")
@@ -44,6 +47,10 @@ def analyze_scenario_investor(game: dict[str, Any]) -> dict[str, Any]:
     if world_decisions:
         findings.append(f"중요 사건 판단 게이트에서 사용자 주문이 {len(world_decisions)}회 기록됐습니다.")
         lessons.append({"topic": "사건 판단 기록", "message": "사건의 첫 인상, 실제 근거, 주문 이유를 분리해 다음 판단과 비교해 보세요."})
+    if daily_reflections:
+        findings.append(f"평상시 거래일 판단을 {len(daily_reflections)}회 기록했습니다.")
+        if daily_buy_bias or daily_sell_bias:
+            lessons.append({"topic": "일일 방향성 점검", "message": "매수·매도 고려를 남긴 날의 다음 거래일 반응을 비교해, 추세 추종과 성급한 반전 기대를 구분해 보세요."})
     if high_confidence:
         findings.append(f"확신도 80% 이상으로 기록한 주문이 {len(high_confidence)}회 있습니다.")
     if loss_avoidance_sells:
@@ -64,6 +71,9 @@ def analyze_scenario_investor(game: dict[str, Any]) -> dict[str, Any]:
         "metrics": {"completed_events": completed_events, "trade_count": len(fills),
                     "pre_event_trades": len(pre), "post_event_trades": len(post),
                     "world_decision_trades": len(world_decisions),
+                    "daily_reflection_count": len(daily_reflections),
+                    "daily_buy_watch_count": daily_buy_bias,
+                    "daily_sell_watch_count": daily_sell_bias,
                     "high_confidence_trade_count": len(high_confidence),
                     "loss_avoidance_sell_count": len(loss_avoidance_sells),
                     "autonomous_market_days": autonomous_market_days,

@@ -1260,6 +1260,25 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-feed-empty strong { margin-top: 10px; color: #52525b; font-size: 12px; }
 .paper-feed-empty p { max-width: 320px; margin: 6px 0 0; font-size: 9px; line-height: 1.6; }
 .paper-desk-scroll { min-height: 0; flex: 1; overflow-y: auto; padding: 12px 14px; }
+.paper-daily-practice { margin-bottom: 12px; padding: 13px; border: 1px solid #dbeafe; border-radius: 10px; background: #f8fbff; }
+.paper-daily-practice.waiting { display: grid; gap: 6px; border-style: dashed; border-color: var(--line); color: var(--muted); background: #fafafa; }
+.paper-daily-practice.waiting > span { color: var(--light); font-size: 8px; font-weight: 900; letter-spacing: .08em; }
+.paper-daily-practice.waiting > strong { color: var(--muted); font-size: 10px; line-height: 1.6; }
+.paper-daily-practice-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.paper-daily-practice-head span { color: #1d4ed8; font-size: 9px; font-weight: 900; letter-spacing: .07em; }
+.paper-daily-practice-head em { color: var(--light); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 8px; font-style: normal; }
+.paper-daily-practice > p { margin: 7px 0 9px; color: #3f3f46; font-size: 11px; line-height: 1.65; }
+.paper-daily-practice-flow { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; padding: 7px 9px; border-radius: 7px; background: #fff; }
+.paper-daily-practice-flow b { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }.paper-daily-practice-flow b.up { color: var(--up); }.paper-daily-practice-flow b.down { color: var(--down); }
+.paper-daily-practice-flow span { color: var(--muted); font-size: 9px; line-height: 1.45; }
+.paper-daily-choices { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; }
+.paper-daily-choices button { min-height: 59px; display: grid; align-content: center; gap: 3px; padding: 7px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); text-align: left; background: #fff; font-family: inherit; cursor: pointer; }
+.paper-daily-choices button:hover:not(:disabled) { border-color: #a1a1aa; background: #fafafa; }.paper-daily-choices button:disabled { cursor: default; opacity: .68; }
+.paper-daily-choices b { color: var(--ink); font-size: 9px; }.paper-daily-choices span { color: var(--light); font-size: 8px; line-height: 1.35; }
+.paper-daily-choices button.buy_watch.active { border-color: #fca5a5; background: #fff5f5; }.paper-daily-choices button.buy_watch.active b { color: #b91c1c; }
+.paper-daily-choices button.hold_watch.active { border-color: #a5b4fc; background: #f5f7ff; }.paper-daily-choices button.hold_watch.active b { color: #3730a3; }
+.paper-daily-choices button.sell_watch.active { border-color: #93c5fd; background: #f5faff; }.paper-daily-choices button.sell_watch.active b { color: #1d4ed8; }
+.paper-daily-practice > small { display: block; margin-top: 9px; color: var(--light); font-size: 8px; line-height: 1.5; }
 .paper-holdings { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; margin-bottom: 13px; }
 .paper-holdings > div { padding: 9px 11px; border: 1px solid #ececef; border-radius: 8px; background: #fafafa; }
 .paper-holdings span { display: block; margin-bottom: 3px; color: var(--light); font-size: 8px; font-weight: 900; letter-spacing: .06em; }
@@ -1311,6 +1330,8 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-assessment p { margin: 0; color: #14532d; font-size: 10px; line-height: 1.65; white-space: pre-wrap; }
 .paper-advance-row { display: flex; gap: 8px; margin: 0 14px 14px; }
 .paper-advance-row .paper-advance { flex: 1; margin: 0; }
+.paper-advance-fast { min-height: 50px; flex: 1.15; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 13px; border: 1px solid #c7d2fe; border-radius: 10px; color: #3730a3; background: #f5f7ff; font-family: inherit; font-size: 10px; font-weight: 800; cursor: pointer; }
+.paper-advance-fast:hover { border-color: #818cf8; background: #eef2ff; }
 .paper-advance-day { min-height: 50px; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: #fff; font-family: inherit; font-size: 12px; font-weight: 700; white-space: nowrap; cursor: pointer; }
 .paper-advance-day:hover { border-color: #a1a1aa; background: #fafafa; }
 .paper-advance { min-height: 50px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; margin: 0 14px 14px; border: 0; border-radius: 10px; color: #fff; background: var(--ink); font-family: inherit; font-size: 13px; font-weight: 750; cursor: pointer; }

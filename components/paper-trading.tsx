@@ -324,6 +324,16 @@ type ScenarioGame = {
   agent_rounds?: AgentRound[];
   fills?: Fill[];
   revealed_events?: ScenarioEvent[];
+  daily_reflections?: DailyReflection[];
+};
+
+type DailyReflection = {
+  market_date: string;
+  stance: "BUY_WATCH" | "HOLD_WATCH" | "SELL_WATCH";
+  label: string;
+  market_return_pct?: number;
+  market_summary?: string;
+  recorded_at?: string;
 };
 
 type Job = {
@@ -499,12 +509,6 @@ const STEP_LABEL: Record<Phase, string> = {
   world_decision: "중요 판단",
   completed: "회고",
 };
-
-/** `*강조*` 표기만 굵게 바꿔 안내 문구를 읽기 쉽게 만든다. */
-function emphasise(text: string) {
-  return text.split(/\*([^*]+)\*/g).map((chunk, index) =>
-    index % 2 ? <b key={index}>{chunk}</b> : <span key={index}>{chunk}</span>);
-}
 
 async function callApi<T = Record<string, unknown>>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api/paper-trading${path}`, {
@@ -854,6 +858,57 @@ function PsychologyStrip({ round }: { round?: AgentRound }) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+const DAILY_STANCES: { key: DailyReflection["stance"]; label: string; description: string }[] = [
+  { key: "BUY_WATCH", label: "내일 매수 고려", description: "상승 가능성을 더 확인" },
+  { key: "HOLD_WATCH", label: "관찰 계속", description: "지금은 근거를 더 모음" },
+  { key: "SELL_WATCH", label: "내일 매도 고려", description: "위험 확대 가능성을 점검" },
+];
+
+function DailyPracticeCard({
+  round, reflection, disabled, onSelect,
+}: {
+  round?: AgentRound;
+  reflection?: DailyReflection;
+  disabled: boolean;
+  onSelect: (stance: DailyReflection["stance"]) => void;
+}) {
+  if (!round) {
+    return (
+      <div className="paper-daily-practice waiting">
+        <span>오늘의 시장 요약</span>
+        <strong>첫 거래일을 열면 그날의 시장 상황과 에이전트 반응을 바탕으로 판단을 남길 수 있습니다.</strong>
+      </div>
+    );
+  }
+  return (
+    <div className="paper-daily-practice">
+      <div className="paper-daily-practice-head">
+        <span>오늘의 시장 요약</span>
+        <em>{round.market_date}</em>
+      </div>
+      <p>{round.market_summary || "오늘의 공개 정보와 시장 참여자 반응을 확인하세요."}</p>
+      <div className="paper-daily-practice-flow">
+        <b className={toneOf(round.return_pct)}>{signedPct(round.return_pct)}</b>
+        <span>59개 에이전트 반응 후 형성된 오늘의 종가</span>
+      </div>
+      <div className="paper-daily-choices" role="group" aria-label="오늘의 방향성 판단">
+        {DAILY_STANCES.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            className={`${item.key.toLowerCase()} ${reflection?.stance === item.key ? "active" : ""}`}
+            onClick={() => onSelect(item.key)}
+            disabled={disabled}
+          >
+            <b>{item.label}</b><span>{item.description}</span>
+          </button>
+        ))}
+      </div>
+      <small>이 판단은 주문이 아니며 시장 가격을 움직이지 않습니다. 마지막 회고에서 다음 거래일 결과와 비교합니다.</small>
     </div>
   );
 }
@@ -2078,6 +2133,7 @@ function TradingScreen({
   assessment,
   orderSubmitting,
   onOrder,
+  onDailyReflection,
   onAdvance,
   onReset,
   onClose,
@@ -2090,6 +2146,7 @@ function TradingScreen({
   assessment: Assessment | null;
   orderSubmitting: boolean;
   onOrder: (input: { side: "BUY" | "SELL"; quantity: number; rationale: string; confidence: number }) => void;
+  onDailyReflection: (stance: DailyReflection["stance"]) => void;
   onAdvance: (days?: number) => void;
   onReset: () => void;
   onClose: () => void;
@@ -2122,6 +2179,10 @@ function TradingScreen({
     : (game.phase === "completed" ? game.total_events : game.current_event_index);
   const eventProgress = totalProgressUnits ? Math.min(100, (currentProgressUnits / totalProgressUnits) * 100) : 0;
   const latestRound = game.agent_rounds?.[game.agent_rounds.length - 1];
+  const latestReflection = useMemo(() => {
+    const marketDate = latestRound?.market_date;
+    return (game.daily_reflections ?? []).find((item) => item.market_date === marketDate);
+  }, [game.daily_reflections, latestRound?.market_date]);
   const event = game.current_event;
   const startFromCoach = useCallback(() => {
     dismissCoach();
@@ -2202,22 +2263,15 @@ function TradingScreen({
             <em>{meta.eyebrow}</em>
           </div>
 
-          <div className="paper-now">
-            <div className="paper-now-head">
-              <span>현재 단계</span>
-              <b>{meta.label}</b>
-            </div>
-            <ol>
-              {meta.todo.map((line) => <li key={line}>{emphasise(line)}</li>)}
-            </ol>
-            {!coach && (
-              <button type="button" className="paper-now-help" onClick={() => setCoach(true)}>
-                전체 흐름 다시 보기
-              </button>
-            )}
-          </div>
-
           <div className="paper-desk-scroll">
+            {worldMode && (
+              <DailyPracticeCard
+                round={latestRound}
+                reflection={latestReflection}
+                disabled={busy || game.phase !== "world_market"}
+                onSelect={onDailyReflection}
+              />
+            )}
             <div className="paper-holdings">
               <div><span>평가금액</span><strong>{compactWon(portfolio.market_value)}</strong></div>
               <div><span>평단가</span><strong>{portfolio.average_price ? portfolio.average_price.toLocaleString("ko-KR") : "—"}</strong></div>
@@ -2263,6 +2317,15 @@ function TradingScreen({
           </div>
 
           <div className="paper-advance-row">
+            {worldMode && meta.action === "advance" && !busy && (
+              <button
+                className="paper-advance-fast"
+                type="button"
+                onClick={() => onAdvance(Math.max(1, (game.simulation_days ?? 1) - (game.current_day_index ?? 0)))}
+              >
+                중요 사건 전까지 빠르게 진행
+              </button>
+            )}
             {meta.action === "advance_days" && !busy && (
               <button className="paper-advance-day" type="button" onClick={() => onAdvance(1)}>
                 <CalendarClock size={15} /> 하루만
@@ -2271,7 +2334,7 @@ function TradingScreen({
             <button className="paper-advance" type="button" onClick={() => onAdvance()} disabled={busy}>
               {busy
                 ? <><LoaderCircle size={16} className="spin" /> {job?.message ?? "진행 중"}</>
-                : <>{meta.cta} <ChevronRight size={16} /></>}
+                : <>{worldMode && meta.action === "advance" ? "하루씩 보기" : meta.cta} <ChevronRight size={16} /></>}
             </button>
           </div>
         </section>
@@ -2523,6 +2586,20 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
     }
   }, [game]);
 
+  const recordDailyReflection = useCallback(async (stance: DailyReflection["stance"]) => {
+    if (!game || busy) return;
+    setError(null);
+    try {
+      const payload = await callApi<{ game: ScenarioGame }>(`/scenarios/${game.game_id}/daily-reflections`, {
+        method: "POST",
+        body: JSON.stringify({ stance }),
+      });
+      setGame(payload.game);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "오늘의 판단을 기록하지 못했습니다.");
+    }
+  }, [busy, game]);
+
   return (
     <div className="modal-backdrop paper-trading-backdrop" onMouseDown={onClose}>
       <section
@@ -2542,6 +2619,7 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
               assessment={assessment}
               orderSubmitting={orderSubmitting}
               onOrder={submitOrder}
+              onDailyReflection={recordDailyReflection}
               onAdvance={advance}
               onReset={reset}
               onClose={onClose}

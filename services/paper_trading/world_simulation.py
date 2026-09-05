@@ -94,6 +94,9 @@ def new_world_game(
         },
         "world": world, "events": [], "revealed_events": [], "released_signals": [],
         "pending_orders": [], "fills": [], "agent_rounds": [], "decision_log": [], "user_decision_memory": [],
+        # 평상시 거래일의 방향성 메모다. 실제 주문과 달리 시장 체결에는 영향을 주지
+        # 않고, 마지막 투자 회고에서만 사용자의 판단 패턴을 비교한다.
+        "daily_reflections": [],
         "history_candles": _real_candles(impact_history),
         "price_history": [{"step": 0, "label": "시뮬레이션 시작", "phase": "initial", "price": int(previous_close),
                            "market_date": str(impact_history[-1].get("trade_date") or ""), "real": True}],
@@ -125,6 +128,48 @@ def submit_world_order(game: dict[str, Any], side: str, quantity: int, rationale
     return order
 
 
+DAILY_REFLECTION_LABELS = {
+    "BUY_WATCH": "내일 매수 고려",
+    "HOLD_WATCH": "관찰 계속",
+    "SELL_WATCH": "내일 매도 고려",
+}
+
+
+def record_world_daily_reflection(game: dict[str, Any], stance: str) -> dict[str, Any]:
+    """Save a daily learning note without placing or simulating a user order."""
+    if game.get("mode") != "world":
+        raise TradingError("일일 판단 기록은 World Agent 모의투자에서만 지원합니다.")
+    if game.get("phase") not in (PHASE_WORLD_MARKET, PHASE_COMPLETED):
+        raise TradingError("중요 사건 판단 중에는 일일 메모 대신 주문 판단을 기록해주세요.")
+    stance = str(stance or "").upper()
+    if stance not in DAILY_REFLECTION_LABELS:
+        raise TradingError("매수 고려, 관찰, 매도 고려 중 하나를 선택해주세요.")
+    rounds = game.get("agent_rounds") or []
+    if not rounds:
+        raise TradingError("첫 거래일이 열린 뒤 오늘의 판단을 기록할 수 있습니다.")
+    latest = rounds[-1]
+    market_date = str(latest.get("market_date") or "")
+    if not market_date:
+        raise TradingError("오늘의 시장 날짜를 확인하지 못했습니다.")
+    reflection = {
+        "market_date": market_date,
+        "stance": stance,
+        "label": DAILY_REFLECTION_LABELS[stance],
+        "market_return_pct": latest.get("return_pct"),
+        "market_summary": latest.get("market_summary"),
+        "recorded_at": datetime.now().isoformat(),
+    }
+    reflections = game.setdefault("daily_reflections", [])
+    for index, existing in enumerate(reflections):
+        if existing.get("market_date") == market_date:
+            reflections[index] = reflection
+            break
+    else:
+        reflections.append(reflection)
+    game["updated_at"] = datetime.now().isoformat()
+    return reflection
+
+
 def _run_market_agents(
     game: dict[str, Any], market_date: str, information: dict[str, Any], phase: str,
     progress: Callable[[int, int, str], None] | None,
@@ -134,7 +179,7 @@ def _run_market_agents(
     )
 
 
-def advance_world_market(game: dict[str, Any], *, progress: Callable[[int, str], None] | None = None) -> dict[str, Any]:
+def _advance_world_market_day(game: dict[str, Any], *, progress: Callable[[int, str], None] | None = None) -> dict[str, Any]:
     if game.get("phase") != PHASE_WORLD_MARKET:
         raise TradingError("현재는 다음 거래일 환경을 진행할 수 없습니다.")
     step = advance_environment(game)
@@ -163,6 +208,25 @@ def advance_world_market(game: dict[str, Any], *, progress: Callable[[int, str],
     game["status"] = "completed" if game["phase"] == PHASE_COMPLETED else "ready"
     game["updated_at"] = datetime.now().isoformat()
     return {"completed": game["phase"] == PHASE_COMPLETED, "awaiting_user": False, "market_date": market_date, "round": result}
+
+
+def advance_world_market(game: dict[str, Any], *, days: int = 1,
+                         progress: Callable[[int, str], None] | None = None) -> dict[str, Any]:
+    """Advance one or more trading days, stopping before every important event."""
+    requested_days = max(1, min(int(days or 1), max(1, int(game.get("simulation_days") or 1))))
+    progressed: list[dict[str, Any]] = []
+    result: dict[str, Any] = {}
+    for index in range(requested_days):
+        if game.get("phase") != PHASE_WORLD_MARKET:
+            break
+        result = _advance_world_market_day(game, progress=progress)
+        progressed.append(result)
+        if result.get("awaiting_user") or result.get("completed"):
+            break
+        if progress and requested_days > 1:
+            progress(min(96, 10 + round(86 * (index + 1) / requested_days)),
+                     f"{index + 1}/{requested_days} 거래일을 진행했습니다.")
+    return {**result, "advanced_days": len(progressed), "requested_days": requested_days}
 
 
 def resolve_world_decision(game: dict[str, Any], *, progress: Callable[[int, str], None] | None = None) -> dict[str, Any]:
