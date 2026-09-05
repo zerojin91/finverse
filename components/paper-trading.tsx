@@ -2197,7 +2197,6 @@ function TradingScreen({
 
   const meta = PHASE_META[game.phase] ?? PHASE_META.inter_event_market;
   const worldMode = game.mode === "world";
-  const portfolio = game.portfolio;
   const totalProgressUnits = worldMode ? (game.simulation_days ?? 0) : game.total_events;
   const currentProgressUnits = worldMode
     ? (game.phase === "completed" ? totalProgressUnits : game.current_day_index ?? 0)
@@ -2264,13 +2263,6 @@ function TradingScreen({
                 onSelect={onDailyReflection}
               />
             )}
-            <div className="paper-holdings">
-              <div><span>평가금액</span><strong>{compactWon(portfolio.market_value)}</strong></div>
-              <div><span>평단가</span><strong>{portfolio.average_price ? portfolio.average_price.toLocaleString("ko-KR") : "—"}</strong></div>
-              <div><span>평가손익</span><strong className={toneOf(portfolio.unrealized_pnl)}>{portfolio.unrealized_pnl ? compactWon(portfolio.unrealized_pnl) : "—"}</strong></div>
-              <div><span>실현손익</span><strong className={toneOf(portfolio.realized_pnl)}>{portfolio.realized_pnl ? compactWon(portfolio.realized_pnl) : "—"}</strong></div>
-            </div>
-
             {meta.canOrder && !worldMode
               ? <OrderDesk game={game} disabled={busy} onSubmit={onOrder} submitting={orderSubmitting} />
               : (!worldMode && (

@@ -1365,12 +1365,6 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-daily-choices button.hold_watch.active { border-color: #a5b4fc; background: #f5f7ff; }.paper-daily-choices button.hold_watch.active b { color: #3730a3; }
 .paper-daily-choices button.sell_watch.active { border-color: #93c5fd; background: #f5faff; }.paper-daily-choices button.sell_watch.active b { color: #1d4ed8; }
 .paper-daily-practice > small { display: block; margin-top: 9px; color: var(--light); font-size: 8px; line-height: 1.5; }
-.paper-holdings { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; margin-bottom: 13px; }
-.paper-holdings > div { padding: 9px 11px; border: 1px solid #ececef; border-radius: 8px; background: #fafafa; }
-.paper-holdings span { display: block; margin-bottom: 3px; color: var(--light); font-size: 8px; font-weight: 900; letter-spacing: .06em; }
-.paper-holdings strong { color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
-.paper-holdings strong.up { color: var(--up); }
-.paper-holdings strong.down { color: var(--down); }
 .paper-order { display: flex; flex-direction: column; gap: 11px; }
 .paper-order.locked { opacity: .5; }
 .paper-order-side { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
@@ -1684,7 +1678,6 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
   .paper-document-modal { height: calc(100vh - 24px); border-radius: 12px; }
   .paper-document-modal > header { padding: 20px 18px 16px; }
   .paper-document-modal pre { padding: 18px; }
-  .paper-holdings { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
 
 @media (min-width: 1101px) {
