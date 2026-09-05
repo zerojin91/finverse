@@ -194,6 +194,30 @@ type AgentProfiles = {
   groups: AgentProfileGroup[];
 };
 
+type AgentProfileDetail = {
+  persona_id: string;
+  group: AgentProfileGroup["key"];
+  group_label: string;
+  role_description: string;
+  risk_tolerance: number;
+  profile: {
+    display_name: string;
+    investment_thesis: string;
+    focus_signals: string[];
+    bias: string;
+    holding_horizon: string;
+    event_response: string;
+    risk_rule: string;
+    initial_stance: "bullish" | "bearish" | "neutral" | "mixed";
+  };
+};
+
+type AgentProfileGroupDetails = {
+  group: AgentProfileGroup["key"];
+  label: string;
+  profiles: AgentProfileDetail[];
+};
+
 type ContextDocumentProgress = { key: "market" | "economy" | "events" | "community"; label: string; file: string; status: "waiting" | "generating" | "ready" };
 
 const INITIAL_CONTEXT_DOCUMENTS: ContextDocumentProgress[] = [
@@ -1112,6 +1136,9 @@ function SetupScreen({
   const [resetSetupError, setResetSetupError] = useState<string | null>(null);
   const [selectedContextDocument, setSelectedContextDocument] = useState<{ label: string; content: string } | null>(null);
   const [contextDocumentLoading, setContextDocumentLoading] = useState(false);
+  const [selectedAgentGroup, setSelectedAgentGroup] = useState<AgentProfileGroup | null>(null);
+  const [agentProfileDetails, setAgentProfileDetails] = useState<AgentProfileGroupDetails | null>(null);
+  const [agentProfileDetailsLoading, setAgentProfileDetailsLoading] = useState(false);
   const pickedTicker = picked?.ticker;
   const step2Ref = useRef<HTMLElement | null>(null);
   const step3Ref = useRef<HTMLElement | null>(null);
@@ -1137,6 +1164,16 @@ function SetupScreen({
       .then((content) => setSelectedContextDocument({ label: document.label, content }))
       .catch(() => setSelectedContextDocument({ label: document.label, content: "문서를 불러오지 못했습니다." }))
       .finally(() => setContextDocumentLoading(false));
+  };
+  const openAgentProfileGroup = (group: AgentProfileGroup) => {
+    if (!pickedTicker) return;
+    setSelectedAgentGroup(group);
+    setAgentProfileDetails(null);
+    setAgentProfileDetailsLoading(true);
+    callApi<{ data: AgentProfileGroupDetails }>(`/securities/${encodeURIComponent(pickedTicker)}/agent-profiles/${group.key}`)
+      .then((payload) => setAgentProfileDetails(payload.data))
+      .catch(() => setAgentProfileDetails({ group: group.key, label: group.label, profiles: [] }))
+      .finally(() => setAgentProfileDetailsLoading(false));
   };
   const investmentReady = investmentMode === "new"
     ? initialCash > 0
@@ -1710,7 +1747,12 @@ function SetupScreen({
               {agentProfiles?.groups.map((agent) => {
                 const Icon = AGENT_GROUP_ICON[agent.key];
                 return (
-                  <article className={`paper-agent-card ${agent.key}`} key={agent.key}>
+                  <article className={`paper-agent-card ${agent.key}`} key={agent.key} role="button" tabIndex={0} onClick={() => openAgentProfileGroup(agent)} onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openAgentProfileGroup(agent);
+                    }
+                  }} aria-label={`${agent.label} ${agent.count}명 개별 프로필 보기`}>
                     <header>
                       <div className="paper-agent-title"><Icon size={15} /><strong>{agent.label}</strong></div>
                       <b>{agent.count}명</b>
@@ -1724,6 +1766,7 @@ function SetupScreen({
                       <div><dt>행동 빈도</dt><dd>{agent.activity_frequency === "high" ? "높음" : agent.activity_frequency === "medium" ? "보통" : "낮음"}</dd></div>
                       <div><dt>시장 영향</dt><dd>{agent.market_impact_tier === "very_high" ? "매우 큼" : agent.market_impact_tier === "high" ? "큼" : agent.market_impact_tier === "medium" ? "중간" : "낮음"}</dd></div>
                     </dl>
+                    <span className="paper-agent-card-link">개별 프로필 {agent.count}명 보기 <ArrowRight size={13} /></span>
                   </article>
                 );
               })}
@@ -1787,6 +1830,28 @@ function SetupScreen({
               <button className="scenario-modal-close" type="button" onClick={() => setSelectedContextDocument(null)} aria-label="Evidence 문서 닫기"><X size={18} /></button>
             </header>
             <pre>{selectedContextDocument.content}</pre>
+          </section>
+        </div>
+      )}
+      {selectedAgentGroup && (
+        <div className="paper-document-backdrop" role="presentation" onMouseDown={() => setSelectedAgentGroup(null)}>
+          <section className="paper-agent-modal" role="dialog" aria-modal="true" aria-labelledby="paper-agent-modal-title" onMouseDown={(event) => event.stopPropagation()}>
+            <header>
+              <div><span>MARKET AGENT PROFILES</span><h3 id="paper-agent-modal-title">{picked?.name} · {selectedAgentGroup.label}</h3><p>초기 상황과 역할 정책을 바탕으로 각각 생성된 독립 에이전트 프로필입니다.</p></div>
+              <button className="scenario-modal-close" type="button" onClick={() => setSelectedAgentGroup(null)} aria-label="개별 에이전트 프로필 닫기"><X size={18} /></button>
+            </header>
+            {agentProfileDetailsLoading ? <div className="paper-agent-modal-loading"><LoaderCircle size={18} className="spin" /> 개별 프로필을 불러오는 중입니다.</div> : agentProfileDetails?.profiles.length ? (
+              <div className="paper-agent-profile-list">
+                {agentProfileDetails.profiles.map((agent) => <article className="paper-agent-profile-detail" key={agent.persona_id}>
+                  <header><div><small>{agent.persona_id}</small><h4>{agent.profile.display_name}</h4><p>{agent.role_description}</p></div><span className={`paper-agent-stance ${agent.profile.initial_stance}`}>{agent.profile.initial_stance}</span></header>
+                  <p className="paper-agent-thesis">{agent.profile.investment_thesis}</p>
+                  <dl><div><dt>편향</dt><dd>{agent.profile.bias}</dd></div><div><dt>보유 관점</dt><dd>{agent.profile.holding_horizon}</dd></div><div><dt>위험 허용</dt><dd>{agent.risk_tolerance.toFixed(2)}</dd></div></dl>
+                  <div className="paper-agent-profile-signals"><strong>주로 보는 신호</strong><div>{agent.profile.focus_signals.map((signal) => <span key={signal}>{signal}</span>)}</div></div>
+                  <p className="paper-agent-rule"><b>사건 반응</b>{agent.profile.event_response}</p>
+                  <p className="paper-agent-rule"><b>위험 규칙</b>{agent.profile.risk_rule}</p>
+                </article>)}
+              </div>
+            ) : <div className="paper-agent-modal-loading">개별 프로필을 불러오지 못했습니다. 다시 시도해 주세요.</div>}
           </section>
         </div>
       )}

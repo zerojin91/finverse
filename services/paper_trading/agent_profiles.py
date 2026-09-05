@@ -325,3 +325,27 @@ def profile_summary(payload: dict[str, Any]) -> dict[str, Any]:
             "activity_frequency": policy["frequency"], "market_impact_tier": policy["market_impact"],
         })
     return {"context_id": payload.get("context_id"), "schema_version": payload.get("schema_version"), "counts": payload.get("counts"), "groups": groups, "profile_count": len(profiles), "cached": bool(payload.get("cached"))}
+
+
+def public_group_profiles(payload: dict[str, Any], group: str) -> list[dict[str, Any]]:
+    """Return UI-safe individual profiles without simulation balances or prompts."""
+    if group not in GROUP_POLICY:
+        raise TradingError("지원하지 않는 시장 참여자 범주입니다.")
+    rows = [row for row in payload.get("profiles") or [] if row.get("group") == group]
+    public_keys = (
+        "persona_id", "group", "group_label", "role_key", "role_description",
+        "bias_seed", "risk_tolerance", "trend_sensitivity", "event_sensitivity",
+        "flow_sensitivity", "allowed_actions", "activity_frequency", "market_impact_tier",
+    )
+    profile_keys = (
+        "display_name", "investment_thesis", "focus_signals", "ignored_signals", "bias",
+        "holding_horizon", "event_response", "risk_rule", "memory_seed", "initial_stance",
+    )
+    result = []
+    for row in rows:
+        profile = row.get("profile") or {}
+        result.append({
+            **{key: row.get(key) for key in public_keys},
+            "profile": {key: profile.get(key) for key in profile_keys},
+        })
+    return result

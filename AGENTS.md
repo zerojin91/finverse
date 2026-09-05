@@ -49,7 +49,7 @@
 - 기존 보유로 시작하면 `initial_position.quantity`와 `initial_position.average_price`가 게임에 반영된다. 미실현 손익은 평단 기준으로 보여주며 시뮬레이션 수익률은 시작 시점의 현금+현재가 평가액(`initial_equity`)을 기준으로 0%에서 시작한다.
 - 모의투자 2단계 `자료 수집`은 `GET /api/paper-trading/securities/:ticker/scenario-context`로 시나리오 엔진과 동일한 종목별 DB 조회를 미리 수행한다. 시장·경제·사건·커뮤니티 네 도메인의 건수·최신 시점을 표시하며, 결과는 로컬 이력 캐시에 남아 시나리오 생성 시 재사용된다. 이 단계는 OpenRouter·온톨로지·MiroFish를 실행하지 않는다.
 - 모의투자 4단계는 먼저 `GET /api/paper-trading/securities/:ticker/initial-context/documents`로 같은 실제 이력에서 종목 타깃형 `market/economy/events/community` Evidence Markdown 4종을 준비한다. 네 문서가 모두 준비된 뒤에만 `GET /api/paper-trading/securities/:ticker/initial-context`가 이 문서 묶음을 OpenRouter에 전달해 근거·의미를 함께 담은 음슴체 5줄 요약·종목 전체 현황·최근 한 달 이벤트 시퀀스·위험 요인·관찰 포인트를 생성한다. 문서와 분석 결과는 `var/market_cache/initial-context-<지문>/` 및 `initial-context-<지문>.json`에 12시간 캐시되며, 시나리오 시작 시 동일 분석을 게임에 `initial_context`로 저장한다. 이벤트 시퀀스는 문서에 있는 실제 관측 흐름만 표시하고 미래 사건·가격 예측을 섞지 않는다.
-- 이어서 `POST /api/paper-trading/securities/:ticker/agent-profiles/prepare`가 동일 `context_id` 기준으로 총 59개 개별 프로필 생성을 백그라운드 작업으로 시작한다. `GET /agent-profiles`는 UI 카드용 범주 요약만 반환하고, 전체 프로필·개인 기억·LLM 프롬프트는 게임 생성 전까지 서버 파일 캐시에만 둔다. 게임 생성 `POST /scenarios`는 준비된 59개 프로필이 없으면 거부한다.
+- 이어서 `POST /api/paper-trading/securities/:ticker/agent-profiles/prepare`가 동일 `context_id` 기준으로 총 59개 개별 프로필 생성을 백그라운드 작업으로 시작한다. `GET /agent-profiles`는 UI 카드용 범주 요약을, `GET /agent-profiles/:group`은 클릭한 범주의 UI 안전 개별 프로필(관점·편향·신호·반응·위험 규칙)을 반환한다. 자금·보유·개인 기억·LLM 프롬프트는 게임 생성 전까지 서버 파일 캐시에만 둔다. 게임 생성 `POST /scenarios`는 준비된 59개 프로필이 없으면 거부한다.
 
 ### 데이터·AI 흐름
 

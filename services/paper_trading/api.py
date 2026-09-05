@@ -23,7 +23,7 @@ from .initial_context_analyzer import (
 )
 from .agent_profiles import (
     clear_agent_profile_cache, generate_agent_profiles, get_cached_agent_profiles,
-    profile_summary,
+    profile_summary, public_group_profiles,
 )
 from .evidence_documents import DOCUMENT_FILES
 from .llm_scenario_simulator import run_scenario_agent_round
@@ -167,6 +167,21 @@ def security_agent_profiles(ticker: str):
     if not payload:
         return jsonify({"success": True, "data": {"status": "missing", "context_id": context["context_id"]}})
     return jsonify({"success": True, "data": {"status": "ready", **profile_summary(payload)}})
+
+
+@paper_trading_bp.route("/securities/<ticker>/agent-profiles/<group>", methods=["GET"])
+def security_agent_profile_group(ticker: str, group: str):
+    """Expose the generated profiles for one group in the setup modal."""
+    history = _market_data().load_game_data(ticker, "", "")
+    context = get_initial_context_documents(history)
+    payload = get_cached_agent_profiles(context["context_id"])
+    if not payload:
+        return jsonify({"success": False, "error": "개별 에이전트 프로필이 아직 준비되지 않았습니다."}), 409
+    profiles = public_group_profiles(payload, group)
+    return jsonify({"success": True, "data": {
+        "context_id": context["context_id"], "group": group,
+        "label": profiles[0].get("group_label") if profiles else group, "profiles": profiles,
+    }})
 
 
 @paper_trading_bp.route("/securities/<ticker>/agent-profiles/prepare", methods=["POST"])
