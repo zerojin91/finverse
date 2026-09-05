@@ -1056,6 +1056,8 @@ function SetupScreen({
   const [initialContextError, setInitialContextError] = useState<string | null>(null);
   const [contextDocuments, setContextDocuments] = useState<ContextDocumentProgress[]>(INITIAL_CONTEXT_DOCUMENTS);
   const [contextDwellComplete, setContextDwellComplete] = useState(false);
+  const [selectedContextDocument, setSelectedContextDocument] = useState<{ label: string; content: string } | null>(null);
+  const [contextDocumentLoading, setContextDocumentLoading] = useState(false);
   const pickedTicker = picked?.ticker;
   const step2Ref = useRef<HTMLElement | null>(null);
   const step3Ref = useRef<HTMLElement | null>(null);
@@ -1068,7 +1070,17 @@ function SetupScreen({
   const initialContextReadyForStart = initialContextReady && contextDwellComplete;
   const openContextDocument = (domain: ContextDocumentProgress["key"]) => {
     if (!pickedTicker) return;
-    window.open(`/api/paper-trading/securities/${encodeURIComponent(pickedTicker)}/initial-context/documents/${domain}`, `_blank`, "noopener,noreferrer");
+    const document = contextDocuments.find((item) => item.key === domain);
+    if (!document) return;
+    setContextDocumentLoading(true);
+    fetch(`/api/paper-trading/securities/${encodeURIComponent(pickedTicker)}/initial-context/documents/${domain}`, { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("문서를 불러오지 못했습니다.");
+        return response.text();
+      })
+      .then((content) => setSelectedContextDocument({ label: document.label, content }))
+      .catch(() => setSelectedContextDocument({ label: document.label, content: "문서를 불러오지 못했습니다." }))
+      .finally(() => setContextDocumentLoading(false));
   };
   const investmentReady = investmentMode === "new"
     ? initialCash > 0
@@ -1492,7 +1504,6 @@ function SetupScreen({
                 <div className="paper-context-document-body">
                   <header><strong>{document.label}</strong><small>{document.status === "ready" ? "문서 준비 완료" : document.status === "generating" ? "문서 생성 중" : "생성 대기 중"}</small></header>
                   <p>{initialContext?.source_summary.document_previews?.[document.key] || (document.status === "waiting" ? "자료를 확인하고 있습니다." : "수집된 자료를 문서로 정리하고 있습니다…")}</p>
-                  {document.status === "ready" && <span className="paper-context-document-link">전체 문서 보기 <ArrowRight size={11} /></span>}
                 </div>
               </button>
             ))}
@@ -1576,6 +1587,18 @@ function SetupScreen({
       )}
 
       {error && <p className="paper-error"><AlertTriangle size={14} /> {error}</p>}
+      {contextDocumentLoading && <div className="paper-document-loading" role="status"><LoaderCircle size={15} className="spin" /> 문서를 불러오는 중입니다.</div>}
+      {selectedContextDocument && (
+        <div className="paper-document-backdrop" role="presentation" onMouseDown={() => setSelectedContextDocument(null)}>
+          <section className="paper-document-modal" role="dialog" aria-modal="true" aria-labelledby="paper-document-title" onMouseDown={(event) => event.stopPropagation()}>
+            <header>
+              <div><span>EVIDENCE DOCUMENT</span><h3 id="paper-document-title">{picked?.name} · {selectedContextDocument.label}</h3><p>선택 종목의 실제 자료를 정리한 Markdown 문서입니다.</p></div>
+              <button className="scenario-modal-close" type="button" onClick={() => setSelectedContextDocument(null)} aria-label="Evidence 문서 닫기"><X size={18} /></button>
+            </header>
+            <pre>{selectedContextDocument.content}</pre>
+          </section>
+        </div>
+      )}
       {activeStep > 1 && <div className="paper-setup-focus-space" aria-hidden="true" />}
     </form>
   );

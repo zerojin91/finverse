@@ -1030,6 +1030,14 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-context-document p { display: -webkit-box; overflow: hidden; margin: 0; color: var(--muted); font-size: 9px; line-height: 1.6; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 .paper-context-document-link { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; color: var(--ink); font-size: 8px; font-weight: 700; }
 .paper-context-document:hover:not(:disabled) { border-color: #86efac; box-shadow: 0 5px 16px rgba(22,163,74,.08); }
+.paper-document-loading { position: fixed; right: 24px; bottom: 24px; z-index: 30; display: flex; align-items: center; gap: 7px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); background: #fff; box-shadow: 0 10px 30px rgba(0,0,0,.12); font-size: 9px; }
+.paper-document-backdrop { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 28px; background: rgba(17,17,19,.58); }
+.paper-document-modal { width: min(980px,100%); height: min(760px,calc(100vh - 56px)); display: flex; flex-direction: column; overflow: hidden; border: 1px solid rgba(255,255,255,.72); border-radius: 16px; background: #fff; box-shadow: 0 28px 90px rgba(0,0,0,.28); }
+.paper-document-modal > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 24px 28px 20px; border-bottom: 1px solid var(--line); }
+.paper-document-modal > header span { color: var(--light); font-size: 9px; font-weight: 800; letter-spacing: .12em; }
+.paper-document-modal h3 { margin: 7px 0 5px; color: var(--ink); font-size: 17px; }
+.paper-document-modal > header p { margin: 0; color: var(--muted); font-size: 10px; }
+.paper-document-modal pre { flex: 1; overflow: auto; margin: 0; padding: 24px 28px 34px; color: #3f3f46; background: #fff; font-family: inherit; font-size: 10px; line-height: 1.75; white-space: pre-wrap; }
 .paper-context-summary { display: flex; align-items: flex-start; gap: 8px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); background: #fff; }
 .paper-context-summary svg { flex: 0 0 auto; margin-top: 1px; color: var(--ink); }
 .paper-context-summary p { margin: 0; font-size: 10px; line-height: 1.6; }
@@ -1500,6 +1508,10 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
   .paper-investment-actions { align-items: flex-start; flex-direction: column; }
   .paper-agent-grid { grid-template-columns: minmax(0,1fr); }
   .paper-context-documents,.paper-context-grid,.paper-context-points { grid-template-columns: minmax(0,1fr); }
+  .paper-document-backdrop { padding: 12px; }
+  .paper-document-modal { height: calc(100vh - 24px); border-radius: 12px; }
+  .paper-document-modal > header { padding: 20px 18px 16px; }
+  .paper-document-modal pre { padding: 18px; }
   .paper-holdings { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
 
