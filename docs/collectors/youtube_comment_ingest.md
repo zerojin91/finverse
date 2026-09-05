@@ -1,6 +1,6 @@
 # YouTube 국내 주식 댓글 수집기
 
-`collectors/youtube_comment_ingest.py`는 국내 주식 관련 YouTube 채널 30개를 고정하고, 기본적으로 제목·설명·태그가 반도체와 관련된 공개 영상의 댓글·답글만 수집한다. 실행용 셸은 `scripts/youtube_comment_ingest.sh`다.
+`collectors/youtube_comment_ingest.py`는 국내 주식 관련 YouTube 채널 30개를 고정하고, 기본적으로 제목·설명·태그가 반도체와 관련된 공개 영상마다 좋아요 수 상위 댓글·답글 5개만 유지한다. 실행용 셸은 `scripts/youtube_comment_ingest.sh`다.
 
 비공개·삭제 영상, 검토 대기·스팸 댓글, API가 반환하지 않는 댓글은 수집할 수 없다.
 
@@ -8,7 +8,7 @@
 
 - 채널: 채널 ID, 이름, 국가, 누적 조회수, 구독자 수, 영상 수, 업로드 플레이리스트, 선정 순위
 - 영상: 영상 ID, 채널 ID, 제목, 게시 시각, 공개 영상 URL, 적용한 영상 필터와 일치 키워드, 마지막 댓글 전체 스캔 상태
-- 댓글과 답글: 가명화된 댓글·부모·스레드 ID, 채널·영상 ID, 본문, 좋아요·답글 수, 게시·수정 시각, ETag
+- 댓글과 답글: 영상별 좋아요 수 상위 5개, 가명화된 댓글·부모·스레드 ID, 채널·영상 ID, 본문, 좋아요·답글 수, 게시·수정 시각, ETag
 - 변경 기록: 신규·수정·삭제 상태, 이전/현재 레코드 해시, 관측 시각
 - 실행 상태: 업로드·댓글·답글별 다음 페이지 토큰, 남은 영상 수, 호출 수와 종료 사유
 
@@ -19,6 +19,8 @@
 ```
 
 YouTube API 원본의 `source=youtube_data_api`는 수집 방식 식별용으로 유지하고, `tags.source=youtube`는 여러 커뮤니티 원천을 같은 `community_v2` 영역에서 구분하는 조회 태그로 사용한다.
+
+`--comments-per-video`의 기본값은 5다. 정확한 상위 댓글을 고르기 위해 영상의 공개 댓글과 답글 전체 페이지를 조회한 뒤 `like_count` 내림차순으로 선택하며, 동률이면 최신 게시 댓글을 우선한다. 선택된 댓글에는 `video_like_rank`와 `comments_per_video`가 기록된다. 제외된 댓글은 최신 데이터에서 본문을 제거한 tombstone으로 바뀌고 변경 이력만 남는다.
 
 작성자 이름, 작성자 채널 ID, 프로필 URL은 API 응답 필드에서 제외한다. 원본 댓글 ID와 댓글 deep-link도 저장하지 않는다. 댓글·부모·스레드 ID는 `YOUTUBE_ID_HASH_SALT`를 사용한 HMAC-SHA256으로 가명화한다. 본문의 이메일, 국내 휴대전화 번호와 IPv4 주소는 대체 문자열로 가린다.
 
@@ -86,6 +88,7 @@ vi config/youtube_channels.json
   --start 2025-01-01 \
   --search-pages-per-company 5 \
   --search-order date \
+  --comments-per-video 5 \
   --quota-budget 4000
 ```
 
@@ -150,6 +153,7 @@ cd /home/ubuntu/finverse
 ./scripts/youtube_comment_ingest.sh backfill \
   --channel-file config/youtube_channels.json \
   --video-filter semiconductor \
+  --comments-per-video 5 \
   --quota-budget 9000
 ```
 
@@ -193,7 +197,8 @@ cd /home/ubuntu/finverse
 ```bash
 ./scripts/youtube_comment_ingest.sh update \
   --channel-file config/youtube_channels.json \
-  --video-filter semiconductor
+  --video-filter semiconductor \
+  --comments-per-video 5
 ```
 
 `update`는 다음 작업을 한다.
@@ -233,6 +238,7 @@ YouTube 댓글 API에는 `updated_since` 필터가 없다. 최신 최상위 댓�
 - 같은 ID와 같은 해시는 새 이력·변경 이벤트를 만들지 않고 최신 만료 시각만 갱신한다.
 - 오래된 체크포인트 페이지가 최신 빠른 업데이트보다 늦게 처리돼도 `refreshed_at` 비교로 최신 값을 되돌리지 않는다.
 - 신규·수정 데이터는 `records.jsonl`과 `changes.jsonl`에 기록한다.
+- 영상 전체 스캔이 끝나면 좋아요 수 상위 `--comments-per-video`개만 활성 상태로 유지한다. 정확한 순위를 확인하지 못한 중단 상태에서는 마지막으로 확정된 순위를 유지한다.
 - 영상·댓글 삭제는 서로 다른 두 번의 오류 없는 전체 스캔에서 연속으로 보이지 않을 때 확정한다.
 - 삭제가 확정되면 과거 댓글 본문 버전은 즉시 물리 제거하고, 본문이 없는 tombstone과 해시 변경 기록만 유지한다.
 - `commentsDisabled`, 접근 거부, 답글 조회 중 삭제 경합은 완전한 삭제 근거로 사용하지 않는다.
@@ -283,16 +289,17 @@ data/youtube_comments/
 회사 검색으로 발견된 영상과 댓글에는 같은 `search_tags`, `search_matches`가 추가된다. PostgreSQL 적재 후에는 `psychology.community_v2`에서 다음처럼 회사별 YouTube 댓글을 확인할 수 있다. 기존 소비자를 위한 `psychology.youtube_comment`는 같은 데이터의 호환 뷰로 유지된다.
 
 ```sql
-SELECT published_at, video_title, comment_text, search_tags
+SELECT published_at, video_title, comment_text, like_count,
+       video_like_rank, search_tags
 FROM psychology.community_v2
 WHERE search_tags ? '삼성전자'
   AND tags->>'source' = 'youtube'
-ORDER BY published_at DESC
+ORDER BY video_id, video_like_rank
 LIMIT 100;
 ```
 
 ```json
-{"record_id":"youtube:comment:hmac-sha256:...","record_type":"youtube_comment","category":"community_v2","tags":{"source":"youtube"},"channel_id":"UC...","video_id":"VIDEO_ID","comment_id":"hmac-sha256:...","parent_comment_id":null,"thread_id":"hmac-sha256:...","text":"댓글 본문","like_count":3,"reply_count":1,"published_at":"2026-08-01T01:02:03Z","updated_at":"2026-08-02T01:02:03Z","refreshed_at":"...","expires_at":"...","record_hash":"..."}
+{"record_id":"youtube:comment:hmac-sha256:...","record_type":"youtube_comment","category":"community_v2","tags":{"source":"youtube"},"channel_id":"UC...","video_id":"VIDEO_ID","comment_id":"hmac-sha256:...","parent_comment_id":null,"thread_id":"hmac-sha256:...","text":"댓글 본문","like_count":3,"video_like_rank":1,"comments_per_video":5,"reply_count":1,"published_at":"2026-08-01T01:02:03Z","updated_at":"2026-08-02T01:02:03Z","refreshed_at":"...","expires_at":"...","record_hash":"..."}
 ```
 
 ## 29일 보관과 쿼터 조건

@@ -324,7 +324,9 @@ SELECT
     v.payload->'search_tags'                            AS search_tags,
     v.payload->'search_matches'                         AS search_matches,
     c.payload->>'category'                              AS category,
-    c.payload->'tags'                                   AS tags
+    c.payload->'tags'                                   AS tags,
+    nullif(c.payload->>'video_like_rank', '')::integer  AS video_like_rank,
+    nullif(c.payload->>'comments_per_video', '')::integer AS comments_per_video
 FROM lake.records AS c
 JOIN lake.records AS v
   ON v.record_type = 'youtube_video'
@@ -334,6 +336,8 @@ JOIN lake.records AS v
 WHERE c.record_type = 'youtube_comment'
   AND c.payload->>'category' = 'community_v2'
   AND c.payload->'tags'->>'source' = 'youtube'
+  AND nullif(c.payload->>'video_like_rank', '')::integer BETWEEN 1
+      AND nullif(c.payload->>'comments_per_video', '')::integer
   AND coalesce(nullif(c.payload->>'is_deleted', '')::boolean, false) = false
   AND nullif(c.payload->>'published_at', '') IS NOT NULL
   AND nullif(c.payload->>'text', '') IS NOT NULL;
@@ -343,7 +347,8 @@ CREATE OR REPLACE VIEW psychology.youtube_comment AS
 SELECT
     published_at, updated_at, channel_id, video_id, comment_text,
     like_count, reply_count, source_url, collected_at, record_id,
-    video_title, video_filter_terms, search_tags, search_matches
+    video_title, video_filter_terms, search_tags, search_matches,
+    video_like_rank, comments_per_video
 FROM psychology.community_v2;
 
 CREATE OR REPLACE VIEW psychology.sentiment_daily AS

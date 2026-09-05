@@ -7,6 +7,7 @@ import argparse
 from contextlib import closing
 from datetime import UTC, date, datetime, time as wall_time, timedelta
 import hashlib
+import heapq
 import hmac
 import json
 import os
@@ -534,6 +535,18 @@ class WorkState:
             for row in cursor:
                 yield json.loads(row["record_json"])
 
+    def seen_comments(self, video_id: str) -> Iterator[dict[str, Any]]:
+        with closing(self.connect()) as connection, connection:
+            cursor = connection.execute(
+                "SELECT l.record_json FROM latest l "
+                f"JOIN {self.comment_seen_table} s ON s.record_id = l.record_id "
+                "WHERE l.record_type = 'youtube_comment' AND l.video_id = ? "
+                "AND l.is_deleted = 0",
+                (video_id,),
+            )
+            for row in cursor:
+                yield json.loads(row["record_json"])
+
     def comments_for_video(self, video_id: str) -> Iterator[dict[str, Any]]:
         with closing(self.connect()) as connection, connection:
             cursor = connection.execute(
@@ -661,6 +674,38 @@ def apply_absence(
             )
             deleted.extend(deleted_block)
     return deleted
+
+
+def apply_comment_limit(
+    video_id: str, limit: int, mode: str, totals: dict[str, int]
+) -> None:
+    rank = lambda row: (
+        int(row.get("like_count") or 0),
+        str(row.get("published_at") or ""),
+        str(row["record_id"]),
+    )
+    ranked = heapq.nlargest(limit, STATE.seen_comments(video_id), key=rank)
+    kept = {row["record_id"] for row in ranked}
+    merge_rows(
+        [
+            record_without_store_fields(row)
+            | {"video_like_rank": position, "comments_per_video": limit}
+            for position, row in enumerate(ranked, 1)
+        ],
+        mode,
+        totals,
+    )
+    for block in chunks(
+        row for row in STATE.seen_comments(video_id) if row["record_id"] not in kept
+    ):
+        tombstones = [tombstone(row, "outside_top_liked_comments") for row in block]
+        merge_rows(tombstones, mode, totals)
+        STORE.purge_versions(
+            (row["record_id"] for row in tombstones), materialize=False
+        )
+        totals["limited_comments"] = totals.get("limited_comments", 0) + len(
+            tombstones
+        )
 
 
 def load_channel_ids(path: Path) -> list[str]:
@@ -1224,6 +1269,7 @@ def operation_signature(
             "end": args.end.isoformat(),
             "channel_ids": sorted(channel_ids),
             "video_filter": args.video_filter,
+            "comments_per_video": args.comments_per_video,
         }
     )
 
@@ -1239,6 +1285,7 @@ def company_operation_signature(
             "companies": companies,
             "search_order": args.search_order,
             "search_pages_per_company": args.search_pages_per_company,
+            "comments_per_video": args.comments_per_video,
         }
     )
 
@@ -1825,10 +1872,12 @@ def process_reply_pages(
 
 
 def complete_video_scan(
-    operation: dict[str, Any], mode: str, totals: dict[str, int], status: str
+    operation: dict[str, Any], mode: str, totals: dict[str, int], status: str,
+    comments_per_video: int,
 ) -> dict[str, Any]:
     video_id = str(operation["current_video_id"])
     if status == "complete":
+        apply_comment_limit(video_id, comments_per_video, mode, totals)
         apply_absence(
             STATE.unseen_comments(video_id),
             "not_returned_by_complete_video_scan",
@@ -1892,7 +1941,11 @@ def run_comment_phase(
             except ApiError as exc:
                 if exc.reason in {"commentsDisabled", "forbidden", "videoNotFound"}:
                     operation = complete_video_scan(
-                        operation, f"{args.command}_comments", totals, "unavailable"
+                        operation,
+                        f"{args.command}_comments",
+                        totals,
+                        "unavailable",
+                        args.comments_per_video,
                     )
                     continue
                 if (
@@ -1927,7 +1980,11 @@ def run_comment_phase(
                 STATE.save_operation(operation)
                 continue
             operation = complete_video_scan(
-                operation, f"{args.command}_comments", totals, "complete"
+                operation,
+                f"{args.command}_comments",
+                totals,
+                "complete",
+                args.comments_per_video,
             )
             continue
         thread = items[index]
@@ -2123,6 +2180,12 @@ def build_parser() -> argparse.ArgumentParser:
         child.add_argument("--quick-pages", type=int, default=1)
         child.add_argument("--search-pages-per-company", type=int, default=1)
         child.add_argument(
+            "--comments-per-video",
+            type=int,
+            default=5,
+            help="keep only this many highest-like comments per video (default: 5)",
+        )
+        child.add_argument(
             "--search-order",
             choices=("date", "relevance", "viewCount"),
             default="date",
@@ -2155,6 +2218,8 @@ def main() -> int:
         raise SystemExit("--quick-pages must be between 0 and 10")
     if not 1 <= args.search_pages_per_company <= 10:
         raise SystemExit("--search-pages-per-company must be between 1 and 10")
+    if args.comments_per_video < 1:
+        raise SystemExit("--comments-per-video must be positive")
     if not 1 <= args.refresh_cycle_days < RETENTION_DAYS:
         raise SystemExit(f"--refresh-cycle-days must be between 1 and {RETENTION_DAYS - 1}")
     return collect(args)

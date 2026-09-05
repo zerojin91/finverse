@@ -36,6 +36,7 @@ def collector_args(command: str = "backfill", **overrides: object) -> argparse.N
         "quick_pages": 0,
         "search_pages_per_company": 1,
         "search_order": "date",
+        "comments_per_video": 5,
         "video_filter": "all",
         "refresh_cycle_days": 28,
         "timeout": 1,
@@ -458,6 +459,38 @@ class YouTubeCollectorTest(unittest.TestCase):
             all_signature, youtube.operation_signature(args, [channel_id(1)])
         )
 
+    def test_comment_limit_is_part_of_resume_signatures(self) -> None:
+        args = collector_args(comments_per_video=5)
+        channel_signature = youtube.operation_signature(args, [channel_id(1)])
+        company_signature = youtube.company_operation_signature(
+            args,
+            [
+                {
+                    "company_name": "삼성전자",
+                    "stock_code": "005930",
+                    "search_query": "삼성전자 주식",
+                }
+            ],
+        )
+        args.comments_per_video = 10
+
+        self.assertNotEqual(
+            channel_signature, youtube.operation_signature(args, [channel_id(1)])
+        )
+        self.assertNotEqual(
+            company_signature,
+            youtube.company_operation_signature(
+                args,
+                [
+                    {
+                        "company_name": "삼성전자",
+                        "stock_code": "005930",
+                        "search_query": "삼성전자 주식",
+                    }
+                ],
+            ),
+        )
+
     def test_missing_playlist_is_empty_only_for_zero_video_channel(self) -> None:
         class MissingPlaylistClient:
             def get(self, resource: str, params: dict[str, object]) -> dict[str, object]:
@@ -757,6 +790,56 @@ class YouTubeCollectorTest(unittest.TestCase):
                     (record["record_id"],),
                 ).fetchone()[0]
             self.assertEqual(1, versions)
+
+    def test_comment_limit_keeps_five_highest_likes_per_video(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, isolated_collector(
+            Path(directory)
+        ) as (store, state):
+            records = []
+            for number, likes in enumerate((1, 9, 5, 9, 2, 8, 7), 1):
+                records.append(
+                    youtube.timestamped(
+                        {
+                            "record_id": f"youtube:comment:{number}",
+                            "record_type": "youtube_comment",
+                            "comment_id": str(number),
+                            "video_id": "video",
+                            "channel_id": channel_id(1),
+                            "text": str(number),
+                            "like_count": likes,
+                            "published_at": f"2025-01-{number:02d}T00:00:00Z",
+                            "is_deleted": False,
+                        }
+                    )
+                )
+            totals = {"inserted": 0, "changed": 0, "unchanged": 0, "stale": 0}
+            youtube.merge_rows(records, "seed", totals)
+            state.mark_comment_seen(row["record_id"] for row in records)
+
+            youtube.apply_comment_limit("video", 5, "scan", totals)
+
+            active = list(
+                store.iter_latest(
+                    record_type="youtube_comment", video_id="video", is_deleted=False
+                )
+            )
+            deleted = list(
+                store.iter_latest(
+                    record_type="youtube_comment", video_id="video", is_deleted=True
+                )
+            )
+            self.assertEqual([5, 7, 8, 9, 9], sorted(row["like_count"] for row in active))
+            self.assertEqual([1, 2, 3, 4, 5], sorted(row["video_like_rank"] for row in active))
+            self.assertEqual(
+                ["4", "2", "6", "7", "3"],
+                [row["text"] for row in sorted(active, key=lambda row: row["video_like_rank"])],
+            )
+            self.assertTrue(all(row["comments_per_video"] == 5 for row in active))
+            self.assertEqual(2, len(deleted))
+            self.assertTrue(
+                all(row["deletion_reason"] == "outside_top_liked_comments" for row in deleted)
+            )
+            self.assertEqual(2, totals["limited_comments"])
 
     def test_redacts_personal_data_and_pseudonymizes_comment_ids(self) -> None:
         record = youtube.normalize_comment(
