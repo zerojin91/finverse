@@ -30,8 +30,8 @@ export const metadata: Metadata = {
     images: [socialImageUrl],
   },
   icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
+    icon: "/favicon.svg?v=2",
+    shortcut: "/favicon.svg?v=2",
   },
 };
 

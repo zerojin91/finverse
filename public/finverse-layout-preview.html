@@ -1,0 +1,1768 @@
+<!doctype html>
+<html lang="en" data-visualize-standalone>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src 'unsafe-inline' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src 'self' blob: data: http://localhost:3000 https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Finverse Top Navigation</title>
+<style>:root{color-scheme:light dark;background:light-dark(rgb(255 255 255), rgb(24 24 24))}html,body{margin:0}body{box-sizing:border-box;padding:1rem;background:inherit}iframe{display:block;width:100%;height:calc(100vh - 2rem);margin:0 auto;border:0}</style>
+</head>
+<body>
+<iframe sandbox="allow-scripts" referrerpolicy="no-referrer" title="Finverse Top Navigation" srcdoc="&lt;!doctype html&gt;
+&lt;html lang=&quot;en&quot; data-visualize-standalone&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;utf-8&quot;&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+&lt;meta name=&quot;referrer&quot; content=&quot;no-referrer&quot;&gt;
+&lt;meta http-equiv=&quot;Content-Security-Policy&quot; content=&quot;default-src &#x27;none&#x27;; script-src &#x27;unsafe-inline&#x27; &#x27;unsafe-eval&#x27; &#x27;wasm-unsafe-eval&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src &#x27;unsafe-inline&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src 'self' blob: data: http://localhost:3000 https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src &#x27;none&#x27;; object-src &#x27;none&#x27;; base-uri &#x27;none&#x27;; form-action &#x27;none&#x27;&quot;&gt;
+&lt;title&gt;Finverse Top Navigation&lt;/title&gt;
+&lt;style&gt;:root {
+  color-scheme: light dark;
+  background-color: var(
+    --background,
+    var(--color-background-primary, light-dark(rgb(255 255 255), rgb(24 24 24)))
+  ) !important;
+
+  /* Agent-facing contract; keep in sync with SKILL.md. */
+  --background: var(
+    --color-background-primary,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --card: color-mix(in oklab, var(--foreground) 5%, var(--background));
+  --card-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --popover: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255), rgb(45 45 45))
+  );
+  --popover-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --primary: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --primary-foreground: var(
+    --color-text-inverse,
+    light-dark(rgb(255 255 255), rgb(13 13 13))
+  );
+  --secondary: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255 / 96%), rgb(54 54 54 / 96%))
+  );
+  --secondary-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --muted: color-mix(in srgb, var(--foreground) 10%, transparent);
+  --muted-foreground: var(
+    --color-text-secondary,
+    light-dark(rgb(26 28 31 / 49.4%), rgb(255 255 255 / 49.8%))
+  );
+  --accent: var(
+    --color-background-info,
+    light-dark(rgb(229 242 255), rgb(13 39 63))
+  );
+  --accent-foreground: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --destructive: var(
+    --color-text-warning,
+    light-dark(rgb(226 85 7), rgb(255 133 73))
+  );
+  --border: var(
+    --color-border-secondary,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+  --input: var(
+    --color-border-primary,
+    light-dark(
+      rgb(26 28 31 / 11.8%),
+      color-mix(in oklab, rgb(0 0 0) 10%, transparent)
+    )
+  );
+  --ring: var(
+    --color-ring-primary,
+    light-dark(rgb(51 156 255), rgb(131 195 255 / 76%))
+  );
+  --font-size-base: var(--font-text-md-size, 14px);
+  --blue: light-dark(rgb(51 156 255), rgb(51 156 255));
+  --orange: light-dark(rgb(226 85 7), rgb(251 106 34));
+  --green: light-dark(rgb(0 162 64), rgb(64 201 119));
+  --red: light-dark(rgb(224 46 42), rgb(255 103 100));
+  --purple: light-dark(rgb(146 79 247), rgb(173 123 249));
+  --yellow: light-dark(rgb(255 195 0), rgb(255 210 64));
+  --viz-series-1: var(--primary);
+  --viz-series-2: light-dark(rgb(243 136 59), rgb(245 154 86));
+  --viz-series-3: light-dark(rgb(93 201 119), rgb(116 213 139));
+  --viz-series-4: light-dark(rgb(235 119 177), rgb(240 143 192));
+  --viz-series-5: light-dark(rgb(155 121 236), rgb(170 145 239));
+  --viz-series-6: light-dark(rgb(58 185 177), rgb(90 203 194));
+
+  /* Internal implementation variables; not part of the agent contract. */
+  --font-sans: -apple-system, system-ui, &quot;Segoe UI&quot;, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;,
+    monospace;
+  --font-size-normal: max(11px, var(--font-size-base));
+  --font-size-tooltip: calc(var(--font-size-base) - 1px);
+  --font-size-small: max(11px, calc(var(--font-size-base) - 2px));
+  --font-size-h1: calc(var(--font-size-normal) * 1.7142857143);
+  --font-size-h2: calc(var(--font-size-normal) * 1.4285714286);
+  --font-size-h3: calc(var(--font-size-normal) * 1.2857142857);
+  --font-weight-normal: 430;
+  --font-weight-medium: 500;
+  --icon-size: 16px;
+  --line-height-normal: calc(var(--font-size-normal) * 1.5);
+  --line-height-tooltip: calc(var(--font-size-tooltip) * 1.4285714286);
+  --line-height-small: calc(var(--font-size-small) + 4px);
+  --corner-shape: round;
+  --radius: var(--border-radius-lg, 10px);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-2xl: calc(var(--radius) * 1.6);
+  --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px -1px rgb(0 0 0 / 8%);
+  --checkmark-image: url(&quot;data:image/svg+xml,%3Csvg xmlns=&#x27;http://www.w3.org/2000/svg&#x27; viewBox=&#x27;0 0 17 17&#x27;%3E%3Cpath d=&#x27;M12.8961 3.64101C13.1297 3.41418 13.4984 3.37523 13.7779 3.56581C14.0571 3.75635 14.1554 4.11331 14.0299 4.41347L13.9615 4.53847L7.71151 13.7045C7.59411 13.8767 7.4063 13.9877 7.19881 14.0072C6.99136 14.0267 6.78564 13.9533 6.63826 13.806L2.88826 10.056L2.79842 9.9457C2.6192 9.67407 2.64927 9.30496 2.88826 9.06581C3.12738 8.82669 3.49647 8.79676 3.76815 8.97597L3.8785 9.06581L7.03084 12.2182L12.8053 3.74941L12.8961 3.64101Z&#x27;/%3E%3C/svg%3E&quot;);
+
+  /* Legacy aliases; not part of the current agent contract. */
+  --viz-bg: transparent;
+  --viz-panel: var(--card);
+  --viz-border: var(--border);
+  --viz-text: var(--foreground);
+  --viz-muted: var(--muted-foreground);
+  --viz-accent: var(--primary);
+  --viz-accent-text: var(--primary-foreground);
+  --viz-accent-bg: var(--accent);
+  --viz-font-size: var(--font-size-base);
+  --viz-warning: var(--destructive);
+}
+
+:root[data-theme=&quot;light&quot;] {
+  color-scheme: light;
+}
+
+:root[data-theme=&quot;dark&quot;] {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html &gt; body {
+  /* Preserve MCP aliases for older inline renderers without creating :root cycles. */
+  --color-background-primary: var(
+    --background,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --color-text-primary: var(
+    --foreground,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --color-border-secondary: var(
+    --border,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+
+  margin: 0;
+  padding: var(--visualize-paint-gutter, 0px);
+  color: var(--foreground);
+  background: transparent !important;
+  font-family: var(--font-sans) !important;
+  font-size: var(--font-size-normal);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-normal);
+}
+
+a {
+  color: color-mix(in srgb, var(--viz-accent) 80%, var(--viz-text) 20%);
+  cursor: pointer;
+  font-weight: var(--font-weight-medium, 500);
+  text-decoration: none;
+  text-underline-offset: 2px;
+}
+
+a:is(:hover, :focus-visible) {
+  text-decoration-line: underline;
+  text-decoration-style: dashed;
+  text-decoration-thickness: 0.5px;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  margin-block: 0;
+}
+
+h1 {
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h2 {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h3,
+h4,
+h5,
+h6 {
+  font-size: var(--font-size-h3);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.3;
+}
+
+b,
+strong,
+th {
+  font-weight: var(--font-weight-medium);
+}
+
+code:not(pre code) {
+  display: inline;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  corner-shape: var(--corner-shape);
+  background: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  word-break: break-word;
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--foreground);
+  font: inherit;
+  text-align: start;
+}
+
+.table :is(th, td) {
+  padding-block: 10px;
+  padding-inline: 0 24px;
+  overflow-wrap: anywhere;
+  border-bottom: 1px solid var(--border);
+  text-align: start;
+  vertical-align: top;
+}
+
+.table-responsive &gt; .table :is(th, td) {
+  overflow-wrap: break-word;
+}
+
+.table :is(th, td):last-child {
+  padding-inline-end: 0;
+}
+
+.table :is(caption, thead th) {
+  font-weight: 600;
+}
+
+.table thead th {
+  padding-block: 8px;
+  border-bottom-color: color-mix(in srgb, var(--foreground) 16%, transparent);
+}
+
+.table tbody tr:last-child :is(th, td) {
+  border-bottom: 0;
+}
+
+.table.table-sm :is(th, td) {
+  padding-block: 6px;
+}
+
+.table.table-sm :is(th, td):not(:last-child) {
+  padding-inline-end: 16px;
+}
+
+.table :is(.text-end, [align=&quot;right&quot;]) {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.table :is(.text-center, [align=&quot;center&quot;]) {
+  text-align: center;
+}
+
+.table .text-nowrap {
+  white-space: nowrap;
+}
+
+#widget {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  background: transparent !important;
+}
+
+.card {
+  min-width: 0;
+  padding: 12px;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  border-radius: var(--radius-2xl);
+  corner-shape: var(--corner-shape);
+  color: var(--card-foreground);
+  background: var(--card);
+}
+
+#widget &gt; :not(.card, .progress) {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.tooltip {
+  position: fixed;
+  z-index: 50;
+  top: 0;
+  left: 0;
+  width: max-content;
+  max-width: min(
+    20rem,
+    var(--tooltip-available-width, calc(100vw - 10px)),
+    calc(100vw - 10px)
+  );
+  max-height: min(
+    var(--tooltip-available-height, calc(100vh - 10px)),
+    calc(100vh - 10px)
+  );
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--popover-foreground);
+  background: var(--popover);
+  box-shadow: none;
+  font-size: var(--font-size-tooltip);
+  line-height: var(--line-height-tooltip);
+  overflow-wrap: break-word;
+  white-space: normal;
+  pointer-events: none;
+  user-select: none;
+}
+
+.viz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(max(180px, 24%), 1fr));
+  gap: 10px;
+}
+
+.viz-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.viz-stat-value {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+.viz-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+hr {
+  width: 100%;
+  height: 1px;
+  margin-block: 6px;
+  border: 0;
+  background: var(--border);
+}
+
+.nav {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+
+.progress {
+  display: flex;
+  height: 8px;
+  margin-block: calc((var(--line-height-normal, 1.5em) - 8px) / 2);
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+}
+
+.progress-bar:only-child {
+  border-radius: var(--radius-full);
+}
+
+.progress-bar {
+  height: 100%;
+  flex-shrink: 0;
+  border: 0;
+  background: var(--viz-series-1);
+}
+
+.viz-badge {
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  color: var(--accent-foreground);
+  background: var(--accent);
+  font-weight: var(--font-weight-medium);
+}
+
+small,
+.text-small,
+.viz-badge {
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.text-muted {
+  color: var(--muted-foreground);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.viz-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.viz-controls &gt; .form-label {
+  display: grid;
+  min-width: min(100%, 260px);
+  flex: 1 1 280px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px 12px;
+  margin-bottom: 0;
+}
+
+.viz-controls &gt; .form-label &gt; :is(.form-control, .form-range, .form-select) {
+  grid-column: 1 / -1;
+}
+
+.btn,
+.nav-link,
+.form-check-input,
+.form-control,
+.form-range,
+.form-select {
+  font: inherit;
+}
+
+.btn,
+.nav-link {
+  appearance: button;
+  display: inline-flex;
+  inline-size: fit-content;
+  max-inline-size: 100%;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0 8px;
+  -webkit-app-region: no-drag;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: var(--cursor-interaction, pointer);
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.btn:is(.btn-block, .viz-tile) {
+  inline-size: 100%;
+}
+
+.btn.viz-tile {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+a.btn {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn:not(:disabled):hover,
+.nav-link:not(:disabled):not([aria-disabled=&quot;true&quot;]):hover {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.btn-primary {
+  border-color: transparent;
+  color: var(--primary-foreground);
+  background: var(--foreground);
+  background-clip: padding-box;
+}
+
+.btn-primary .text-muted {
+  color: color-mix(in srgb, var(--primary-foreground) 50%, transparent);
+}
+
+.btn-primary:not(:disabled):hover {
+  background: color-mix(in srgb, var(--foreground) 80%, transparent);
+  background-clip: padding-box;
+}
+
+.btn-ghost {
+  border-color: transparent;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+
+.btn-ghost:not(:disabled):hover {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.nav-pills .nav-link {
+  min-width: 0;
+  border-color: transparent;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+
+.nav-justified .nav-link {
+  flex: 1 1 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.nav-pills .nav-link.active {
+  color: var(--foreground);
+  background: var(--muted);
+}
+
+.btn:disabled,
+.nav-link:disabled,
+.nav-link[aria-disabled=&quot;true&quot;] {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+[data-lucide] {
+  stroke-width: 1.6;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--foreground);
+}
+
+.form-control {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  padding: 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+.form-control::placeholder {
+  color: var(--muted-foreground);
+}
+
+.form-control[type=&quot;file&quot;] {
+  padding: 0;
+  overflow: hidden;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control[type=&quot;file&quot;]::file-selector-button {
+  min-height: 26px;
+  margin-right: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-right: 1px solid var(--input);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: inherit;
+  font: inherit;
+}
+
+.form-control[type=&quot;file&quot;]:not(:disabled):hover::file-selector-button {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-control-color[type=&quot;color&quot;] {
+  width: 40px;
+  height: 28px;
+  padding: 3px;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch {
+  border: 0;
+  border-radius: calc(var(--radius-lg) - 4px);
+  corner-shape: var(--corner-shape);
+}
+
+textarea.form-control {
+  height: auto;
+  min-height: 72px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.form-control:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-control:disabled,
+.form-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.form-select {
+  appearance: none;
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  margin: 0;
+  padding: 0 32px 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--foreground);
+  background-color: var(--secondary);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted-foreground) 50%),
+    linear-gradient(135deg, var(--muted-foreground) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 50%,
+    calc(100% - 10px) 50%;
+  background-repeat: no-repeat;
+  background-size: 4px 4px;
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-select:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-select:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-check {
+  display: flex;
+  min-height: 20px;
+  align-items: center;
+  gap: 6px;
+}
+
+.form-check-input {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  margin: 0;
+  border: 1px solid var(--input);
+  color: var(--primary-foreground);
+  background-color: transparent;
+  cursor: var(--cursor-interaction, default);
+  transition:
+    background-color 150ms,
+    border-color 150ms,
+    box-shadow 150ms;
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;] {
+  border-color: var(--input);
+  border-radius: var(--radius-sm);
+  corner-shape: var(--corner-shape);
+  background-color: var(--secondary);
+  box-shadow: var(--shadow-sm);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input:not(:disabled):not(:checked):hover {
+  background-color: var(--card);
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;]:checked {
+  border-color: var(--primary);
+  background-color: var(--primary);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input[type=&quot;checkbox&quot;]:checked::before {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--primary-foreground);
+  content: &quot;&quot;;
+  mask: var(--checkmark-image) center / 12px 12px no-repeat;
+}
+
+.form-check-input[type=&quot;radio&quot;] {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-full);
+}
+
+.form-check-input[type=&quot;radio&quot;]:checked {
+  border: 2px solid var(--primary);
+  background:
+    radial-gradient(circle, var(--primary-foreground) 0 2.5px, transparent 3px),
+    var(--primary);
+}
+
+.form-check:not(.form-switch) .form-check-input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+}
+
+.form-switch .form-check-input:disabled,
+.form-switch .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.form-check-label {
+  color: var(--foreground);
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-switch .form-check-input {
+  position: relative;
+  width: 32px;
+  height: 20px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  box-shadow: none;
+  transition: background-color 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1px solid light-dark(var(--primary-foreground), var(--foreground));
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+  box-shadow: var(--shadow-sm);
+  content: &quot;&quot;;
+  transform: translate(2px, -50%);
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input:checked {
+  background: var(--primary);
+}
+
+.form-switch .form-check-input:checked::before {
+  transform: translate(14px, -50%);
+}
+
+.form-switch .form-check-input:focus-visible {
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+.form-range {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 28px;
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  outline: none;
+  border: 0;
+  accent-color: var(--primary);
+  background: linear-gradient(
+      color-mix(in srgb, var(--foreground) 7%, transparent),
+      color-mix(in srgb, var(--foreground) 7%, transparent)
+    )
+    center / 100% 2px no-repeat;
+}
+
+.form-range::-webkit-slider-runnable-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-webkit-slider-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range::-moz-range-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-moz-range-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.btn:not(.btn-primary, .viz-tile):is(
+  [aria-pressed=&quot;true&quot;],
+  [aria-selected=&quot;true&quot;],
+  .is-selected
+) {
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+
+.btn.viz-tile:is([aria-pressed=&quot;true&quot;], [aria-selected=&quot;true&quot;], .is-selected) {
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.btn:focus-visible,
+.nav-link:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .btn,
+  .nav-link,
+  .form-control,
+  .form-select {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Keep small-screen WebKit from zooming when a text field receives focus. */
+  .form-control,
+  .form-select {
+    font-size: max(16px, var(--font-size-normal));
+  }
+
+  .form-control[type=&quot;file&quot;]::file-selector-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .form-control-color[type=&quot;color&quot;] {
+    width: 44px;
+    height: 44px;
+  }
+
+  .form-control:is(
+    [type=&quot;date&quot;],
+    [type=&quot;datetime-local&quot;],
+    [type=&quot;month&quot;],
+    [type=&quot;time&quot;],
+    [type=&quot;week&quot;]
+  ) {
+    min-width: 0;
+    max-width: 100%;
+    padding-block: 8px;
+  }
+
+  .form-check {
+    min-height: 44px;
+    padding-inline: 15px;
+  }
+
+  .form-check-input {
+    position: relative;
+  }
+
+  .form-check-input::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    content: &quot;&quot;;
+    transform: translate(-50%, -50%);
+  }
+
+  .form-check-label {
+    display: inline-flex;
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+  }
+
+  .form-range {
+    height: 44px;
+    touch-action: pan-y;
+  }
+
+  .form-range::-webkit-slider-runnable-track {
+    height: 44px;
+  }
+
+  .form-range::-moz-range-track {
+    height: 44px;
+  }
+
+  .form-range::-webkit-slider-thumb {
+    margin-top: 12px;
+  }
+}
+
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+#widget &gt; svg {
+  width: 100%;
+}
+
+/* Model-authored chart rules can otherwise stretch icons after these styles load. */
+svg.lucide {
+  display: block;
+  width: var(--icon-size) !important;
+  height: var(--icon-size) !important;
+  flex: none;
+  margin: 0 !important;
+  stroke-width: 1.6;
+}
+
+.text-warning,
+.text-destructive {
+  color: var(--destructive);
+}
+
+html&gt;body{padding:0}&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;link rel=&quot;stylesheet&quot; href=&quot;https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css&quot;&gt;
+&lt;style&gt;
+  #fv-nav-preview { color-scheme: light; --fv-bg:light-dark(#fff,#0c0e12); --fv-ink:light-dark(#0b0d14,#f4f5f8); --fv-muted:light-dark(#6d7380,#a5acb8); --fv-line:light-dark(#e8eaf0,#292e38); --fv-wash:light-dark(#f7f8fa,#161a22); --fv-blue:#0769ff; --fv-bluewash:light-dark(#f0f6ff,#132442); --fv-up:light-dark(#d64c53,#ff868a); --fv-radius:12px; --fv-gap:32px; background:var(--fv-bg); color:var(--fv-ink); font-family:&#x27;Pretendard Variable&#x27;,Pretendard,sans-serif; font-size:15px; line-height:1.55; letter-spacing:-.025em; position:relative; width:100%; }
+  #fv-nav-preview * { box-sizing:border-box; }
+  #fv-nav-preview button,#fv-nav-preview input { font:inherit; }
+  #fv-nav-preview button { cursor:pointer; }
+  #fv-nav-preview button:focus-visible,#fv-nav-preview input:focus-visible { outline:2px solid var(--fv-blue); outline-offset:4px; }
+  #fv-nav-preview [hidden] { display:none!important; }
+  #fv-nav-preview h1,#fv-nav-preview h2,#fv-nav-preview h3,#fv-nav-preview p { margin:0; }
+  #fv-nav-preview .fv-header { min-height:76px; padding:0 36px; border-bottom:1px solid var(--fv-line); display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:24px; }
+  #fv-nav-preview .fv-brand { font-size:29px; font-weight:650; letter-spacing:-.065em; background:transparent; border:0; padding:0; color:var(--fv-ink); justify-self:start; }
+  #fv-nav-preview .fv-brand span { color:var(--fv-blue); }
+  #fv-nav-preview .fv-nav { display:flex; gap:30px; align-items:center; }
+  #fv-nav-preview .fv-nav button { position:relative; height:76px; padding:0; white-space:nowrap; border:0; background:transparent; color:var(--fv-muted); font-size:15px; font-weight:500; }
+  #fv-nav-preview .fv-nav button[aria-current=&quot;page&quot;] { color:var(--fv-ink); }
+  #fv-nav-preview .fv-nav button[aria-current=&quot;page&quot;]::after { content:&quot;&quot;; height:2px; background:var(--fv-blue); position:absolute; bottom:-1px; left:0; right:0; }
+  #fv-nav-preview[data-nav=&quot;pill&quot;] .fv-nav { gap:8px; }
+  #fv-nav-preview[data-nav=&quot;pill&quot;] .fv-nav button { height:38px; padding:0 14px; border-radius:24px; }
+  #fv-nav-preview[data-nav=&quot;pill&quot;] .fv-nav button[aria-current=&quot;page&quot;] { background:var(--fv-ink); color:var(--fv-bg); }
+  #fv-nav-preview[data-nav=&quot;pill&quot;] .fv-nav button::after { display:none; }
+  #fv-nav-preview .fv-preview { justify-self:end; font-size:12px; color:var(--fv-muted); border:1px solid var(--fv-line); padding:4px 9px; border-radius:20px; white-space:nowrap; }
+  #fv-nav-preview .fv-main { max-width:1280px; padding:38px 36px 40px; margin:auto; }
+  #fv-nav-preview .fv-heading { display:flex; justify-content:space-between; align-items:end; flex-wrap:wrap; gap:16px; margin-bottom:26px; }
+  #fv-nav-preview .fv-kicker { color:var(--fv-muted); font-size:11px; letter-spacing:.13em; font-weight:500; margin-bottom:8px; }
+  #fv-nav-preview h1 { font-size:24px; line-height:1.25; font-weight:550; letter-spacing:-.055em; }
+  #fv-nav-preview .fv-heading p { color:var(--fv-muted); margin-top:10px; font-size:15px; }
+  #fv-nav-preview [data-view=&quot;market&quot;] { width:100vw; margin:-38px calc(50% - 50vw) -40px; }
+  #fv-nav-preview .fv-market-layout { display:grid; grid-template-columns:308px minmax(0,1fr); gap:34px; align-items:stretch; min-height:calc(100vh - 76px); }
+  #fv-nav-preview .fv-market-content { padding:38px 36px 40px 0; }
+  #fv-nav-preview .fv-symbol-sidebar { order:-1; align-self:stretch; border-right:1px solid var(--fv-line); padding:20px 14px 20px 27px; }
+  #fv-nav-preview .fv-symbol-list { display:grid; gap:7px; }
+  #fv-nav-preview .fv-symbol { width:100%; min-height:62px; display:flex; align-items:center; gap:11px; padding:9px; border:1px solid transparent; border-radius:8px; background:transparent; color:var(--fv-ink); text-align:left; }
+  #fv-nav-preview .fv-symbol[aria-pressed=&quot;true&quot;] { border-color:#cfe5ff; background:#f2f8ff; }
+  #fv-nav-preview .fv-symbol-mark { width:34px; height:34px; flex:0 0 34px; display:grid; place-items:center; overflow:hidden; border-radius:50%; background:#fff; }
+  #fv-nav-preview .fv-symbol-mark img { display:block; width:100%; height:100%; object-fit:cover; }
+  #fv-nav-preview .fv-symbol-mark svg { display:block; width:100%; height:100%; }
+  #fv-nav-preview .fv-symbol-name { display:grid; gap:1px; min-width:0; }
+  #fv-nav-preview .fv-symbol-name strong { font-size:14px; font-weight:650; }
+  #fv-nav-preview .fv-symbol-name small { color:var(--fv-muted); font-size:11px; letter-spacing:.02em; }
+  #fv-nav-preview .fv-market-connection { margin-bottom:42px; }
+  #fv-nav-preview .fv-market-connection &gt; h2 { margin-bottom:16px; font-size:24px; line-height:1.25; font-weight:550; letter-spacing:-.055em; }
+  #fv-nav-preview .fv-connection-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+  #fv-nav-preview .fv-connection-card { min-height:160px; padding:0; display:flex; flex-direction:column; border:1px solid #e9edf5; border-radius:8px; background:#fff; overflow:hidden; }
+  #fv-nav-preview .fv-connection-card header { min-height:38px; display:flex; align-items:center; justify-content:space-between; padding:0 13px; border-bottom:1px solid #e9edf5; background:#fafbfc; }
+  #fv-nav-preview .fv-connection-card header strong { font-size:15px; font-weight:650; }
+  #fv-nav-preview .fv-connection-meta { display:flex; align-items:center; gap:7px; color:var(--fv-muted); font-size:12px; }
+  #fv-nav-preview .fv-connection-card ul { display:grid; gap:10px; margin:0; padding:14px; list-style:none; }
+  #fv-nav-preview .fv-connection-card li { display:flex; align-items:center; justify-content:space-between; gap:6px; font-size:13px; }
+  #fv-nav-preview .fv-connection-card li span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #fv-nav-preview .fv-connection-card li b { flex:0 0 auto; color:#d99626; font-size:11px; letter-spacing:.03em; }
+  #fv-nav-preview .fv-connection-action { height:34px; margin-top:auto; padding:0 10px; display:flex; align-items:center; justify-content:flex-end; border-top:1px solid #e9edf5; }
+  #fv-nav-preview .fv-evidence-button { height:24px; padding:0 7px; border:1px solid #cad0db; border-radius:4px; background:#fff; color:#575c66; font-size:11px; font-weight:700; }
+  #fv-nav-preview .fv-note { font-size:12px; color:var(--fv-muted); }
+  #fv-nav-preview .fv-tickers { display:grid; grid-template-columns:repeat(3,1fr); border-block:1px solid var(--fv-line); padding:18px 0; margin-bottom:var(--fv-gap); }
+  #fv-nav-preview .fv-ticker { padding:0 24px; border-right:1px solid var(--fv-line); }
+  #fv-nav-preview .fv-ticker:first-child { padding-left:0; }
+  #fv-nav-preview .fv-ticker:last-child { border:0; }
+  #fv-nav-preview .fv-ticker-label { font-size:12px; color:var(--fv-muted); margin-bottom:4px; letter-spacing:.02em; }
+  #fv-nav-preview .fv-ticker-data { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  #fv-nav-preview .fv-number { font-size:25px; font-weight:500; letter-spacing:-.035em; font-variant-numeric:tabular-nums; }
+  #fv-nav-preview .fv-up { font-size:12px; color:var(--fv-up); }
+  #fv-nav-preview .fv-down { font-size:12px; color:var(--fv-blue); }
+  #fv-nav-preview .fv-market-grid { display:grid; grid-template-columns:minmax(0,1.7fr) minmax(0,1fr); gap:28px; margin-bottom:var(--fv-gap); }
+  #fv-nav-preview h2 { font-size:18px; font-weight:550; letter-spacing:-.04em; }
+  #fv-nav-preview .fv-section-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px; }
+  #fv-nav-preview .fv-periods { display:flex; gap:3px; }
+  #fv-nav-preview .fv-periods button { border:0; padding:4px 9px; border-radius:5px; background:transparent; color:var(--fv-muted); font-size:12px; }
+  #fv-nav-preview .fv-periods button[aria-pressed=&quot;true&quot;] { color:var(--fv-ink); background:var(--fv-wash); }
+  #fv-nav-preview .fv-condition-cards { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-bottom:36px; }
+  #fv-nav-preview .fv-condition-card { min-height:110px; padding:0; display:flex; flex-direction:column; align-items:stretch; overflow:hidden; border:1px solid #e9edf5; border-radius:8px; background:#fff; color:#16171a; text-align:left; box-shadow:0 1px 2px #0000000d; }
+  #fv-nav-preview .fv-condition-card:has(.fv-condition-select[aria-pressed=&quot;true&quot;]) { border-color:#188bff; background:#f7faff; box-shadow:0 2px 5px #188bff26; }
+  #fv-nav-preview .fv-condition-select { flex:1; display:flex; flex-direction:column; align-items:stretch; padding:0; border:0; background:transparent; color:inherit; text-align:left; }
+  #fv-nav-preview .fv-card-head { min-height:30px; padding:0 13px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #e9edf5; background:#fafbfc; color:#767c85; font-size:11px; font-weight:500; letter-spacing:.02em; }
+  #fv-nav-preview .fv-card-top-meta { display:flex; align-items:baseline; gap:7px; }
+  #fv-nav-preview .fv-card-top-meta i { font-style:normal; }
+  #fv-nav-preview .fv-card-top-meta em { font-size:12px; font-style:normal; font-weight:650; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+  #fv-nav-preview .fv-condition-card[data-tone=&quot;up&quot;] .fv-card-top-meta em { color:var(--fv-up); }
+  #fv-nav-preview .fv-condition-card[data-tone=&quot;down&quot;] .fv-card-top-meta em { color:var(--fv-blue); }
+  #fv-nav-preview .fv-condition-select[aria-pressed=&quot;true&quot;] .fv-card-head { border-color:#d6e9ff; background:#f0f7ff; color:#188bff; }
+  #fv-nav-preview .fv-card-body { min-height:56px; padding:9px 14px 8px; display:flex; flex-direction:column; align-items:start; }
+  #fv-nav-preview .fv-card-body &gt; strong { font-size:15px; font-weight:550; line-height:1.35; }
+  #fv-nav-preview .fv-card-body &gt; small { margin-top:3px; color:#767c85; font-size:11px; line-height:1.35; }
+  #fv-nav-preview .fv-card-body &gt; em { margin-top:auto; padding-top:8px; font-size:18px; font-weight:500; font-style:normal; letter-spacing:-.04em; font-variant-numeric:tabular-nums; }
+  #fv-nav-preview .fv-condition-card[data-tone=&quot;up&quot;] .fv-card-body &gt; em { color:var(--fv-up); }
+  #fv-nav-preview .fv-condition-card[data-tone=&quot;down&quot;] .fv-card-body &gt; em { color:var(--fv-blue); }
+  #fv-nav-preview .fv-condition-card[data-tone=&quot;up&quot;] .fv-condition-select[aria-pressed=&quot;true&quot;] .fv-card-body &gt; em { color:var(--fv-up); }
+  #fv-nav-preview .fv-condition-card[data-tone=&quot;down&quot;] .fv-condition-select[aria-pressed=&quot;true&quot;] .fv-card-body &gt; em { color:var(--fv-blue); }
+  #fv-nav-preview .fv-card-action { height:28px; padding:0 10px; display:flex; align-items:center; justify-content:flex-end; border-top:1px solid #e9edf5; background:#fff; }
+  #fv-nav-preview .fv-card-action em { font-size:18px; font-style:normal; font-weight:500; letter-spacing:-.04em; }
+  #fv-nav-preview .fv-card-action[data-tone=&quot;up&quot;] em { color:var(--fv-up); }
+  #fv-nav-preview .fv-card-action[data-tone=&quot;down&quot;] em { color:var(--fv-blue); }
+  #fv-nav-preview .fv-scenario-detail { height:24px; padding:0 7px; border:1px solid #cad0db; border-radius:4px; background:#fff; color:#575c66; font-size:11px; font-weight:700; line-height:1; white-space:nowrap; }
+  #fv-nav-preview .fv-scenario-detail:hover { border-color:#188bff; color:#188bff; }
+  #fv-nav-preview .fv-custom-card { min-height:110px; border:1px dashed #8ec7ff; border-radius:8px; background:#f0f7ff; color:#075bb8; display:flex; }
+  #fv-nav-preview .fv-custom-card button { flex:1; padding:12px 14px; border:0; background:transparent; color:inherit; text-align:left; }
+  #fv-nav-preview .fv-custom-card strong { display:block; font-size:28px; font-weight:400; line-height:1; }
+  #fv-nav-preview .fv-custom-card span { display:block; margin-top:7px; font-size:14px; font-weight:550; line-height:1.35; }
+  #fv-nav-preview .fv-conditional-chart { padding-top:0; }
+  #fv-nav-preview .fv-chart-title { display:flex; align-items:end; justify-content:space-between; gap:18px; padding-bottom:17px; border-bottom:1px solid var(--fv-line); }
+  #fv-nav-preview .fv-chart-title h1 { font-size:18px; }
+  #fv-nav-preview .fv-chart-meta { display:flex; align-items:baseline; gap:10px; white-space:nowrap; }
+  #fv-nav-preview .fv-chart-meta span { color:var(--fv-muted); font-size:20px; font-weight:500; letter-spacing:-.04em; }
+  #fv-nav-preview .fv-chart-meta strong { font-size:20px; font-weight:500; letter-spacing:-.04em; }
+  #fv-nav-preview .fv-chart-meta[data-tone=&quot;up&quot;] strong { color:var(--fv-up); }
+  #fv-nav-preview .fv-chart-meta[data-tone=&quot;down&quot;] strong { color:var(--fv-blue); }
+  #fv-nav-preview .fv-chart-content { display:grid; grid-template-columns:minmax(0,2fr) minmax(250px,1fr); gap:28px; padding-top:20px; }
+  #fv-nav-preview .fv-chart-wrap { min-width:0; }
+  #fv-nav-preview .fv-chart { width:100%; height:250px; display:block; overflow:visible; }
+  #fv-nav-preview .fv-chart text { fill:var(--fv-muted); font-family:inherit; font-size:11px; }
+  #fv-nav-preview .fv-chart line { stroke:var(--fv-line); stroke-width:1; }
+  #fv-nav-preview .fv-chart .fv-event-guide { stroke:#b7c4d3; stroke-dasharray:2 3; }
+  #fv-nav-preview .fv-chart .fv-event-label { font-size:10px; font-weight:700; }
+  #fv-nav-preview .fv-event-rail { position:relative; border-left:1px solid var(--fv-line); padding-left:20px; }
+  #fv-nav-preview .fv-event-rail &gt; header { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:12px; }
+  #fv-nav-preview .fv-event-rail &gt; header h2 { font-size:15px; }
+  #fv-nav-preview .fv-event-rail &gt; header span { color:var(--fv-muted); font-size:11px; }
+  #fv-nav-preview .fv-event-list { display:grid; gap:0; }
+  #fv-nav-preview .fv-event { position:relative; padding:0 0 15px 15px; border-left:1px solid #d8dee8; }
+  #fv-nav-preview .fv-event:last-child { padding-bottom:0; }
+  #fv-nav-preview .fv-event::before { content:&quot;&quot;; position:absolute; width:7px; height:7px; border:2px solid #fff; border-radius:50%; background:#188bff; left:-5px; top:3px; box-shadow:0 0 0 1px #9fb7d4; }
+  #fv-nav-preview .fv-event[data-tone=&quot;up&quot;]::before { background:var(--fv-up); }
+  #fv-nav-preview .fv-event-time { display:flex; justify-content:space-between; gap:8px; color:var(--fv-muted); font-size:11px; }
+  #fv-nav-preview .fv-event-time strong { font-size:12px; font-weight:650; }
+  #fv-nav-preview .fv-event[data-tone=&quot;up&quot;] .fv-event-time strong { color:var(--fv-up); }
+  #fv-nav-preview .fv-event[data-tone=&quot;down&quot;] .fv-event-time strong { color:var(--fv-blue); }
+  #fv-nav-preview .fv-event-category { display:block; margin-top:5px; color:var(--fv-muted); font-size:11px; }
+  #fv-nav-preview .fv-event h3 { margin-top:2px; font-size:13px; font-weight:600; line-height:1.35; letter-spacing:-.025em; }
+  #fv-nav-preview .fv-event-marquee { min-height:250px; overflow:hidden; position:relative; padding-left:13px; }
+  #fv-nav-preview .fv-event-marquee::before { content:&quot;&quot;; position:absolute; left:13px; top:0; bottom:0; width:1px; background:#d8dee8; }
+  #fv-nav-preview .fv-event-marquee-card { min-height:150px; animation:fv-event-rise 2s cubic-bezier(.2,.8,.2,1) both; }
+  #fv-nav-preview .fv-event-marquee-card .fv-event { min-height:150px; padding-bottom:0; border-left:0; }
+  #fv-nav-preview .fv-event-next { position:absolute; left:13px; right:0; top:158px; opacity:.34; }
+  #fv-nav-preview .fv-event-next .fv-event { border-left:0; padding-bottom:0; }
+  #fv-nav-preview .fv-event-next .fv-event::before { display:none; }
+  #fv-nav-preview .fv-event-next h3 { font-size:12px; }
+  #fv-nav-preview .fv-event-detail { margin-top:9px; color:var(--fv-muted); font-size:12px; line-height:1.55; }
+  @keyframes fv-event-rise { from { opacity:0; transform:translateY(38px); } 45% { opacity:1; transform:translateY(0); } to { opacity:1; transform:translateY(0); } }
+  @media (prefers-reduced-motion:reduce) { #fv-nav-preview .fv-event-marquee-card { animation:none; } }
+  #fv-nav-preview .fv-brief { border-radius:var(--fv-radius); background:var(--fv-wash); padding:24px; display:flex; flex-direction:column; }
+  #fv-nav-preview .fv-brief-label { display:flex; align-items:center; gap:7px; color:var(--fv-blue); font-size:12px; font-weight:500; margin-bottom:14px; }
+  #fv-nav-preview .fv-brief h3 { font-size:23px; font-weight:500; line-height:1.45; letter-spacing:-.045em; }
+  #fv-nav-preview .fv-brief p { color:var(--fv-muted); font-size:14px; line-height:1.8; margin:12px 0 20px; }
+  #fv-nav-preview .fv-text-button { color:var(--fv-ink); background:none; border:0; padding:0; font-size:13px; display:inline-flex; align-items:center; gap:8px; align-self:start; margin-top:auto; }
+  #fv-nav-preview .fv-signals { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); border-top:1px solid var(--fv-line); border-bottom:1px solid var(--fv-line); padding:21px 0; margin-bottom:var(--fv-gap); }
+  #fv-nav-preview .fv-signal { padding:0 20px; border-right:1px solid var(--fv-line); }
+  #fv-nav-preview .fv-signal:first-child { padding-left:0; }
+  #fv-nav-preview .fv-signal:last-child { border:0; }
+  #fv-nav-preview .fv-signal header { display:flex; align-items:center; gap:8px; margin-bottom:10px; font-weight:500; font-size:14px; }
+  #fv-nav-preview .fv-signal header i { color:var(--fv-muted); }
+  #fv-nav-preview .fv-signal strong { font-size:15px; font-weight:500; }
+  #fv-nav-preview .fv-signal p { color:var(--fv-muted); font-size:13px; line-height:1.7; margin-top:6px; }
+  #fv-nav-preview .fv-scenarios { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
+  #fv-nav-preview .fv-scenario { border:1px solid var(--fv-line); border-radius:var(--fv-radius); padding:20px; }
+  #fv-nav-preview .fv-scenario small { font-size:11px; color:var(--fv-muted); }
+  #fv-nav-preview .fv-scenario h3 { font-size:17px; line-height:1.5; font-weight:500; margin:10px 0; }
+  #fv-nav-preview .fv-scenario p { font-size:13px; color:var(--fv-muted); }
+  #fv-nav-preview .fv-primary { background:var(--fv-ink); color:var(--fv-bg); border:0; border-radius:24px; padding:11px 20px; font-size:14px; display:inline-flex; align-items:center; gap:10px; }
+  #fv-nav-preview .fv-footer { border-top:1px solid var(--fv-line); padding:18px 36px; display:flex; justify-content:space-between; gap:10px; color:var(--fv-muted); font-size:11px; }
+  #fv-nav-preview .fv-twin-grid { display:grid; grid-template-columns:1fr 1.2fr; gap:36px; margin-top:32px; }
+  #fv-nav-preview .fv-field { display:flex; flex-direction:column; gap:7px; margin:20px 0; font-size:14px; }
+  #fv-nav-preview input { width:100%; padding:13px 14px; border:1px solid var(--fv-line); border-radius:8px; background:var(--fv-bg); color:var(--fv-ink); font-size:16px; }
+  #fv-nav-preview .fv-custom-input { width:100%; min-height:120px; padding:13px 14px; border:1px solid var(--fv-line); border-radius:8px; background:var(--fv-bg); color:var(--fv-ink); font:inherit; font-size:16px; resize:vertical; }
+  #fv-nav-preview .fv-goal-result { background:var(--fv-wash); padding:30px; border-radius:var(--fv-radius); }
+  #fv-nav-preview .fv-goal-result h3 { font-size:24px; font-weight:500; line-height:1.5; margin:18px 0; }
+  #fv-nav-preview .fv-goal-result p { color:var(--fv-muted); line-height:1.8; }
+  #fv-nav-preview .fv-overlay { position:absolute; inset:0; z-index:10; background:light-dark(#10152266,#000a); padding:100px 28px 32px; display:flex; justify-content:center; align-items:start; }
+  #fv-nav-preview .fv-dialog { background:var(--fv-bg); border:1px solid var(--fv-line); width:min(640px,100%); padding:32px; border-radius:18px; box-shadow:0 18px 70px #0002; }
+  #fv-nav-preview .fv-dialog-top { display:flex; justify-content:space-between; align-items:center; gap:20px; }
+  #fv-nav-preview .fv-dialog h2 { font-size:25px; }
+  #fv-nav-preview .fv-close { border:0; background:var(--fv-wash); color:var(--fv-ink); width:36px; height:36px; border-radius:50%; display:grid; place-items:center; }
+  #fv-nav-preview .fv-steps { display:flex; flex-wrap:wrap; gap:10px 18px; margin:24px 0; border-bottom:1px solid var(--fv-line); padding-bottom:20px; color:var(--fv-muted); font-size:12px; }
+  #fv-nav-preview .fv-steps span:first-child { color:var(--fv-blue); }
+  #fv-nav-preview .fv-stock { width:100%; text-align:left; padding:18px 0; border:0; border-bottom:1px solid var(--fv-line); display:flex; justify-content:space-between; background:transparent; color:var(--fv-ink); }
+  #fv-nav-preview .fv-stock.selected { color:var(--fv-blue); }
+  #fv-nav-preview .fv-stock small { color:var(--fv-muted); margin-left:10px; font-size:12px; }
+  #fv-nav-preview .fv-dialog-actions { display:flex; justify-content:space-between; align-items:center; gap:20px; margin-top:24px; }
+  #fv-nav-preview .fv-detail { margin-top:14px; padding-top:14px; border-top:1px solid var(--fv-line); font-size:13px; color:var(--fv-muted); }
+  @media(max-width:760px) {
+    #fv-nav-preview .fv-header { grid-template-columns:1fr auto; padding:18px 22px 0; gap:10px; }
+    #fv-nav-preview .fv-nav { grid-row:2; grid-column:1/-1; justify-content:center; gap:28px; }
+    #fv-nav-preview .fv-nav button { height:48px; }
+    #fv-nav-preview .fv-main { padding:28px 22px; }
+    #fv-nav-preview [data-view=&quot;market&quot;] { width:auto; margin:-28px -22px; }
+    #fv-nav-preview .fv-market-layout { grid-template-columns:1fr; gap:28px; }
+    #fv-nav-preview .fv-market-content { padding:28px 22px; }
+    #fv-nav-preview .fv-symbol-sidebar { order:-1; border-right:0; border-bottom:1px solid var(--fv-line); padding:16px 22px 18px; }
+    #fv-nav-preview .fv-symbol-list { grid-template-columns:1fr 1fr; }
+    #fv-nav-preview .fv-market-grid { grid-template-columns:1fr; }
+    #fv-nav-preview .fv-condition-cards { grid-template-columns:1fr; gap:8px; margin-bottom:30px; }
+    #fv-nav-preview .fv-connection-grid { grid-template-columns:1fr 1fr; }
+    #fv-nav-preview .fv-condition-card { min-height:0; }
+    #fv-nav-preview .fv-card-head { min-height:38px; }
+    #fv-nav-preview .fv-card-body { min-height:0; padding:14px 16px; }
+    #fv-nav-preview .fv-card-body &gt; small { margin-top:4px; }
+    #fv-nav-preview .fv-card-body &gt; em { margin-top:10px; padding-top:0; font-size:19px; }
+    #fv-nav-preview .fv-brief { padding:22px; }
+    #fv-nav-preview .fv-brief h3 { font-size:22px; }
+    #fv-nav-preview .fv-signals { grid-template-columns:1fr 1fr; gap:24px 0; }
+    #fv-nav-preview .fv-signal:nth-child(2) { border:0; }
+    #fv-nav-preview .fv-signal:nth-child(3) { padding-left:0; }
+    #fv-nav-preview .fv-number { font-size:21px; }
+    #fv-nav-preview .fv-ticker { padding:0 12px; }
+    #fv-nav-preview .fv-twin-grid { grid-template-columns:1fr; }
+    #fv-nav-preview .fv-chart-content { grid-template-columns:1fr; }
+    #fv-nav-preview .fv-event-rail { border-left:0; border-top:1px solid var(--fv-line); padding:18px 0 0; }
+  }
+  @media(max-width:480px) {
+    #fv-nav-preview .fv-nav { gap:20px; }
+    #fv-nav-preview .fv-nav button { font-size:13px; }
+    #fv-nav-preview .fv-brand { font-size:20px; }
+    #fv-nav-preview h1 { font-size:28px; }
+    #fv-nav-preview .fv-number { font-size:19px; }
+    #fv-nav-preview .fv-ticker-data { gap:2px; flex-direction:column; align-items:start; }
+    #fv-nav-preview .fv-scenarios { grid-template-columns:1fr; }
+    #fv-nav-preview .fv-connection-grid { grid-template-columns:1fr; }
+    #fv-nav-preview .fv-footer { padding:18px 22px; flex-wrap:wrap; }
+    #fv-nav-preview .fv-dialog { padding:22px; }
+    #fv-nav-preview .fv-overlay { padding:120px 12px 24px; }
+    #fv-nav-preview .fv-dialog-actions { flex-wrap:wrap; }
+    #fv-nav-preview[data-nav=&quot;pill&quot;] .fv-nav { gap:0; }
+    #fv-nav-preview[data-nav=&quot;pill&quot;] .fv-nav button { padding:0 10px; }
+  }
+&lt;/style&gt;
+&lt;div id=&quot;fv-nav-preview&quot; data-nav=&quot;line&quot; aria-label=&quot;Finverse 상단 내비게이션 시안&quot;&gt;
+  &lt;header class=&quot;fv-header&quot;&gt;
+    &lt;button class=&quot;fv-brand&quot; type=&quot;button&quot; data-page=&quot;market&quot; aria-label=&quot;Finverse 홈&quot;&gt;finverse&lt;span&gt;.&lt;/span&gt;&lt;/button&gt;
+    &lt;nav class=&quot;fv-nav&quot; aria-label=&quot;주 메뉴&quot;&gt;
+      &lt;button type=&quot;button&quot; data-page=&quot;market&quot; aria-current=&quot;page&quot;&gt;시장 시뮬레이션&lt;/button&gt;
+      &lt;button type=&quot;button&quot; data-page=&quot;twin&quot;&gt;마이 금융 트윈&lt;/button&gt;
+      &lt;button type=&quot;button&quot; data-trading aria-haspopup=&quot;dialog&quot;&gt;모의 투자&lt;/button&gt;
+    &lt;/nav&gt;
+  &lt;/header&gt;
+  &lt;main class=&quot;fv-main&quot;&gt;
+    &lt;section data-view=&quot;market&quot; aria-label=&quot;시장 인사이트&quot;&gt;
+      &lt;div class=&quot;fv-market-layout&quot;&gt;
+        &lt;div class=&quot;fv-market-content&quot;&gt;
+          &lt;div class=&quot;fv-heading&quot;&gt;&lt;div&gt;&lt;h1&gt;&lt;span data-selected-stock&gt;삼성전자&lt;/span&gt;, 당신이 선택한 조건에서 어떻게 움직일까요?&lt;/h1&gt;&lt;/div&gt;&lt;/div&gt;
+          &lt;div class=&quot;fv-condition-cards&quot; aria-label=&quot;조건부 시나리오 선택&quot;&gt;
+            &lt;article class=&quot;fv-condition-card&quot; data-tone=&quot;up&quot;&gt;&lt;button class=&quot;fv-condition-select&quot; type=&quot;button&quot; data-scenario=&quot;rebound&quot; aria-pressed=&quot;true&quot;&gt;&lt;span class=&quot;fv-card-head&quot;&gt;&lt;span&gt;01&lt;/span&gt;&lt;span class=&quot;fv-card-top-meta&quot;&gt;&lt;i&gt;중기&lt;/i&gt;&lt;em data-card-forecast=&quot;rebound&quot;&gt;+10.5%&lt;/em&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&quot;fv-card-body&quot;&gt;&lt;strong&gt;조건부 반등&lt;/strong&gt;&lt;small&gt;수급 회복 · 실적 상회&lt;/small&gt;&lt;/span&gt;&lt;/button&gt;&lt;div class=&quot;fv-card-action&quot; data-tone=&quot;up&quot;&gt;&lt;button class=&quot;fv-scenario-detail&quot; type=&quot;button&quot; data-scenario-detail=&quot;rebound&quot;&gt;시나리오 상세&lt;/button&gt;&lt;/div&gt;&lt;/article&gt;
+            &lt;article class=&quot;fv-condition-card&quot; data-tone=&quot;down&quot;&gt;&lt;button class=&quot;fv-condition-select&quot; type=&quot;button&quot; data-scenario=&quot;chip&quot; aria-pressed=&quot;false&quot;&gt;&lt;span class=&quot;fv-card-head&quot;&gt;&lt;span&gt;02&lt;/span&gt;&lt;span class=&quot;fv-card-top-meta&quot;&gt;&lt;i&gt;중기&lt;/i&gt;&lt;em data-card-forecast=&quot;chip&quot;&gt;-9.9%&lt;/em&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&quot;fv-card-body&quot;&gt;&lt;strong&gt;실적 미스&lt;/strong&gt;&lt;small&gt;가이던스 하향 · 수요 둔화&lt;/small&gt;&lt;/span&gt;&lt;/button&gt;&lt;div class=&quot;fv-card-action&quot; data-tone=&quot;down&quot;&gt;&lt;button class=&quot;fv-scenario-detail&quot; type=&quot;button&quot; data-scenario-detail=&quot;chip&quot;&gt;시나리오 상세&lt;/button&gt;&lt;/div&gt;&lt;/article&gt;
+            &lt;article class=&quot;fv-condition-card&quot; data-tone=&quot;down&quot;&gt;&lt;button class=&quot;fv-condition-select&quot; type=&quot;button&quot; data-scenario=&quot;risk&quot; aria-pressed=&quot;false&quot;&gt;&lt;span class=&quot;fv-card-head&quot;&gt;&lt;span&gt;03&lt;/span&gt;&lt;span class=&quot;fv-card-top-meta&quot;&gt;&lt;i&gt;중기&lt;/i&gt;&lt;em data-card-forecast=&quot;risk&quot;&gt;-11.7%&lt;/em&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&quot;fv-card-body&quot;&gt;&lt;strong&gt;수급 악화&lt;/strong&gt;&lt;small&gt;외국인 매도 · 변동성 확대&lt;/small&gt;&lt;/span&gt;&lt;/button&gt;&lt;div class=&quot;fv-card-action&quot; data-tone=&quot;down&quot;&gt;&lt;button class=&quot;fv-scenario-detail&quot; type=&quot;button&quot; data-scenario-detail=&quot;risk&quot;&gt;시나리오 상세&lt;/button&gt;&lt;/div&gt;&lt;/article&gt;
+            &lt;article class=&quot;fv-custom-card&quot;&gt;&lt;button type=&quot;button&quot; data-custom-scenario&gt;&lt;strong&gt;+&lt;/strong&gt;&lt;span&gt;내가 생각한&lt;br&gt;시나리오로 보기&lt;/span&gt;&lt;/button&gt;&lt;/article&gt;
+          &lt;/div&gt;
+          &lt;section class=&quot;fv-conditional-chart&quot; aria-label=&quot;조건부 종목 경로&quot;&gt;
+            &lt;header class=&quot;fv-chart-title&quot;&gt;&lt;div&gt;&lt;h1&gt;시나리오 - &lt;span data-scenario-title&gt;삼성전자 조건부 반등&lt;/span&gt;&lt;/h1&gt;&lt;/div&gt;&lt;div class=&quot;fv-chart-meta&quot; data-scenario-meta data-tone=&quot;up&quot;&gt;&lt;span data-scenario-duration&gt;20일&lt;/span&gt;&lt;strong data-scenario-forecast&gt;+10.5%&lt;/strong&gt;&lt;/div&gt;&lt;/header&gt;
+            &lt;div class=&quot;fv-chart-content&quot;&gt;&lt;div class=&quot;fv-chart-wrap&quot;&gt;&lt;svg class=&quot;fv-chart&quot; role=&quot;img&quot; aria-label=&quot;선택한 조건의 종목 과거 캔들과 미래 경로&quot;&gt;&lt;title&gt;선택한 조건의 종목 과거 캔들과 미래 경로&lt;/title&gt;&lt;/svg&gt;&lt;/div&gt;&lt;aside class=&quot;fv-event-rail&quot; aria-label=&quot;발생 가능 이벤트&quot;&gt;&lt;header&gt;&lt;h2&gt;발생 가능 이벤트&lt;/h2&gt;&lt;span data-event-horizon&gt;중기&lt;/span&gt;&lt;/header&gt;&lt;div class=&quot;fv-event-list&quot; data-event-list&gt;&lt;/div&gt;&lt;/aside&gt;&lt;/div&gt;
+          &lt;/section&gt;
+        &lt;/div&gt;
+        &lt;aside class=&quot;fv-symbol-sidebar&quot; aria-label=&quot;종목 선택&quot;&gt;&lt;div class=&quot;fv-symbol-list&quot;&gt;
+          &lt;button class=&quot;fv-symbol&quot; type=&quot;button&quot; data-symbol=&quot;samsung&quot; aria-pressed=&quot;true&quot;&gt;&lt;span class=&quot;fv-symbol-mark&quot;&gt;&lt;img src=&quot;/stock-logos/005930.png?v=2&quot; alt=&quot;삼성전자 로고&quot;&gt;&lt;/span&gt;&lt;span class=&quot;fv-symbol-name&quot;&gt;&lt;strong&gt;삼성전자&lt;/strong&gt;&lt;small&gt;005930&lt;/small&gt;&lt;/span&gt;&lt;/button&gt;
+          &lt;button class=&quot;fv-symbol&quot; type=&quot;button&quot; data-symbol=&quot;skhynix&quot; aria-pressed=&quot;false&quot;&gt;&lt;span class=&quot;fv-symbol-mark&quot;&gt;&lt;img src=&quot;/stock-logos/000660.png?v=2&quot; alt=&quot;SK하이닉스 로고&quot;&gt;&lt;/span&gt;&lt;span class=&quot;fv-symbol-name&quot;&gt;&lt;strong&gt;SK하이닉스&lt;/strong&gt;&lt;small&gt;000660&lt;/small&gt;&lt;/span&gt;&lt;/button&gt;
+          &lt;button class=&quot;fv-symbol&quot; type=&quot;button&quot; data-symbol=&quot;hyundai&quot; aria-pressed=&quot;false&quot;&gt;&lt;span class=&quot;fv-symbol-mark&quot;&gt;&lt;img src=&quot;/stock-logos/005380.png?v=2&quot; alt=&quot;현대차 로고&quot;&gt;&lt;/span&gt;&lt;span class=&quot;fv-symbol-name&quot;&gt;&lt;strong&gt;현대차&lt;/strong&gt;&lt;small&gt;005380&lt;/small&gt;&lt;/span&gt;&lt;/button&gt;
+          &lt;button class=&quot;fv-symbol&quot; type=&quot;button&quot; data-symbol=&quot;sdi&quot; aria-pressed=&quot;false&quot;&gt;&lt;span class=&quot;fv-symbol-mark&quot;&gt;&lt;img src=&quot;/stock-logos/009150.png?v=2&quot; alt=&quot;삼성전기 로고&quot;&gt;&lt;/span&gt;&lt;span class=&quot;fv-symbol-name&quot;&gt;&lt;strong&gt;삼성전기&lt;/strong&gt;&lt;small&gt;009150&lt;/small&gt;&lt;/span&gt;&lt;/button&gt;
+        &lt;/div&gt;&lt;/aside&gt;
+      &lt;/div&gt;
+    &lt;/section&gt;
+    &lt;section data-view=&quot;twin&quot; aria-label=&quot;마이 금융 트윈&quot; hidden&gt;
+      &lt;div class=&quot;fv-heading&quot;&gt;&lt;div&gt;&lt;h1&gt;마이 금융 트윈&lt;/h1&gt;&lt;/div&gt;&lt;/div&gt;
+      &lt;div class=&quot;fv-twin-grid&quot;&gt;&lt;section&gt;&lt;h2&gt;금융 목표&lt;/h2&gt;&lt;label class=&quot;fv-field&quot;&gt;목표 이름&lt;input data-goal value=&quot;내 금융 목표&quot;&gt;&lt;/label&gt;&lt;label class=&quot;fv-field&quot;&gt;목표 금액&lt;input value=&quot;50,000,000원&quot; readonly&gt;&lt;/label&gt;&lt;label class=&quot;fv-field&quot;&gt;준비 기간&lt;input value=&quot;3년&quot; readonly&gt;&lt;/label&gt;&lt;button class=&quot;fv-primary&quot; type=&quot;button&quot; data-goal-apply&gt;반영하기 &lt;i data-lucide=&quot;arrow-right&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;/button&gt;&lt;/section&gt;&lt;aside class=&quot;fv-goal-result&quot;&gt;&lt;h3 data-goal-heading&gt;내 금융 목표&lt;/h3&gt;&lt;div class=&quot;fv-signals&quot; style=&quot;grid-template-columns:1fr 1fr;margin-top:28px&quot;&gt;&lt;div class=&quot;fv-signal&quot;&gt;&lt;header&gt;목표 금액&lt;/header&gt;&lt;strong&gt;5,000만 원&lt;/strong&gt;&lt;/div&gt;&lt;div class=&quot;fv-signal&quot;&gt;&lt;header&gt;준비 기간&lt;/header&gt;&lt;strong&gt;36개월&lt;/strong&gt;&lt;/div&gt;&lt;/div&gt;&lt;/aside&gt;&lt;/div&gt;
+    &lt;/section&gt;
+  &lt;/main&gt;
+  &lt;div class=&quot;fv-overlay&quot; data-overlay hidden&gt;
+    &lt;section class=&quot;fv-dialog&quot; role=&quot;dialog&quot; aria-modal=&quot;true&quot; aria-labelledby=&quot;fv-trading-title&quot;&gt;
+      &lt;div class=&quot;fv-dialog-top&quot;&gt;&lt;h2 id=&quot;fv-trading-title&quot;&gt;모의 투자&lt;/h2&gt;&lt;button class=&quot;fv-close&quot; type=&quot;button&quot; data-close aria-label=&quot;모의 투자 닫기&quot;&gt;&lt;i data-lucide=&quot;x&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;/button&gt;&lt;/div&gt;
+      &lt;div class=&quot;fv-steps&quot;&gt;&lt;span&gt;01 종목 선택&lt;/span&gt;&lt;span&gt;02 자료 수집&lt;/span&gt;&lt;span&gt;03 투자 상태&lt;/span&gt;&lt;span&gt;04 시뮬레이션 설정&lt;/span&gt;&lt;/div&gt;
+      &lt;h3&gt;어떤 종목으로 연습할까요?&lt;/h3&gt;
+      &lt;button class=&quot;fv-stock selected&quot; type=&quot;button&quot; data-stock=&quot;삼성전자&quot; aria-pressed=&quot;true&quot;&gt;&lt;span&gt;삼성전자&lt;small&gt;005930&lt;/small&gt;&lt;/span&gt;&lt;span&gt;선택됨&lt;/span&gt;&lt;/button&gt;
+      &lt;button class=&quot;fv-stock&quot; type=&quot;button&quot; data-stock=&quot;SK하이닉스&quot; aria-pressed=&quot;false&quot;&gt;&lt;span&gt;SK하이닉스&lt;small&gt;000660&lt;/small&gt;&lt;/span&gt;&lt;span&gt;선택&lt;/span&gt;&lt;/button&gt;
+      &lt;button class=&quot;fv-stock&quot; type=&quot;button&quot; data-stock=&quot;현대차&quot; aria-pressed=&quot;false&quot;&gt;&lt;span&gt;현대차&lt;small&gt;005380&lt;/small&gt;&lt;/span&gt;&lt;span&gt;선택&lt;/span&gt;&lt;/button&gt;
+      &lt;div class=&quot;fv-dialog-actions&quot;&gt;&lt;span class=&quot;fv-note&quot; data-stock-note aria-live=&quot;polite&quot;&gt;삼성전자&lt;/span&gt;&lt;button class=&quot;fv-primary&quot; type=&quot;button&quot; data-close&gt;선택 완료 &lt;i data-lucide=&quot;arrow-right&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;/button&gt;&lt;/div&gt;
+    &lt;/section&gt;
+  &lt;/div&gt;
+  &lt;div class=&quot;fv-overlay&quot; data-scenario-overlay hidden&gt;
+    &lt;section class=&quot;fv-dialog&quot; role=&quot;dialog&quot; aria-modal=&quot;true&quot; aria-labelledby=&quot;fv-scenario-detail-title&quot;&gt;
+      &lt;div class=&quot;fv-dialog-top&quot;&gt;&lt;h2 id=&quot;fv-scenario-detail-title&quot; data-detail-title&gt;&lt;/h2&gt;&lt;button class=&quot;fv-close&quot; type=&quot;button&quot; data-scenario-close aria-label=&quot;시나리오 상세 닫기&quot;&gt;&lt;i data-lucide=&quot;x&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;/button&gt;&lt;/div&gt;
+      &lt;div class=&quot;fv-steps&quot;&gt;&lt;span data-detail-duration&gt;&lt;/span&gt;&lt;span data-detail-forecast&gt;&lt;/span&gt;&lt;/div&gt;
+      &lt;div class=&quot;fv-detail&quot; data-detail-items&gt;&lt;/div&gt;
+    &lt;/section&gt;
+  &lt;/div&gt;
+  &lt;div class=&quot;fv-overlay&quot; data-custom-overlay hidden&gt;
+    &lt;section class=&quot;fv-dialog&quot; role=&quot;dialog&quot; aria-modal=&quot;true&quot; aria-labelledby=&quot;fv-custom-title&quot;&gt;
+      &lt;div class=&quot;fv-dialog-top&quot;&gt;&lt;h2 id=&quot;fv-custom-title&quot;&gt;내 시나리오&lt;/h2&gt;&lt;button class=&quot;fv-close&quot; type=&quot;button&quot; data-custom-close aria-label=&quot;내 시나리오 닫기&quot;&gt;&lt;i data-lucide=&quot;x&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;/button&gt;&lt;/div&gt;
+      &lt;label class=&quot;fv-field&quot;&gt;시장 조건&lt;textarea class=&quot;fv-custom-input&quot; rows=&quot;5&quot; placeholder=&quot;예: 미국 금리 인하와 반도체 수요 회복&quot;&gt;&lt;/textarea&gt;&lt;/label&gt;
+      &lt;button class=&quot;fv-primary&quot; type=&quot;button&quot; data-custom-close&gt;시나리오 만들기&lt;/button&gt;
+    &lt;/section&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;script&gt;
+(() =&gt; {
+  const root = document.getElementById(&#x27;fv-nav-preview&#x27;);
+  const state = { navigation:&#x27;line&#x27;, spacing:32, radius:12, appearance:&#x27;light&#x27; };
+  const chart = root.querySelector(&#x27;.fv-chart&#x27;);
+  const overlay = root.querySelector(&#x27;[data-overlay]&#x27;);
+  const scenarioOverlay = root.querySelector(&#x27;[data-scenario-overlay]&#x27;);
+  const customOverlay = root.querySelector(&#x27;[data-custom-overlay]&#x27;);
+  let period = &#x27;20&#x27;;
+  let opener = null;
+  const paths = {&#x27;20&#x27;:[2590,2600,2594,2618,2605,2612,2637,2628,2632,2607,2616,2646,2634,2642,2655,2648,2658,2664,2651,2668]};
+  const stocks = {
+    samsung:{name:&#x27;삼성전자&#x27;,code:&#x27;005930&#x27;,candles:[[235000,239500,229000,231000],[236000,238500,228500,230000],[229500,243000,227500,239500],[243500,260500,241000,255500],[267500,271000,262500,268000],[275000,275500,266000,274500],[283000,288000,265000,268500],[251500,254500,246500,247500],[257000,273000,252500,271000],[267000,285000,266000,281500],[271500,272000,255000,257000],[249000,258000,245000,257000],[256500,266500,255500,261500],[270000,271000,262500,266000],[262500,266000,256000,257000],[249000,260000,246000,260000],[256500,262500,254000,261000],[252000,255500,249500,250500],[254000,255000,243000,250000],[254000,259000,252500,255500]]},
+    skhynix:{name:&#x27;SK하이닉스&#x27;,code:&#x27;000660&#x27;,candles:[[1521000,1542000,1409000,1422000],[1443000,1487000,1397000,1420000],[1405000,1455000,1373000,1425000],[1456000,1549000,1440000,1504000],[1582000,1634000,1567000,1593000],[1695000,1697000,1626000,1645000],[1736000,1792000,1640000,1662000],[1545000,1559000,1486000,1500000],[1613000,1720000,1576000,1691000],[1675000,1773000,1669000,1730000],[1775000,1792000,1670000,1671000],[1598000,1687000,1557000,1678000],[1668000,1735000,1662000,1688000],[1776000,1788000,1708000,1730000],[1704000,1725000,1653000,1653000],[1596000,1674000,1577000,1674000],[1666000,1713000,1652000,1693000],[1630000,1661000,1612000,1613000],[1643000,1649000,1558000,1596000],[1620000,1683000,1620000,1647000]]},
+    hyundai:{name:&#x27;현대차&#x27;,code:&#x27;005380&#x27;,candles:[[401000,406000,387000,395500],[396000,410500,392500,408000],[406000,411000,400500,403000],[403000,413000,400500,409500],[419500,431500,415000,418500],[424000,456000,421500,453000],[459500,459500,427000,435000],[416000,422500,406500,414000],[417000,425000,408000,417500],[406500,420500,405000,415000],[416000,420000,408000,414000],[422000,427250,406000,421000],[427000,434000,406500,408000],[411000,414000,395000,398000],[399000,404750,397500,399500],[391500,405500,387000,403500],[404000,408000,396500,400500],[389000,391000,376000,378000],[381500,387000,374500,383500],[389000,393500,381000,383500]]},
+    sdi:{name:&#x27;삼성전기&#x27;,code:&#x27;009150&#x27;,candles:[[1259000,1304000,1233000,1278000],[1315000,1357000,1250000,1274000],[1238000,1297000,1191000,1262000],[1288000,1350000,1275000,1335000],[1432000,1548000,1412000,1503000],[1593000,1600000,1511000,1558000],[1574000,1595000,1422000,1440000],[1357000,1431000,1350000,1387000],[1401000,1421000,1335000,1396000],[1345000,1348000,1306000,1316000],[1316000,1343000,1292000,1318000],[1272000,1362000,1222000,1362000],[1342000,1357000,1303000,1330000],[1391000,1398000,1336000,1385000],[1398000,1460000,1393000,1421000],[1370000,1461000,1331000,1458000],[1440000,1475000,1408000,1430000],[1381000,1438000,1369000,1400000],[1432000,1449000,1312000,1348000],[1367000,1418000,1351000,1401000]]}
+  };
+  let activeStock=&#x27;samsung&#x27;;
+  const conditions = {
+    rebound:{title:&#x27;조건부 반등&#x27;,duration:20,tone:&#x27;up&#x27;,path:[0,.03,.06,.104,.13,.15,.17,.19,.21,.225,.237,.245],detail:[&#x27;외국인 순매수 회복&#x27;,&#x27;실적 상회&#x27;,&#x27;수요 회복&#x27;],events:[{day:4,category:&#x27;수급·실적&#x27;,title:&#x27;외국인 수급 회복과 실적 상회&#x27;,body:&#x27;수급과 실적이 함께 개선되면 반등의 첫 신호가 확인됩니다.&#x27;,impact:&#x27;+10.0%&#x27;},{day:12,category:&#x27;산업&#x27;,title:&#x27;수요 회복 확인&#x27;,body:&#x27;핵심 수요가 재확인되면 밸류에이션 재평가가 이어질 수 있습니다.&#x27;,impact:&#x27;+17.0%&#x27;},{day:20,category:&#x27;분기점&#x27;,title:&#x27;20일 이동평균 회복 여부&#x27;,body:&#x27;수급과 실적 조건이 유지될 때 기술적 저항 돌파가 다음 경로의 분기점이 됩니다.&#x27;,impact:&#x27;+24.5%&#x27;}]},
+    chip:{title:&#x27;실적 미스&#x27;,duration:20,tone:&#x27;down&#x27;,path:[0,-.021,-.045,-.062,-.09,-.107,-.12,-.132,-.14,-.145,-.14,-.138],detail:[&#x27;실적 하회 또는 보수적 가이던스&#x27;,&#x27;수요 회복 지연&#x27;,&#x27;이익 추정치 하향&#x27;],events:[{day:4,category:&#x27;실적&#x27;,title:&#x27;실적 미스 또는 보수적 가이던스&#x27;,body:&#x27;컨센서스 하회가 확인되면 이익 추정치가 함께 낮아질 수 있습니다.&#x27;,impact:&#x27;-5.5%&#x27;},{day:12,category:&#x27;수요&#x27;,title:&#x27;수요 회복 지연&#x27;,body:&#x27;수요 회복이 지연되면 밸류에이션 재평가가 늦어집니다.&#x27;,impact:&#x27;-9.8%&#x27;},{day:20,category:&#x27;산업&#x27;,title:&#x27;이익 추정치 하향&#x27;,body:&#x27;경쟁과 공급 우려가 이어지면 이익 추정치 하향 가능성이 열립니다.&#x27;,impact:&#x27;-13.8%&#x27;}]},
+    risk:{title:&#x27;수급 악화&#x27;,duration:20,tone:&#x27;down&#x27;,path:[0,-.017,-.04,-.062,-.07,-.078,-.082,-.09,-.094,-.09,-.089,-.087],detail:[&#x27;외국인 순매도 지속&#x27;,&#x27;변동성 확대&#x27;,&#x27;금리·에너지·지정학 리스크&#x27;],events:[{day:4,category:&#x27;수급&#x27;,title:&#x27;외국인 순매도 지속&#x27;,body:&#x27;현물과 선물에서 매도가 겹치면 위험 회피가 확대될 수 있습니다.&#x27;,impact:&#x27;-3.2%&#x27;},{day:12,category:&#x27;매크로&#x27;,title:&#x27;금리와 위험 프리미엄 재부각&#x27;,body:&#x27;할인율과 위험 프리미엄이 함께 올라 반등 시도를 제한합니다.&#x27;,impact:&#x27;-6.1%&#x27;},{day:20,category:&#x27;변동성&#x27;,title:&#x27;프로그램 매매 재충격&#x27;,body:&#x27;변동성이 확대되면 하단 경로가 다시 열릴 수 있습니다.&#x27;,impact:&#x27;-8.7%&#x27;}]}
+  };
+  const durationProfiles={20:{label:&#x27;20일&#x27;,horizon:&#x27;중기&#x27;,historyPeriod:&#x27;20&#x27;,factor:.72,band:1,ticks:[&#x27;D+4&#x27;,&#x27;D+8&#x27;,&#x27;D+12&#x27;,&#x27;D+16&#x27;,&#x27;D+20&#x27;]}};
+  let activeCondition=&#x27;rebound&#x27;;
+  let simulationDays=20;
+  let activeEventIndex=0;
+  const profile=()=&gt;durationProfiles[simulationDays];
+  const formatForecast=(condition,days=simulationDays)=&gt;{const value=condition.path.at(-1)*durationProfiles[days].factor*100;return `${value&gt;=0?&#x27;+&#x27;:&#x27;&#x27;}${value.toFixed(1)}%`;};
+  function updateScenarioUi(){const condition=conditions[activeCondition],stock=stocks[activeStock];root.querySelectorAll(&#x27;[data-selected-stock]&#x27;).forEach(node=&gt;node.textContent=stock.name);root.querySelector(&#x27;[data-scenario-title]&#x27;).textContent=`${stock.name} ${condition.title}`;root.querySelector(&#x27;[data-scenario-duration]&#x27;).textContent=profile().label;root.querySelector(&#x27;[data-scenario-forecast]&#x27;).textContent=formatForecast(condition,20);root.querySelector(&#x27;[data-scenario-meta]&#x27;).dataset.tone=condition.tone;root.querySelectorAll(&#x27;[data-card-forecast]&#x27;).forEach(node=&gt;{const cardCondition=conditions[node.dataset.cardForecast];node.textContent=formatForecast(cardCondition,20);});}
+  const eventDate=event=&gt;{const base=new Date(&#x27;2026-09-05T00:00:00&#x27;);base.setDate(base.getDate()+event.day);return `${String(base.getMonth()+1).padStart(2,&#x27;0&#x27;)}/${String(base.getDate()).padStart(2,&#x27;0&#x27;)}`;};
+  function renderEventRail(condition){const event=condition.events[activeEventIndex],next=condition.events[(activeEventIndex+1)%condition.events.length];root.querySelector(&#x27;[data-event-horizon]&#x27;).textContent=profile().horizon;root.querySelector(&#x27;[data-event-list]&#x27;).innerHTML=`&lt;div class=&quot;fv-event-marquee&quot;&gt;&lt;div class=&quot;fv-event-marquee-card&quot;&gt;&lt;article class=&quot;fv-event&quot; data-tone=&quot;${condition.tone}&quot;&gt;&lt;div class=&quot;fv-event-time&quot;&gt;&lt;span&gt;${eventDate(event)} · D+${event.day}&lt;/span&gt;&lt;strong&gt;${event.impact}&lt;/strong&gt;&lt;/div&gt;&lt;span class=&quot;fv-event-category&quot;&gt;${event.category}&lt;/span&gt;&lt;h3&gt;${event.title}&lt;/h3&gt;&lt;p class=&quot;fv-event-detail&quot;&gt;${event.body}&lt;/p&gt;&lt;/article&gt;&lt;/div&gt;&lt;div class=&quot;fv-event-next&quot;&gt;&lt;article class=&quot;fv-event&quot; data-tone=&quot;${condition.tone}&quot;&gt;&lt;div class=&quot;fv-event-time&quot;&gt;&lt;span&gt;${eventDate(next)} · D+${next.day}&lt;/span&gt;&lt;strong&gt;${next.impact}&lt;/strong&gt;&lt;/div&gt;&lt;span class=&quot;fv-event-category&quot;&gt;${next.category}&lt;/span&gt;&lt;h3&gt;${next.title}&lt;/h3&gt;&lt;/article&gt;&lt;/div&gt;&lt;/div&gt;`;}
+  function drawChart() {
+    const w=Math.max(300,chart.parentElement.clientWidth), h=282, left=36, right=w-2, top=10, bottom=238;
+    const stock=stocks[activeStock], actual=stock.candles.map(candle=&gt;candle[3]);
+    const futureBase=actual.at(-1), condition=conditions[activeCondition], duration=profile();
+    const forecast=condition.path.map(ratio=&gt;futureBase*(1+ratio*duration.factor));
+    const outerUpper=forecast.map((value,index)=&gt;value*(1+(.012+index*.008)*duration.band)), outerLower=forecast.map((value,index)=&gt;value*(1-(.012+index*.008)*duration.band));
+    const innerUpper=forecast.map((value,index)=&gt;value*(1+(.006+index*.004)*duration.band)), innerLower=forecast.map((value,index)=&gt;value*(1-(.006+index*.004)*duration.band));
+    const all=[...stock.candles.flatMap(candle=&gt;[candle[1],candle[2]]),...outerUpper,...outerLower], priceUnitHint=Math.max(...all)&gt;=500000?1000:Math.max(...all)&gt;=100000?500:Math.max(...all)&gt;=50000?100:Math.max(...all)&gt;=10000?50:10, low=Math.floor((Math.min(...all)-priceUnitHint*2)/priceUnitHint)*priceUnitHint, high=Math.ceil((Math.max(...all)+priceUnitHint*2)/priceUnitHint)*priceUnitHint;
+    const split=left+(right-left)*.5, y=value=&gt;bottom-(value-low)/(high-low)*(bottom-top);
+    const actualX=index=&gt;left+index*(split-left)/Math.max(actual.length-1,1), forecastX=index=&gt;split+index*(right-split)/Math.max(forecast.length-1,1);
+    const makePath=(values,x)=&gt;&#x27;M&#x27;+values.map((value,index)=&gt;`${x(index).toFixed(1)},${y(value).toFixed(1)}`).join(&#x27; L&#x27;);
+    const band=(upper,lower)=&gt;`${makePath(upper,forecastX)} L${[...lower].reverse().map((value,reverseIndex)=&gt;`${forecastX(lower.length-1-reverseIndex).toFixed(1)},${y(value).toFixed(1)}`).join(&#x27; L&#x27;)} Z`;
+    const forecastPath=makePath(forecast,forecastX);
+    const priceUnit=high&gt;=500000?1000:high&gt;=100000?500:high&gt;=50000?100:high&gt;=10000?50:high&gt;=5000?10:high&gt;=1000?5:1;
+    const tickStep=Math.max(priceUnit,Math.ceil((high-low)/4/priceUnit)*priceUnit), ticks=[]; for(let tick=low;tick&lt;=high;tick+=tickStep)ticks.push(tick);
+    const actualLabels=[&#x27;8/8&#x27;,&#x27;8/14&#x27;,&#x27;8/20&#x27;,&#x27;8/26&#x27;,&#x27;9/1&#x27;];
+    const actualIndexes=[0,4,8,12,16];
+    chart.setAttribute(&#x27;viewBox&#x27;,`0 0 ${w} ${h}`);
+    const forecastColor=condition.tone===&#x27;up&#x27;?&#x27;var(--fv-up)&#x27;:&#x27;var(--fv-blue)&#x27;;
+    const event=condition.events[activeEventIndex];
+    const ratio=event.day/simulationDays,index=Math.round(ratio*(forecast.length-1)),eventX=forecastX(index),eventY=y(forecast[index]),labelY=Math.max(top+12,eventY-14);
+    const eventMarkers=`&lt;line class=&quot;fv-event-guide&quot; x1=&quot;${eventX}&quot; x2=&quot;${eventX}&quot; y1=&quot;${labelY+4}&quot; y2=&quot;${bottom}&quot;/&gt;&lt;circle cx=&quot;${eventX}&quot; cy=&quot;${eventY}&quot; r=&quot;8&quot; fill=&quot;var(--fv-bg)&quot; stroke=&quot;${forecastColor}&quot; stroke-width=&quot;3&quot;/&gt;&lt;circle cx=&quot;${eventX}&quot; cy=&quot;${eventY}&quot; r=&quot;3&quot; fill=&quot;${forecastColor}&quot;/&gt;&lt;text class=&quot;fv-event-label&quot; x=&quot;${eventX}&quot; y=&quot;${labelY}&quot; text-anchor=&quot;middle&quot; fill=&quot;${forecastColor}&quot;&gt;D+${event.day}&lt;/text&gt;`;
+    const candles=stock.candles.map(([open,highC,lowC,close],index)=&gt;{const x=actualX(index),width=Math.max(3,(split-left)/actual.length*.58),color=close&gt;=open?&#x27;var(--fv-up)&#x27;:&#x27;var(--fv-blue)&#x27;;return `&lt;line x1=&quot;${x}&quot; x2=&quot;${x}&quot; y1=&quot;${y(highC)}&quot; y2=&quot;${y(lowC)}&quot; stroke=&quot;${color}&quot;/&gt;&lt;rect x=&quot;${x-width/2}&quot; y=&quot;${y(Math.max(open,close))}&quot; width=&quot;${width}&quot; height=&quot;${Math.max(1,y(Math.min(open,close))-y(Math.max(open,close)))}&quot; fill=&quot;${color}&quot;/&gt;`;}).join(&#x27;&#x27;);
+    chart.innerHTML=`&lt;title&gt;${stock.name} 과거 20거래일 캔들과 미래 20거래일 경로&lt;/title&gt;${ticks.map(value=&gt;`&lt;line x1=&quot;${left}&quot; x2=&quot;${right}&quot; y1=&quot;${y(value)}&quot; y2=&quot;${y(value)}&quot;/&gt;&lt;text x=&quot;0&quot; y=&quot;${y(value)+4}&quot;&gt;${value.toLocaleString()}&lt;/text&gt;`).join(&#x27;&#x27;)}${candles}&lt;path d=&quot;${band(outerUpper,outerLower)}&quot; fill=&quot;${forecastColor}&quot; opacity=&quot;.07&quot;/&gt;&lt;path d=&quot;${band(innerUpper,innerLower)}&quot; fill=&quot;${forecastColor}&quot; opacity=&quot;.12&quot;/&gt;&lt;path d=&quot;${forecastPath}&quot; stroke=&quot;${forecastColor}&quot; stroke-width=&quot;2.5&quot; fill=&quot;none&quot; stroke-linejoin=&quot;round&quot;/&gt;&lt;line x1=&quot;${split}&quot; x2=&quot;${split}&quot; y1=&quot;${top}&quot; y2=&quot;${bottom}&quot; stroke=&quot;var(--fv-ink)&quot; stroke-width=&quot;1&quot;/&gt;&lt;line x1=&quot;${left}&quot; x2=&quot;${right}&quot; y1=&quot;${bottom}&quot; y2=&quot;${bottom}&quot;/&gt;&lt;circle cx=&quot;${split}&quot; cy=&quot;${y(futureBase)}&quot; r=&quot;3.5&quot; fill=&quot;var(--fv-bg)&quot; stroke=&quot;var(--fv-ink)&quot; stroke-width=&quot;2&quot;/&gt;${forecast.slice(1).map((value,index)=&gt;`&lt;circle cx=&quot;${forecastX(index+1)}&quot; cy=&quot;${y(value)}&quot; r=&quot;3&quot; fill=&quot;var(--fv-bg)&quot; stroke=&quot;${forecastColor}&quot; stroke-width=&quot;1.7&quot;/&gt;`).join(&#x27;&#x27;)}${eventMarkers}${actualIndexes.map((index,labelIndex)=&gt;`&lt;text x=&quot;${actualX(index)}&quot; y=&quot;266&quot; text-anchor=&quot;${labelIndex===0?&#x27;start&#x27;:&#x27;middle&#x27;}&quot;&gt;${actualLabels[labelIndex]}&lt;/text&gt;`).join(&#x27;&#x27;)}&lt;text x=&quot;${split}&quot; y=&quot;266&quot; text-anchor=&quot;middle&quot; fill=&quot;var(--fv-ink)&quot;&gt;9/5&lt;/text&gt;${duration.ticks.map((label,index)=&gt;`&lt;text x=&quot;${split+((index+1)/5)*(right-split)}&quot; y=&quot;266&quot; text-anchor=&quot;middle&quot;&gt;${label}&lt;/text&gt;`).join(&#x27;&#x27;)}`;
+    renderEventRail(condition);
+  }
+  root.querySelectorAll(&#x27;[data-page]&#x27;).forEach(button=&gt;button.addEventListener(&#x27;click&#x27;,()=&gt;{
+    const page=button.dataset.page;
+    root.querySelectorAll(&#x27;[data-view]&#x27;).forEach(view=&gt;view.hidden=view.dataset.view!==page);
+    root.querySelectorAll(&#x27;.fv-nav [data-page]&#x27;).forEach(nav=&gt;{if(nav.dataset.page===page)nav.setAttribute(&#x27;aria-current&#x27;,&#x27;page&#x27;);else nav.removeAttribute(&#x27;aria-current&#x27;);});
+    if(page===&#x27;market&#x27;)drawChart();
+  }));
+  root.querySelectorAll(&#x27;[data-period]&#x27;).forEach(button=&gt;button.addEventListener(&#x27;click&#x27;,()=&gt;{period=button.dataset.period;root.querySelectorAll(&#x27;[data-period]&#x27;).forEach(b=&gt;b.setAttribute(&#x27;aria-pressed&#x27;,String(b===button)));drawChart();}));
+  root.querySelectorAll(&#x27;[data-scenario]&#x27;).forEach(button=&gt;button.addEventListener(&#x27;click&#x27;,()=&gt;{activeCondition=button.dataset.scenario;simulationDays=20;period=&#x27;20&#x27;;activeEventIndex=0;root.querySelectorAll(&#x27;[data-scenario]&#x27;).forEach(card=&gt;card.setAttribute(&#x27;aria-pressed&#x27;,String(card===button)));updateScenarioUi();drawChart();}));
+  root.querySelectorAll(&#x27;[data-scenario-detail]&#x27;).forEach(button=&gt;button.addEventListener(&#x27;click&#x27;,()=&gt;{const condition=conditions[button.dataset.scenarioDetail];root.querySelector(&#x27;[data-detail-title]&#x27;).textContent=condition.title;root.querySelector(&#x27;[data-detail-duration]&#x27;).textContent=profile().label;root.querySelector(&#x27;[data-detail-forecast]&#x27;).textContent=formatForecast(condition);root.querySelector(&#x27;[data-detail-items]&#x27;).innerHTML=condition.detail.map(item=&gt;`&lt;p&gt;${item}&lt;/p&gt;`).join(&#x27;&#x27;);scenarioOverlay.hidden=false;root.querySelector(&#x27;[data-scenario-close]&#x27;).focus();}));
+  function closeScenarioDetail(){scenarioOverlay.hidden=true;}
+  root.querySelector(&#x27;[data-scenario-close]&#x27;).addEventListener(&#x27;click&#x27;,closeScenarioDetail);
+  scenarioOverlay.addEventListener(&#x27;click&#x27;,event=&gt;{if(event.target===scenarioOverlay)closeScenarioDetail();});
+  scenarioOverlay.addEventListener(&#x27;keydown&#x27;,event=&gt;{if(event.key===&#x27;Escape&#x27;)closeScenarioDetail();});
+  root.querySelector(&#x27;[data-custom-scenario]&#x27;).addEventListener(&#x27;click&#x27;,()=&gt;{customOverlay.hidden=false;root.querySelector(&#x27;.fv-custom-input&#x27;).focus();});
+  root.querySelectorAll(&#x27;[data-custom-close]&#x27;).forEach(button=&gt;button.addEventListener(&#x27;click&#x27;,()=&gt;{customOverlay.hidden=true;}));
+  customOverlay.addEventListener(&#x27;click&#x27;,event=&gt;{if(event.target===customOverlay)customOverlay.hidden=true;});
+  customOverlay.addEventListener(&#x27;keydown&#x27;,event=&gt;{if(event.key===&#x27;Escape&#x27;)customOverlay.hidden=true;});
+  root.querySelector(&#x27;[data-goal-apply]&#x27;).addEventListener(&#x27;click&#x27;,()=&gt;{root.querySelector(&#x27;[data-goal-heading]&#x27;).textContent=root.querySelector(&#x27;[data-goal]&#x27;).value.trim()||&#x27;나의 금융 목표&#x27;;});
+  function closeDialog(){overlay.hidden=true;root.querySelector(&#x27;.fv-header&#x27;).inert=false;root.querySelector(&#x27;.fv-main&#x27;).inert=false;if(opener)opener.focus();}
+  root.querySelectorAll(&#x27;[data-trading]&#x27;).forEach(button=&gt;button.addEventListener(&#x27;click&#x27;,()=&gt;{opener=button;overlay.hidden=false;root.querySelector(&#x27;.fv-header&#x27;).inert=true;root.querySelector(&#x27;.fv-main&#x27;).inert=true;root.querySelector(&#x27;[data-close]&#x27;).focus();}));
+  root.querySelectorAll(&#x27;[data-close]&#x27;).forEach(button=&gt;button.addEventListener(&#x27;click&#x27;,closeDialog));
+  overlay.addEventListener(&#x27;click&#x27;,event=&gt;{if(event.target===overlay)closeDialog();});
+  overlay.addEventListener(&#x27;keydown&#x27;,event=&gt;{if(event.key===&#x27;Escape&#x27;)closeDialog();if(event.key===&#x27;Tab&#x27;){const buttons=overlay.querySelectorAll(&#x27;button&#x27;);if(event.shiftKey&amp;&amp;document.activeElement===buttons[0]){event.preventDefault();buttons[buttons.length-1].focus();}else if(!event.shiftKey&amp;&amp;document.activeElement===buttons[buttons.length-1]){event.preventDefault();buttons[0].focus();}}});
+  root.querySelectorAll(&#x27;[data-stock]&#x27;).forEach(button=&gt;button.addEventListener(&#x27;click&#x27;,()=&gt;{root.querySelectorAll(&#x27;[data-stock]&#x27;).forEach(stock=&gt;{stock.classList.toggle(&#x27;selected&#x27;,stock===button);stock.setAttribute(&#x27;aria-pressed&#x27;,String(stock===button));stock.lastElementChild.textContent=stock===button?&#x27;선택됨&#x27;:&#x27;선택&#x27;;});root.querySelector(&#x27;[data-stock-note]&#x27;).textContent=button.dataset.stock;}));
+  root.querySelectorAll(&#x27;[data-symbol]&#x27;).forEach(button=&gt;button.addEventListener(&#x27;click&#x27;,()=&gt;{activeStock=button.dataset.symbol;root.querySelectorAll(&#x27;[data-symbol]&#x27;).forEach(symbol=&gt;symbol.setAttribute(&#x27;aria-pressed&#x27;,String(symbol===button)));updateScenarioUi();drawChart();}));
+  function render(){root.dataset.nav=state.navigation;root.style.setProperty(&#x27;--fv-gap&#x27;,state.spacing+&#x27;px&#x27;);root.style.setProperty(&#x27;--fv-radius&#x27;,state.radius+&#x27;px&#x27;);root.style.colorScheme=state.appearance;}
+  render();updateScenarioUi();drawChart();new ResizeObserver(drawChart).observe(chart.parentElement);setInterval(()=&gt;{activeEventIndex=(activeEventIndex+1)%conditions[activeCondition].events.length;drawChart();},3000);
+  if(globalThis.Tweak){const tweak=new Tweak({container:root,onChange:render});tweak.addSelect(state,&#x27;navigation&#x27;,{label:&#x27;상단 메뉴 표시&#x27;,options:[{label:&#x27;밑줄형 · 추천&#x27;,value:&#x27;line&#x27;},{label:&#x27;알약형&#x27;,value:&#x27;pill&#x27;}]});tweak.addSlider(state,&#x27;spacing&#x27;,{label:&#x27;섹션 사이 여백&#x27;,min:20,max:48,step:4,unit:&#x27;px&#x27;});tweak.addSlider(state,&#x27;radius&#x27;,{label:&#x27;카드 모서리&#x27;,min:0,max:20,step:2,unit:&#x27;px&#x27;});tweak.addSelect(state,&#x27;appearance&#x27;,{label:&#x27;화면 색상&#x27;,options:[{label:&#x27;라이트 · 추천&#x27;,value:&#x27;light&#x27;},{label:&#x27;다크&#x27;,value:&#x27;dark&#x27;}]});}
+})();
+&lt;/script&gt;
+
+&lt;script src=&quot;https://unpkg.com/@floating-ui/core@1.7.3/dist/floating-ui.core.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script src=&quot;https://unpkg.com/@floating-ui/dom@1.7.4/dist/floating-ui.dom.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  if (window.FloatingUIDOM == null) {
+    return;
+  }
+  const { autoUpdate, computePosition, flip, offset, shift, size } =
+    window.FloatingUIDOM;
+  const tooltipPlacements = new Set([&quot;top&quot;, &quot;right&quot;, &quot;bottom&quot;, &quot;left&quot;]);
+  const tooltipId = `codex-visualization-tooltip-${
+    window.crypto?.randomUUID?.() ?? Date.now().toString(36)
+  }`;
+  const tooltipGap = 5;
+  const hoverDelay = 700;
+  const skipDelay = 300;
+  let activeTrigger = null;
+  let pendingTrigger = null;
+  let tooltip = null;
+  let openTimeout = null;
+  let autoUpdateCleanup = null;
+  let positionRequest = 0;
+  let skipDelayUntil = 0;
+  let lastPointerWasTouch = false;
+  let pinnedByTouch = false;
+
+  const getTrigger = (target) =&gt;
+    target?.nodeType === Node.ELEMENT_NODE
+      ? target.closest(&quot;[data-tooltip]&quot;)
+      : null;
+  const containsTarget = (trigger, target) =&gt;
+    target?.nodeType != null &amp;&amp; trigger.contains(target);
+  const getContent = (trigger) =&gt;
+    trigger.getAttribute(&quot;data-tooltip&quot;)?.trim() ?? &quot;&quot;;
+  const getPlacement = (trigger) =&gt; {
+    const placement = trigger.getAttribute(&quot;data-tooltip-placement&quot;);
+    return tooltipPlacements.has(placement) ? placement : &quot;top&quot;;
+  };
+  const getTooltip = () =&gt; {
+    if (tooltip == null) {
+      tooltip = document.createElement(&quot;div&quot;);
+      tooltip.id = tooltipId;
+      tooltip.className = &quot;tooltip&quot;;
+      tooltip.setAttribute(&quot;role&quot;, &quot;tooltip&quot;);
+    }
+    return tooltip;
+  };
+  const setDescribedBy = (trigger, described) =&gt; {
+    const ids = new Set(
+      (trigger.getAttribute(&quot;aria-describedby&quot;) ?? &quot;&quot;)
+        .split(/\s+/)
+        .filter(Boolean),
+    );
+    if (described) {
+      ids.add(tooltipId);
+    } else {
+      ids.delete(tooltipId);
+    }
+    if (ids.size === 0) {
+      trigger.removeAttribute(&quot;aria-describedby&quot;);
+    } else {
+      trigger.setAttribute(&quot;aria-describedby&quot;, [...ids].join(&quot; &quot;));
+    }
+  };
+  const clearOpenTimeout = () =&gt; {
+    if (openTimeout != null) {
+      window.clearTimeout(openTimeout);
+      openTimeout = null;
+    }
+    pendingTrigger = null;
+  };
+  const closeTooltip = (activateSkipDelay = true) =&gt; {
+    clearOpenTimeout();
+    pinnedByTouch = false;
+    positionRequest += 1;
+    autoUpdateCleanup?.();
+    autoUpdateCleanup = null;
+    if (activeTrigger == null) {
+      return;
+    }
+    setDescribedBy(activeTrigger, false);
+    activeTrigger = null;
+    tooltip?.remove();
+    if (activateSkipDelay) {
+      skipDelayUntil = Date.now() + skipDelay;
+    }
+  };
+  const updatePosition = (trigger, floating) =&gt; {
+    const request = ++positionRequest;
+    void computePosition(trigger, floating, {
+      middleware: [
+        offset(tooltipGap),
+        flip({ padding: tooltipGap }),
+        shift({ padding: tooltipGap }),
+        size({
+          padding: tooltipGap,
+          apply({ availableHeight, availableWidth, elements }) {
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-width&quot;,
+              `${Math.max(0, availableWidth)}px`,
+            );
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-height&quot;,
+              `${Math.max(0, availableHeight)}px`,
+            );
+          },
+        }),
+      ],
+      placement: getPlacement(trigger),
+      strategy: &quot;fixed&quot;,
+    })
+      .then(({ x, y }) =&gt; {
+        if (activeTrigger !== trigger || request !== positionRequest) {
+          return;
+        }
+        const scale = window.devicePixelRatio || 1;
+        floating.style.transform = `translate(${Math.round(x * scale) / scale}px, ${Math.round(y * scale) / scale}px)`;
+        floating.style.visibility = &quot;visible&quot;;
+      })
+      .catch(() =&gt; {
+        if (activeTrigger === trigger &amp;&amp; request === positionRequest) {
+          closeTooltip(false);
+        }
+      });
+  };
+  const openTooltip = (trigger) =&gt; {
+    const content = getContent(trigger);
+    if (!trigger.isConnected || content.length === 0) {
+      return;
+    }
+    clearOpenTimeout();
+    if (activeTrigger === trigger) {
+      return;
+    }
+    closeTooltip();
+    const floating = getTooltip();
+    floating.textContent = content;
+    floating.style.visibility = &quot;hidden&quot;;
+    floating.style.transform = &quot;translate(0, 0)&quot;;
+    document.body.appendChild(floating);
+    activeTrigger = trigger;
+    setDescribedBy(trigger, true);
+    autoUpdateCleanup = autoUpdate(trigger, floating, () =&gt; {
+      updatePosition(trigger, floating);
+    });
+  };
+  const requestOpen = (trigger, immediate = false) =&gt; {
+    if (
+      getContent(trigger).length === 0 ||
+      activeTrigger === trigger ||
+      pendingTrigger === trigger
+    ) {
+      return;
+    }
+    clearOpenTimeout();
+    pendingTrigger = trigger;
+    const delay =
+      immediate || activeTrigger != null || Date.now() &lt; skipDelayUntil
+        ? 0
+        : hoverDelay;
+    if (delay === 0) {
+      openTooltip(trigger);
+      return;
+    }
+    openTimeout = window.setTimeout(() =&gt; {
+      openTimeout = null;
+      pendingTrigger = null;
+      openTooltip(trigger);
+    }, delay);
+  };
+  const handlePointerOpen = (event) =&gt; {
+    if (event.pointerType === &quot;touch&quot;) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    requestOpen(trigger);
+  };
+  const handlePointer = (event) =&gt; {
+    lastPointerWasTouch =
+      event.type === &quot;pointerdown&quot; &amp;&amp; event.pointerType === &quot;touch&quot;;
+  };
+  const handleTouchClick = (event) =&gt; {
+    const isTouch = event.pointerType === &quot;touch&quot; || lastPointerWasTouch;
+    lastPointerWasTouch = false;
+    if (!isTouch || event.detail === 0) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (
+      trigger == null ||
+      !trigger.isConnected ||
+      getContent(trigger).length === 0 ||
+      (pinnedByTouch &amp;&amp; activeTrigger === trigger)
+    ) {
+      if (pinnedByTouch) {
+        closeTooltip();
+      }
+      return;
+    }
+    openTooltip(trigger);
+    pinnedByTouch = activeTrigger === trigger;
+    window.setTimeout(() =&gt; {
+      if (activeTrigger === trigger &amp;&amp; !trigger.isConnected) {
+        closeTooltip(false);
+      }
+    }, 0);
+  };
+  const handleLeave = (event) =&gt; {
+    if (pinnedByTouch) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const handleFocusIn = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (trigger?.matches(&quot;:focus-visible&quot;)) {
+      requestOpen(trigger, true);
+    }
+  };
+  const handleKeyDown = (event) =&gt; {
+    if (event.key === &quot;Escape&quot;) {
+      closeTooltip();
+    }
+  };
+  const handleContextMenu = (event) =&gt; {
+    lastPointerWasTouch = false;
+    const trigger = getTrigger(event.target);
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const destroy = () =&gt; {
+    closeTooltip(false);
+    lastPointerWasTouch = false;
+    document.removeEventListener(&quot;pointerover&quot;, handlePointerOpen);
+    document.removeEventListener(&quot;pointerdown&quot;, handlePointer);
+    document.removeEventListener(&quot;pointercancel&quot;, handlePointer);
+    document.removeEventListener(&quot;click&quot;, handleTouchClick);
+    document.removeEventListener(&quot;pointerout&quot;, handleLeave);
+    document.removeEventListener(&quot;focusin&quot;, handleFocusIn);
+    document.removeEventListener(&quot;focusout&quot;, handleLeave);
+    document.removeEventListener(&quot;keydown&quot;, handleKeyDown);
+    document.removeEventListener(&quot;contextmenu&quot;, handleContextMenu);
+    tooltip = null;
+  };
+
+  document.addEventListener(&quot;pointerover&quot;, handlePointerOpen);
+  document.addEventListener(&quot;pointerdown&quot;, handlePointer);
+  document.addEventListener(&quot;pointercancel&quot;, handlePointer);
+  document.addEventListener(&quot;click&quot;, handleTouchClick);
+  document.addEventListener(&quot;pointerout&quot;, handleLeave);
+  document.addEventListener(&quot;focusin&quot;, handleFocusIn);
+  document.addEventListener(&quot;focusout&quot;, handleLeave);
+  document.addEventListener(&quot;keydown&quot;, handleKeyDown);
+  document.addEventListener(&quot;contextmenu&quot;, handleContextMenu);
+  window.addEventListener(&quot;pagehide&quot;, destroy, { once: true });
+})();
+&lt;/script&gt;
+&lt;script id=&quot;codex-visualization-tabs&quot;&gt;
+(() =&gt; {
+  const selector = &#x27;.nav[role=&quot;tablist&quot;] [role=&quot;tab&quot;]&#x27;;
+  const disabled = &#x27;:disabled,[aria-disabled=&quot;true&quot;]&#x27;;
+  const selectTab = (selected) =&gt; {
+    const panelId = selected.getAttribute(&quot;aria-controls&quot;);
+    for (const tab of selected.closest(&#x27;[role=&quot;tablist&quot;]&#x27;).querySelectorAll(&#x27;[role=&quot;tab&quot;]&#x27;)) {
+      const active = tab === selected;
+      tab.classList.toggle(&quot;active&quot;, active);
+      tab.setAttribute(&quot;aria-selected&quot;, String(active));
+      const id = tab.getAttribute(&quot;aria-controls&quot;);
+      const panel = id &amp;&amp; document.getElementById(id);
+      if (panel != null) {
+        panel.hidden = id !== panelId;
+        if (!panel.hidden &amp;&amp; selected.id) {
+          panel.setAttribute(&quot;aria-labelledby&quot;, selected.id);
+        }
+      }
+    }
+  };
+  const interact = (event) =&gt; {
+    const tab = event.target?.closest?.(selector);
+    if (event.defaultPrevented || tab == null || tab.matches(disabled)) {
+      return;
+    }
+    if (event.type === &quot;click&quot;) {
+      selectTab(tab);
+      return;
+    }
+    const tabs = Array.from(
+      tab.closest(&#x27;[role=&quot;tablist&quot;]&#x27;).querySelectorAll(&#x27;[role=&quot;tab&quot;]&#x27;),
+    ).filter((candidate) =&gt; !candidate.matches(disabled));
+    const current = tabs.indexOf(tab);
+    let next;
+    if (event.key === &quot;ArrowRight&quot; || event.key === &quot;ArrowDown&quot;) {
+      next = (current + 1) % tabs.length;
+    } else if (event.key === &quot;ArrowLeft&quot; || event.key === &quot;ArrowUp&quot;) {
+      next = (current + tabs.length - 1) % tabs.length;
+    } else if (event.key === &quot;Home&quot;) {
+      next = 0;
+    } else if (event.key === &quot;End&quot;) {
+      next = tabs.length - 1;
+    } else {
+      return;
+    }
+    event.preventDefault();
+    tabs[next].focus();
+    selectTab(tabs[next]);
+  };
+
+  for (const list of document.querySelectorAll(&#x27;.nav[role=&quot;tablist&quot;]&#x27;)) {
+    const selected =
+      list.querySelector(&#x27;[role=&quot;tab&quot;][aria-selected=&quot;true&quot;]&#x27;) ??
+      list.querySelector(&#x27;[role=&quot;tab&quot;].active&#x27;) ??
+      list.querySelector(&#x27;[role=&quot;tab&quot;]&#x27;);
+    if (selected != null) {
+      selectTab(selected);
+    }
+  }
+  document.addEventListener(&quot;click&quot;, interact);
+  document.addEventListener(&quot;keydown&quot;, interact);
+  window.addEventListener(&quot;pagehide&quot;, () =&gt; {
+    document.removeEventListener(&quot;click&quot;, interact);
+    document.removeEventListener(&quot;keydown&quot;, interact);
+  }, { once: true });
+})();
+&lt;/script&gt;
+&lt;script id=&quot;codex-visualization-lucide&quot; async src=&quot;https://unpkg.com/lucide@1.17.0/dist/umd/lucide.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  const initialize = () =&gt; {
+    globalThis.lucide?.createIcons({ attrs: { width: 16, height: 16 } });
+  };
+  if (globalThis.lucide != null) {
+    initialize();
+    return;
+  }
+  document
+    .getElementById(&quot;codex-visualization-lucide&quot;)
+    ?.addEventListener(&quot;load&quot;, initialize, { once: true });
+})();
+&lt;/script&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;
+"></iframe>
+</body>
+</html>
