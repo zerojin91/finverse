@@ -127,6 +127,32 @@ type CollectionSource = {
   detail: string;
 };
 
+type InitialContextAnalysis = {
+  summary: string;
+  market: { trend?: string; assessment?: string; signals?: string[] };
+  economy: { condition?: string; assessment?: string; signals?: string[] };
+  events: { assessment?: string; themes?: string[]; signals?: string[] };
+  community: { sentiment?: string; assessment?: string; signals?: string[] };
+  positive_factors: string[];
+  risk_factors: string[];
+  tensions: string[];
+  uncertainties: string[];
+  watch_points: string[];
+};
+
+type InitialContext = {
+  context_id: string;
+  cached: boolean;
+  analysis: InitialContextAnalysis;
+  source_summary: {
+    market_days: number;
+    macro_observations: number;
+    events: number;
+    community_days: number;
+    as_of?: { latest_market_date?: string | null };
+  };
+};
+
 type Observation = {
   investor_group: string;
   platform: string;
@@ -989,7 +1015,7 @@ function SetupScreen({
   onStart: (input: {
     ticker: string; name: string; initialCash: number;
     investmentMode: InvestmentMode; initialPosition?: { quantity: number; averagePrice: number };
-    simulationDays: number;
+    simulationDays: number; initialContextId: string;
   }) => void;
   onResume: (gameId: string) => void;
   starting: boolean;
@@ -1014,6 +1040,9 @@ function SetupScreen({
   const [averagePrice, setAveragePrice] = useState(0);
   const [holdingQuantity, setHoldingQuantity] = useState(0);
   const [simulationDays, setSimulationDays] = useState(20);
+  const [initialContext, setInitialContext] = useState<InitialContext | null>(null);
+  const [initialContextLoading, setInitialContextLoading] = useState(false);
+  const [initialContextError, setInitialContextError] = useState<string | null>(null);
   const pickedTicker = picked?.ticker;
   const step2Ref = useRef<HTMLElement | null>(null);
   const step3Ref = useRef<HTMLElement | null>(null);
@@ -1022,6 +1051,7 @@ function SetupScreen({
   const previewStepVisible = previewReady && previewDwellComplete;
   const collectionReady = Boolean(collectionSources?.every((source) => source.status === "ready"));
   const collectionStepComplete = collectionReady && collectionDwellComplete;
+  const initialContextReady = Boolean(initialContext?.analysis?.summary);
   const investmentReady = investmentMode === "new"
     ? initialCash > 0
     : investmentMode === "holding" && averagePrice > 0 && holdingQuantity > 0;
@@ -1101,6 +1131,25 @@ function SetupScreen({
   }, [pickedTicker, previewStepVisible]);
 
   useEffect(() => {
+    if (!pickedTicker || !collectionStepComplete) return;
+    let cancelled = false;
+    const loadInitialContext = async () => {
+      setInitialContextLoading(true);
+      setInitialContextError(null);
+      try {
+        const payload = await callApi<{ data: InitialContext }>(`/securities/${encodeURIComponent(pickedTicker)}/initial-context`);
+        if (!cancelled) setInitialContext(payload.data);
+      } catch (cause) {
+        if (!cancelled) setInitialContextError(cause instanceof Error ? cause.message : "초기 상황을 분석하지 못했습니다.");
+      } finally {
+        if (!cancelled) setInitialContextLoading(false);
+      }
+    };
+    void loadInitialContext();
+    return () => { cancelled = true; };
+  }, [pickedTicker, collectionStepComplete]);
+
+  useEffect(() => {
     if (!pickedTicker || !previewStepVisible) return;
     let cancelled = false;
     callApi<{ data: { sources: CollectionSource[] } }>(`/securities/${encodeURIComponent(pickedTicker)}/scenario-context`)
@@ -1115,13 +1164,14 @@ function SetupScreen({
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!picked || !investmentMode || !investmentConfirmed || starting || initialCash < 0) return;
+    if (!picked || !investmentMode || !investmentConfirmed || !initialContextReady || starting || initialCash < 0) return;
     if (investmentMode === "new" && initialCash <= 0) return;
     if (investmentMode === "holding" && (!averagePrice || !holdingQuantity)) return;
     onStart({
       ticker: picked.ticker, name: picked.name,
       initialCash: investmentMode === "new" ? initialCash : 0,
       investmentMode, simulationDays,
+      initialContextId: initialContext?.context_id ?? "",
       initialPosition: investmentMode === "holding"
         ? { quantity: holdingQuantity, averagePrice }
         : undefined,
@@ -1141,6 +1191,9 @@ function SetupScreen({
     setCollectionSources(null);
     setCollectionError(null);
     setCollectionDwellComplete(false);
+    setInitialContext(null);
+    setInitialContextError(null);
+    setInitialContextLoading(false);
     setPicked(item);
     setQuery(item.name);
     setResults([]);
@@ -1237,6 +1290,8 @@ function SetupScreen({
                 setPreviewDwellComplete(false);
                 setCollectionSources(null);
                 setCollectionError(null);
+                setInitialContext(null);
+                setInitialContextError(null);
               }
             }}
             placeholder="종목명 또는 티커로 검색 (예: 삼성전자, 005930)"
@@ -1384,6 +1439,38 @@ function SetupScreen({
             ))}
           </div>
         </div>
+        <section className="paper-context-field" aria-live="polite">
+          <div className="paper-simulation-label">
+            <span>초기 상황 · 현재까지의 맥락</span>
+            <small>실제 4종 자료를 OpenRouter로 분석</small>
+          </div>
+          {initialContextLoading && <div className="paper-context-loading"><LoaderCircle size={15} className="spin" /> 수집된 자료에서 현재 상황을 분석하고 있습니다.</div>}
+          {initialContextError && <p className="paper-inline-error">{initialContextError}</p>}
+          {initialContext && (
+            <>
+              <div className="paper-context-summary"><Sparkles size={15} /><p>{initialContext.analysis.summary}</p></div>
+              <div className="paper-context-grid">
+                {([
+                  ["시장", initialContext.analysis.market.trend, initialContext.analysis.market.assessment, initialContext.analysis.market.signals],
+                  ["경제", initialContext.analysis.economy.condition, initialContext.analysis.economy.assessment, initialContext.analysis.economy.signals],
+                  ["사건", undefined, initialContext.analysis.events.assessment, initialContext.analysis.events.signals],
+                  ["커뮤니티", initialContext.analysis.community.sentiment, initialContext.analysis.community.assessment, initialContext.analysis.community.signals],
+                ] as [string, string | undefined, string | undefined, string[] | undefined][]).map(([label, status, assessment, signals]) => (
+                  <article key={label} className="paper-context-card">
+                    <header><strong>{label}</strong>{status && <em>{status}</em>}</header>
+                    <p>{assessment || "분석 내용이 없습니다."}</p>
+                    {Boolean(signals?.length) && <ul>{signals?.slice(0, 2).map((signal) => <li key={signal}>{signal}</li>)}</ul>}
+                  </article>
+                ))}
+              </div>
+              <div className="paper-context-points">
+                <div><strong>위험 요인</strong><span>{initialContext.analysis.risk_factors.slice(0, 3).join(" · ") || "추가 확인 필요"}</span></div>
+                <div><strong>관찰 포인트</strong><span>{initialContext.analysis.watch_points.slice(0, 3).join(" · ") || "시나리오 진행 중 변화"}</span></div>
+              </div>
+              <small className="paper-context-source">시장 {initialContext.source_summary.market_days}일 · 경제 {initialContext.source_summary.macro_observations}개 · 사건 {initialContext.source_summary.events}건 · 커뮤니티 {initialContext.source_summary.community_days}일 · {initialContext.cached ? "캐시된 분석" : "새로 분석"}</small>
+            </>
+          )}
+        </section>
         <div className="paper-agent-field">
           <div className="paper-simulation-label">
             <span>시장 참여 에이전트</span>
@@ -1419,10 +1506,10 @@ function SetupScreen({
         <>
           <div className="paper-hint paper-setup-reveal">
             <CalendarClock size={13} />
-            사건 수와 시장 참여자는 선택한 기간과 수집 자료에 맞춰 자동으로 구성됩니다. 거래일 하나를 넘기는 데 15~25초 정도 걸립니다.
+            초기 맥락과 실제 자료를 바탕으로 시장 참여자와 사건을 구성합니다. 거래일 하나를 넘기는 데 15~25초 정도 걸립니다.
           </div>
 
-          <button className="paper-start-button paper-setup-reveal" type="submit" disabled={starting}>
+          <button className="paper-start-button paper-setup-reveal" type="submit" disabled={starting || !initialContextReady}>
             {starting
               ? <><LoaderCircle size={17} className="spin" /> 수집한 자료로 시나리오를 만들고 있습니다</>
               : <><CircleDollarSign size={17} /> 모의 투자 시작하기 <ArrowRight size={16} /></>}
@@ -1908,7 +1995,7 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
   const start = useCallback(async (input: {
     ticker: string; name: string; initialCash: number;
     investmentMode: InvestmentMode; initialPosition?: { quantity: number; averagePrice: number };
-    simulationDays: number;
+    simulationDays: number; initialContextId: string;
   }) => {
     setStarting(true);
     setError(null);
@@ -1923,6 +2010,7 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
             : undefined,
           investment_mode: input.investmentMode,
           simulation_days: input.simulationDays,
+          context_id: input.initialContextId,
           event_source: "ontology",
           // 캐시 리플레이 이력은 종가만 있어 캔들이 선으로 뭉개진다.
           // finverse는 실제 OHLC를 쓰고, DB가 죽었을 때만 백엔드가 캐시로 내려간다.

@@ -15,6 +15,7 @@ from .kospi_paper_trading import TradingError
 from .paper_game_store import PaperGameStore
 from .finverse_market_data import FinverseMarketData, FinverseUnavailable
 from .llm_market_simulator import LLMMarketUnavailable
+from .initial_context_analyzer import InitialContextUnavailable, get_initial_context
 from .llm_scenario_simulator import generate_scenario_events, run_scenario_agent_round
 from .scenario_trading import (
     advance_inter_event_market, finish_event, new_scenario_game, public_scenario_game,
@@ -95,6 +96,11 @@ def handle_llm_market_unavailable(error):
     return jsonify({"success": False, "error": str(error)}), 503
 
 
+@paper_trading_bp.errorhandler(InitialContextUnavailable)
+def handle_initial_context_unavailable(error):
+    return jsonify({"success": False, "error": str(error)}), 503
+
+
 @paper_trading_bp.route("/securities", methods=["GET"])
 def list_securities():
     items = _market_data().list_kospi_securities(
@@ -112,6 +118,12 @@ def security_candles(ticker: str):
 @paper_trading_bp.route("/securities/<ticker>/scenario-context", methods=["GET"])
 def security_scenario_context(ticker: str):
     return jsonify({"success": True, "data": _market_data().collect_scenario_context(ticker)})
+
+
+@paper_trading_bp.route("/securities/<ticker>/initial-context", methods=["GET"])
+def security_initial_context(ticker: str):
+    history = _market_data().load_game_data(ticker, "", "")
+    return jsonify({"success": True, "data": get_initial_context(history)})
 
 
 @paper_trading_bp.route("/data-source/status", methods=["GET"])
@@ -173,6 +185,7 @@ def create_event_scenario():
         raise TradingError("지원하지 않는 투자 상태입니다.")
     history = _market_data().load_game_data(
         ticker, data.get("history_start", ""), data.get("history_end", ""))
+    initial_context = get_initial_context(history)
     history_source = "finverse_postgresql_history_only"
     event_count = duration_config["event_count"]
     history_days = history["market_days"]
@@ -216,6 +229,9 @@ def create_event_scenario():
     game["simulation_days"] = simulation_days
     game["practice_mode"] = practice_mode
     game["investment_mode"] = investment_mode
+    game["initial_context_id"] = initial_context["context_id"]
+    game["initial_context"] = initial_context["analysis"]
+    game["initial_context_sources"] = initial_context["source_summary"]
     _store().save(game)
     return jsonify({"success": True, "data": public_scenario_game(game)}), 201
 

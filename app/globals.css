@@ -1008,6 +1008,23 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-setting-note { display: flex; align-items: center; gap: 6px; margin: 0; color: #15803d; font-size: 9px; }
 .paper-investment-actions { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .paper-simulation-field { width: 100%; display: flex; flex-direction: column; gap: 8px; padding: 13px 14px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.paper-context-field { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid #dbeafe; border-radius: 10px; background: #f8fbff; }
+.paper-context-loading { display: flex; align-items: center; gap: 7px; min-height: 62px; color: var(--muted); font-size: 10px; }
+.paper-context-summary { display: flex; align-items: flex-start; gap: 8px; padding: 11px 12px; border: 1px solid #bfdbfe; border-radius: 8px; color: #1e3a8a; background: #eff6ff; }
+.paper-context-summary svg { flex: 0 0 auto; margin-top: 1px; color: #2563eb; }
+.paper-context-summary p { margin: 0; font-size: 10px; line-height: 1.6; }
+.paper-context-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; }
+.paper-context-card { min-width: 0; padding: 10px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; }
+.paper-context-card header { display: flex; align-items: center; justify-content: space-between; gap: 7px; }
+.paper-context-card header strong { color: var(--ink); font-size: 10px; }
+.paper-context-card header em { padding: 3px 6px; border-radius: 999px; color: #2563eb; background: #eff6ff; font-size: 8px; font-style: normal; }
+.paper-context-card p { margin: 7px 0 0; color: var(--muted); font-size: 9px; line-height: 1.5; }
+.paper-context-card ul { display: flex; flex-direction: column; gap: 3px; margin: 7px 0 0; padding-left: 14px; color: var(--light); font-size: 8px; line-height: 1.4; }
+.paper-context-points { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; }
+.paper-context-points div { display: flex; flex-direction: column; gap: 4px; padding: 9px 10px; border-radius: 8px; background: #fff; }
+.paper-context-points strong { color: var(--ink); font-size: 9px; }
+.paper-context-points span { color: var(--muted); font-size: 8px; line-height: 1.45; }
+.paper-context-source { color: var(--light); font-size: 8px; }
 .paper-simulation-label { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .paper-duration-options { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; }
 .paper-duration-options button { min-width: 0; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); background: #fafafa; font-family: inherit; text-align: left; cursor: pointer; }
@@ -1462,6 +1479,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
   .paper-collection-status { align-items: flex-start; flex-direction: column; }
   .paper-investment-actions { align-items: flex-start; flex-direction: column; }
   .paper-agent-grid { grid-template-columns: minmax(0,1fr); }
+  .paper-context-grid,.paper-context-points { grid-template-columns: minmax(0,1fr); }
   .paper-holdings { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
 
