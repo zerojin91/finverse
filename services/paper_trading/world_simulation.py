@@ -15,6 +15,7 @@ import uuid
 
 from .kospi_paper_trading import TradingError, calibrate_impact_model
 from .llm_scenario_simulator import run_individual_agent_round
+from .participant_sizing import scale_personas_to_representative_capacity
 from .daily_market_summary import generate_daily_market_summary
 from .scenario_trading import (
     GROUP_PSYCHOLOGY, _execute_user_orders, _real_candles, apply_agent_round,
@@ -53,11 +54,14 @@ def new_world_game(
         raise TradingError("시뮬레이션 기간은 10일, 20일, 60일 중에서 선택해주세요.")
     if int(previous_close) <= 0:
         raise TradingError("시작 기준 가격이 필요합니다.")
+    if not impact_history:
+        raise TradingError("시나리오 가격 생성을 위한 시작일 이전 가격 이력이 부족합니다.")
+    model = calibrate_impact_model(impact_history)
     personas = deepcopy(agent_profiles.get("profiles") or [])
     if len(personas) != 59:
         raise TradingError("초기 상황을 바탕으로 생성한 59개 에이전트 프로필이 필요합니다.")
-    if not impact_history:
-        raise TradingError("시나리오 가격 생성을 위한 시작일 이전 가격 이력이 부족합니다.")
+    scale_personas_to_representative_capacity(
+        personas, model.get("participant_sizing") or {})
     for persona in personas:
         profile = persona.get("profile") or {}
         persona["memory"] = [{
@@ -65,7 +69,6 @@ def new_world_game(
             "note": str(profile.get("memory_seed") or "초기 공개 맥락만 근거로 판단한다.")[:500],
         }]
     cash, quantity, average_price, initial_equity = _initial_portfolio(initial_cash, initial_position, int(previous_close))
-    model = calibrate_impact_model(impact_history)
     if not model.get("return_distribution_pct"):
         raise TradingError("시나리오 가격 생성을 위한 시작일 이전 가격 이력이 부족합니다.")
     game_id = f"world_{uuid.uuid4().hex[:12]}"

@@ -15,6 +15,7 @@ from .kospi_paper_trading import (
 from .volatility_regime import (
     IDIOSYNCRATIC_SHARE, fetch_vix_regime, session_multiplier, update_cluster_level)
 from .ontology import standardize_market_context
+from .participant_sizing import group_targets_for_round
 
 
 PHASE_PRE_EVENT = "pre_event_decision"
@@ -398,6 +399,7 @@ def _group_observation_sentiment(round_data: dict[str, Any]) -> dict[str, float]
 def _update_market_psychology(
     game: dict[str, Any], round_data: dict[str, Any], orders: list[dict[str, Any]],
     *, phase: str, market_date: str | None,
+    group_notional_targets: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     psychology = game["market_psychology"]
     event = current_event(game)
@@ -405,11 +407,23 @@ def _update_market_psychology(
     group_flows = {group: 0.0 for group in INVESTOR_GROUPS}
     for order in orders:
         direction = 1 if order["side"] == "BUY" else -1 if order["side"] == "SELL" else 0
-        group_flows[order["group"]] += direction * float(order.get("allocation_pct", 0)) / MAX_LLM_ALLOCATION_PCT
-    group_counts = {group: max(1, sum(p["group"] == group for p in game["personas"]))
-                    for group in INVESTOR_GROUPS}
-    group_flows = {group: max(-1.0, min(1.0, value / group_counts[group]))
-                   for group, value in group_flows.items()}
+        if group_notional_targets:
+            group_flows[order["group"]] += direction * float(order.get("notional") or 0)
+        else:
+            group_flows[order["group"]] += direction * float(order.get("allocation_pct", 0)) / MAX_LLM_ALLOCATION_PCT
+    if group_notional_targets:
+        group_flows = {
+            group: max(-1.0, min(1.0, value / max(1.0, float(group_notional_targets.get(group) or 0))))
+            for group, value in group_flows.items()
+        }
+    else:
+        # Preserve the original scenario-mode psychology scale.  World mode
+        # uses historical notionals above so group size and market scale are
+        # represented separately from the number of synthetic personas.
+        group_counts = {group: max(1, sum(p["group"] == group for p in game["personas"]))
+                        for group in INVESTOR_GROUPS}
+        group_flows = {group: max(-1.0, min(1.0, value / group_counts[group]))
+                       for group, value in group_flows.items()}
 
     regime = psychology["event_regime"]
     if phase != "event_reaction" and regime["days_remaining"] > 0:
@@ -482,14 +496,61 @@ def apply_agent_round(game: dict[str, Any], round_data: dict[str, Any], *,
     decisions = {row["persona_id"]: row for row in round_data["persona_decisions"]}
     orders, buy, sell = [], 0, 0
     price = game["current_price"]
+    representative_sizing = ((game.get("impact_model") or {}).get("participant_sizing")
+                              if game.get("mode") == "world" else None)
+    representative_targets = group_targets_for_round(
+        representative_sizing, len(game.get("agent_rounds") or []) + 1
+    ) if representative_sizing else None
+    target_weights: dict[tuple[str, str], float] = {}
+    for persona in game["personas"]:
+        decision = decisions.get(persona["persona_id"])
+        if not decision or decision.get("side") not in ("BUY", "SELL"):
+            continue
+        side = str(decision["side"])
+        allocation = max(0.0, float(decision.get("allocation_pct") or 0))
+        confidence = max(0.0, min(100.0, float(decision.get("confidence") or 0))) / 100
+        # The LLM still decides who acts and in which direction.  Confidence
+        # and allocation only distribute the group's historical notional among
+        # those independent decisions; they no longer erase the group scale.
+        weight = max(.1, allocation / MAX_LLM_ALLOCATION_PCT) * (.5 + .5 * confidence)
+        target_weights[(persona["persona_id"], side)] = weight
+    target_weight_totals = {
+        (group, side): sum(
+            target_weights.get((persona["persona_id"], side), 0.0)
+            for persona in game["personas"] if persona["group"] == group
+        )
+        for group in INVESTOR_GROUPS for side in ("BUY", "SELL")
+    }
+    effective_targets: dict[tuple[str, str], float] = {}
+    if representative_targets:
+        for group in INVESTOR_GROUPS:
+            active = [(side, target_weight_totals[(group, side)]) for side in ("BUY", "SELL")
+                      if target_weight_totals[(group, side)] > 0]
+            total_active = sum(weight for _, weight in active)
+            for side, weight in active:
+                raw_target = float(representative_targets.get(group) or 0) * weight / total_active
+                available = sum(
+                    (persona["cash"] if side == "BUY" else persona["quantity"] * price)
+                    for persona in game["personas"]
+                    if persona["group"] == group
+                    and target_weights.get((persona["persona_id"], side), 0) > 0
+                )
+                effective_targets[(group, side)] = min(raw_target, available)
     for persona in game["personas"]:
         decision = decisions.get(persona["persona_id"])
         if not decision:
             raise TradingError(f"페르소나 주문이 누락됐습니다: {persona['persona_id']}")
         side = decision["side"]
-        allocation = float(decision["allocation_pct"])
-        base = persona["cash"] if side == "BUY" else persona["quantity"] * price
-        quantity = int(base * allocation / price) if side != "HOLD" else 0
+        if representative_targets and side in ("BUY", "SELL"):
+            weight = target_weights.get((persona["persona_id"], side), 0.0)
+            total_weight = target_weight_totals.get((persona["group"], side), 0.0)
+            target_notional = (effective_targets.get((persona["group"], side), 0.0)
+                               * weight / total_weight if total_weight else 0.0)
+            quantity = int(target_notional / price)
+        else:
+            allocation = float(decision["allocation_pct"])
+            base = persona["cash"] if side == "BUY" else persona["quantity"] * price
+            quantity = int(base * allocation / price) if side != "HOLD" else 0
         quantity = min(quantity, persona["cash"] // price) if side == "BUY" else min(quantity, persona["quantity"])
         if quantity <= 0:
             side = "HOLD"
@@ -498,6 +559,8 @@ def apply_agent_round(game: dict[str, Any], round_data: dict[str, Any], *,
         sell += notional if side == "SELL" else 0
         orders.append({**decision, "group": persona["group"], "strategy": persona["strategy"],
                        "side": side, "quantity": quantity, "notional": notional,
+                       "representative_target_notional": round(
+                           target_notional if representative_targets and decision["side"] in ("BUY", "SELL") else notional),
                        "decision_source": decision.get("decision_source", "llm")})
     gross = buy + sell
     imbalance = (buy - sell) / gross if gross else 0.0
@@ -507,7 +570,8 @@ def apply_agent_round(game: dict[str, Any], round_data: dict[str, Any], *,
     market_pressure = ((buy - sell) / max_round_capacity if max_round_capacity else 0.0)
     market_pressure = max(-1.0, min(1.0, market_pressure))
     psychology = _update_market_psychology(
-        game, round_data, orders, phase=phase, market_date=market_date)
+        game, round_data, orders, phase=phase, market_date=market_date,
+        group_notional_targets=representative_targets)
     sentiment_signal = psychology["aggregate_sentiment"]
     regime = psychology["event_regime"]
     regime_signal = regime["direction"] * regime["intensity"]
@@ -587,6 +651,14 @@ def apply_agent_round(game: dict[str, Any], round_data: dict[str, Any], *,
               "max_round_capacity": round(max_round_capacity),
               "context_mode": game.get("settings", {}).get("context_mode", CONTEXT_MODE),
               "buy_notional": buy, "sell_notional": sell, "persona_orders": orders,
+              "group_notional_targets": representative_targets,
+              "group_notional_actuals": {
+                  group: {"buy": sum(order["notional"] for order in orders
+                                     if order["group"] == group and order["side"] == "BUY"),
+                          "sell": sum(order["notional"] for order in orders
+                                      if order["group"] == group and order["side"] == "SELL")}
+                  for group in INVESTOR_GROUPS
+              },
               "market_summary": round_data.get("market_summary", ""),
               "observations": round_data.get("observations", []),
               "risk_flags": round_data.get("risk_flags", [])}
