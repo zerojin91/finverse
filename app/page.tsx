@@ -2057,27 +2057,21 @@ export default function Home() {
 
   return (
     <div className="finverse-app">
-      <header className="mobile-header">
-        <button className="sidebar-brand" onClick={() => activateTab("market")} aria-label="FINVERSE 시장 인사이트 홈">
-          <span className="brand-mark">F</span><span>FINVERSE</span>
+      <header className="top-header">
+        <button className="brand" onClick={() => activateTab("market")} aria-label="FINVERSE 시장 인사이트 홈">
+          FINVERSE<span>.</span>
         </button>
+        <nav className="top-nav" aria-label="FINVERSE 탐색">
+          <button className={activeTab === "market" ? "active" : ""} onClick={() => activateTab("market")} aria-current={activeTab === "market" ? "page" : undefined}>시장 인사이트</button>
+          <button className={activeTab === "twin" ? "active" : ""} onClick={() => activateTab("twin")} aria-current={activeTab === "twin" ? "page" : undefined}>나의 투자 일지</button>
+          <button onClick={() => setPaperTradingOpen(true)}>모의 투자</button>
+        </nav>
+        <div className="top-header-actions">
+          <button className="header-help" type="button" aria-label="도움말"><CircleHelp size={18} /></button>
+        </div>
       </header>
 
-      <div className="app-layout">
-        <aside className="sidebar" aria-label="FINVERSE 탐색">
-          <button className="sidebar-brand" onClick={() => activateTab("market")} aria-label="FINVERSE 시장 인사이트 홈">
-            <span className="brand-mark">F</span><span>FINVERSE</span>
-          </button>
-          <div className="sidebar-label"><BrainCircuit size={19} /><div><span>AI DECISION LAB</span><strong>금융 판단 실험실</strong></div></div>
-          <nav className="side-tabs">
-            <button className={activeTab === "market" ? "active" : ""} onClick={() => activateTab("market")}><BarChart3 size={18} />시장 인사이트</button>
-            <button className={activeTab === "twin" ? "active" : ""} onClick={() => activateTab("twin")}><UserRound size={18} />마이 금융 트윈</button>
-            <button onClick={() => setPaperTradingOpen(true)}><CircleDollarSign size={18} />모의 투자</button>
-          </nav>
-          <button className="sidebar-help" type="button"><CircleHelp size={20} /><span>도움말</span><ChevronRight size={17} /></button>
-        </aside>
-
-        <main className="main-content">
+      <main className="main-content">
           {activeTab === "market" ? (
             <div className="market-page">
               <header className="page-heading">
@@ -2359,12 +2353,11 @@ export default function Home() {
               </section>
             </div>
           ) : <TwinPage selectedScenario={selectedScenario} onSelectScenario={setSelectedScenario} onOpenBuilder={openBuilder} />}
-        </main>
-      </div>
+      </main>
 
       <nav className="mobile-tabs" aria-label="모바일 주요 메뉴">
         <button className={activeTab === "market" ? "active" : ""} onClick={() => activateTab("market")}><BarChart3 size={18} /><span>시장 인사이트</span></button>
-        <button className={activeTab === "twin" ? "active" : ""} onClick={() => activateTab("twin")}><UserRound size={18} /><span>마이 금융 트윈</span></button>
+        <button className={activeTab === "twin" ? "active" : ""} onClick={() => activateTab("twin")}><UserRound size={18} /><span>나의 투자 일지</span></button>
       </nav>
 
       {builderOpen && (
