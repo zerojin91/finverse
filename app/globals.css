@@ -1006,6 +1006,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-holding-inputs input { width: 100%; min-width: 0; height: 35px; border: 0; outline: 0; background: transparent; font-family: inherit; font-size: 11px; font-weight: 700; text-align: right; }
 .paper-holding-inputs em { color: var(--light); font-size: 9px; font-style: normal; }
 .paper-setting-note { display: flex; align-items: center; gap: 6px; margin: 0; color: #15803d; font-size: 9px; }
+.paper-investment-actions { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .paper-simulation-field { width: 100%; display: flex; flex-direction: column; gap: 8px; padding: 13px 14px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
 .paper-simulation-label { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .paper-duration-options { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; }
@@ -1444,6 +1445,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
   .paper-holding-inputs { grid-template-columns: minmax(0,1fr); }
   .paper-collection-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .paper-collection-status { align-items: flex-start; flex-direction: column; }
+  .paper-investment-actions { align-items: flex-start; flex-direction: column; }
   .paper-holdings { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
 

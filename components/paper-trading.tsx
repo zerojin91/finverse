@@ -1328,11 +1328,13 @@ function SetupScreen({
             <label htmlFor="paper-holding-quantity"><span>보유 수량</span><div><input id="paper-holding-quantity" inputMode="numeric" value={holdingQuantity ? holdingQuantity.toLocaleString("ko-KR") : ""} onChange={(event) => { setHoldingQuantity(parsePositiveInteger(event.target.value)); setInvestmentConfirmed(false); }} /><em>주</em></div></label>
           </div>
         )}
-        {investmentMode && <p className="paper-setting-note"><CheckCircle2 size={13} /> {investmentMode === "holding" ? "입력한 보유 종목만으로 시작하며 추가 투자금은 사용하지 않습니다." : "실제 주문이나 계좌 연결 없이 입력한 조건으로만 연습합니다."}</p>}
         {investmentMode && (
-          <button className="paper-start-button paper-investment-confirm-button" type="button" disabled={!investmentReady} onClick={() => setInvestmentConfirmed(true)}>
-            투자 상태 설정 완료 <ArrowRight size={14} />
-          </button>
+          <div className="paper-investment-actions">
+            <p className="paper-setting-note"><CheckCircle2 size={13} /> {investmentMode === "holding" ? "입력한 보유 종목만으로 시작하며 추가 투자금은 사용하지 않습니다." : "실제 주문이나 계좌 연결 없이 입력한 조건으로만 연습합니다."}</p>
+            <button className="paper-start-button paper-investment-confirm-button" type="button" disabled={!investmentReady} onClick={() => setInvestmentConfirmed(true)}>
+              투자 상태 설정 완료 <ArrowRight size={14} />
+            </button>
+          </div>
         )}
       </section>
       )}
