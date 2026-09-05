@@ -1056,6 +1056,7 @@ function SetupScreen({
   const [initialContextError, setInitialContextError] = useState<string | null>(null);
   const [contextDocuments, setContextDocuments] = useState<ContextDocumentProgress[]>(INITIAL_CONTEXT_DOCUMENTS);
   const [contextDwellComplete, setContextDwellComplete] = useState(false);
+  const [simulationSetupStage, setSimulationSetupStage] = useState(0);
   const [selectedContextDocument, setSelectedContextDocument] = useState<{ label: string; content: string } | null>(null);
   const [contextDocumentLoading, setContextDocumentLoading] = useState(false);
   const pickedTicker = picked?.ticker;
@@ -1200,6 +1201,23 @@ function SetupScreen({
     const timer = window.setTimeout(() => setContextDwellComplete(true), 1_500);
     return () => window.clearTimeout(timer);
   }, [investmentConfirmed]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSimulationSetupStage(investmentConfirmed ? 1 : 0), 0);
+    return () => window.clearTimeout(timer);
+  }, [investmentConfirmed]);
+
+  useEffect(() => {
+    if (!investmentConfirmed || !contextDwellComplete) return;
+    const timer = window.setTimeout(() => setSimulationSetupStage(2), 1_500);
+    return () => window.clearTimeout(timer);
+  }, [investmentConfirmed, contextDwellComplete]);
+
+  useEffect(() => {
+    if (!investmentConfirmed || simulationSetupStage !== 2) return;
+    const timer = window.setTimeout(() => setSimulationSetupStage(3), 1_500);
+    return () => window.clearTimeout(timer);
+  }, [investmentConfirmed, simulationSetupStage]);
 
   useEffect(() => {
     if (!pickedTicker || !previewStepVisible) return;
@@ -1486,7 +1504,7 @@ function SetupScreen({
       {investmentConfirmed && (
       <section ref={step4Ref} className="paper-setup-block paper-setup-reveal">
         <div className="paper-setup-heading"><span>04 · 시뮬레이션 설정</span><h3>초기 상황</h3></div>
-        <div className="paper-simulation-field">
+        {simulationSetupStage >= 2 && <div className="paper-simulation-field paper-setup-reveal">
           <div className="paper-simulation-label"><span>연습 기간</span><small>거래일 기준</small></div>
           <div className="paper-duration-options">
             {DURATION_OPTIONS.map((option) => (
@@ -1495,7 +1513,7 @@ function SetupScreen({
               </button>
             ))}
           </div>
-        </div>
+        </div>}
         <section className="paper-context-field" aria-live="polite">
           <div className="paper-context-documents" aria-label="초기 맥락 문서 생성 상태">
             {contextDocuments.map((document) => (
@@ -1535,7 +1553,7 @@ function SetupScreen({
             </>
           )}
         </section>
-        <div className="paper-agent-field">
+        {simulationSetupStage >= 3 && <div className="paper-agent-field paper-setup-reveal">
           <div className="paper-simulation-label">
             <span>시장 참여 에이전트</span>
             <small>총 18명 · 시나리오 시작 시 실제 설정으로 생성</small>
@@ -1562,11 +1580,11 @@ function SetupScreen({
               );
             })}
           </div>
-        </div>
+        </div>}
       </section>
       )}
 
-      {investmentConfirmed && (
+      {investmentConfirmed && simulationSetupStage >= 3 && (
         <>
           <div className="paper-hint paper-setup-reveal">
             <CalendarClock size={13} />
