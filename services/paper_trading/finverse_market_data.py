@@ -47,6 +47,18 @@ DEFAULT_HISTORY_DAYS = 240
 # lake.records는 2,500만 행이라 콜드 캐시에서 한 번 훑는 데 30초까지 걸린다.
 # 같은 종목·기간을 다시 부를 때 그 값을 다시 치르지 않도록 디스크에 남긴다.
 HISTORY_CACHE_TTL_SECONDS = 12 * 60 * 60
+# 뉴스 분류 규칙이 바뀌면 이전의 전체-뉴스 캐시를 재사용하면 안 된다.
+HISTORY_CACHE_SCHEMA_VERSION = "targeted-news-v2"
+
+# ``events.news``에는 종목 ticker 태그가 비어 있는 경우가 많다. 따라서 선택
+# 종목명으로 직접 확인되는 기사와 명백한 시장 전체 기사만 시나리오에 넣는다.
+# 개별 타사 기사(예: HD현대건설기계 제재)는 삼성전자 시나리오의 근거가 될 수 없다.
+MARKET_WIDE_NEWS_TERMS = (
+    "한국은행", "기준금리", "통화정책", "연준", "fomc", "금리", "국채", "채권",
+    "환율", "원화", "달러", "인플레이", "물가", "고용", "경기", "gdp",
+    "유가", "wti", "opec", "코스피", "kospi", "코스닥", "kosdaq", "증시",
+    "주가지수", "관세", "무역 분쟁", "제재", "지정학", "전쟁", "반도체 업황",
+)
 
 
 def plain_text(value: str | None, limit: int = 600) -> str:
@@ -57,6 +69,29 @@ def plain_text(value: str | None, limit: int = 600) -> str:
     """
     text = html.unescape(re.sub(r"<[^>]+>", " ", str(value or "")))
     return re.sub(r"\s+", " ", text).strip()[:limit]
+
+
+def security_name_aliases(name: str | None, english_name: str | None) -> tuple[str, ...]:
+    """Return stable company-name aliases for untagged news matching."""
+    aliases: list[str] = []
+    for raw in (name, english_name):
+        value = re.sub(r"(보통주|우선주|\(주\)|주식회사)$", "", str(raw or "")).strip()
+        if len(value) >= 2:
+            aliases.append(value.casefold())
+        words = re.findall(r"[A-Z][a-z]+|[가-힣]+", value)
+        if len(words) > 1 and len(words[0]) >= 4:
+            aliases.append(words[0].casefold())
+    return tuple(dict.fromkeys(aliases))
+
+
+def scenario_news_scope(title: str, summary: str, aliases: tuple[str, ...]) -> str | None:
+    """Classify news as target-security, market-wide, or irrelevant."""
+    haystack = f"{title} {summary}".casefold()
+    if any(alias in haystack for alias in aliases):
+        return "security"
+    if any(term.casefold() in haystack for term in MARKET_WIDE_NEWS_TERMS):
+        return "market"
+    return None
 
 
 def assign_news_session(published: datetime, trading_dates: list[date]) -> tuple[date | None, bool]:
@@ -260,7 +295,9 @@ class FinverseMarketData:
 
     @staticmethod
     def _cache_path(ticker: str, start: date, end: date) -> Path:
-        key = hashlib.sha256(f"{ticker}|{start}|{end}".encode("utf-8")).hexdigest()[:16]
+        key = hashlib.sha256(
+            f"{HISTORY_CACHE_SCHEMA_VERSION}|{ticker}|{start}|{end}".encode("utf-8")
+        ).hexdigest()[:16]
         root = Path(Config.UPLOAD_FOLDER) / "market_cache"
         root.mkdir(parents=True, exist_ok=True)
         return root / f"{ticker}_{key}.json"
@@ -429,12 +466,8 @@ class FinverseMarketData:
             WHERE sentiment_date BETWEEN %s AND %s
             ORDER BY sentiment_date
         """
-        # 뉴스는 종목으로 거르지 않는다. 수집된 기사에는 tickers 배열이 아예
-        # 비어 있어서(1,105건 전부) 종목 필터를 걸면 항상 0건이 나왔고, 그래서
-        # 온톨로지의 event 커버리지가 계속 missing이었다.
-        # 실제로 들어오는 기사는 한국은행 통화정책·환율·지정학 같은 시장 전체
-        # 사건이므로 거래일 기준으로 모든 종목에 동일하게 붙인다. 종목 고유
-        # 사건이 아니라는 사실은 각 이벤트의 scope로 남긴다.
+        # 기사 ticker 태그는 비어 있는 경우가 많아 SQL에서 종목으로 거르지 않는다.
+        # 대신 아래에서 선택 종목명 또는 명백한 거시·시장 키워드로 좁힌다.
         news_sql = """
             SELECT published_at::date AS trade_date, published_at, title, summary,
                    publisher, feed, event_types, url, coalesce(selection_score, 0) AS score
@@ -481,6 +514,7 @@ class FinverseMarketData:
         if not security_rows:
             raise TradingError(f"KOSPI 상장 종목을 찾을 수 없습니다: {ticker}")
         security = security_rows[0]
+        aliases = security_name_aliases(security.get("name"), security.get("english_name"))
         previous_rows = required("previous")
         if not previous_rows:
             raise TradingError(f"시작일 이전 종가 데이터가 없습니다: {ticker}")
@@ -519,15 +553,19 @@ class FinverseMarketData:
             published = row.get("published_at")
             if not published:
                 continue
+            title = plain_text(row["title"], 300)
+            summary = plain_text(row.get("summary"))
+            scope = scenario_news_scope(title, summary, aliases)
+            if scope is None:
+                continue
             target_date, available_before_open = assign_news_session(published, trading_dates)
             if target_date is None:
                 continue
             day = str(target_date)
             news_by_day.setdefault(day, []).append({
-                "title": plain_text(row["title"], 300),
-                "summary": plain_text(row.get("summary")),
-                # 종목 고유 공시가 아니라 시장 전체 사건이라는 뜻이다.
-                "scope": "market",
+                "title": title,
+                "summary": summary,
+                "scope": scope,
                 "publisher": row["publisher"], "feed": row.get("feed"),
                 "event_types": row.get("event_types") or [], "url": row["url"],
                 "published_at": published.isoformat() if published else None,

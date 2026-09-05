@@ -43,11 +43,16 @@ def _analogue_events(history: dict[str, Any]) -> list[dict[str, Any]]:
             title = str(event.get("title") or "").strip()
             if not title:
                 continue
+            scope = str(event.get("scope") or "market")
+            # 방어선: 이전 캐시나 외부 입력에 타사 뉴스가 있어도 World Agent의
+            # 유사 사례 후보로 승격시키지 않는다.
+            if scope not in {"security", "market", "micro", "macro"}:
+                continue
             result.append({
                 "analogue_id": f"analogue:{day.get('trade_date')}:{index}",
                 "date": str(day.get("trade_date") or ""), "title": title,
                 "summary": str(event.get("summary") or "").strip(),
-                "scope": str(event.get("scope") or "market"),
+                "scope": scope,
                 "event_types": [str(item) for item in (event.get("event_types") or [])],
                 "source_score": float(event.get("source_score") or 0),
             })

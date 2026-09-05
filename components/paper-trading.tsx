@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   ChevronRight,
   CircleDollarSign,
-  Flag,
   Landmark,
   LoaderCircle,
   MessageSquare,
@@ -465,18 +464,6 @@ const PHASE_META: Record<Phase, {
   },
 };
 
-const LEGACY_STEP_ORDER: Phase[] = [
-  "inter_event_market", "pre_event_decision", "post_event_decision", "completed",
-];
-const STEP_LABEL: Record<Phase, string> = {
-  inter_event_market: "관망",
-  pre_event_decision: "사전 판단",
-  post_event_decision: "사후 대응",
-  world_market: "시장 진행",
-  world_decision: "중요 판단",
-  completed: "회고",
-};
-
 async function callApi<T = Record<string, unknown>>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api/paper-trading${path}`, {
     ...init,
@@ -666,9 +653,6 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
               x1={cx(simStart) - slot / 2} x2={cx(simStart) - slot / 2}
               y1={0} y2={PRICE_H + VOLUME_H + 6}
             />
-            <text className="paper-chart-divider-label" x={cx(simStart) - slot / 2 + 5} y={11}>
-              시뮬레이션 시작
-            </text>
           </g>
         )}
 
@@ -734,6 +718,8 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
         <span>{preview ? bars[bars.length - 1].date : futureSlots ? `남은 ${futureSlots}거래일` : "연습 완료"}</span>
       </div>
 
+      {!preview && simStart > 0 && <span className="paper-chart-start-label">시뮬레이션 시작</span>}
+
       <div className="paper-chart-legend">
         {preview ? (
           <><span className="up">양봉</span><span className="down">음봉</span><span className="real">실제 일봉</span></>
@@ -782,46 +768,6 @@ function EventProvenanceStrip({ source }: { source: OntologySource }) {
           <a href={source.url} target="_blank" rel="noreferrer">원문 <ArrowRight size={10} /></a>
         )}
       </footer>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------ psychology */
-
-function PsychologyStrip({ round }: { round?: AgentRound }) {
-  const groups = round?.psychology?.groups;
-  if (!groups) return null;
-  return (
-    <div className="paper-psych">
-      <div className="paper-psych-title">
-        <Users size={12} />
-        <div><span>오늘의 시장 참여자 반응</span><small>59개 에이전트의 독립 판단이 위 캔들을 만듭니다</small></div>
-        <em>{round?.market_date ?? round?.label}</em>
-      </div>
-      <div className="paper-psych-result">
-        <span>집단 주문</span>
-        <b className="up">매수 {compactWon(round?.buy_notional ?? 0)}</b>
-        <b className="down">매도 {compactWon(round?.sell_notional ?? 0)}</b>
-        <em>수급 압력 {signedPct((round?.market_pressure ?? 0) * 100)}</em>
-      </div>
-      <div className="paper-psych-rows">
-        {Object.entries(GROUP_LABEL).map(([key, label]) => {
-          const state = groups[key];
-          if (!state) return null;
-          const width = Math.min(50, Math.abs(state.sentiment) * 50);
-          return (
-            <div className={`paper-psych-row ${toneOf(state.sentiment)}`} key={key}>
-              <span>{label}</span>
-              <i>
-                <b style={state.sentiment >= 0
-                  ? { left: "50%", width: `${width}%` }
-                  : { right: "50%", width: `${width}%` }} />
-              </i>
-              <em>{signedPct(state.sentiment * 100)}</em>
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }
@@ -1970,23 +1916,6 @@ function CoachOverlay({ onDone, worldMode = false }: { onDone: () => void; world
   );
 }
 
-function PhaseStepper({ phase, worldMode = false }: { phase: Phase; worldMode?: boolean }) {
-  const steps: Phase[] = worldMode
-    ? ["world_market", "world_decision", "completed"]
-    : LEGACY_STEP_ORDER;
-  const active = steps.indexOf(phase);
-  return (
-    <ol className="paper-stepper">
-      {steps.map((step, index) => (
-        <li key={step} className={index < active ? "done" : index === active ? "active" : ""}>
-          <i>{index < active ? <CheckCircle2 size={12} /> : index + 1}</i>
-          <span>{STEP_LABEL[step]}</span>
-        </li>
-      ))}
-    </ol>
-  );
-}
-
 function TradingScreen({
   game,
   job,
@@ -1997,8 +1926,6 @@ function TradingScreen({
   onOrder,
   onDailyReflection,
   onAdvance,
-  onReset,
-  onClose,
 }: {
   game: ScenarioGame;
   job: Job | null;
@@ -2009,8 +1936,6 @@ function TradingScreen({
   onOrder: (input: { side: "BUY" | "SELL"; quantity: number; rationale: string; confidence: number }) => void;
   onDailyReflection: (stance: DailyReflection["stance"]) => void;
   onAdvance: (days?: number) => void;
-  onReset: () => void;
-  onClose: () => void;
 }) {
   // 모달은 사용자가 열었을 때만 마운트되므로 첫 렌더에서 바로 읽어도 안전하다.
   // 저장소 접근이 막힌 브라우저에서는 안내를 띄우지 않는다.
@@ -2025,11 +1950,6 @@ function TradingScreen({
   const meta = PHASE_META[game.phase] ?? PHASE_META.inter_event_market;
   const worldMode = game.mode === "world";
   const portfolio = game.portfolio;
-  const returnTone = toneOf(portfolio.total_return_pct);
-  const priceChangePct = game.initial_reference_price
-    ? ((game.current_price - game.initial_reference_price) / game.initial_reference_price) * 100
-    : 0;
-  const priceTone = toneOf(priceChangePct);
   const totalProgressUnits = worldMode ? (game.simulation_days ?? 0) : game.total_events;
   const currentProgressUnits = worldMode
     ? (game.phase === "completed" ? totalProgressUnits : game.current_day_index ?? 0)
@@ -2053,44 +1973,12 @@ function TradingScreen({
       {coach && <CoachOverlay onDone={startFromCoach} worldMode={worldMode} />}
 
       <header className="paper-run-header">
-        <div className="paper-run-identity">
-          <span>FINVERSE · PAPER TRADING</span>
-          <h2 id="paper-trading-title">{game.name} <em>{game.ticker}</em></h2>
-        </div>
-        <div className="paper-run-header-actions">
-          <div className="paper-quote">
-            <strong className={priceTone}>{game.current_price.toLocaleString("ko-KR")}</strong>
-            <em className={priceTone}>{signedPct(priceChangePct)}</em>
-          </div>
-          <span className={`paper-phase-pill ${game.phase}`}>{busy && <i />} {meta.label}</span>
-          <button className="paper-reset" type="button" onClick={onReset} disabled={busy}>새 시나리오</button>
-          <button className="scenario-modal-close" type="button" onClick={onClose} aria-label="모의 투자 닫기"><X size={20} /></button>
-        </div>
         <div className="paper-header-dashboard" aria-label="시나리오 진행 현황">
           <div className="paper-header-progress">
-            <PhaseStepper phase={game.phase} worldMode={worldMode} />
             <strong>{worldMode
-              ? `${currentProgressUnits} / ${totalProgressUnits} 거래일`
+              ? `시나리오 ${currentProgressUnits} / ${totalProgressUnits} 거래일`
               : `${game.phase === "completed" ? game.total_events : game.current_event_index + 1} / ${game.total_events} 이벤트`}</strong>
             <div className="paper-progress"><i style={{ width: `${busy && job ? job.progress : eventProgress}%` }} className={busy ? "busy" : ""} /></div>
-          </div>
-          <div className="paper-header-metrics">
-            <div>
-              <Wallet size={14} /><span>총자산</span>
-              <strong>{compactWon(portfolio.equity)}</strong>
-            </div>
-            <div>
-              {returnTone === "down" ? <TrendingDown size={14} /> : <TrendingUp size={14} />}<span>수익률</span>
-              <strong className={returnTone}>{signedPct(portfolio.total_return_pct)}</strong>
-            </div>
-            <div>
-              <CircleDollarSign size={14} /><span>현금</span>
-              <strong>{compactWon(portfolio.cash)}</strong>
-            </div>
-            <div>
-              <Flag size={14} /><span>보유</span>
-              <strong>{portfolio.quantity.toLocaleString("ko-KR")} <em>주</em></strong>
-            </div>
           </div>
           {error && <div className="paper-run-error"><AlertTriangle size={14} /> <span>{error}</span></div>}
           {stalled && !error && (
@@ -2109,7 +1997,6 @@ function TradingScreen({
             <em>{(game.last_market_date ?? latestRound?.market_date) ? `${game.last_market_date ?? latestRound?.market_date} 기준` : "시작 전"}</em>
           </div>
           <CandleChart game={game} />
-          <PsychologyStrip round={latestRound} />
         </section>
 
         <section className="paper-panel paper-desk-panel" aria-label="사용자 연습">
@@ -2281,15 +2168,6 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
     }
   }, []);
 
-  // 진행 중인 게임은 서버에 저장되어 있다. 목록에서 언제든 이어서 할 수 있다.
-  const reset = useCallback(() => {
-    if (pollRef.current) clearTimeout(pollRef.current);
-    setGame(null);
-    setJob(null);
-    setError(null);
-    setStalled(false);
-  }, []);
-
   const pollJob = useCallback((jobId: string, gameId: string) => {
     let lastStamp = "";
     let lastMessage = "";
@@ -2392,7 +2270,7 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
         className={`scenario-modal paper-trading-modal ${game ? "running" : "setup"}`}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="paper-trading-title"
+        aria-label="모의 투자 시뮬레이션"
         onMouseDown={(event) => event.stopPropagation()}
       >
         {game
@@ -2406,8 +2284,6 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
               onOrder={submitOrder}
               onDailyReflection={recordDailyReflection}
               onAdvance={advance}
-              onReset={reset}
-              onClose={onClose}
             />
           : <SetupScreen onStart={start} starting={starting} error={error} onClose={onClose} />}
       </section>
