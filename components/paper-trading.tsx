@@ -1072,7 +1072,6 @@ function SetupScreen({
   const step4Ref = useRef<HTMLElement | null>(null);
   const agentStepRef = useRef<HTMLDivElement | null>(null);
   const readyStepRef = useRef<HTMLElement | null>(null);
-  const agentProfileRequestedContextRef = useRef<string | null>(null);
   const previewReady = Boolean(previewCandles && previewCandles.length >= 2 && !previewError);
   const previewStepVisible = previewReady && previewDwellComplete;
   const collectionReady = Boolean(collectionSources?.every((source) => source.status === "ready"));
@@ -1123,7 +1122,6 @@ function SetupScreen({
       setAgentProfiles(null);
       setAgentProfileJob(null);
       setAgentProfileError(null);
-      agentProfileRequestedContextRef.current = null;
       setAgentProfileStartedAt(null);
       setSimulationSetupStage(0);
       setInvestmentConfirmed(false);
@@ -1272,14 +1270,23 @@ function SetupScreen({
   }, [simulationSetupStage]);
 
   useEffect(() => {
-    if (!pickedTicker || !initialContext || !contextDwellComplete || agentProfileRequestedContextRef.current === initialContext.context_id) return;
+    const contextId = initialContext?.context_id;
+    if (!pickedTicker || !contextId || !contextDwellComplete || agentProfilesReady) return;
     let cancelled = false;
-    agentProfileRequestedContextRef.current = initialContext.context_id;
-    setAgentProfileStartedAt(Date.now());
-    setAgentProfiles(null);
-    setAgentProfileError(null);
     const prepare = async () => {
       try {
+        // Strict Mode 재실행이나 화면 재진입으로 POST 응답을 놓쳐도, 완료된
+        // 프로필 매니페스트를 먼저 읽어 즉시 카드 화면을 복구한다.
+        const existing = await callApi<{ data: { status: "missing" | "ready" } & Partial<AgentProfiles> }>(
+          `/securities/${encodeURIComponent(pickedTicker)}/agent-profiles`);
+        if (cancelled) return;
+        setAgentProfileError(null);
+        if (existing.data.status === "ready" && existing.data.profile_count === 59) {
+          setAgentProfiles(existing.data as AgentProfiles);
+          setAgentProfileJob(null);
+          return;
+        }
+        setAgentProfileStartedAt((startedAt) => startedAt ?? Date.now());
         const payload = await callApi<{ data: { status: "ready" | "running"; job?: Job } & AgentProfiles }>(
           `/securities/${encodeURIComponent(pickedTicker)}/agent-profiles/prepare`, { method: "POST" });
         if (cancelled) return;
@@ -1295,7 +1302,7 @@ function SetupScreen({
     };
     void prepare();
     return () => { cancelled = true; };
-  }, [pickedTicker, initialContext, contextDwellComplete]);
+  }, [pickedTicker, initialContext?.context_id, contextDwellComplete, agentProfilesReady]);
 
   useEffect(() => {
     if (!pickedTicker || !agentProfileJob || agentProfileJob.status === "completed" || agentProfileJob.status === "failed") return;
@@ -1373,7 +1380,6 @@ function SetupScreen({
     setAgentProfiles(null);
     setAgentProfileJob(null);
     setAgentProfileError(null);
-    agentProfileRequestedContextRef.current = null;
     setAgentProfileStartedAt(null);
     setSimulationSetupStage(0);
     setPicked(item);
@@ -1456,7 +1462,6 @@ function SetupScreen({
                 setAgentProfiles(null);
                 setAgentProfileJob(null);
                 setAgentProfileError(null);
-                setAgentProfileRequestContextId(null);
                 setAgentProfileStartedAt(null);
                 setSimulationSetupStage(0);
               }

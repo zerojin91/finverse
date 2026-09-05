@@ -54,6 +54,7 @@
 - 모의투자 2단계 `자료 수집`은 `GET /api/paper-trading/securities/:ticker/scenario-context`로 시나리오 엔진과 동일한 종목별 DB 조회를 미리 수행한다. 시장·경제·사건·커뮤니티 네 도메인의 건수·최신 시점을 표시하며, 결과는 로컬 이력 캐시에 남아 시나리오 생성 시 재사용된다. 이 단계는 OpenRouter·온톨로지·MiroFish를 실행하지 않는다.
 - 모의투자 4단계는 먼저 `GET /api/paper-trading/securities/:ticker/initial-context/documents`로 같은 실제 이력에서 종목 타깃형 `market/economy/events/community` Evidence Markdown 4종을 준비한다. 네 문서가 모두 준비된 뒤에만 `GET /api/paper-trading/securities/:ticker/initial-context`가 이 문서 묶음을 OpenRouter에 전달해 근거·의미를 함께 담은 음슴체 5줄 요약·종목 전체 현황·최근 한 달 이벤트 시퀀스·위험 요인·관찰 포인트를 생성한다. 문서와 분석 결과는 `var/market_cache/initial-context-<지문>/` 및 `initial-context-<지문>.json`에 12시간 캐시되며, 시나리오 시작 시 동일 분석을 게임에 `initial_context`로 저장한다. 이벤트 시퀀스는 문서에 있는 실제 관측 흐름만 표시하고 미래 사건·가격 예측을 섞지 않는다.
 - 이어서 `POST /api/paper-trading/securities/:ticker/agent-profiles/prepare`가 동일 `context_id` 기준으로 총 59개 개별 프로필 생성을 백그라운드 작업으로 시작한다. `GET /agent-profiles`는 UI 카드용 범주 요약을, `GET /agent-profiles/:group`은 클릭한 범주의 UI 안전 개별 프로필(관점·편향·신호·반응·위험 규칙)을 반환한다. 자금·보유·개인 기억·LLM 프롬프트는 게임 생성 전까지 서버 파일 캐시에만 둔다. 게임 생성 `POST /scenarios`는 준비된 59개 프로필이 없으면 거부한다.
+- 프로필 준비 화면은 먼저 `GET /agent-profiles`로 완료 캐시를 복구한 뒤 필요한 경우에만 `POST /prepare`를 호출한다. 동일 `context_id`의 준비 요청이 겹치면 `ScenarioJobManager`는 기존 `job_id`를 반환하므로, 프론트는 새 작업을 중복 생성하지 않고 같은 작업을 폴링한다.
 
 ### 데이터·AI 흐름
 
@@ -94,6 +95,13 @@ scripts/run_bedrock_signal_update.sh --dry-run
 - 작업 시작 전 방향 점검: 이 프로젝트의 핵심은 실제 Finverse 데이터로 근거를 만들고, LLM은 해석·시나리오 보조로만 사용하며, 미래 결과를 사실처럼 단정하지 않는 금융 판단 연습이다. UI·API·에이전트 동작을 바꿀 때는 [프로젝트 히스토리](docs/project-history.md)를 먼저 읽고, 기존의 실제 데이터·4개 참여자 범주·순차 설정 흐름·캐시 재사용 원칙에서 벗어나지 않는지 확인한다. 큰 방향이 바뀌면 구현 전에 히스토리에 결정과 이유를 기록한다.
 
 ### 운영 변경·사고 기록
+
+#### 2026-09-05 — 완료된 시장 참여 에이전트 카드가 준비 화면에 남음
+
+- 증상: 59개 에이전트 프로필 백그라운드 작업은 완료됐지만 설정 화면이 계속 “초기 상황을 읽고 있습니다”로 표시됐다.
+- 원인: React 개발 모드의 effect 재실행 중 첫 `POST /agent-profiles/prepare` 응답이 취소됐는데, 프론트가 요청 식별자를 미리 기록해 재조회·재시도를 막았다.
+- 조치: 프로필 단계 진입 시 완료 캐시를 먼저 조회해 카드 상태를 복구하고, 동일 컨텍스트의 겹친 준비 요청에는 백엔드가 진행 중인 기존 job을 반환하도록 멱등 처리했다.
+- 재발 방지: 비동기 준비 UI는 작업 시작 응답만 신뢰하지 말고, 진입·재진입 시 완료 매니페스트를 조회해 화면 상태를 재수화한다.
 
 #### 2026-09-05 — 선택 종목과 무관한 뉴스가 World Agent 사건으로 생성
 
