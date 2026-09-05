@@ -1487,14 +1487,14 @@ function SetupScreen({
         <section className="paper-context-field" aria-live="polite">
           <div className="paper-context-documents" aria-label="초기 맥락 문서 생성 상태">
             {contextDocuments.map((document) => (
-              <article key={document.key} className={`paper-context-document ${document.status}`}>
+              <button key={document.key} type="button" className={`paper-context-document ${document.status}`} onClick={() => openContextDocument(document.key)} disabled={document.status !== "ready"} aria-label={`${document.label} Evidence Markdown 전체 보기`}>
                 {document.status === "ready" ? <CheckCircle2 size={14} /> : <LoaderCircle size={14} className="spin" />}
                 <div className="paper-context-document-body">
                   <header><strong>{document.label}</strong><small>{document.status === "ready" ? "문서 준비 완료" : document.status === "generating" ? "문서 생성 중" : "생성 대기 중"}</small></header>
                   <p>{initialContext?.source_summary.document_previews?.[document.key] || (document.status === "waiting" ? "자료를 확인하고 있습니다." : "수집된 자료를 문서로 정리하고 있습니다…")}</p>
-                  {document.status === "ready" && <button type="button" onClick={() => openContextDocument(document.key)}>MD 전체 보기 <ArrowRight size={11} /></button>}
+                  {document.status === "ready" && <span className="paper-context-document-link">전체 문서 보기 <ArrowRight size={11} /></span>}
                 </div>
-              </article>
+              </button>
             ))}
           </div>
           {initialContextLoading && <div className="paper-context-loading"><LoaderCircle size={15} className="spin" /> 수집된 자료에서 현재 상황을 분석하고 있습니다.</div>}

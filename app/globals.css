@@ -1016,6 +1016,8 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-context-loading { display: flex; align-items: center; gap: 7px; min-height: 62px; color: var(--muted); font-size: 10px; }
 .paper-context-documents { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
 .paper-context-document { min-width: 0; min-height: 132px; display: flex; align-items: flex-start; gap: 9px; padding: 13px; border: 1px solid #e5e7eb; border-radius: 9px; background: #fff; }
+.paper-context-document { color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.paper-context-document:disabled { cursor: default; }
 .paper-context-document > svg { flex: 0 0 auto; color: #a1a1aa; }
 .paper-context-document.generating { border-color: #93c5fd; background: #eff6ff; }
 .paper-context-document.generating > svg { color: #2563eb; }
@@ -1026,8 +1028,8 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-context-document strong { color: var(--ink); font-size: 11px; }
 .paper-context-document small { color: var(--muted); font-size: 8px; }
 .paper-context-document p { display: -webkit-box; overflow: hidden; margin: 0; color: var(--muted); font-size: 9px; line-height: 1.6; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
-.paper-context-document-body button { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; color: var(--ink); background: transparent; font-size: 8px; font-weight: 700; cursor: pointer; }
-.paper-context-document-body button:hover { color: #2563eb; }
+.paper-context-document-link { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; color: var(--ink); font-size: 8px; font-weight: 700; }
+.paper-context-document:hover:not(:disabled) { border-color: #86efac; box-shadow: 0 5px 16px rgba(22,163,74,.08); }
 .paper-context-summary { display: flex; align-items: flex-start; gap: 8px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); background: #fff; }
 .paper-context-summary svg { flex: 0 0 auto; margin-top: 1px; color: var(--ink); }
 .paper-context-summary p { margin: 0; font-size: 10px; line-height: 1.6; }
