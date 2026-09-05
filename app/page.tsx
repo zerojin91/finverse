@@ -1422,16 +1422,20 @@ function ForecastChart({ scenario, marketData, liveSeries }: { scenario: Scenari
         else candles.push(liveCandle);
       }
       const closes = candles.map((candle) => candle.close);
-      const forecastOffset = closes[closes.length - 1] - scenario.path[0];
-      const forecastPath = scenario.path.map((value) => value + forecastOffset);
-      const outerUpper = forecastPath.map((value, index) => value + 80 + index * 60);
-      const outerLower = forecastPath.map((value, index) => value - 80 - index * 60);
-      const innerUpper = forecastPath.map((value, index) => value + 45 + index * 32);
-      const innerLower = forecastPath.map((value, index) => value - 45 - index * 32);
+      const scaleRatio = closes[closes.length - 1] / scenario.path[0];
+      const forecastPath = scenario.path.map((value) => value * scaleRatio);
+      const outerUpper = forecastPath.map((value, index) => value * (1 + .015 + index * .011));
+      const outerLower = forecastPath.map((value, index) => value * (1 - .015 - index * .011));
+      const innerUpper = forecastPath.map((value, index) => value * (1 + .008 + index * .006));
+      const innerLower = forecastPath.map((value, index) => value * (1 - .008 - index * .006));
       const all = [...closes, ...outerUpper, ...outerLower];
-      const axisStep = 500;
-      const min = Math.floor((Math.min(...all) - 40) / axisStep) * axisStep;
-      const max = Math.ceil((Math.max(...all) + 40) / axisStep) * axisStep;
+      const rawSpan = Math.max(...all) - Math.min(...all);
+      const rawStep = rawSpan / 6;
+      const magnitude = Math.pow(10, Math.floor(Math.log10(Math.max(rawStep, 1))));
+      const niceStep = [1, 2, 5, 10].map((mult) => mult * magnitude).find((step) => rawStep <= step) ?? 10 * magnitude;
+      const axisStep = niceStep;
+      const min = Math.floor((Math.min(...all) - rawSpan * .06) / axisStep) * axisStep;
+      const max = Math.ceil((Math.max(...all) + rawSpan * .06) / axisStep) * axisStep;
       const xActual = (index: number) => pad.left + (index / Math.max(candles.length - 1, 1)) * (splitX - pad.left);
       const xForecast = (index: number) => splitX + (index / Math.max(forecastPath.length - 1, 1)) * (rightX - splitX);
       const y = (value: number) => pad.top + ((max - value) / (max - min)) * plotH;
@@ -2200,6 +2204,7 @@ export default function Home() {
   const [symbolSearching, setSymbolSearching] = useState(false);
   const [tickerSources, setTickerSources] = useState<TickerSource[] | null>(null);
   const [tickerSourcesError, setTickerSourcesError] = useState<string | null>(null);
+  const [symbolCandles, setSymbolCandles] = useState<KospiMarketData | null>(null);
   const [selectedScenario, setSelectedScenario] = useState(scenarios[0]);
   const [scenarioDetailOpen, setScenarioDetailOpen] = useState(false);
   const [scenarioEditorial, setScenarioEditorial] = useState<ScenarioEditorial>(() => fallbackEditorial(scenarios[0]));
@@ -2311,6 +2316,35 @@ export default function Home() {
       }
     };
     loadTickerContext();
+    return () => { active = false; };
+  }, [selectedSymbol.ticker]);
+
+  useEffect(() => {
+    let active = true;
+    setSymbolCandles(null);
+    const loadSymbolCandles = async () => {
+      try {
+        const response = await fetch(`/api/paper-trading/securities/${encodeURIComponent(selectedSymbol.ticker)}/candles?limit=40`, { cache: "no-store" });
+        const payload = await response.json().catch(() => null) as { data?: { candles?: Array<{ market_date: string; open: number; high: number; low: number; close: number }> } } | null;
+        const rows = payload?.data?.candles ?? [];
+        if (!response.ok || !rows.length || !active) return;
+        const candles: KospiCandle[] = rows.map((row) => {
+          const parsed = new Date(row.market_date);
+          return { date: row.market_date.replaceAll("-", ""), label: `${parsed.getMonth() + 1}/${parsed.getDate()}`, open: row.open, high: row.high, low: row.low, close: row.close };
+        });
+        const last = candles[candles.length - 1];
+        const prev = candles[candles.length - 2];
+        setSymbolCandles({
+          latestDate: last.date, latestLabel: last.label, value: last.close,
+          change: prev ? last.close - prev.close : 0,
+          rate: prev ? ((last.close - prev.close) / prev.close) * 100 : 0,
+          candles,
+        });
+      } catch {
+        // keep null; ForecastChart falls back to the KOSPI placeholder while a symbol has no real candles yet
+      }
+    };
+    loadSymbolCandles();
     return () => { active = false; };
   }, [selectedSymbol.ticker]);
 
@@ -2849,7 +2883,7 @@ export default function Home() {
                     <div className={`chart-meta ${selectedScenario.tone}`}><span>{selectedScenario.duration}</span><strong>{selectedScenario.forecast.replace(/^KOSPI\s*/, "")}</strong></div>
                   </header>
                   <div className="chart-content">
-                    <div className="chart-wrap"><ForecastChart scenario={selectedScenario} marketData={kospiData} liveSeries={liveKospi} /></div>
+                    <div className="chart-wrap"><ForecastChart scenario={selectedScenario} marketData={symbolCandles ?? kospiData} /></div>
                     <aside className="event-rail" aria-label="발생 가능 이벤트">
                       <header><h2>발생 가능 이벤트</h2><span>{selectedScenario.duration}</span></header>
                       <div className="event-timeline">
@@ -2874,44 +2908,6 @@ export default function Home() {
                         ))}
                       </div>
                     </aside>
-                  </div>
-                </section>
-
-                <section className="panel connection-panel market-signal-panel">
-                  <div className="panel-title">
-                    <div><span>MARKET PULSE</span><h2>시장 연결</h2></div>
-                  </div>
-                  <div className="signal-stack">
-                    {dashboardSignals.map((signal) => {
-                      const Icon = marketSignalIcons[signal.key];
-                      return (
-                        <article className={`signal-group ${signal.key}`} key={signal.key}>
-                          <button className="signal-group-button" type="button" onClick={() => setSelectedMarketSignal(signal)} aria-label={`${signal.label} 상세 보기`}>
-                            <span className="signal-group-head">
-                              <span className="signal-icon"><Icon size={15} /></span>
-                              <strong>{signal.label}</strong>
-                              <span className="signal-share"><ChevronRight className="signal-disclosure" size={12} /></span>
-                            </span>
-                            <span className="signal-events">
-                              {signal.topics.slice(0, 2).map((topic) => {
-                                const importance = importanceScore(topic.importance);
-                                return <span key={topic.title}><span><strong>{topic.title}</strong><small>근거 {topic.sources?.length ?? 0}개</small></span><b aria-label={`중요도 ${importance}점`}>{"★".repeat(importance)}{"☆".repeat(3 - importance)}</b></span>;
-                              })}
-                            </span>
-                            <span className="signal-track" aria-hidden="true">
-                              {signal.topics.slice(0, 2).map((topic) => <i key={topic.title} />)}
-                            </span>
-                          </button>
-                        </article>
-                      );
-                    })}
-                  </div>
-                  <div className={`ai-summary ${marketBriefExpanded ? "expanded" : ""}`}>
-                    <Sparkles size={17} />
-                    <button className="ai-summary-copy" type="button" aria-expanded={marketBriefExpanded} aria-label={`AI 요약 전문 ${marketBriefExpanded ? "접기" : "보기"}`} onClick={() => setMarketBriefExpanded((expanded) => !expanded)}>
-                      <strong>AI 요약</strong>
-                      <p>{marketBrief.map((line) => <span key={line}>{line}</span>)}</p>
-                    </button>
                   </div>
                 </section>
 
