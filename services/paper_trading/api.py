@@ -37,7 +37,7 @@ from .world_simulation import (
 )
 from .scenario_investor_analyzer import analyze_scenario_investor
 from .scenario_job_manager import ScenarioJobManager
-from .llm_scenario_report import generate_llm_scenario_report
+from .llm_scenario_report import generate_llm_reports
 from .config import Config
 
 paper_trading_bp = Blueprint("paper_trading", __name__)
@@ -346,6 +346,7 @@ def get_event_scenario_assessment(game_id: str):
         raise TradingError("지원하지 않는 모의투자 게임입니다.")
     report = analyze_scenario_investor(game)
     report["llm_report"] = game.get("llm_report")
+    report["llm_reports"] = game.get("llm_reports")
     return jsonify({"success": True, "data": report})
 
 
@@ -381,7 +382,10 @@ def start_event_scenario_action(game_id: str):
             else:
                 def generate_report(game):
                     report(15, "World Agent 사건과 사용자 판단 기록을 분석 중입니다.")
-                    game["llm_report"] = generate_llm_scenario_report(game)
+                    game["llm_reports"] = generate_llm_reports(game)
+                    # 기존 저장 게임/클라이언트와의 호환을 위해 투자 보고서를
+                    # 단일 리포트 필드에도 남긴다.
+                    game["llm_report"] = game["llm_reports"]["investment"]
                     report(90, "인지 편향 중심 교육 보고서를 저장 중입니다.")
                     return game["llm_report"]
                 store.update(game_id, generate_report)
@@ -439,7 +443,8 @@ def start_event_scenario_action(game_id: str):
         else:
             def generate_report(game):
                 report(15, "이벤트와 투자 판단 기록 분석 중")
-                game["llm_report"] = generate_llm_scenario_report(game)
+                game["llm_reports"] = generate_llm_reports(game)
+                game["llm_report"] = game["llm_reports"]["investment"]
                 report(90, "종합 교육 보고서 저장 중")
                 return game["llm_report"]
             store.update(game_id, generate_report)

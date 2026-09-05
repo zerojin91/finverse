@@ -301,6 +301,25 @@ type PendingOrder = {
   confidence?: number | null;
 };
 
+type LlmReport = {
+  summary?: string;
+  daily_action_review?: { date?: string; action?: string; result?: string }[];
+  behavior_pattern?: string;
+  strengths?: string[];
+  risk_patterns?: string[];
+  next_practice?: string[];
+  environment_evolution?: string;
+  event_reviews?: { date?: string; event?: string; impact?: string }[];
+  stock_flow?: string;
+  group_behavior?: Record<string, string>;
+  key_turning_points?: string[];
+  verified_metrics?: { total_return_pct?: number; trade_count?: number; daily_reflection_count?: number; max_price_drawdown_pct?: number };
+  portfolio_at_end?: Portfolio;
+  initial_equity?: number;
+};
+
+type LlmReports = { investment?: LlmReport; scenario?: LlmReport };
+
 type Phase = "inter_event_market" | "pre_event_decision" | "post_event_decision" | "world_market" | "world_decision" | "completed";
 
 type ScenarioGame = {
@@ -335,6 +354,7 @@ type ScenarioGame = {
   revealed_events?: ScenarioEvent[];
   daily_reflections?: DailyReflection[];
   world?: { memory?: { event_ledger?: ScenarioEvent[] } };
+  llm_reports?: LlmReports;
 };
 
 type DailyReflection = {
@@ -2164,6 +2184,42 @@ function CoachOverlay({ onDone, worldMode = false }: { onDone: () => void; world
   );
 }
 
+function ReportList({ title, items, tone = "" }: { title: string; items?: string[]; tone?: string }) {
+  if (!items?.length) return null;
+  return <div className={`paper-report-list ${tone}`}><b>{title}</b><ul>{items.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul></div>;
+}
+
+function CompletedReports({ reports, portfolio, initialEquity }: { reports?: LlmReports; portfolio: Portfolio; initialEquity?: number }) {
+  const investment = reports?.investment;
+  const scenario = reports?.scenario;
+  if (!investment && !scenario) return null;
+  const end = investment?.portfolio_at_end ?? portfolio;
+  const starting = investment?.initial_equity ?? initialEquity ?? 0;
+  const profit = end.equity - starting;
+  return (
+    <section className="paper-completed-reports" aria-label="AI 시뮬레이션 보고서">
+      <div className="paper-completed-reports-heading"><span>SIMULATION REPORTS</span><h2>시뮬레이션이 끝났습니다</h2><p>기록된 판단과 변화한 시장 환경을 바탕으로 두 가지 보고서를 만들었습니다.</p></div>
+      {investment && <article className="paper-report-card">
+        <header><div><span>01 · USER REPORT</span><h3>나의 투자보고서</h3></div><b className={toneOf(profit)}>{signedPct(end.total_return_pct ?? 0)}</b></header>
+        <div className="paper-report-metrics"><div><span>최종 투자금액</span><strong>{won(end.equity)}</strong></div><div><span>종료일 평가손익</span><strong className={toneOf(profit)}>{won(profit)}</strong></div><div><span>실현손익</span><strong>{won(end.realized_pnl)}</strong></div><div><span>판단 횟수</span><strong>{investment.verified_metrics?.daily_reflection_count ?? investment.verified_metrics?.trade_count ?? 0}회</strong></div></div>
+        <p className="paper-report-summary">{investment.summary}</p>
+        {investment.behavior_pattern && <p className="paper-report-detail"><b>행동 패턴</b>{investment.behavior_pattern}</p>}
+        {investment.daily_action_review?.length ? <div className="paper-report-daily"><b>일자별 판단과 결과</b>{investment.daily_action_review.map((row, index) => <p key={`${row.date}-${index}`}><strong>{row.date}</strong> <span>{row.action}</span> — {row.result}</p>)}</div> : null}
+        <div className="paper-report-columns"><ReportList title="잘한 점" items={investment.strengths} tone="good" /><ReportList title="다음에 점검할 점" items={investment.risk_patterns} tone="risk" /><ReportList title="다음 연습 원칙" items={investment.next_practice} tone="plan" /></div>
+      </article>}
+      {scenario && <article className="paper-report-card scenario">
+        <header><div><span>02 · WORLD REPORT</span><h3>시나리오 보고서</h3></div><span>환경 변화·에이전트 흐름</span></header>
+        <p className="paper-report-summary">{scenario.summary}</p>
+        {scenario.environment_evolution && <p className="paper-report-detail"><b>World State 변화</b>{scenario.environment_evolution}</p>}
+        {scenario.stock_flow && <p className="paper-report-detail"><b>종목 흐름</b>{scenario.stock_flow}</p>}
+        {scenario.event_reviews?.length ? <div className="paper-report-events"><b>발생 이벤트</b>{scenario.event_reviews.map((row, index) => <p key={`${row.date}-${index}`}><strong>{row.date} · {row.event}</strong>{row.impact}</p>)}</div> : null}
+        {scenario.group_behavior && <div className="paper-report-groups">{Object.entries(scenario.group_behavior).map(([key, value]) => <p key={key}><b>{GROUP_LABEL[key] ?? key}</b>{value}</p>)}</div>}
+        <ReportList title="주요 전환점" items={scenario.key_turning_points} tone="plan" />
+      </article>}
+    </section>
+  );
+}
+
 function TradingScreen({
   game,
   job,
@@ -2337,6 +2393,8 @@ function TradingScreen({
           </div>
         </section>
       </div>
+
+      {game.phase === "completed" && <CompletedReports reports={game.llm_reports} portfolio={game.portfolio} initialEquity={game.initial_equity} />}
 
       <footer className="paper-run-footer">
         <span>GAME {game.game_id.slice(0, 22)}</span>

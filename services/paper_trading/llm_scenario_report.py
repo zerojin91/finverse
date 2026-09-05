@@ -42,6 +42,131 @@ REQUIRED_REPORT_KEYS = ("executive_summary", "investor_profile", "event_reviews"
 REPORT_ATTEMPTS = 3
 
 
+def _compact_agent_rounds(game: dict[str, Any]) -> list[dict[str, Any]]:
+    """Keep every recorded agent action while making the report prompt bounded.
+
+    Rationales are already available in the persisted game for drill-down. The
+    report needs the complete action log, but not the repeated prose for every
+    agent, so each action is represented by its identity, side and notional.
+    """
+    rounds = []
+    for row in game.get("agent_rounds", []):
+        actions = []
+        for order in row.get("persona_orders") or []:
+            actions.append({key: order.get(key) for key in
+                            ("persona_id", "group", "side", "quantity", "filled_quantity", "notional")})
+        rounds.append({
+            "market_date": row.get("market_date"), "phase": row.get("phase"),
+            "return_pct": row.get("return_pct"), "previous_price": row.get("previous_price"),
+            "price": row.get("price"), "order_imbalance": row.get("order_imbalance"),
+            "market_pressure": row.get("market_pressure"),
+            "market_summary": row.get("market_summary", ""),
+            "actions": actions,
+        })
+    return rounds
+
+
+def _report_context(game: dict[str, Any]) -> dict[str, Any]:
+    base = analyze_scenario_investor(game)
+    world = game.get("world") or {}
+    memory = world.get("memory") or {}
+    portfolio = game.get("portfolio") or {}
+    if not portfolio:
+        from .scenario_trading import scenario_portfolio
+        portfolio = scenario_portfolio(game)
+    return {
+        "security": {"ticker": game.get("ticker"), "name": game.get("name")},
+        "mode": game.get("mode"),
+        "simulation_period": game.get("simulation_days") or len(game.get("agent_rounds", [])),
+        "portfolio_at_end": portfolio,
+        "initial_equity": game.get("initial_equity"),
+        "user_daily_actions": [
+            {key: row.get(key) for key in
+             ("market_date", "stance", "label", "event_id", "market_return_pct", "market_summary", "source")}
+            for row in game.get("daily_reflections", [])
+        ],
+        "user_fills": [{key: fill.get(key) for key in
+                        ("market_date", "event_id", "phase", "side", "quantity", "price", "gross_amount", "rationale", "confidence", "realized_pnl")}
+                       for fill in game.get("fills", [])],
+        "world_state_daily_memory": memory.get("daily_ledger", []),
+        "world_event_memory": memory.get("event_ledger", []),
+        "agent_rounds_and_all_actions": _compact_agent_rounds(game),
+        "verified_assessment": base,
+    }
+
+
+def _call_structured_report(messages: list[dict[str, str]], required_keys: list[str],
+                            chat: Callable[..., str]) -> dict[str, Any]:
+    report: dict[str, Any] = {}
+    missing: list[str] = []
+    last_error: Exception | None = None
+    for _ in range(REPORT_ATTEMPTS):
+        retry = list(messages)
+        if missing:
+            retry.append({"role": "user", "content":
+                          f"직전 응답에 다음 필수 키가 없었다. 형식을 지켜 모두 포함해 다시 반환하라: {', '.join(missing)}"})
+        try:
+            report = _parse_json(chat(retry, temperature=.35, max_tokens=5000,
+                                      response_format={"type": "json_object"}))
+        except Exception as exc:  # noqa: BLE001 - 제한된 횟수로 재시도
+            last_error, missing = exc, []
+            continue
+        missing = [key for key in required_keys if key not in report]
+        if not missing:
+            return report
+        last_error = None
+    if last_error is not None:
+        raise LLMMarketUnavailable("LLM 보고서 생성에 실패했습니다.") from last_error
+    raise LLMMarketUnavailable(f"LLM 보고서에 필수 항목이 누락됐습니다: {', '.join(missing)}")
+
+
+def generate_llm_reports(game: dict[str, Any],
+                         chat: Callable[..., str] | None = None) -> dict[str, Any]:
+    """Generate separate learner and world reports from one completed game.
+
+    Both reports receive the same persisted world/action history, but use
+    different prompts so the learner report focuses on the user's decisions
+    while the scenario report explains the evolving environment and agents.
+    """
+    if chat is None:
+        from .llm_client import LLMClient
+        chat = LLMClient().chat
+    context = _report_context(game)
+    common = ("한국 주식 교육용 가상 시뮬레이션이다. 실제 투자 권유나 미래 예측을 하지 않는다. "
+              "입력의 금액과 퍼센트는 엔진이 계산한 검증값이므로 임의로 바꾸지 않는다. "
+              "근거가 없는 심리 특성은 단정하지 말고 기록에서 확인되는 행동 패턴으로만 설명한다. "
+              "반드시 JSON 객체만 반환한다.")
+    investment_keys = ["summary", "daily_action_review", "behavior_pattern", "strengths", "risk_patterns", "next_practice"]
+    scenario_keys = ["summary", "environment_evolution", "event_reviews", "stock_flow", "group_behavior", "key_turning_points"]
+    investment_message = {"role": "user", "content": (
+        f"다음 기록으로 사용자의 투자보고서를 작성하라.\n{json.dumps(context, ensure_ascii=False)}\n"
+        "사용자가 날짜별로 매수·매도·관찰을 어떻게 선택했는지, 최종 투자금액과 종료일 가격 기준 손익을 설명하라. "
+        "daily_action_review는 날짜별 1~2문장 배열로 작성하라. 반환 형식: "
+        '{"summary":"3~5문장", "daily_action_review":[{"date":"날짜","action":"행동","result":"다음 결과"}], '
+        '"behavior_pattern":"종합 행동 패턴", "strengths":["잘한 점"], "risk_patterns":["주의할 점"], "next_practice":["다음 연습 원칙"]}'
+    )}
+    scenario_message = {"role": "user", "content": (
+        f"다음 기록으로 시나리오 보고서를 작성하라.\n{json.dumps(context, ensure_ascii=False)}\n"
+        "World State의 거래일별 변화, 실제 유사 근거로 생성된 이벤트, 사건 전후 종목 흐름, "
+        "개인·외국인·기관·연기금의 집단 행동과 모든 개별 행동 기록을 종합하라. "
+        "반환 형식: {\"summary\":\"전체 흐름 3~5문장\", \"environment_evolution\":\"환경 변화\", "
+        "\"event_reviews\":[{\"date\":\"날짜\",\"event\":\"사건\",\"impact\":\"영향\"}], "
+        "\"stock_flow\":\"가격 흐름\", \"group_behavior\":{\"retail\":\"개인\",\"foreign\":\"외국인\",\"institution\":\"기관\",\"pension\":\"연기금\"}, "
+        "\"key_turning_points\":[\"전환점\"]}"
+    )}
+    investment = _call_structured_report(
+        [{"role": "system", "content": common}, investment_message], investment_keys, chat)
+    scenario = _call_structured_report(
+        [{"role": "system", "content": common}, scenario_message], scenario_keys, chat)
+    metrics = context["verified_assessment"]["metrics"]
+    investment["verified_metrics"] = metrics
+    investment["portfolio_at_end"] = context["portfolio_at_end"]
+    investment["initial_equity"] = context["initial_equity"]
+    investment = enforce_verified_report_metrics(investment, metrics)
+    scenario["verified_metrics"] = metrics
+    return {"investment": investment, "scenario": scenario}
+
+
 def _slim_psychology(psychology: dict[str, Any]) -> dict[str, Any]:
     """Keep the psychology signal, drop the per-persona memory arrays.
 
