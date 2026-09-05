@@ -1,5 +1,6 @@
 from services.paper_trading.config import Config
 from services.paper_trading.initial_context_analyzer import (
+    _mark_direct_event_evidence,
     _normalize,
     get_initial_context_documents,
 )
@@ -51,3 +52,21 @@ def test_event_sequence_is_normalized_and_preserves_evidence_basis():
     assert [item["title"] for item in result["event_sequence"]] == ["실제 사건", "문서 종합"]
     assert result["event_sequence"][0]["basis"] == "observed"
     assert result["event_sequence"][1]["basis"] == "inferred"
+
+
+def test_source_news_marks_matching_inferred_timeline_item_as_observed():
+    analysis = _normalize({
+        "summary": "요약",
+        "event_sequence": [{
+            "date": "2026-08-26",
+            "title": "미국 연준 위원장 잭슨홀 연설 앞두고 채권시장 불안",
+            "basis": "inferred",
+        }],
+    })
+
+    _mark_direct_event_evidence(analysis, [{
+        "date": "2026-08-26",
+        "title": "미국 연준 위원장 잭슨홀 연설 앞두고 채권시장 불안",
+    }])
+
+    assert analysis["event_sequence"][0]["basis"] == "observed"

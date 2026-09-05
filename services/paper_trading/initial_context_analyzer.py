@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import tempfile
 import time
 from typing import Any
@@ -16,7 +17,7 @@ from .kospi_paper_trading import TradingError
 from .llm_client import LLMClient
 
 
-CONTEXT_SCHEMA_VERSION = "initial-context-v6"
+CONTEXT_SCHEMA_VERSION = "initial-context-v7"
 CONTEXT_CACHE_TTL_SECONDS = 12 * 60 * 60
 
 
@@ -231,6 +232,31 @@ def _normalize(value: dict[str, Any]) -> dict[str, Any]:
     return normalized
 
 
+def _event_title_key(value: Any) -> str:
+    """Compare source headlines despite spaces and punctuation differences."""
+    return re.sub(r"[^0-9a-z가-힣]", "", str(value or "").lower())
+
+
+def _mark_direct_event_evidence(analysis: dict[str, Any], events: list[dict[str, Any]]) -> None:
+    """Source news beats an LLM's conservative inferred label for the event itself."""
+    direct_events = [
+        (str(event.get("date") or ""), _event_title_key(event.get("title")))
+        for event in events
+        if event.get("title")
+    ]
+    for item in analysis.get("event_sequence") or []:
+        item_date = str(item.get("date") or "")
+        item_title = _event_title_key(item.get("title"))
+        if not item_date or len(item_title) < 6:
+            continue
+        if any(
+            source_date == item_date
+            and (source_title == item_title or source_title in item_title or item_title in source_title)
+            for source_date, source_title in direct_events
+        ):
+            item["basis"] = "observed"
+
+
 def _document_preview(content: str) -> str:
     """Return a short readable excerpt without exposing Markdown table noise."""
     key_section = content.split("## Key Findings", 1)[-1].split("\n## ", 1)[0]
@@ -298,6 +324,7 @@ def get_initial_context(history: dict[str, Any]) -> dict[str, Any]:
 
     try:
         analysis = _normalize(LLMClient().chat_json(_messages(source, evidence_documents), temperature=.25, max_tokens=3800))
+        _mark_direct_event_evidence(analysis, source["events"]["recent_events"])
     except Exception as exc:  # noqa: BLE001 - API 계층에서 사용자용 503으로 변환한다.
         raise InitialContextUnavailable("초기 시장 맥락 분석을 생성하지 못했습니다.") from exc
 
