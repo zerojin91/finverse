@@ -535,7 +535,6 @@ type Bar = {
 const CHART_W = 760;
 const AXIS_W = 52;
 const PRICE_H = 210;
-const VOLUME_H = 42;
 
 /** 실제 이력 봉과 시뮬레이션 봉을 하나의 시계열로 합친다. */
 type CandleChartData = Pick<ScenarioGame, "history_candles" | "price_history" | "initial_reference_price" | "revealed_events" | "fills" | "daily_reflections" | "simulation_days">;
@@ -609,7 +608,6 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
     return {
       top, bottom, span, slot,
       bodyW: Math.max(2, Math.min(13, slot * 0.6)),
-      maxVolume: Math.max(...bars.map((bar) => bar.volume), 1),
       simStart: historicalCount,
       futureSlots,
       remainingSimulationDays: Math.max(0, (game.simulation_days ?? 20) - simulatedCount),
@@ -628,7 +626,7 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
     );
   }
 
-  const { top, span, slot, bodyW, maxVolume, simStart, futureSlots, remainingSimulationDays, y, cx } = layout;
+  const { top, span, slot, bodyW, simStart, futureSlots, remainingSimulationDays, y, cx } = layout;
   const gridValues = [0, 0.25, 0.5, 0.75, 1].map((ratio) => top - span * ratio);
 
   // 사용자 체결은 해당 이벤트가 반응한 봉 위에 표시한다. 사전 판단은 왼쪽,
@@ -684,7 +682,7 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
 
       <svg
         className="paper-chart-svg"
-        viewBox={`0 0 ${CHART_W} ${PRICE_H + VOLUME_H + 22}`}
+        viewBox={`0 0 ${CHART_W} ${PRICE_H + 22}`}
         preserveAspectRatio="none"
         role="img"
         aria-label={preview ? "최근 실제 캔들 차트" : "시나리오 캔들 차트"}
@@ -712,8 +710,11 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
             <line
               className="paper-chart-divider"
               x1={cx(simStart) - slot / 2} x2={cx(simStart) - slot / 2}
-              y1={0} y2={PRICE_H + VOLUME_H + 6}
+              y1={0} y2={PRICE_H + 6}
             />
+            <text className="paper-chart-start-label" x={cx(simStart) - slot / 2 + 5} y={11}>
+              시뮬레이션 시작
+            </text>
           </g>
         )}
 
@@ -724,7 +725,7 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
               x={bars.length * slot + 1}
               y={8}
               width={Math.max(1, futureSlots * slot - 2)}
-              height={PRICE_H + VOLUME_H - 3}
+              height={PRICE_H - 3}
             />
           </g>
         )}
@@ -737,7 +738,6 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
           const tone = rising ? "up" : "down";
           return (
             <g key={bar.key} className={`paper-candle ${tone} ${bar.real ? "historical" : "simulated"} ${hovered === index ? "hovered" : ""}`}>
-              {bar.event && <line className="paper-candle-event" x1={cx(index)} x2={cx(index)} y1={0} y2={PRICE_H} />}
               {flat
                 // 캐시 이력은 종가만 있어 봉을 그릴 수 없다. 종가선으로 표시한다.
                 ? <line className="paper-candle-flat" x1={cx(index) - bodyW / 2} x2={cx(index) + bodyW / 2} y1={y(bar.close)} y2={y(bar.close)} />
@@ -748,15 +748,8 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
                   </>
                 )}
               <rect
-                className="paper-candle-volume"
-                x={cx(index) - bodyW / 2}
-                y={PRICE_H + 10 + (VOLUME_H - (bar.volume / maxVolume) * VOLUME_H)}
-                width={bodyW}
-                height={Math.max(0.8, (bar.volume / maxVolume) * VOLUME_H)}
-              />
-              <rect
                 className="paper-candle-hit"
-                x={index * slot} y={0} width={slot} height={PRICE_H + VOLUME_H + 12}
+                x={index * slot} y={0} width={slot} height={PRICE_H + 12}
                 onMouseEnter={() => setHovered(index)}
               />
             </g>
@@ -778,8 +771,6 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
         {simStart > 0 && <span>{bars[simStart]?.date}</span>}
         <span>{preview ? bars[bars.length - 1].date : remainingSimulationDays ? `남은 ${remainingSimulationDays}거래일` : "연습 완료"}</span>
       </div>
-
-      {!preview && simStart > 0 && <span className="paper-chart-start-label">시뮬레이션 시작</span>}
 
       <div className="paper-chart-legend">
         {preview ? (

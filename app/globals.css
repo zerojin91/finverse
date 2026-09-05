@@ -1201,23 +1201,19 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-chart-axis { fill: #a1a1aa; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 8px; }
 .paper-chart-reference { stroke: #d4d4d8; stroke-width: 1; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
 .paper-chart-divider { stroke: #c7c7cc; stroke-width: 1; stroke-dasharray: 2 3; vector-effect: non-scaling-stroke; }
-.paper-chart-start-label { display: inline-flex; margin: 2px 14px 0; color: #52525b; font-size: 9px; font-weight: 800; }
+.paper-chart-start-label { fill: #71717a; font-family: inherit; font-size: 8px; font-weight: 800; }
 .paper-candle-wick { stroke-width: 1; vector-effect: non-scaling-stroke; }
 .paper-candle-flat { stroke-width: 1.6; stroke: #c7c7cc; vector-effect: non-scaling-stroke; }
-.paper-candle-event { stroke: #f97316; stroke-width: 1; stroke-dasharray: 2 3; opacity: .5; vector-effect: non-scaling-stroke; }
 .paper-candle-hit { fill: transparent; }
 .paper-candle.hovered .paper-candle-hit { fill: rgba(17,17,19,.045); }
 .paper-candle.historical { opacity: .72; }
 .paper-candle.historical .paper-candle-body { opacity: .72; }
-.paper-candle.historical .paper-candle-volume { opacity: .42; }
 .paper-candle.simulated .paper-candle-body { filter: drop-shadow(0 1px 1px rgba(17,17,19,.12)); }
 .paper-candle-future { fill: rgba(244,244,245,.45); stroke: #d4d4d8; stroke-width: 1; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
 .paper-candle.up .paper-candle-wick { stroke: var(--up); }
 .paper-candle.up .paper-candle-body { fill: var(--up); }
-.paper-candle.up .paper-candle-volume { fill: rgba(239,68,68,.28); }
 .paper-candle.down .paper-candle-wick { stroke: var(--down); }
 .paper-candle.down .paper-candle-body { fill: var(--down); }
-.paper-candle.down .paper-candle-volume { fill: rgba(37,99,235,.24); }
 .paper-fill-marker.buy path { fill: #7c3aed; stroke: #fff; stroke-width: 1.2; }
 .paper-fill-marker.sell path { fill: #f59e0b; stroke: #fff; stroke-width: 1.2; }
 .paper-chart-dates { display: flex; justify-content: space-between; gap: 8px; margin-top: 2px; color: var(--light); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 8px; }
