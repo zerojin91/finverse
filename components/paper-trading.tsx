@@ -705,7 +705,7 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
           />
         )}
 
-        {simStart > 0 && (
+        {!preview && simStart > 0 && (
           <g>
             <line
               className="paper-chart-divider"
@@ -774,7 +774,7 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
 
       <div className="paper-chart-legend">
         {preview ? (
-          <><span className="up">양봉</span><span className="down">음봉</span><span className="real">실제 일봉</span></>
+          <><span className="up">양봉</span><span className="down">음봉</span></>
         ) : (
           <><span className="real">실제 이력</span><span className="up">상승 캔들</span><span className="down">하락 캔들</span><span className="future">앞으로의 거래일</span><span className="event">이벤트 공개일</span><span className="buy">내 매수 판단</span><span className="sell">내 매도 판단</span></>
         )}
