@@ -122,6 +122,13 @@ scripts/run_bedrock_signal_update.sh --dry-run
 - 조치: `.venv-paper/bin/python` 다음에 `.venv/bin/python`을 확인하도록 실행기를 보완했다.
 - 재발 방지: 로컬 통합 실행 후 5055 `/health`와 3000 응답을 함께 확인한다.
 
+#### 2026-09-05 — 종목 선택 캔들 조회가 PostgreSQL statement timeout에 걸림
+
+- 증상: PEM SSH 터널은 정상 연결됐지만 종목 선택의 최근 실제 캔들 조회가 `canceling statement due to statement timeout`으로 실패했다.
+- 원인: `lake.records`의 GIN 인덱스가 종목 코드만 포함한 느슨한 JSON 조건을 넓게 읽어, 원격 DB 부하 때 30초 제한을 넘겼다. 오류 문구는 이를 연결 실패로 감싸 실제 원인을 가렸다.
+- 조치: 종목 코드와 KOSPI 시장을 함께 포함한 JSON 조건으로 GIN 인덱스 범위를 좁히고, 캔들 전용 조회 제한을 45초로 설정했다. 조회 제한 오류는 데이터 조회 시간 초과로 구분한다.
+- 재발 방지: DB 오류가 발생하면 15432 SSH 터널 수신 여부와 캔들 단독 API 응답 시간을 먼저 확인한다.
+
 #### 2026-09-02 — Windows 모의투자 API 재시작 시 이전 라우트 상태 유지
 
 - 증상: 새 종목 캔들 조회 경로를 추가한 뒤 5055 API를 파일 경로로 실행해 모듈을 찾지 못했고, 하위 Python 프로세스만 종료했을 때에는 이전 라우트가 계속 404를 반환했다.

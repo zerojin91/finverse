@@ -103,9 +103,17 @@ class FinverseMarketData:
 
     def _fetch(self, sql: str, params: tuple, statement_timeout: str) -> list[dict[str, Any]]:
         """Run one read-only query on its own connection."""
-        with self._connection(statement_timeout) as connection, connection.cursor() as cursor:
-            cursor.execute(sql, params)
-            return [dict(row) for row in cursor.fetchall()]
+        try:
+            with self._connection(statement_timeout) as connection, connection.cursor() as cursor:
+                cursor.execute(sql, params)
+                return [dict(row) for row in cursor.fetchall()]
+        except FinverseUnavailable as exc:
+            # SSH 터널 접속 성공 뒤 서버 쿼리 제한에 걸린 경우까지 연결 실패로
+            # 보이면 사용자가 PEM/네트워크를 잘못 진단하게 된다.
+            if "statement timeout" in str(exc):
+                raise FinverseUnavailable(
+                    "finverse PostgreSQL 데이터 조회 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.") from exc
+            raise
 
     def _fetch_parallel(self, queries: dict[str, tuple[str, tuple]],
                         statement_timeout: str = "40s") -> dict[str, Any]:
@@ -162,8 +170,7 @@ class FinverseMarketData:
                 coalesce(NULLIF(payload->>'volume', '')::bigint, 0) AS volume
               FROM lake.records
               WHERE record_type = 'market_price_daily'
-                AND payload @> jsonb_build_object('ticker', %s::text)
-                AND payload->>'market' = 'KOSPI'
+                AND payload @> jsonb_build_object('ticker', %s::text, 'market', 'KOSPI')
                 AND payload->>'bas_dd' >= to_char(current_date - interval '180 days', 'YYYYMMDD')
               ORDER BY payload->>'bas_dd',
                        (payload->>'source' = 'krx_open_api') DESC, payload->>'source'
@@ -174,14 +181,13 @@ class FinverseMarketData:
             FROM recent
             ORDER BY trade_date
         """
-        with self._connection() as connection, connection.cursor() as cursor:
-            cursor.execute(sql, (ticker, limit))
-            return [{
-                "market_date": row["trade_date"].isoformat(),
-                "open": int(row["open"]), "high": int(row["high"]),
-                "low": int(row["low"]), "close": int(row["close"]),
-                "volume": int(row["volume"] or 0), "real": True,
-            } for row in cursor.fetchall()]
+        rows = self._fetch(sql, (ticker, limit), "45s")
+        return [{
+            "market_date": row["trade_date"].isoformat(),
+            "open": int(row["open"]), "high": int(row["high"]),
+            "low": int(row["low"]), "close": int(row["close"]),
+            "volume": int(row["volume"] or 0), "real": True,
+        } for row in rows]
 
     def collect_scenario_context(self, ticker: str) -> dict[str, Any]:
         """Load the four evidence domains used by a paper-trading scenario.
