@@ -1063,13 +1063,6 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-event-sequence li footer span { color: var(--light); font-size: 8px; }
 .paper-event-sequence li footer p { margin: 0; color: var(--muted); font-size: 8px; line-height: 1.45; }
 .paper-event-sequence-empty { margin: 0; padding: 9px 10px; border-radius: 7px; color: var(--muted); background: #fff; font-size: 9px; }
-.paper-context-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; }
-.paper-context-card { min-width: 0; padding: 10px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; }
-.paper-context-card header { display: flex; align-items: center; justify-content: space-between; gap: 7px; }
-.paper-context-card header strong { color: var(--ink); font-size: 10px; }
-.paper-context-card header em { padding: 3px 6px; border-radius: 999px; color: #2563eb; background: #eff6ff; font-size: 8px; font-style: normal; }
-.paper-context-card p { margin: 7px 0 0; color: var(--muted); font-size: 9px; line-height: 1.5; }
-.paper-context-card ul { display: flex; flex-direction: column; gap: 3px; margin: 7px 0 0; padding-left: 14px; color: var(--light); font-size: 8px; line-height: 1.4; }
 .paper-context-points { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; }
 .paper-context-points div { display: flex; flex-direction: column; gap: 4px; padding: 9px 10px; border-radius: 8px; background: #fff; }
 .paper-context-points strong { color: var(--ink); font-size: 9px; }
@@ -1529,7 +1522,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
   .paper-collection-status { align-items: flex-start; flex-direction: column; }
   .paper-investment-actions { align-items: flex-start; flex-direction: column; }
   .paper-agent-grid { grid-template-columns: minmax(0,1fr); }
-  .paper-context-documents,.paper-context-grid,.paper-context-points { grid-template-columns: minmax(0,1fr); }
+  .paper-context-documents,.paper-context-points { grid-template-columns: minmax(0,1fr); }
   .paper-document-backdrop { padding: 12px; }
   .paper-document-modal { height: calc(100vh - 24px); border-radius: 12px; }
   .paper-document-modal > header { padding: 20px 18px 16px; }

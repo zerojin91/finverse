@@ -1574,20 +1574,6 @@ function SetupScreen({
                 ) : <p className="paper-event-sequence-empty">최근 한 달 내 순서화할 사건 근거가 충분하지 않습니다.</p>}
                 <small className="paper-event-sequence-note">표시된 이벤트는 수집 문서에서 확인된 흐름이며, 미래 사건이나 가격 예측이 아닙니다.</small>
               </section>
-              <div className="paper-context-grid">
-                {([
-                  ["시장", initialContext.analysis.market.trend, initialContext.analysis.market.assessment, initialContext.analysis.market.signals],
-                  ["경제", initialContext.analysis.economy.condition, initialContext.analysis.economy.assessment, initialContext.analysis.economy.signals],
-                  ["사건", undefined, initialContext.analysis.events.assessment, initialContext.analysis.events.signals],
-                  ["커뮤니티", initialContext.analysis.community.sentiment, initialContext.analysis.community.assessment, initialContext.analysis.community.signals],
-                ] as [string, string | undefined, string | undefined, string[] | undefined][]).map(([label, status, assessment, signals]) => (
-                  <article key={label} className="paper-context-card">
-                    <header><strong>{label}</strong>{status && <em>{status}</em>}</header>
-                    <p>{assessment || "분석 내용이 없습니다."}</p>
-                    {Boolean(signals?.length) && <ul>{signals?.slice(0, 2).map((signal) => <li key={signal}>{signal}</li>)}</ul>}
-                  </article>
-                ))}
-              </div>
               <div className="paper-context-points">
                 <div><strong>위험 요인</strong><span>{initialContext.analysis.risk_factors.slice(0, 3).join(" · ") || "추가 확인 필요"}</span></div>
                 <div><strong>관찰 포인트</strong><span>{initialContext.analysis.watch_points.slice(0, 3).join(" · ") || "시나리오 진행 중 변화"}</span></div>
