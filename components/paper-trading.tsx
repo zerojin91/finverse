@@ -2438,38 +2438,6 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
     return payload.data;
   }, []);
 
-  const start = useCallback(async (input: {
-    ticker: string; name: string; initialCash: number;
-    investmentMode: InvestmentMode; initialPosition?: { quantity: number; averagePrice: number };
-    simulationDays: number; initialContextId: string;
-  }) => {
-    setStarting(true);
-    setError(null);
-    try {
-      const payload = await callApi<{ data: ScenarioGame }>("/scenarios", {
-        method: "POST",
-        body: JSON.stringify({
-          ticker: input.ticker,
-          initial_cash: input.initialCash,
-          initial_position: input.initialPosition
-            ? { quantity: input.initialPosition.quantity, average_price: input.initialPosition.averagePrice }
-            : undefined,
-          investment_mode: input.investmentMode,
-          simulation_days: input.simulationDays,
-          context_id: input.initialContextId,
-          // 캐시 리플레이 이력은 종가만 있어 캔들이 선으로 뭉개진다.
-          // finverse는 실제 OHLC를 쓰고, DB가 죽었을 때만 백엔드가 캐시로 내려간다.
-          prefer_live_finverse: true,
-        }),
-      });
-      setGame(payload.data);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "시나리오를 만들지 못했습니다.");
-    } finally {
-      setStarting(false);
-    }
-  }, []);
-
   const pollJob = useCallback((jobId: string, gameId: string) => {
     let lastStamp = "";
     let lastMessage = "";
@@ -2517,6 +2485,60 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
     };
     pollRef.current = setTimeout(tick, 900);
   }, [refreshGame]);
+
+  const start = useCallback(async (input: {
+    ticker: string; name: string; initialCash: number;
+    investmentMode: InvestmentMode; initialPosition?: { quantity: number; averagePrice: number };
+    simulationDays: number; initialContextId: string;
+  }) => {
+    setStarting(true);
+    setError(null);
+    try {
+      const payload = await callApi<{ data: ScenarioGame }>("/scenarios", {
+        method: "POST",
+        body: JSON.stringify({
+          ticker: input.ticker,
+          initial_cash: input.initialCash,
+          initial_position: input.initialPosition
+            ? { quantity: input.initialPosition.quantity, average_price: input.initialPosition.averagePrice }
+            : undefined,
+          investment_mode: input.investmentMode,
+          simulation_days: input.simulationDays,
+          context_id: input.initialContextId,
+          // 캐시 리플레이 이력은 종가만 있어 캔들이 선으로 뭉개진다.
+          // finverse는 실제 OHLC를 쓰고, DB가 죽었을 때만 백엔드가 캐시로 내려간다.
+          prefer_live_finverse: true,
+        }),
+      });
+      setGame(payload.data);
+
+      // 시작 화면에서는 0일차를 보여주지 않고 첫 거래일을 한 번 자동 진행한다.
+      // 이후 거래일은 사용자가 `하루 진행` 또는 `자동 진행`으로 선택한다.
+      const firstAction = payload.data.mode === "world"
+        ? "advance"
+        : payload.data.phase === "inter_event_market"
+          ? "advance_days"
+          : null;
+      if (firstAction) {
+        try {
+          const actionPayload = await callApi<{ data: Job }>(`/scenarios/${payload.data.game_id}/actions`, {
+            method: "POST",
+            body: JSON.stringify({ action: firstAction, days: 1 }),
+          });
+          setJob(actionPayload.data);
+          pollJob(actionPayload.data.job_id, payload.data.game_id);
+        } catch (cause) {
+          setError(cause instanceof Error
+            ? `첫 거래일을 자동으로 진행하지 못했습니다: ${cause.message}`
+            : "첫 거래일을 자동으로 진행하지 못했습니다. 하루 진행 버튼으로 다시 시도해주세요.");
+        }
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "시나리오를 만들지 못했습니다.");
+    } finally {
+      setStarting(false);
+    }
+  }, [pollJob]);
 
   const advance = useCallback(async (days?: number) => {
     if (!game || busy) return;
