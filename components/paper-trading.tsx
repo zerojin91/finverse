@@ -350,19 +350,6 @@ type Job = {
 // 하나가 수 분 걸리므로 넉넉히 잡되, 이 시간을 넘기면 사용자에게 알린다.
 const STALL_NOTICE_MS = 8 * 60 * 1000;
 
-type GameSummary = {
-  game_id: string;
-  ticker: string;
-  name: string;
-  phase: Phase;
-  scenario_premise?: string;
-  current_event_index: number;
-  total_events: number;
-  market_days: number;
-  total_return_pct: number | null;
-  updated_at?: string;
-};
-
 /* -------------------------------------------------------------- helpers */
 
 const won = (value: number) => `${Math.round(value).toLocaleString("ko-KR")}원`;
@@ -1085,7 +1072,6 @@ const parsePositiveInteger = (value: string) => Number(value.replace(/[^0-9]/g, 
 
 function SetupScreen({
   onStart,
-  onResume,
   starting,
   error,
   onClose,
@@ -1095,12 +1081,10 @@ function SetupScreen({
     investmentMode: InvestmentMode; initialPosition?: { quantity: number; averagePrice: number };
     simulationDays: number; initialContextId: string;
   }) => void;
-  onResume: (gameId: string) => void;
   starting: boolean;
   error: string | null;
   onClose: () => void;
 }) {
-  const [saved, setSaved] = useState<GameSummary[]>([]);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Security[]>([]);
   const [searching, setSearching] = useState(false);
@@ -1204,18 +1188,6 @@ function SetupScreen({
       setResettingSetup(false);
     }
   };
-
-  useEffect(() => {
-    let cancelled = false;
-    callApi<{ data: GameSummary[] }>("/games?summary=1&limit=6")
-      .then((payload) => {
-        if (cancelled) return;
-        setSaved((payload.data ?? []).filter((row) => row.total_events > 0));
-      })
-      // 이어하기 목록은 부가 기능이다. 실패해도 새 시나리오 생성은 막지 않는다.
-      .catch(() => undefined);
-    return () => { cancelled = true; };
-  }, []);
 
   useEffect(() => {
     const keyword = query.trim();
@@ -1482,29 +1454,6 @@ function SetupScreen({
         </div>
         <button className="scenario-modal-close" type="button" onClick={onClose} aria-label="모의 투자 닫기"><X size={20} /></button>
       </header>
-
-      {Boolean(saved.length) && (
-        <section className="paper-setup-block">
-          <div className="paper-setup-heading"><span>이어서 하기</span><h3>진행 중인 시나리오가 있습니다</h3></div>
-          <div className="paper-resume-list">
-            {saved.map((row) => (
-              <button key={row.game_id} type="button" onClick={() => onResume(row.game_id)} disabled={starting}>
-                <div>
-                  <strong>{row.name}</strong>
-                  <span>{PHASE_META[row.phase]?.label ?? row.phase}</span>
-                </div>
-                <p>{row.scenario_premise || "이벤트 시나리오 모의 투자"}</p>
-                <footer>
-                  <em>이벤트 {Math.min(row.current_event_index + 1, row.total_events)}/{row.total_events} · {row.market_days}거래일</em>
-                  {typeof row.total_return_pct === "number" && (
-                    <b className={toneOf(row.total_return_pct)}>{signedPct(row.total_return_pct)}</b>
-                  )}
-                </footer>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
 
       <section className="paper-setup-block">
         <div className="paper-setup-heading"><span>01 · 종목 선택</span><h3>어떤 종목으로 연습할까요?</h3></div>
@@ -2295,18 +2244,6 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
     return payload.data;
   }, []);
 
-  const resume = useCallback(async (gameId: string) => {
-    setStarting(true);
-    setError(null);
-    try {
-      await refreshGame(gameId);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "저장된 시나리오를 불러오지 못했습니다.");
-    } finally {
-      setStarting(false);
-    }
-  }, [refreshGame]);
-
   const start = useCallback(async (input: {
     ticker: string; name: string; initialCash: number;
     investmentMode: InvestmentMode; initialPosition?: { quantity: number; averagePrice: number };
@@ -2467,7 +2404,7 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
               onReset={reset}
               onClose={onClose}
             />
-          : <SetupScreen onStart={start} onResume={resume} starting={starting} error={error} onClose={onClose} />}
+          : <SetupScreen onStart={start} starting={starting} error={error} onClose={onClose} />}
       </section>
     </div>
   );

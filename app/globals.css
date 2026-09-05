@@ -1509,20 +1509,6 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-collection-source.waiting header svg { color: #a1a1aa; }
 .paper-collection-source.waiting header em { color: #a1a1aa; }
 
-/* resume list */
-.paper-resume-list { display: grid; gap: 7px; }
-.paper-resume-list button { display: block; width: 100%; padding: 12px 13px; border: 1px solid var(--line); border-radius: 10px; color: inherit; text-align: left; background: #fff; cursor: pointer; }
-.paper-resume-list button:hover { border-color: #a1a1aa; background: #fafafa; }
-.paper-resume-list button:disabled { cursor: wait; opacity: .55; }
-.paper-resume-list button > div { display: flex; align-items: center; gap: 8px; }
-.paper-resume-list strong { color: var(--ink); font-size: 13px; }
-.paper-resume-list button > div span { padding: 3px 6px; border-radius: 5px; color: #3730a3; background: #eef2ff; font-size: 8px; font-weight: 800; }
-.paper-resume-list p { margin: 5px 0 0; overflow: hidden; color: var(--muted); font-size: 10px; line-height: 1.5; text-overflow: ellipsis; white-space: nowrap; }
-.paper-resume-list footer { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-top: 7px; }
-.paper-resume-list em { color: var(--light); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9px; font-style: normal; }
-.paper-resume-list footer b { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; font-weight: 750; }
-.paper-resume-list footer b.up { color: var(--up); }
-.paper-resume-list footer b.down { color: var(--down); }
 
 /* feed / report tabs */
 .paper-tabs { display: flex; gap: 4px; }
