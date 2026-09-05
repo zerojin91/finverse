@@ -1457,7 +1457,7 @@ function SetupScreen({
 
       {investmentConfirmed && (
       <section ref={step4Ref} className="paper-setup-block paper-setup-reveal">
-        <div className="paper-setup-heading"><span>04 · 시뮬레이션 설정</span><h3>초기 상황을 확인하고 연습을 시작해볼까요?</h3></div>
+        <div className="paper-setup-heading"><span>04 · 시뮬레이션 설정</span><h3>초기 상황</h3></div>
         <div className="paper-simulation-field">
           <div className="paper-simulation-label"><span>연습 기간</span><small>거래일 기준</small></div>
           <div className="paper-duration-options">
