@@ -2280,7 +2280,7 @@ function TradingScreen({
             <strong>{worldMode
               ? `시나리오 ${currentProgressUnits} / ${totalProgressUnits} 거래일`
               : `${game.phase === "completed" ? game.total_events : game.current_event_index + 1} / ${game.total_events} 이벤트`}</strong>
-            <div className="paper-progress"><i style={{ width: `${eventProgress}%` }} className={busy ? "busy" : ""} /></div>
+            <div className="paper-progress"><i style={{ width: `${eventProgress}%` }} /></div>
           </div>
           {error && <div className="paper-run-error"><AlertTriangle size={14} /> <span>{error}</span></div>}
           {stalled && !error && (
