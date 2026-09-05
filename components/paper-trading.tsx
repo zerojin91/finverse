@@ -1457,7 +1457,7 @@ function SetupScreen({
 
       {investmentConfirmed && (
       <section ref={step4Ref} className="paper-setup-block paper-setup-reveal">
-        <div className="paper-setup-heading"><span>04 · 시뮬레이션 설정</span><h3>어떤 방식으로 연습할까요?</h3></div>
+        <div className="paper-setup-heading"><span>04 · 시뮬레이션 설정</span><h3>초기 상황을 확인하고 연습을 시작해볼까요?</h3></div>
         <div className="paper-simulation-field">
           <div className="paper-simulation-label"><span>연습 기간</span><small>거래일 기준</small></div>
           <div className="paper-duration-options">
@@ -1470,7 +1470,7 @@ function SetupScreen({
         </div>
         <section className="paper-context-field" aria-live="polite">
           <div className="paper-simulation-label">
-            <span>초기 상황 · 현재까지의 맥락</span>
+            <span>현재까지의 맥락</span>
             <small>실제 4종 자료를 OpenRouter로 분석</small>
           </div>
           <div className="paper-context-documents" aria-label="초기 맥락 문서 생성 상태">
