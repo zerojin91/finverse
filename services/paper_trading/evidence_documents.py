@@ -22,6 +22,14 @@ def _evidence_row(index: int, claim: str, observed_at: Any, source: str) -> str:
     return f"| {source.upper()}-{index:03d} | {_line(claim)} | {_line(observed_at)} | {_line(source)} | paper-trading-history |"
 
 
+def _change_pct(start: Any, end: Any) -> str:
+    try:
+        first, last = float(start), float(end)
+        return f"{(last / first - 1) * 100:+.2f}%" if first else "계산 불가"
+    except (TypeError, ValueError, ZeroDivisionError):
+        return "계산 불가"
+
+
 def _header(title: str, history: dict[str, Any]) -> list[str]:
     return [
         f"# {title}",
@@ -48,6 +56,10 @@ def build_target_documents(history: dict[str, Any], output_dir: Path) -> dict[st
     market_lines = _header("Market Evidence", history) + [
         "## Scenario-Aligned Retrieval Plan",
         "- 선택 종목의 실제 가격·거래량·수급 이력과 최근 30거래일을 초기 맥락 분석 대상으로 삼는다.",
+        "## Key Findings",
+        f"- 최근 30거래일 종가 변화: {_change_pct(recent[0].get('close'), recent[-1].get('close')) if recent else '관측값 부족'}",
+        f"- 최근 구간 고가·저가: {_line(max((day.get('high') or 0) for day in recent) if recent else None)} / {_line(min((day.get('low') or 0) for day in recent) if recent else None)}",
+        f"- 마지막 관측 종가: {_line(recent[-1].get('close') if recent else None)}",
         "## Current State",
         f"- 관측 거래일: {len(market_days)}일",
         f"- 최근 30거래일 원시 행: {len(recent)}개",
@@ -63,6 +75,9 @@ def build_target_documents(history: dict[str, Any], output_dir: Path) -> dict[st
 
     economy_lines = _header("Economic Evidence", history) + [
         "## Scenario-Aligned Retrieval Plan", "- 선택 종목 시나리오 기간과 겹치는 실제 거시경제 관측치를 정리한다.",
+        "## Key Findings",
+        f"- 최근 관측 지표: {_line(macro[-1].get('series_name') if macro else None)} {_line(macro[-1].get('value') if macro else None)} {_line(macro[-1].get('unit') if macro else None)}",
+        f"- 확인된 지표 종류: {len({str(row.get('series_name')) for row in macro if row.get('series_name')})}개",
         "## Current Macro State", "| trade_date | series_name | value | unit | source |", "|---|---|---:|---|---|",
     ]
     for row in macro:
@@ -73,6 +88,9 @@ def build_target_documents(history: dict[str, Any], output_dir: Path) -> dict[st
 
     event_lines = _header("External Event Evidence", history) + [
         "## Scenario-Aligned Retrieval Plan", "- 실제 적재 뉴스·정책·시장 이벤트 중 선택 종목 시나리오의 최근 맥락과 관련된 자료를 정리한다.",
+        "## Key Findings",
+        f"- 최근 주요 사건: {_line(events[0].get('title') if events else '관측된 사건 없음')}",
+        f"- 최근 확인 사건 수: {len(events)}건",
         "## Event Clusters", "| date | title | summary | scope | event_types |", "|---|---|---|---|---|",
     ]
     for event in events:
@@ -83,6 +101,10 @@ def build_target_documents(history: dict[str, Any], output_dir: Path) -> dict[st
 
     community_lines = _header("Community Evidence", history) + [
         "## Scenario-Aligned Retrieval Plan", "- 실제 일별 커뮤니티 심리·게시량·참여 지표를 보조 맥락으로 정리한다.",
+        "## Key Findings",
+        f"- 최근 관측 감성: {_line(social[-1].get('sentiment') if social else '데이터 부족')}",
+        f"- 최근 관측 기간: {len(social)}일",
+        f"- 최근 30일 게시물 수: {sum(int(row.get('post_count') or 0) for row in social):,}개",
         "## Community Signals", "| trade_date | sentiment | post_count | engagement |", "|---|---:|---:|---:|",
     ]
     for row in social:

@@ -16,7 +16,7 @@ from .kospi_paper_trading import TradingError
 from .llm_client import LLMClient
 
 
-CONTEXT_SCHEMA_VERSION = "initial-context-v4"
+CONTEXT_SCHEMA_VERSION = "initial-context-v5"
 CONTEXT_CACHE_TTL_SECONDS = 12 * 60 * 60
 
 
@@ -200,7 +200,8 @@ def _normalize(value: dict[str, Any]) -> dict[str, Any]:
 
 def _document_preview(content: str) -> str:
     """Return a short readable excerpt without exposing Markdown table noise."""
-    lines = [line.strip() for line in content.splitlines() if line.strip() and not line.startswith("#") and not line.startswith("|")]
+    key_section = content.split("## Key Findings", 1)[-1].split("\n## ", 1)[0]
+    lines = [line.strip().removeprefix("- ") for line in key_section.splitlines() if line.strip() and not line.startswith("#")]
     return " ".join(lines)[:280].rstrip() + ("…" if len(" ".join(lines)) > 280 else "")
 
 

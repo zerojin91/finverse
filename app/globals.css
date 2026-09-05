@@ -1027,7 +1027,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-context-document-body header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .paper-context-document strong { color: var(--ink); font-size: 11px; }
 .paper-context-document small { color: var(--muted); font-size: 8px; }
-.paper-context-document p { display: -webkit-box; overflow: hidden; margin: 0; color: var(--muted); font-size: 9px; line-height: 1.6; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.paper-context-document p { display: -webkit-box; overflow: hidden; min-height: 58px; margin: 0; color: var(--muted); font-size: 9px; line-height: 1.65; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
 .paper-context-document-link { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; color: var(--ink); font-size: 8px; font-weight: 700; }
 .paper-context-document:hover:not(:disabled) { border-color: #86efac; box-shadow: 0 5px 16px rgba(22,163,74,.08); }
 .paper-document-loading { position: fixed; right: 24px; bottom: 24px; z-index: 30; display: flex; align-items: center; gap: 7px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); background: #fff; box-shadow: 0 10px 30px rgba(0,0,0,.12); font-size: 9px; }
