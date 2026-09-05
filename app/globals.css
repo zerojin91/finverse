@@ -1719,6 +1719,15 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
   .connection-list article { padding: 10px; }
   .event-timeline { grid-template-columns: 1fr; }
   .scenario-grid { grid-template-columns: 1fr; }
+  .indicator-grid { grid-template-columns: repeat(2,minmax(0,1fr)); row-gap: 18px; }
+  .indicator-tile:nth-child(2n) { border-right: 0; }
+  .indicator-tile:nth-child(-n+2) { padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+  .stock-condition-heading h1 { font-size: 21px; }
+  .chart-title-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .chart-content { grid-template-columns: 1fr; }
+  .chart-wrap { border-right: 0; border-bottom: 1px solid var(--line); padding: 16px; }
+  .event-rail > header { padding: 16px 16px 0; }
+  .event-rail .event-timeline { padding: 12px 16px 6px; }
   .scenario-modal { max-height: calc(100vh - 24px); padding: 20px 16px; }
   .scenario-builder-header,.scenario-build-header { gap: 12px; }
   .builder-input-grid { grid-template-columns: 1fr; gap: 18px; }
@@ -1958,3 +1967,4 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
     @apply font-sans;
   }
 }
+
