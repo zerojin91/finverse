@@ -22,6 +22,18 @@ CREATE OR REPLACE FUNCTION graph.sample_evidence(ids text[]) RETURNS text[] AS $
     SELECT (array_agg(id ORDER BY id))[1:5] FROM unnest(ids) AS id;
 $$ LANGUAGE sql IMMUTABLE;
 
+-- external_id 는 소스가 주는 값을 그대로 쓴다. 그런데 Google News 피드는 기사
+-- 주소를 통째로 id 로 주고, 9/5 에 들어온 것 하나가 2,910자였다. uid 는
+-- node_pkey(btree)의 키라 인덱스 행이 2,704바이트를 넘으면 그 한 건 때문에
+-- 투영 전체가 롤백된다 -- 실제로 그렇게 멈췄다.
+--
+-- 전부 해시로 바꾸지는 않는다. yonhap:46자처럼 짧은 id 는 uid 만 보고도 어느
+-- 기사인지 알 수 있고, 그 가독성이 그래프를 손으로 들여다볼 때의 값이다.
+-- 긴 것만 접고, 원본은 props.external_id 에 남겨 되짚을 수 있게 한다.
+CREATE OR REPLACE FUNCTION graph.event_key(ext text) RETURNS text AS $$
+    SELECT CASE WHEN length(ext) <= 128 THEN ext ELSE 'md5:' || md5(ext) END;
+$$ LANGUAGE sql IMMUTABLE;
+
 -- 지수 131개는 같은 종류가 아니다(문서 §1-1). 코스피·코스피 200 금융·
 -- KRX 삼성전자 지수·코스닥 벤처기업부가 전부 같은 엔드포인트로 들어오므로,
 -- 분류 없이 한 라벨로 뭉치면 "지수 평균 변동률" 류의 계산이 곧바로 무의미해진다.
@@ -195,7 +207,7 @@ BEGIN
     -- fact 만 채우고 interpretation·market_reaction 은 비워 둔다 -- 채운 척
     -- 하지 않는 것이 요점이다.
     INSERT INTO graph.node (uid, label, props, evidence)
-    SELECT 'event:' || graph.slug(src) || ':' || ext,
+    SELECT 'event:' || graph.slug(src) || ':' || graph.event_key(ext),
            'Event',
            jsonb_strip_nulls(jsonb_build_object(
                'title',         payload->>'title',
@@ -204,6 +216,7 @@ BEGIN
                'country_codes', payload->'country_codes',
                'event_types',   payload->'event_types',
                'source',        src,
+               'external_id',   ext,
                'fact',          coalesce(nullif(payload->>'summary', ''),
                                          payload->>'title'))),
            ARRAY[record_id]
