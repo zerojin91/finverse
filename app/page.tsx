@@ -5,7 +5,6 @@ import {
   ArrowRight,
   BarChart3,
   Bookmark,
-  BrainCircuit,
   CalendarDays,
   CalendarClock,
   CandlestickChart,
@@ -2901,30 +2900,27 @@ export default function Home() {
               <section className="scenario-section">
                 <div className="scenario-heading"><div><span>SCENARIO LIBRARY</span><h2>시나리오별 KOSPI 경로를 비교하세요</h2><p>준비된 시장 환경을 선택하면 발생 가능 이벤트와 조건부 예상 경로가 열립니다.</p></div><span><CircleDollarSign size={15} />가상 시뮬레이션</span></div>
                 <div className="scenario-grid">
-                  {scenarios.map((scenario) => (
-                    <article key={scenario.id} className={`scenario-card ${scenario.id} ${selectedScenario.id === scenario.id ? "active" : ""}`} onMouseDown={(event) => event.preventDefault()} onClick={() => selectScenario(scenario)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") selectScenario(scenario); }} role="button" tabIndex={0} aria-pressed={selectedScenario.id === scenario.id}>
-                      <div className="scenario-card-main">
-                        <span className={`scenario-icon ${scenario.tone}`}>
-                          {scenario.id === "kospi-rebound" ? <BarChart3 size={22} /> : scenario.id === "chip-miss" ? <BrainCircuit size={22} /> : scenario.id === "risk-off" ? <CircleDollarSign size={22} /> : <UserRound size={22} />}
-                        </span>
-                        <div>
-                          <h3>{scenario.title}</h3>
-                          <div className="scenario-tags"><span>{scenario.duration}</span>{scenario.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
-                        </div>
+                  {scenarios.map((scenario, index) => (
+                    <article key={scenario.id} className={`scenario-card ${scenario.tone} ${selectedScenario.id === scenario.id ? "active" : ""}`} onMouseDown={(event) => event.preventDefault()} onClick={() => selectScenario(scenario)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") selectScenario(scenario); }} role="button" tabIndex={0} aria-pressed={selectedScenario.id === scenario.id}>
+                      <div className="scenario-card-head">
+                        <span className="scenario-card-index">{String(index + 1).padStart(2, "0")}</span>
+                        <span className="scenario-card-meta"><i>{scenario.duration}</i><em className={scenario.tone}>{scenario.forecast.replace(/^KOSPI\s*/, "")}</em></span>
                       </div>
-                      <small>조건부 예상</small>
-                      <strong className={scenario.tone}>{scenario.forecast}</strong>
-                      <button className="scenario-card-detail-button" type="button" onClick={(event) => { event.stopPropagation(); openScenarioDetail(scenario); }}>상세 보기 <ChevronRight size={15} /></button>
+                      <div className="scenario-card-body">
+                        <strong>{scenario.title}</strong>
+                        <small>{scenario.tags.join(" · ")}</small>
+                      </div>
+                      <div className={`scenario-card-action ${scenario.tone}`}>
+                        <button type="button" onClick={(event) => { event.stopPropagation(); openScenarioDetail(scenario); }}>시나리오 상세</button>
+                      </div>
                     </article>
                   ))}
-                  <button className="custom-scenario-card" onClick={() => setPaperTradingOpen(true)}>
-                    <Plus size={24} /><div><strong>내 시나리오 예측하기</strong><p>원하는 시장 조건과 기간을 직접 선택하세요.</p></div><ArrowRight size={18} />
-                  </button>
-                  <button className="paper-trading-card" type="button" onClick={() => setPaperTradingOpen(true)}>
-                    <span><CircleDollarSign size={21} /></span>
-                    <div><strong>모의 투자로 연습하기</strong><p>실제 KOSPI 시세 위에서 아직 공개되지 않은 이벤트를 마주하며 매매 판단을 훈련합니다.</p></div>
-                    <ArrowRight size={18} />
-                  </button>
+                  <article className="custom-scenario-card">
+                    <button type="button" onClick={() => setPaperTradingOpen(true)}>
+                      <Plus size={26} />
+                      <span>내가 생각한<br />시나리오로 보기</span>
+                    </button>
+                  </article>
                 </div>
                 <span className="visually-hidden">SELECTED SCENARIO · 시나리오 전제 · 예상 전개</span>
 
