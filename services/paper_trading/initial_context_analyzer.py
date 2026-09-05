@@ -16,7 +16,7 @@ from .kospi_paper_trading import TradingError
 from .llm_client import LLMClient
 
 
-CONTEXT_SCHEMA_VERSION = "initial-context-v5"
+CONTEXT_SCHEMA_VERSION = "initial-context-v6"
 CONTEXT_CACHE_TTL_SECONDS = 12 * 60 * 60
 
 
@@ -129,7 +129,7 @@ def _compact_input(history: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _messages(source: dict[str, Any]) -> list[dict[str, str]]:
+def _messages(source: dict[str, Any], evidence_documents: dict[str, str]) -> list[dict[str, str]]:
     return [
         {
             "role": "system",
@@ -141,10 +141,11 @@ def _messages(source: dict[str, Any]) -> list[dict[str, str]]:
         },
         {
             "role": "user",
-            "content": f"""다음은 {source.get('name')}({source.get('ticker')})의 실제 수집 데이터 요약이다.
-이 자료를 바탕으로 초기 시나리오 시작 전에 사용자가 읽을 맥락을 작성하라.
+            "content": f"""다음은 {source.get('name')}({source.get('ticker')})의 초기 시나리오 근거 문서 4종이다.
+각 문서는 실제 PostgreSQL 관측값에서 생성됐다. 반드시 아래 문서의 내용만 근거로
+초기 시나리오 시작 전에 사용자가 읽을 종합 맥락을 작성하라. 문서에 없는 수치·사건·인과관계는 만들지 않는다.
 
-{_json(source)}
+{_json({"market_evidence": evidence_documents.get("market", ""), "economic_evidence": evidence_documents.get("economy", ""), "event_evidence": evidence_documents.get("events", ""), "community_evidence": evidence_documents.get("community", "")})}
 
 반환 형식:
 {{
@@ -157,8 +158,22 @@ def _messages(source: dict[str, Any]) -> list[dict[str, str]]:
   "risk_factors": ["위험 요인"],
   "tensions": ["시장이 충돌하는 지점"],
   "uncertainties": ["미래 시뮬레이션에서 열어둘 불확실성"],
-  "watch_points": ["사용자가 시뮬레이션에서 관찰할 포인트"]
-}}""",
+  "watch_points": ["사용자가 시뮬레이션에서 관찰할 포인트"],
+  "event_sequence": [
+    {{
+      "date": "문서에서 확인되는 YYYY-MM-DD",
+      "title": "최근 한 달 내 실제 주요 이벤트 제목",
+      "description": "이벤트 흐름과 종목 맥락을 설명하는 1~2문장",
+      "domain": "시장|경제|사건|커뮤니티",
+      "market_reaction": "문서에서 확인되는 가격·거래량·수급·심리 반응, 없으면 직접 확인 불가",
+      "basis": "observed|inferred"
+    }}
+  ]
+}}
+
+이벤트 시퀀스는 최근 한 달 내 문서로 확인되는 실제 흐름 3~6개만 날짜순으로 반환한다.
+`observed`는 문서에 직접 기록된 사건·수치이고, `inferred`는 여러 문서 근거를 묶은 해석이다.
+미래 사건이나 미래 가격은 이벤트 시퀀스에 절대 넣지 않는다.""",
         },
     ]
 
@@ -195,6 +210,24 @@ def _normalize(value: dict[str, Any]) -> dict[str, Any]:
             normalized[key]["assessment"] = signals[0] if signals else "관측된 자료가 충분하지 않습니다."
     for key in ("positive_factors", "risk_factors", "tensions", "uncertainties", "watch_points"):
         normalized[key] = items(value, key)
+    sequence = value.get("event_sequence")
+    normalized["event_sequence"] = []
+    if isinstance(sequence, list):
+        for item in sequence[:6]:
+            if not isinstance(item, dict):
+                continue
+            title = str(item.get("title") or "").strip()
+            if not title:
+                continue
+            basis = str(item.get("basis") or "inferred").strip().lower()
+            normalized["event_sequence"].append({
+                "date": str(item.get("date") or "").strip(),
+                "title": title,
+                "description": str(item.get("description") or "").strip(),
+                "domain": str(item.get("domain") or "사건").strip(),
+                "market_reaction": str(item.get("market_reaction") or "직접 확인 불가").strip(),
+                "basis": "observed" if basis == "observed" else "inferred",
+            })
     return normalized
 
 
@@ -205,30 +238,19 @@ def _document_preview(content: str) -> str:
     return " ".join(lines)[:280].rstrip() + ("…" if len(" ".join(lines)) > 280 else "")
 
 
-def get_initial_context(history: dict[str, Any]) -> dict[str, Any]:
-    """Return a cached, LLM-generated context grounded in one history snapshot."""
+def prepare_initial_context_documents(history: dict[str, Any]) -> dict[str, Any]:
+    """Build the four auditable documents before any LLM call."""
     source = _compact_input(history)
     fingerprint = hashlib.sha256(_json({"schema": CONTEXT_SCHEMA_VERSION, "source": source}).encode()).hexdigest()[:24]
     path = _cache_path(fingerprint)
     document_dir = path.parent / f"initial-context-{fingerprint}"
     document_files = build_target_documents(history, document_dir)
-    source["evidence_documents"] = {
-        key: (document_dir / filename).read_text(encoding="utf-8")[:16_000]
-        for key, filename in document_files.items()
-    }
-    cached = _read_cache(path)
-    if cached:
-        return {**cached, "context_id": f"ctx_{fingerprint}", "cached": True}
-
-    try:
-        analysis = _normalize(LLMClient().chat_json(_messages(source), temperature=.25, max_tokens=3000))
-    except Exception as exc:  # noqa: BLE001 - API 계층에서 사용자용 503으로 변환한다.
-        raise InitialContextUnavailable("초기 시장 맥락 분석을 생성하지 못했습니다.") from exc
-
-    result = {
+    return {
         "context_id": f"ctx_{fingerprint}",
         "schema_version": CONTEXT_SCHEMA_VERSION,
-        "analysis": analysis,
+        "source": source,
+        "document_dir": document_dir,
+        "document_files": document_files,
         "source_summary": {
             "ticker": source["ticker"],
             "name": source["name"],
@@ -244,6 +266,46 @@ def get_initial_context(history: dict[str, Any]) -> dict[str, Any]:
                 for key, filename in document_files.items()
             },
         },
+    }
+
+
+def get_initial_context_documents(history: dict[str, Any]) -> dict[str, Any]:
+    """Return document metadata without starting the aggregate LLM analysis."""
+    prepared = prepare_initial_context_documents(history)
+    return {
+        "context_id": prepared["context_id"],
+        "schema_version": prepared["schema_version"],
+        "source_summary": prepared["source_summary"],
+    }
+
+
+def get_initial_context(history: dict[str, Any]) -> dict[str, Any]:
+    """Return the aggregate analysis after the four Evidence documents exist."""
+    prepared = prepare_initial_context_documents(history)
+    context_id = prepared["context_id"]
+    fingerprint = context_id.removeprefix("ctx_")
+    path = _cache_path(fingerprint)
+    source = prepared["source"]
+    document_dir = prepared["document_dir"]
+    document_files = prepared["document_files"]
+    evidence_documents = {
+        key: (document_dir / filename).read_text(encoding="utf-8")[:16_000]
+        for key, filename in document_files.items()
+    }
+    cached = _read_cache(path)
+    if cached:
+        return {**cached, "context_id": context_id, "cached": True}
+
+    try:
+        analysis = _normalize(LLMClient().chat_json(_messages(source, evidence_documents), temperature=.25, max_tokens=3800))
+    except Exception as exc:  # noqa: BLE001 - API 계층에서 사용자용 503으로 변환한다.
+        raise InitialContextUnavailable("초기 시장 맥락 분석을 생성하지 못했습니다.") from exc
+
+    result = {
+        "context_id": context_id,
+        "schema_version": CONTEXT_SCHEMA_VERSION,
+        "analysis": analysis,
+        "source_summary": prepared["source_summary"],
     }
     _write_cache(path, result)
     return {**result, "cached": False}

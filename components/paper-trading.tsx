@@ -138,20 +138,36 @@ type InitialContextAnalysis = {
   tensions: string[];
   uncertainties: string[];
   watch_points: string[];
+  event_sequence: {
+    date: string;
+    title: string;
+    description: string;
+    domain: string;
+    market_reaction: string;
+    basis: "observed" | "inferred";
+  }[];
+};
+
+type InitialContextSourceSummary = {
+  market_days: number;
+  macro_observations: number;
+  events: number;
+  community_days: number;
+  as_of?: { latest_market_date?: string | null };
+  document_previews?: Record<string, string>;
 };
 
 type InitialContext = {
   context_id: string;
   cached: boolean;
   analysis: InitialContextAnalysis;
-  source_summary: {
-    market_days: number;
-    macro_observations: number;
-    events: number;
-    community_days: number;
-    as_of?: { latest_market_date?: string | null };
-    document_previews?: Record<string, string>;
-  };
+  source_summary: InitialContextSourceSummary;
+};
+
+type InitialContextDocuments = {
+  context_id: string;
+  schema_version: string;
+  source_summary: InitialContextSourceSummary;
 };
 
 type ContextDocumentProgress = { key: "market" | "economy" | "events" | "community"; label: string; file: string; status: "waiting" | "generating" | "ready" };
@@ -162,7 +178,8 @@ const INITIAL_CONTEXT_DOCUMENTS: ContextDocumentProgress[] = [
   { key: "events", label: "사건", file: "external-event-evidence.md", status: "waiting" },
   { key: "community", label: "커뮤니티", file: "community-evidence.md", status: "waiting" },
 ];
-const CONTEXT_DOCUMENT_MIN_MS = 4_800;
+const CONTEXT_DOCUMENT_STEP_MS = 1_000;
+const CONTEXT_ANALYSIS_MIN_MS = 1_500;
 
 type Observation = {
   investor_group: string;
@@ -1055,6 +1072,7 @@ function SetupScreen({
   const [initialContextLoading, setInitialContextLoading] = useState(false);
   const [initialContextError, setInitialContextError] = useState<string | null>(null);
   const [contextDocuments, setContextDocuments] = useState<ContextDocumentProgress[]>(INITIAL_CONTEXT_DOCUMENTS);
+  const [contextDocumentSource, setContextDocumentSource] = useState<InitialContextDocuments | null>(null);
   const [contextDwellComplete, setContextDwellComplete] = useState(false);
   const [simulationSetupStage, setSimulationSetupStage] = useState(0);
   const [selectedContextDocument, setSelectedContextDocument] = useState<{ label: string; content: string } | null>(null);
@@ -1162,45 +1180,49 @@ function SetupScreen({
   }, [pickedTicker, previewStepVisible]);
 
   useEffect(() => {
-    if (!pickedTicker || !collectionStepComplete) return;
+    if (!pickedTicker || !collectionStepComplete || !investmentConfirmed) return;
     let cancelled = false;
     const loadInitialContext = async () => {
-      const startedAt = Date.now();
       setInitialContextLoading(true);
       setInitialContextError(null);
+      setInitialContext(null);
+      setContextDocumentSource(null);
       setContextDocuments(INITIAL_CONTEXT_DOCUMENTS.map((document, index) => ({ ...document, status: index === 0 ? "generating" : "waiting" })));
-      let nextDocument = 0;
-      const documentTimer = window.setInterval(() => {
-        setContextDocuments((documents) => documents.map((document, index) => ({
-          ...document,
-          status: index < nextDocument ? "ready" : index === nextDocument ? "generating" : "waiting",
-        })));
-        nextDocument = Math.min(nextDocument + 1, INITIAL_CONTEXT_DOCUMENTS.length - 1);
-      }, 1_200);
       try {
+        const documentsPayload = await callApi<{ data: InitialContextDocuments }>(`/securities/${encodeURIComponent(pickedTicker)}/initial-context/documents`);
+        if (cancelled) return;
+        setContextDocumentSource(documentsPayload.data);
+        for (let index = 0; index < INITIAL_CONTEXT_DOCUMENTS.length; index += 1) {
+          if (index > 0) await new Promise((resolve) => window.setTimeout(resolve, CONTEXT_DOCUMENT_STEP_MS));
+          if (cancelled) return;
+          setContextDocuments(INITIAL_CONTEXT_DOCUMENTS.map((document, documentIndex) => ({
+            ...document,
+            status: documentIndex <= index ? "ready" : documentIndex === index + 1 ? "generating" : "waiting",
+          })));
+        }
+        // 네 Evidence MD가 화면에 모두 준비된 뒤, 그 문서 묶음만 OpenRouter에 전달한다.
+        const analysisStartedAt = Date.now();
         const payload = await callApi<{ data: InitialContext }>(`/securities/${encodeURIComponent(pickedTicker)}/initial-context`);
-        const remaining = Math.max(0, CONTEXT_DOCUMENT_MIN_MS - (Date.now() - startedAt));
+        const remaining = Math.max(0, CONTEXT_ANALYSIS_MIN_MS - (Date.now() - analysisStartedAt));
         if (remaining) await new Promise((resolve) => window.setTimeout(resolve, remaining));
         if (!cancelled) {
           setInitialContext(payload.data);
-          setContextDocuments(INITIAL_CONTEXT_DOCUMENTS.map((document) => ({ ...document, status: "ready" })));
         }
       } catch (cause) {
         if (!cancelled) setInitialContextError(cause instanceof Error ? cause.message : "초기 상황을 분석하지 못했습니다.");
       } finally {
-        window.clearInterval(documentTimer);
         if (!cancelled) setInitialContextLoading(false);
       }
     };
     void loadInitialContext();
     return () => { cancelled = true; };
-  }, [pickedTicker, collectionStepComplete]);
+  }, [pickedTicker, collectionStepComplete, investmentConfirmed]);
 
   useEffect(() => {
-    if (!investmentConfirmed) return;
+    if (!investmentConfirmed || !initialContextReady) return;
     const timer = window.setTimeout(() => setContextDwellComplete(true), 1_500);
     return () => window.clearTimeout(timer);
-  }, [investmentConfirmed]);
+  }, [investmentConfirmed, initialContextReady]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setSimulationSetupStage(investmentConfirmed ? 1 : 0), 0);
@@ -1266,6 +1288,7 @@ function SetupScreen({
     setInitialContextError(null);
     setInitialContextLoading(false);
     setContextDocuments(INITIAL_CONTEXT_DOCUMENTS);
+    setContextDocumentSource(null);
     setContextDwellComplete(false);
     setPicked(item);
     setQuery(item.name);
@@ -1518,20 +1541,39 @@ function SetupScreen({
           <h3 className="paper-context-title">초기 상황</h3>
           <div className="paper-context-documents" aria-label="초기 맥락 문서 생성 상태">
             {contextDocuments.map((document) => (
-              <button key={document.key} type="button" className={`paper-context-document ${document.status}`} onClick={() => openContextDocument(document.key)} disabled={document.status !== "ready"} aria-label={`${document.label} Evidence Markdown 전체 보기`}>
+              <button key={document.key} type="button" className={`paper-context-document ${document.status}`} onClick={() => openContextDocument(document.key)} disabled={document.status !== "ready"} aria-label={`${document.label} Evidence Markdown 열기`}>
                 {document.status === "ready" ? <CheckCircle2 size={14} /> : <LoaderCircle size={14} className="spin" />}
                 <div className="paper-context-document-body">
                   <header><strong>{document.label}</strong><small>{document.status === "ready" ? "문서 준비 완료" : document.status === "generating" ? "문서 생성 중" : "생성 대기 중"}</small></header>
-                  <p>{initialContext?.source_summary.document_previews?.[document.key] || (document.status === "waiting" ? "자료를 확인하고 있습니다." : "수집된 자료를 문서로 정리하고 있습니다…")}</p>
+                  <p>{contextDocumentSource?.source_summary.document_previews?.[document.key] || (document.status === "waiting" ? "자료를 확인하고 있습니다." : "수집된 자료를 문서로 정리하고 있습니다…")}</p>
                 </div>
               </button>
             ))}
           </div>
-          {initialContextLoading && <div className="paper-context-loading"><LoaderCircle size={15} className="spin" /> 수집된 자료에서 현재 상황을 분석하고 있습니다.</div>}
+          {initialContextLoading && contextDocuments.every((document) => document.status === "ready") && <div className="paper-context-loading"><LoaderCircle size={15} className="spin" /> 네 개의 근거 문서를 바탕으로 종목 전체 현황과 최근 이벤트 흐름을 분석하고 있습니다.</div>}
           {initialContextError && <p className="paper-inline-error">{initialContextError}</p>}
           {initialContext && (
             <>
               <div className="paper-context-summary"><Sparkles size={15} /><p>{initialContext.analysis.summary}</p></div>
+              <section className="paper-event-sequence" aria-label="종목 이벤트 시퀀스">
+                <header><strong>종목 이벤트 시퀀스</strong><small>최근 한 달 · 실제 근거 문서 기반</small></header>
+                {initialContext.analysis.event_sequence.length ? (
+                  <ol>
+                    {initialContext.analysis.event_sequence.map((item, index) => (
+                      <li key={`${item.date}-${item.title}-${index}`}>
+                        <span className={`paper-event-sequence-dot ${item.basis}`} />
+                        <article>
+                          <header><div><time>{item.date || "날짜 확인 필요"}</time><em>{item.domain}</em></div><small>{item.basis === "observed" ? "자료 확인" : "문서 종합"}</small></header>
+                          <strong>{item.title}</strong>
+                          {item.description && <p>{item.description}</p>}
+                          <footer><span>시장 반응</span><p>{item.market_reaction}</p></footer>
+                        </article>
+                      </li>
+                    ))}
+                  </ol>
+                ) : <p className="paper-event-sequence-empty">최근 한 달 내 순서화할 사건 근거가 충분하지 않습니다.</p>}
+                <small className="paper-event-sequence-note">표시된 이벤트는 수집 문서에서 확인된 흐름이며, 미래 사건이나 가격 예측이 아닙니다.</small>
+              </section>
               <div className="paper-context-grid">
                 {([
                   ["시장", initialContext.analysis.market.trend, initialContext.analysis.market.assessment, initialContext.analysis.market.signals],

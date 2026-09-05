@@ -15,7 +15,11 @@ from .kospi_paper_trading import TradingError
 from .paper_game_store import PaperGameStore
 from .finverse_market_data import FinverseMarketData, FinverseUnavailable
 from .llm_market_simulator import LLMMarketUnavailable
-from .initial_context_analyzer import InitialContextUnavailable, get_initial_context
+from .initial_context_analyzer import (
+    InitialContextUnavailable,
+    get_initial_context,
+    get_initial_context_documents,
+)
 from .evidence_documents import DOCUMENT_FILES
 from .llm_scenario_simulator import generate_scenario_events, run_scenario_agent_round
 from .scenario_trading import (
@@ -127,6 +131,13 @@ def security_initial_context(ticker: str):
     return jsonify({"success": True, "data": get_initial_context(history)})
 
 
+@paper_trading_bp.route("/securities/<ticker>/initial-context/documents", methods=["GET"])
+def security_initial_context_documents(ticker: str):
+    """Prepare the four Evidence documents before the aggregate LLM request."""
+    history = _market_data().load_game_data(ticker, "", "")
+    return jsonify({"success": True, "data": get_initial_context_documents(history)})
+
+
 @paper_trading_bp.route("/securities/<ticker>/initial-context/documents/<domain>", methods=["GET"])
 def security_initial_context_document(ticker: str, domain: str):
     """Open one target-specific Evidence Markdown document in a new browser tab."""
@@ -134,7 +145,7 @@ def security_initial_context_document(ticker: str, domain: str):
     if not filename:
         return jsonify({"success": False, "error": "지원하지 않는 Evidence 문서입니다."}), 404
     history = _market_data().load_game_data(ticker, "", "")
-    context = get_initial_context(history)
+    context = get_initial_context_documents(history)
     context_id = context["context_id"].removeprefix("ctx_")
     path = Path(Config.UPLOAD_FOLDER) / "market_cache" / f"initial-context-{context_id}" / filename
     if not path.is_file():
