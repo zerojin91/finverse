@@ -33,7 +33,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation";
-import { PaperTradingModal } from "@/components/paper-trading";
+import { PaperTradingModal, type Security } from "@/components/paper-trading";
 
 const SimulationMessageResponse = dynamic(
   () => import("@/components/ai-elements/message").then((module) => module.MessageResponse),
@@ -108,6 +108,19 @@ const marketSignals: DashboardSignal[] = [
 
 const marketSignalIcons = { economy: Activity, country: Globe2, event: CalendarClock, community: UsersRound };
 const importanceScore = (value?: number) => Math.max(1, Math.min(3, Math.round(value ?? 2)));
+
+type WatchSymbol = { ticker: string; name: string };
+type TickerSource = { key: "market" | "economy" | "events" | "community"; label: string; status: "ready" | "missing"; count: number; unit: string; updated_at: string | null; detail: string };
+const tickerSourceIcons = { market: BarChart3, economy: Activity, events: CalendarClock, community: UsersRound };
+const followedSymbols: WatchSymbol[] = [
+  { ticker: "005930", name: "삼성전자" },
+  { ticker: "000660", name: "SK하이닉스" },
+  { ticker: "005380", name: "현대차" },
+  { ticker: "009150", name: "삼성전기" },
+  { ticker: "373220", name: "LG에너지솔루션" },
+  { ticker: "207940", name: "삼성바이오로직스" },
+  { ticker: "105560", name: "KB금융" },
+];
 const marketOverview = [
   { key: "KOSPI", name: "코스피", value: "6,023.66", change: "-732.09", rate: "-10.84%", tone: "down", badge: "시장 하락", points: [6244, 6312, 6388, 6460, 6380, 6428, 6375, 6160, 6128, 6038, 6048, 6024, 6085, 6032, 5920, 5980, 6002, 6024] },
   { key: "KOSDAQ", name: "코스닥", value: "834.20", change: "-30.45", rate: "-3.52%", tone: "down", badge: "유가 금리 부담", points: [862, 856, 849, 852, 844, 840, 836, 834] },
@@ -746,13 +759,13 @@ type GraphPreviewNode = {
 };
 
 const graphPreviewNodes: GraphPreviewNode[] = [
-  { id: "kospi", label: "KOSPI", type: "지수", x: 320, y: 250, color: "#18181b" },
-  { id: "semiconductor", label: "반도체", type: "섹터", x: 162, y: 130, color: "#2563eb" },
+  { id: "kospi", label: "KOSPI", type: "지수", x: 320, y: 250, color: "#0b0d14" },
+  { id: "semiconductor", label: "반도체", type: "섹터", x: 162, y: 130, color: "#0769ff" },
   { id: "samsung", label: "삼성전자", type: "종목", x: 78, y: 268, color: "#0f766e" },
   { id: "hynix", label: "SK하이닉스", type: "종목", x: 135, y: 400, color: "#0f766e" },
-  { id: "auto", label: "자동차", type: "섹터", x: 460, y: 90, color: "#2563eb" },
-  { id: "internet", label: "인터넷", type: "섹터", x: 560, y: 180, color: "#2563eb" },
-  { id: "finance", label: "금융", type: "섹터", x: 525, y: 340, color: "#2563eb" },
+  { id: "auto", label: "자동차", type: "섹터", x: 460, y: 90, color: "#0769ff" },
+  { id: "internet", label: "인터넷", type: "섹터", x: 560, y: 180, color: "#0769ff" },
+  { id: "finance", label: "금융", type: "섹터", x: 525, y: 340, color: "#0769ff" },
   { id: "hyundai", label: "현대차", type: "종목", x: 490, y: 30, color: "#0f766e" },
   { id: "naver", label: "NAVER", type: "종목", x: 615, y: 165, color: "#0f766e" },
   { id: "kb", label: "KB금융", type: "종목", x: 615, y: 355, color: "#0f766e" },
@@ -812,7 +825,7 @@ function KnowledgeGraphPreview({ seeds, prompt, stage, progress, graphSnapshot }
     ...node,
     x: 50 + ((index * 137) % 545),
     y: 55 + ((Math.floor(index * 137 / 545) * 93 + index * 41) % 465),
-    color: ["#2563eb", "#0f766e", "#7c3aed", "#dc2626", "#d97706", "#0891b2"][index % 6],
+    color: ["#0769ff", "#0f766e", "#7c3aed", "#dc2626", "#d97706", "#0891b2"][index % 6],
   })) : [];
   const graphEdges = hasGraphSnapshot ? graphSnapshot!.edges.map((edge) => [edge.source, edge.target, edge.label] as const) : [];
   const visibleNodeCount = graphNodes.length;
@@ -1426,8 +1439,8 @@ function ForecastChart({ scenario, marketData, liveSeries }: { scenario: Scenari
       ctx.clearRect(0, 0, width, height);
       ctx.font = '10px "Pretendard Variable", sans-serif';
       ctx.textAlign = "right";
-      ctx.fillStyle = "#a1a1aa";
-      ctx.strokeStyle = "#ececef";
+      ctx.fillStyle = "#9aa0ab";
+      ctx.strokeStyle = "#e8eaf0";
       ctx.lineWidth = 1;
       const tickCount = Math.round((max - min) / axisStep);
       for (let i = 0; i <= tickCount; i += 1) {
@@ -1452,7 +1465,7 @@ function ForecastChart({ scenario, marketData, liveSeries }: { scenario: Scenari
           ctx.lineTo(xForecast(index), y(lower[index]));
         }
         ctx.closePath();
-        ctx.fillStyle = scenario.tone === "up" ? `rgba(239,68,68,${opacity})` : `rgba(37,99,235,${opacity})`;
+        ctx.fillStyle = scenario.tone === "up" ? `rgba(214,76,83,${opacity})` : `rgba(7,105,255,${opacity})`;
         ctx.fill();
       };
 
@@ -1462,7 +1475,7 @@ function ForecastChart({ scenario, marketData, liveSeries }: { scenario: Scenari
       const candleWidth = Math.max(3, Math.min(7, (splitX - pad.left) / candles.length * 0.58));
       candles.slice(1).forEach((candle, index) => {
         const px = xActual(index + 1);
-        const color = candle.close >= candle.open ? "#ef4444" : "#2563eb";
+        const color = candle.close >= candle.open ? "#d64c53" : "#0769ff";
         ctx.strokeStyle = color;
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -1476,7 +1489,7 @@ function ForecastChart({ scenario, marketData, liveSeries }: { scenario: Scenari
       });
 
       const currentY = y(closes[closes.length - 1]);
-      ctx.strokeStyle = "#a1a1aa";
+      ctx.strokeStyle = "#9aa0ab";
       ctx.setLineDash([3, 3]);
       ctx.beginPath();
       ctx.moveTo(pad.left, currentY);
@@ -1491,7 +1504,7 @@ function ForecastChart({ scenario, marketData, liveSeries }: { scenario: Scenari
         if (index === 0) ctx.moveTo(px, py);
         else ctx.lineTo(px, py);
       });
-      const forecastColor = scenario.tone === "up" ? "#ef4444" : "#2563eb";
+      const forecastColor = scenario.tone === "up" ? "#d64c53" : "#0769ff";
       ctx.strokeStyle = forecastColor;
       ctx.lineWidth = 3;
       ctx.stroke();
@@ -1507,7 +1520,7 @@ function ForecastChart({ scenario, marketData, liveSeries }: { scenario: Scenari
         ctx.stroke();
       });
 
-      ctx.strokeStyle = "#18181b";
+      ctx.strokeStyle = "#0b0d14";
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.moveTo(splitX, pad.top);
@@ -1516,20 +1529,20 @@ function ForecastChart({ scenario, marketData, liveSeries }: { scenario: Scenari
 
       ctx.textAlign = "center";
       ctx.font = '10px "Pretendard Variable", sans-serif';
-      ctx.fillStyle = "#71717a";
+      ctx.fillStyle = "#6d7380";
       const actualLabelIndexes = [0, .25, .5, .75, 1].map((ratio) => Math.round((candles.length - 1) * ratio));
       actualLabelIndexes.forEach((pathIndex) => {
         ctx.fillText(candles[pathIndex].label, xActual(pathIndex), height - 12);
       });
       ctx.fillStyle = "#fff";
       ctx.fillRect(splitX - 20, height - 29, 40, 24);
-      ctx.fillStyle = "#18181b";
+      ctx.fillStyle = "#0b0d14";
       ctx.fillRect(splitX - 20, height - 29, 40, 24);
       ctx.fillStyle = "#fff";
       ctx.font = '700 10px "Pretendard Variable", sans-serif';
       ctx.fillText(candles[candles.length - 1].label, splitX, height - 13);
       ctx.font = '10px "Pretendard Variable", sans-serif';
-      ctx.fillStyle = "#a1a1aa";
+      ctx.fillStyle = "#9aa0ab";
       ["+7일", "+14일", "+21일", "+1개월"].forEach((label, index, labels) => {
         ctx.fillText(label, splitX + ((index + 1) / labels.length) * (rightX - splitX), height - 12);
       });
@@ -1598,6 +1611,13 @@ export default function Home() {
   const [marketBrief, setMarketBrief] = useState<string[]>(defaultMarketBrief);
   const [marketBriefExpanded, setMarketBriefExpanded] = useState(false);
   const [selectedMarketSignal, setSelectedMarketSignal] = useState<DashboardSignal | null>(null);
+  const [watchlist, setWatchlist] = useState<WatchSymbol[]>(followedSymbols);
+  const [selectedSymbol, setSelectedSymbol] = useState<WatchSymbol>(followedSymbols[0]);
+  const [symbolQuery, setSymbolQuery] = useState("");
+  const [symbolResults, setSymbolResults] = useState<Security[]>([]);
+  const [symbolSearching, setSymbolSearching] = useState(false);
+  const [tickerSources, setTickerSources] = useState<TickerSource[] | null>(null);
+  const [tickerSourcesError, setTickerSourcesError] = useState<string | null>(null);
   const [selectedScenario, setSelectedScenario] = useState(scenarios[0]);
   const [scenarioDetailOpen, setScenarioDetailOpen] = useState(false);
   const [scenarioEditorial, setScenarioEditorial] = useState<ScenarioEditorial>(() => fallbackEditorial(scenarios[0]));
@@ -1694,6 +1714,43 @@ export default function Home() {
     return () => { active = false; window.clearInterval(timer); };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    setTickerSources(null);
+    setTickerSourcesError(null);
+    const loadTickerContext = async () => {
+      try {
+        const response = await fetch(`/api/paper-trading/securities/${encodeURIComponent(selectedSymbol.ticker)}/scenario-context`, { cache: "no-store" });
+        const payload = await response.json().catch(() => null) as { data?: { sources?: TickerSource[] }; success?: boolean; error?: string } | null;
+        if (!response.ok || !payload || payload.success === false) throw new Error(payload?.error ?? "종목 연결 데이터를 불러오지 못했습니다.");
+        if (active) setTickerSources(payload.data?.sources ?? []);
+      } catch (error) {
+        if (active) setTickerSourcesError(error instanceof Error ? error.message : "종목 연결 데이터를 불러오지 못했습니다.");
+      }
+    };
+    loadTickerContext();
+    return () => { active = false; };
+  }, [selectedSymbol.ticker]);
+
+  useEffect(() => {
+    const keyword = symbolQuery.trim();
+    if (!keyword) { setSymbolResults([]); setSymbolSearching(false); return; }
+    let cancelled = false;
+    setSymbolSearching(true);
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/paper-trading/securities?q=${encodeURIComponent(keyword)}&limit=8`, { cache: "no-store" });
+        const payload = await response.json().catch(() => null) as { data?: Security[] } | null;
+        if (!cancelled) setSymbolResults(response.ok && payload?.data ? payload.data : []);
+      } catch {
+        if (!cancelled) setSymbolResults([]);
+      } finally {
+        if (!cancelled) setSymbolSearching(false);
+      }
+    }, 250);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [symbolQuery]);
+
   useLayoutEffect(() => {
     if (scenarioScrollY.current === null) return;
     const scrollTop = scenarioScrollY.current;
@@ -1705,6 +1762,22 @@ export default function Home() {
   const activateTab = (tab: MainTab) => {
     setActiveTab(tab);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const selectSymbol = (item: WatchSymbol) => {
+    setSelectedSymbol(item);
+    setWatchlist((current) => current.some((row) => row.ticker === item.ticker) ? current : [...current, item]);
+    setSymbolQuery("");
+    setSymbolResults([]);
+  };
+
+  const removeSymbol = (ticker: string) => {
+    setWatchlist((current) => {
+      if (current.length <= 1) return current;
+      const next = current.filter((row) => row.ticker !== ticker);
+      if (selectedSymbol.ticker === ticker && next.length) setSelectedSymbol(next[0]);
+      return next;
+    });
   };
 
   const toggleSeed = (seed: string) => {
@@ -2074,6 +2147,56 @@ export default function Home() {
       <main className="main-content">
           {activeTab === "market" ? (
             <div className="market-page">
+              <div className="market-layout">
+                <aside className="symbol-sidebar" aria-label="종목 선택">
+                  <div className="symbol-search">
+                    <div className="symbol-search-row">
+                      <input type="search" value={symbolQuery} onChange={(event) => setSymbolQuery(event.target.value)} placeholder="종목 검색" aria-label="종목 검색" />
+                    </div>
+                    {symbolQuery.trim() && (
+                      <div className="search-results" aria-live="polite">
+                        {symbolSearching ? (
+                          <p className="search-empty">검색 중…</p>
+                        ) : symbolResults.length ? symbolResults.map((item) => (
+                          <button key={item.ticker} className="search-result" type="button" onClick={() => selectSymbol({ ticker: item.ticker, name: item.name })}>
+                            <span><strong>{item.name}</strong><small>{item.ticker}</small></span>
+                          </button>
+                        )) : <p className="search-empty">검색 결과가 없습니다.</p>}
+                      </div>
+                    )}
+                  </div>
+                  <div className="symbol-list">
+                    {watchlist.map((item) => (
+                      <div className="symbol-row" key={item.ticker}>
+                        <button className="symbol" type="button" aria-pressed={selectedSymbol.ticker === item.ticker} onClick={() => setSelectedSymbol(item)}>
+                          <span className="symbol-mark"><em>{item.name.slice(0, 1)}</em><img src={`/stock-logos/${item.ticker}.png`} alt="" onError={(event) => { event.currentTarget.style.display = "none"; }} /></span>
+                          <span className="symbol-name"><strong>{item.name}</strong><small>{item.ticker}</small></span>
+                        </button>
+                        {watchlist.length > 1 && <button className="symbol-remove" type="button" aria-label={`${item.name} 제거`} onClick={() => removeSymbol(item.ticker)}>×</button>}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="symbol-connection">
+                    <div className="symbol-connection-heading"><span>DATA COVERAGE</span><strong>{selectedSymbol.name} 데이터 연결</strong></div>
+                    {tickerSourcesError ? (
+                      <p className="symbol-connection-empty">데이터 준비 중입니다.</p>
+                    ) : tickerSources ? (
+                      tickerSources.length ? tickerSources.map((source) => {
+                        const Icon = tickerSourceIcons[source.key];
+                        return (
+                          <article key={source.key} className={`symbol-source ${source.status}`}>
+                            <header><Icon size={12} /><strong>{source.label}</strong><em>{source.status === "ready" ? "READY" : "MISSING"}</em></header>
+                            <b>{source.count.toLocaleString("ko-KR")}<small>{source.unit}</small></b>
+                            <p>{source.detail}</p>
+                          </article>
+                        );
+                      }) : <p className="symbol-connection-empty">데이터 준비 중입니다.</p>
+                    ) : Array.from({ length: 4 }).map((_, index) => (
+                      <article key={index} className="symbol-source waiting"><LoaderCircle size={12} className="spin" /></article>
+                    ))}
+                  </div>
+                </aside>
+                <div className="market-content">
               <header className="page-heading">
                 <div><span>MARKET INSIGHT</span><h1>오늘의 시장을 이해하고, 다음 움직임을 미리 살펴보세요.</h1></div>
                 <div className="market-stamp"><CalendarDays size={15} />{kospiAsOfLabel} 최신 기준</div>
@@ -2211,7 +2334,7 @@ export default function Home() {
                       <button className="scenario-card-detail-button" type="button" onClick={(event) => { event.stopPropagation(); openScenarioDetail(scenario); }}>상세 보기 <ChevronRight size={15} /></button>
                     </article>
                   ))}
-                  <button className="custom-scenario-card" onClick={openBuilder}>
+                  <button className="custom-scenario-card" onClick={() => setPaperTradingOpen(true)}>
                     <Plus size={24} /><div><strong>내 시나리오 예측하기</strong><p>원하는 시장 조건과 기간을 직접 선택하세요.</p></div><ArrowRight size={18} />
                   </button>
                   <button className="paper-trading-card" type="button" onClick={() => setPaperTradingOpen(true)}>
@@ -2351,6 +2474,8 @@ export default function Home() {
                   </section>
                 </section>}
               </section>
+                </div>
+              </div>
             </div>
           ) : <TwinPage selectedScenario={selectedScenario} onSelectScenario={setSelectedScenario} onOpenBuilder={openBuilder} />}
       </main>
