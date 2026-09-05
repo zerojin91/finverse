@@ -314,7 +314,7 @@ const PHASE_META: Record<Phase, {
     guide: "에이전트들이 사전 신호만 보고 스스로 거래합니다. 지금은 주문을 낼 수 없고, 흘러나오는 신호를 읽는 것이 과제입니다.",
     todo: [
       "*하루만* 버튼으로 한 거래일씩 넘기며 반응을 보거나, *장 진행*으로 이벤트 직전까지 한 번에 갈 수 있습니다.",
-      "하루가 지날 때마다 캔들이 쌓이고, 40명의 에이전트 반응이 오른쪽 피드에 올라옵니다.",
+      "하루가 지날 때마다 캔들이 쌓이고, 18명의 에이전트 반응이 오른쪽 피드에 올라옵니다.",
       "이 구간은 관찰 전용입니다. 누가 사고 누가 파는지 보고 다음 판단의 근거를 모으세요.",
     ],
     canOrder: false,
@@ -717,7 +717,7 @@ function ReactionFeed({ game, busy, job }: { game: ScenarioGame; busy: boolean; 
       <div className="paper-feed-empty">
         <MessageSquare size={22} />
         <strong>아직 시장이 열리지 않았습니다</strong>
-        <p>장을 진행하면 40명의 에이전트가 커뮤니티와 X에 남긴 반응, 그리고 그날의 수급이 여기에 쌓입니다.</p>
+        <p>장을 진행하면 18명의 에이전트가 커뮤니티와 X에 남긴 반응, 그리고 그날의 수급이 여기에 쌓입니다.</p>
       </div>
     );
   }
@@ -950,11 +950,31 @@ const DURATION_OPTIONS = [
   { days: 20, label: "20거래일", caption: "한 달 연습" },
   { days: 60, label: "60거래일", caption: "중기 판단" },
 ];
-const PRACTICE_OPTIONS: { key: PracticeMode; label: string; caption: string }[] = [
-  { key: "balanced", label: "균형 판단", caption: "호재와 악재를 고르게 경험" },
-  { key: "stress", label: "위기 대응", caption: "악재와 변동성 대응에 집중" },
-  { key: "opportunity", label: "기회 포착", caption: "호재 신호와 진입 판단에 집중" },
-  { key: "random", label: "무작위 실전", caption: "사건 구성을 매번 다르게" },
+const AGENT_GROUP_CARDS = [
+  {
+    key: "retail", label: "개인 투자자", count: 8, icon: Users,
+    description: "가격 흐름과 뉴스에 빠르게 반응하는 단기 참여자",
+    strategies: ["모멘텀", "뉴스 반응형", "손실 회피", "가치"],
+    riskAversion: "0.45", halfLife: "2일", eventReaction: "1.05x",
+  },
+  {
+    key: "foreign", label: "외국인", count: 4, icon: TrendingUp,
+    description: "환율·글로벌 흐름과 대형주 비중을 함께 보는 참여자",
+    strategies: ["거시 민감", "환율 민감", "글로벌 대형주"],
+    riskAversion: "0.50", halfLife: "5일", eventReaction: "1.00x",
+  },
+  {
+    key: "institution", label: "기관", count: 4, icon: Landmark,
+    description: "펀드 흐름과 펀더멘털을 기준으로 포지션을 조정하는 참여자",
+    strategies: ["액티브 펀드", "단기 수급", "펀더멘털"],
+    riskAversion: "0.48", halfLife: "4일", eventReaction: "0.90x",
+  },
+  {
+    key: "pension", label: "연기금", count: 2, icon: Wallet,
+    description: "장기 보유와 리밸런싱을 우선하는 안정형 참여자",
+    strategies: ["장기 투자", "리밸런싱", "저변동성"],
+    riskAversion: "0.62", halfLife: "8일", eventReaction: "0.55x",
+  },
 ];
 
 const parsePositiveInteger = (value: string) => Number(value.replace(/[^0-9]/g, "")) || 0;
@@ -969,7 +989,7 @@ function SetupScreen({
   onStart: (input: {
     ticker: string; name: string; initialCash: number;
     investmentMode: InvestmentMode; initialPosition?: { quantity: number; averagePrice: number };
-    simulationDays: number; practiceMode: PracticeMode;
+    simulationDays: number;
   }) => void;
   onResume: (gameId: string) => void;
   starting: boolean;
@@ -994,7 +1014,6 @@ function SetupScreen({
   const [averagePrice, setAveragePrice] = useState(0);
   const [holdingQuantity, setHoldingQuantity] = useState(0);
   const [simulationDays, setSimulationDays] = useState(20);
-  const [practiceMode, setPracticeMode] = useState<PracticeMode>("balanced");
   const pickedTicker = picked?.ticker;
   const step2Ref = useRef<HTMLElement | null>(null);
   const step3Ref = useRef<HTMLElement | null>(null);
@@ -1102,7 +1121,7 @@ function SetupScreen({
     onStart({
       ticker: picked.ticker, name: picked.name,
       initialCash: investmentMode === "new" ? initialCash : 0,
-      investmentMode, simulationDays, practiceMode,
+      investmentMode, simulationDays,
       initialPosition: investmentMode === "holding"
         ? { quantity: holdingQuantity, averagePrice }
         : undefined,
@@ -1365,15 +1384,32 @@ function SetupScreen({
             ))}
           </div>
         </div>
-        <div className="paper-simulation-field">
-          <div className="paper-simulation-label"><span>연습 유형</span><small>수집 자료에서 어떤 사건을 우선 구성할지 선택</small></div>
-          <div className="paper-practice-options">
-            {PRACTICE_OPTIONS.map((option) => (
-              <button key={option.key} type="button" className={practiceMode === option.key ? "active" : ""} aria-pressed={practiceMode === option.key} onClick={() => setPracticeMode(option.key)}>
-                <span>{practiceMode === option.key && <CheckCircle2 size={13} />}<strong>{option.label}</strong></span>
-                <small>{option.caption}</small>
-              </button>
-            ))}
+        <div className="paper-agent-field">
+          <div className="paper-simulation-label">
+            <span>시장 참여 에이전트</span>
+            <small>총 18명 · 시나리오 시작 시 실제 설정으로 생성</small>
+          </div>
+          <div className="paper-agent-grid">
+            {AGENT_GROUP_CARDS.map((agent) => {
+              const Icon = agent.icon;
+              return (
+                <article className={`paper-agent-card ${agent.key}`} key={agent.key}>
+                  <header>
+                    <div className="paper-agent-title"><Icon size={15} /><strong>{agent.label}</strong></div>
+                    <b>{agent.count}명</b>
+                  </header>
+                  <p>{agent.description}</p>
+                  <div className="paper-agent-tags">
+                    {agent.strategies.map((strategy) => <span key={strategy}>{strategy}</span>)}
+                  </div>
+                  <dl className="paper-agent-metrics">
+                    <div><dt>위험 회피</dt><dd>{agent.riskAversion}</dd></div>
+                    <div><dt>심리 반감기</dt><dd>{agent.halfLife}</dd></div>
+                    <div><dt>이벤트 반응</dt><dd>{agent.eventReaction}</dd></div>
+                  </dl>
+                </article>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -1531,7 +1567,7 @@ function CoachOverlay({ onDone }: { onDone: () => void }) {
         <span>HOW IT WORKS</span>
         <h3>한 번의 이벤트를 네 단계로 겪습니다</h3>
         <ol>
-          <li><b>관망</b><p>이벤트 직전까지 하루씩 장이 열립니다. 40명의 에이전트가 스스로 거래하고, 뉴스·루머가 순서대로 흘러나옵니다. 주문은 낼 수 없습니다.</p></li>
+          <li><b>관망</b><p>이벤트 직전까지 하루씩 장이 열립니다. 18명의 에이전트가 스스로 거래하고, 뉴스·루머가 순서대로 흘러나옵니다. 주문은 낼 수 없습니다.</p></li>
           <li><b>사전 판단</b><p>이벤트 내용은 아직 비공개입니다. 신호만 보고 매수·매도를 담습니다. 담지 않으면 관망으로 기록됩니다.</p></li>
           <li><b>공개와 대응</b><p>이벤트가 드러나고 시장이 반응합니다. 과잉 반응인지 추세인지 판단해 다시 주문합니다.</p></li>
           <li><b>회고</b><p>모든 이벤트가 끝나면 매 판단의 근거와 결과를 묶은 리포트를 받습니다.</p></li>
@@ -1872,7 +1908,7 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
   const start = useCallback(async (input: {
     ticker: string; name: string; initialCash: number;
     investmentMode: InvestmentMode; initialPosition?: { quantity: number; averagePrice: number };
-    simulationDays: number; practiceMode: PracticeMode;
+    simulationDays: number;
   }) => {
     setStarting(true);
     setError(null);
@@ -1887,7 +1923,6 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
             : undefined,
           investment_mode: input.investmentMode,
           simulation_days: input.simulationDays,
-          practice_mode: input.practiceMode,
           event_source: "ontology",
           // 캐시 리플레이 이력은 종가만 있어 캔들이 선으로 뭉개진다.
           // finverse는 실제 OHLC를 쓰고, DB가 죽었을 때만 백엔드가 캐시로 내려간다.

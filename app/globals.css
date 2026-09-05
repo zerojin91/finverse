@@ -1010,15 +1010,30 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-simulation-field { width: 100%; display: flex; flex-direction: column; gap: 8px; padding: 13px 14px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
 .paper-simulation-label { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .paper-duration-options { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; }
-.paper-duration-options button,.paper-practice-options button { min-width: 0; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); background: #fafafa; font-family: inherit; text-align: left; cursor: pointer; }
+.paper-duration-options button { min-width: 0; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); background: #fafafa; font-family: inherit; text-align: left; cursor: pointer; }
 .paper-duration-options button { display: flex; align-items: baseline; justify-content: space-between; gap: 4px; padding: 10px; }
-.paper-duration-options button.active,.paper-practice-options button.active { border-color: var(--ink); color: var(--ink); background: #f4f4f5; box-shadow: inset 0 0 0 1px var(--ink); }
-.paper-duration-options strong,.paper-practice-options strong { font-size: 10px; }
-.paper-duration-options small,.paper-practice-options small { color: var(--light); font-size: 8px; }
-.paper-practice-options { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 6px; }
-.paper-practice-options button { display: flex; flex-direction: column; gap: 4px; padding: 10px 11px; }
-.paper-practice-options button > span { display: flex; align-items: center; gap: 5px; }
-.paper-practice-options button.active svg { color: #16a34a; }
+.paper-duration-options button.active { border-color: var(--ink); color: var(--ink); background: #f4f4f5; box-shadow: inset 0 0 0 1px var(--ink); }
+.paper-duration-options strong { font-size: 10px; }
+.paper-duration-options small { color: var(--light); font-size: 8px; }
+.paper-agent-field { width: 100%; display: flex; flex-direction: column; gap: 10px; padding: 13px 14px 14px; border: 1px solid var(--line); border-radius: 10px; background: #fafafa; }
+.paper-agent-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; }
+.paper-agent-card { min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid #e4e4e7; border-radius: 9px; background: #fff; }
+.paper-agent-card > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.paper-agent-title { display: flex; align-items: center; gap: 7px; color: var(--ink); }
+.paper-agent-title svg { color: #6366f1; }
+.paper-agent-card.retail .paper-agent-title svg { color: #16a34a; }
+.paper-agent-card.foreign .paper-agent-title svg { color: #2563eb; }
+.paper-agent-card.institution .paper-agent-title svg { color: #d97706; }
+.paper-agent-card.pension .paper-agent-title svg { color: #7c3aed; }
+.paper-agent-title strong { font-size: 11px; }
+.paper-agent-card > header > b { padding: 4px 7px; border-radius: 999px; color: var(--muted); background: #f4f4f5; font-size: 9px; }
+.paper-agent-card > p { min-height: 30px; margin: 0; color: var(--muted); font-size: 9px; line-height: 1.45; }
+.paper-agent-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.paper-agent-tags span { padding: 3px 6px; border-radius: 999px; color: #52525b; background: #f4f4f5; font-size: 8px; }
+.paper-agent-metrics { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; margin: auto 0 0; padding-top: 8px; border-top: 1px solid #f0f0f2; }
+.paper-agent-metrics div { min-width: 0; }
+.paper-agent-metrics dt { overflow: hidden; color: var(--light); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.paper-agent-metrics dd { margin: 3px 0 0; color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; font-weight: 750; }
 .paper-start-button { width: 100%; min-height: 52px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; border: 0; border-radius: 11px; color: #fff; background: var(--ink); font-family: inherit; font-size: 14px; font-weight: 750; cursor: pointer; }
 .paper-investment-confirm-button { align-self: flex-end; width: auto; min-height: 38px; padding: 0 17px; border-radius: 9px; font-size: 11px; }
 .paper-start-button:disabled { cursor: not-allowed; opacity: .45; }
@@ -1446,6 +1461,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
   .paper-collection-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .paper-collection-status { align-items: flex-start; flex-direction: column; }
   .paper-investment-actions { align-items: flex-start; flex-direction: column; }
+  .paper-agent-grid { grid-template-columns: minmax(0,1fr); }
   .paper-holdings { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
 
