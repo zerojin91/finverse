@@ -950,11 +950,11 @@ function DailyPracticeCard({
   );
 }
 
-function PortfolioSnapshot({ game }: { game: ScenarioGame }) {
+function PortfolioSnapshot({ game, compact = false }: { game: ScenarioGame; compact?: boolean }) {
   const portfolio = game.portfolio;
   const initialEquity = game.initial_equity ?? game.initial_cash ?? portfolio.equity;
   return (
-    <div className="paper-portfolio-summary" aria-label="내 투자 상태">
+    <div className={`paper-portfolio-summary${compact ? " compact" : ""}`} aria-label="내 투자 상태">
       <div className="paper-portfolio-summary-head">
         <strong>내 투자 상태</strong>
         <span>현재가 {won(portfolio.mark_price)}</span>
@@ -2346,6 +2346,7 @@ function TradingScreen({
               : `${game.phase === "completed" ? game.total_events : game.current_event_index + 1} / ${game.total_events} 이벤트`}</strong>
             <div className="paper-progress"><i style={{ width: `${eventProgress}%` }} /></div>
           </div>
+          {worldMode && <PortfolioSnapshot game={game} compact />}
           {error && <div className="paper-run-error"><AlertTriangle size={14} /> <span>{error}</span></div>}
           {stalled && !error && (
             <div className="paper-run-warning">
@@ -2374,7 +2375,6 @@ function TradingScreen({
           <div className="paper-desk-scroll">
             {worldMode && (
               <>
-                <PortfolioSnapshot game={game} />
                 <DailyPracticeCard
                   key={`${reflectionMarketDate ?? "waiting"}-${game.phase}`}
                   round={latestRound}
