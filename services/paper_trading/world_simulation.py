@@ -15,6 +15,7 @@ import uuid
 
 from .kospi_paper_trading import TradingError, calibrate_impact_model
 from .llm_scenario_simulator import run_individual_agent_round
+from .daily_market_summary import generate_daily_market_summary
 from .scenario_trading import (
     GROUP_PSYCHOLOGY, _execute_user_orders, _real_candles, apply_agent_round,
     scenario_portfolio,
@@ -135,6 +136,25 @@ DAILY_REFLECTION_LABELS = {
 }
 
 
+def _ensure_world_daily_reflection(game: dict[str, Any], latest: dict[str, Any]) -> None:
+    """Persist the neutral learning stance when the user did not choose one."""
+    market_date = str(latest.get("market_date") or "")
+    if not market_date:
+        return
+    reflections = game.setdefault("daily_reflections", [])
+    if any(row.get("market_date") == market_date for row in reflections):
+        return
+    reflections.append({
+        "market_date": market_date,
+        "stance": "HOLD_WATCH",
+        "label": DAILY_REFLECTION_LABELS["HOLD_WATCH"],
+        "market_return_pct": latest.get("return_pct"),
+        "market_summary": latest.get("market_summary"),
+        "recorded_at": datetime.now().isoformat(),
+        "source": "default",
+    })
+
+
 def record_world_daily_reflection(game: dict[str, Any], stance: str) -> dict[str, Any]:
     """Save a daily learning note without placing or simulating a user order."""
     if game.get("mode") != "world":
@@ -158,6 +178,7 @@ def record_world_daily_reflection(game: dict[str, Any], stance: str) -> dict[str
         "market_return_pct": latest.get("return_pct"),
         "market_summary": latest.get("market_summary"),
         "recorded_at": datetime.now().isoformat(),
+        "source": "user",
     }
     reflections = game.setdefault("daily_reflections", [])
     for index, existing in enumerate(reflections):
@@ -203,6 +224,9 @@ def _advance_world_market_day(game: dict[str, Any], *, progress: Callable[[int, 
     round_data = _run_market_agents(game, market_date, information, phase, agent_progress)
     result = apply_agent_round(game, round_data, phase=phase, label=f"{market_date} · World Agent 시장 진행", market_date=market_date)
     record_market_feedback(game, result, market_date)
+    result["market_summary_detail"] = generate_daily_market_summary(game, result, information, event)
+    result["market_summary"] = result["market_summary_detail"]["summary"]
+    _ensure_world_daily_reflection(game, result)
     game["current_day_index"] = int(game["world"]["current_day"])
     game["phase"] = PHASE_COMPLETED if game["current_day_index"] >= game["simulation_days"] else PHASE_WORLD_MARKET
     game["status"] = "completed" if game["phase"] == PHASE_COMPLETED else "ready"
@@ -254,6 +278,9 @@ def resolve_world_decision(game: dict[str, Any], *, progress: Callable[[int, str
         "world_state": information.get("world_state"),
     })
     record_market_feedback(game, result, market_date)
+    result["market_summary_detail"] = generate_daily_market_summary(game, result, information, event)
+    result["market_summary"] = result["market_summary_detail"]["summary"]
+    _ensure_world_daily_reflection(game, result)
     game["current_day_index"] = int(world["current_day"])
     game["phase"] = PHASE_COMPLETED if game["current_day_index"] >= game["simulation_days"] else PHASE_WORLD_MARKET
     game["status"] = "completed" if game["phase"] == PHASE_COMPLETED else "ready"

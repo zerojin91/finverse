@@ -246,6 +246,14 @@ type PersonaOrder = {
   filled_quantity?: number;
 };
 
+type DailyMarketSummaryDetail = {
+  summary: string;
+  group_actions?: Record<string, string>;
+  price_reason?: string;
+  uncertainties?: string[];
+  source?: string;
+};
+
 type GroupState = { sentiment: number; risk_aversion: number; event_conviction?: number };
 
 type AgentRound = {
@@ -261,6 +269,7 @@ type AgentRound = {
   order_imbalance: number;
   market_pressure: number;
   market_summary?: string;
+  market_summary_detail?: DailyMarketSummaryDetail;
   observations?: Observation[];
   persona_orders?: PersonaOrder[];
   risk_flags?: string[];
@@ -398,11 +407,11 @@ const PHASE_META: Record<Phase, {
     label: "자율 거래 구간",
     eyebrow: "INTER-EVENT MARKET",
     action: "advance_days",
-    cta: "이벤트 직전까지 장 진행",
+    cta: "이벤트 직전까지 자동 진행",
     guide: "에이전트들이 사전 신호만 보고 스스로 거래합니다. 지금은 주문을 낼 수 없고, 흘러나오는 신호를 읽는 것이 과제입니다.",
     todo: [
-      "*하루만* 버튼으로 한 거래일씩 넘기며 반응을 보거나, *장 진행*으로 이벤트 직전까지 한 번에 갈 수 있습니다.",
-      "하루가 지날 때마다 캔들이 쌓이고, 18명의 에이전트 반응이 오른쪽 피드에 올라옵니다.",
+      "*하루 진행*으로 한 거래일씩 넘기며 반응을 보거나, *자동 진행*으로 이벤트 직전까지 한 번에 갈 수 있습니다.",
+      "하루가 지날 때마다 캔들이 쌓이고, 59명의 에이전트 반응이 오른쪽 피드에 올라옵니다.",
       "이 구간은 관찰 전용입니다. 누가 사고 누가 파는지 보고 다음 판단의 근거를 모으세요.",
     ],
     canOrder: false,
@@ -787,6 +796,13 @@ const DAILY_STANCES: { key: DailyReflection["stance"]; label: string; descriptio
   { key: "SELL_WATCH", label: "내일 매도 고려", description: "위험 확대 가능성을 점검" },
 ];
 
+const DAILY_SUMMARY_GROUPS = [
+  ["retail", "개인 투자자"],
+  ["foreign", "외국인"],
+  ["institution", "기관"],
+  ["pension", "연기금"],
+] as const;
+
 function DailyPracticeCard({
   round, reflection, disabled, onSelect,
 }: {
@@ -809,7 +825,23 @@ function DailyPracticeCard({
         <span>오늘의 시장 요약</span>
         <em>{round.market_date}</em>
       </div>
-      <p>{round.market_summary || "오늘의 공개 정보와 시장 참여자 반응을 확인하세요."}</p>
+      <p>{round.market_summary_detail?.summary || round.market_summary || "오늘의 공개 정보와 시장 참여자 반응을 확인하세요."}</p>
+      {round.market_summary_detail?.group_actions && (
+        <div className="paper-daily-summary-groups" aria-label="수급 주체별 오늘의 행동 요약">
+          {DAILY_SUMMARY_GROUPS.map(([key, label]) => (
+            <div className="paper-daily-summary-group" key={key}>
+              <b>{label}</b>
+              <span>{round.market_summary_detail?.group_actions?.[key]}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {round.market_summary_detail?.price_reason && (
+        <div className="paper-daily-reason">
+          <b>주가 변동 이유 추론</b>
+          <span>{round.market_summary_detail.price_reason}</span>
+        </div>
+      )}
       <div className="paper-daily-practice-flow">
         <b className={toneOf(round.return_pct)}>{signedPct(round.return_pct)}</b>
         <span>59개 에이전트 반응 후 형성된 오늘의 종가</span>
@@ -819,7 +851,7 @@ function DailyPracticeCard({
           <button
             key={item.key}
             type="button"
-            className={`${item.key.toLowerCase()} ${reflection?.stance === item.key ? "active" : ""}`}
+            className={`${item.key.toLowerCase()} ${(reflection?.stance ?? "HOLD_WATCH") === item.key ? "active" : ""}`}
             onClick={() => onSelect(item.key)}
             disabled={disabled}
           >
@@ -909,7 +941,7 @@ function LegacyReactionFeed({ game, busy, job }: { game: ScenarioGame; busy: boo
       <div className="paper-feed-empty">
         <MessageSquare size={22} />
         <strong>아직 시장이 열리지 않았습니다</strong>
-        <p>장을 진행하면 18명의 에이전트가 커뮤니티와 X에 남긴 반응, 그리고 그날의 수급이 여기에 쌓입니다.</p>
+        <p>장을 진행하면 59명의 에이전트가 독립적으로 판단한 주문과 그날의 수급이 여기에 쌓입니다.</p>
       </div>
     );
   }
@@ -2082,7 +2114,7 @@ function CoachOverlay({ onDone, worldMode = false }: { onDone: () => void; world
         <h3>{worldMode ? "거래일마다 이렇게 연습하세요" : "한 번의 이벤트를 네 단계로 겪습니다"}</h3>
         {worldMode ? (
           <ol>
-            <li><b>오늘의 시장 확인</b><p className="paper-coach-lines"><span>‘다음 거래일 진행’을 누르면 오늘의 시황과 새로 공개된 정보를 확인합니다.</span><span>평소 거래일에는 내 포트폴리오 변화와 시장 흐름을 읽는 데 집중하면 됩니다.</span></p></li>
+            <li><b>오늘의 시장 확인</b><p className="paper-coach-lines"><span>‘하루 진행’을 누르면 오늘의 시황과 새로 공개된 정보를 확인합니다.</span><span>평소 거래일에는 내 포트폴리오 변화와 시장 흐름을 읽는 데 집중하면 됩니다.</span></p></li>
             <li><b>중요 사건에서 직접 판단</b><p className="paper-coach-lines"><span>가격에 큰 영향을 줄 사건이 오면 게임이 멈추고 판단 화면이 열립니다.</span><span>그때 매수·매도·관망 중 하나를 고르고 이유와 확신도를 남겨주세요.</span></p></li>
             <li><b>내 선택은 내 포트폴리오에 반영</b><p className="paper-coach-lines"><span>내 주문은 현재 시장 가격으로 체결돼 내 보유·손익에 반영됩니다.</span><span>일반 개인 투자자인 내 주문은 시장 가격·수급·분위기를 직접 움직이지 않습니다.</span><span>시장 변화는 중요한 사건과 59개 에이전트의 전체 반응으로 만들어집니다.</span></p></li>
             <li><b>다음 거래일로 이어가기</b><p className="paper-coach-lines"><span>각 거래일에는 개인·외국인·기관·연기금이 각자 다른 방식으로 반응합니다.</span><span>결과를 확인한 뒤 다음 거래일을 열어 변화가 이어지는 모습을 관찰하세요.</span></p></li>
@@ -2090,7 +2122,7 @@ function CoachOverlay({ onDone, worldMode = false }: { onDone: () => void; world
           </ol>
         ) : (
         <ol>
-          <li><b>관망</b><p>이벤트 직전까지 하루씩 장이 열립니다. 18명의 에이전트가 스스로 거래하고, 뉴스·루머가 순서대로 흘러나옵니다. 주문은 낼 수 없습니다.</p></li>
+          <li><b>관망</b><p>이벤트 직전까지 하루씩 장이 열립니다. 59명의 에이전트가 스스로 거래하고, 공개 정보가 순서대로 흘러나옵니다. 주문은 낼 수 없습니다.</p></li>
           <li><b>사전 판단</b><p>이벤트 내용은 아직 비공개입니다. 신호만 보고 매수·매도를 담습니다. 담지 않으면 관망으로 기록됩니다.</p></li>
           <li><b>공개와 대응</b><p>이벤트가 드러나고 시장이 반응합니다. 과잉 반응인지 추세인지 판단해 다시 주문합니다.</p></li>
           <li><b>회고</b><p>모든 이벤트가 끝나면 매 판단의 근거와 결과를 묶은 리포트를 받습니다.</p></li>
@@ -2184,9 +2216,9 @@ function TradingScreen({
           <CandleChart game={game} />
         </section>
 
-        <section className="paper-panel paper-desk-panel" aria-label="사용자 연습">
+        <section className="paper-panel paper-desk-panel" aria-label="투자 시뮬레이션">
           <div className="paper-panel-heading">
-            <div><CircleDollarSign size={15} /><span>오늘의 연습</span></div>
+            <div><CircleDollarSign size={15} /><span>투자 시뮬레이션</span></div>
             <em>{meta.eyebrow}</em>
           </div>
 
@@ -2250,18 +2282,18 @@ function TradingScreen({
                 type="button"
                 onClick={() => onAdvance(Math.max(1, (game.simulation_days ?? 1) - (game.current_day_index ?? 0)))}
               >
-                중요 사건 전까지 빠르게 진행
+                자동 진행
               </button>
             )}
             {meta.action === "advance_days" && !busy && (
               <button className="paper-advance-day" type="button" onClick={() => onAdvance(1)}>
-                <CalendarClock size={15} /> 하루만
+                <CalendarClock size={15} /> 하루 진행
               </button>
             )}
             <button className="paper-advance" type="button" onClick={() => onAdvance()} disabled={busy}>
               {busy
                 ? <><LoaderCircle size={16} className="spin" /> 오늘의 시장을 준비하는 중</>
-                : <>{worldMode && meta.action === "advance" ? "하루씩 보기" : meta.cta} <ChevronRight size={16} /></>}
+                : <>{worldMode && meta.action === "advance" ? "하루 진행" : meta.cta} <ChevronRight size={16} /></>}
             </button>
           </div>
         </section>
