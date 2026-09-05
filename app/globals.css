@@ -1019,6 +1019,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-practice-options button > span { display: flex; align-items: center; gap: 5px; }
 .paper-practice-options button.active svg { color: #16a34a; }
 .paper-start-button { width: 100%; min-height: 52px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; border: 0; border-radius: 11px; color: #fff; background: var(--ink); font-family: inherit; font-size: 14px; font-weight: 750; cursor: pointer; }
+.paper-investment-confirm-button { align-self: flex-end; width: auto; min-height: 38px; padding: 0 17px; border-radius: 9px; font-size: 11px; }
 .paper-start-button:disabled { cursor: not-allowed; opacity: .45; }
 .paper-start-note { margin: -10px 0 0; color: var(--light); font-size: 10px; text-align: center; }
 .paper-error { display: flex; align-items: center; gap: 7px; margin: 0; padding: 10px 12px; border: 1px solid #fecaca; border-radius: 8px; color: #b91c1c; background: #fef2f2; font-size: 10px; }
