@@ -173,7 +173,7 @@
   #fv-nav-preview .fv-event-next .fv-event::before { display:none; }
   #fv-nav-preview .fv-event-next h3 { font-size:12px; }
   #fv-nav-preview .fv-event-detail { margin-top:9px; color:var(--fv-muted); font-size:12px; line-height:1.55; }
-  #fv-nav-preview .fv-simulation-comparison { display:flex; flex-wrap:wrap; gap:7px 0; margin-top:18px; padding-top:12px; border-top:1px solid var(--fv-line); }
+  #fv-nav-preview .fv-simulation-comparison { display:flex; flex-wrap:wrap; gap:7px 0; margin-top:7px; }
   #fv-nav-preview .fv-simulation-item { padding:0 13px; border-right:1px solid var(--fv-line); color:var(--fv-muted); font-size:12px; line-height:1.35; white-space:nowrap; }
   #fv-nav-preview .fv-simulation-item:first-child { padding-left:0; }
   #fv-nav-preview .fv-simulation-item:last-child { border-right:0; }
@@ -480,8 +480,8 @@
             <article class="fv-custom-card"><button type="button" data-custom-scenario><strong>+</strong><span>내가 생각한<br>시나리오로 보기</span></button></article>
           </div>
           <section class="fv-conditional-chart" aria-label="조건부 종목 경로">
-            <header class="fv-chart-title"><div><h1>시나리오 - <span data-scenario-title>삼성전자 조건부 반등</span></h1></div><div class="fv-chart-meta" data-scenario-meta data-tone="up"><span data-scenario-duration>20일</span><strong data-scenario-forecast>+10.5%</strong></div></header>
-            <div class="fv-chart-content"><div class="fv-chart-wrap"><svg class="fv-chart" role="img" aria-label="선택한 조건의 종목 과거 캔들과 미래 경로"><title>선택한 조건의 종목 과거 캔들과 미래 경로</title></svg></div><aside class="fv-event-rail" aria-label="발생 가능 이벤트"><header><h2>발생 가능 이벤트</h2><span data-event-horizon>중기</span></header><div class="fv-event-list" data-event-list></div></aside></div><div class="fv-simulation-comparison" data-simulation-comparison aria-live="polite"></div>
+            <header class="fv-chart-title"><div><h1>시나리오 - <span data-scenario-title>삼성전자 조건부 반등</span></h1><div class="fv-simulation-comparison" data-simulation-comparison aria-live="polite"></div></div><div class="fv-chart-meta" data-scenario-meta data-tone="up"><span data-scenario-duration>20일</span><strong data-scenario-forecast>+10.5%</strong></div></header>
+            <div class="fv-chart-content"><div class="fv-chart-wrap"><svg class="fv-chart" role="img" aria-label="선택한 조건의 종목 과거 캔들과 미래 경로"><title>선택한 조건의 종목 과거 캔들과 미래 경로</title></svg></div><aside class="fv-event-rail" aria-label="발생 가능 이벤트"><header><h2>발생 가능 이벤트</h2><span data-event-horizon>중기</span></header><div class="fv-event-list" data-event-list></div></aside></div>
           </section>
         </div>
         <aside class="fv-symbol-sidebar" aria-label="종목 선택"><div class="fv-symbol-search"><div class="fv-symbol-search-row"><input type="search" data-symbol-query placeholder="종목 검색"><button class="fv-symbol-add" type="button" data-symbol-add aria-label="종목 추가">+</button></div><div class="fv-search-results" data-search-results aria-live="polite" hidden></div></div><div class="fv-symbol-list">
