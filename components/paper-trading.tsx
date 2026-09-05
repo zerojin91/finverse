@@ -849,7 +849,7 @@ function DailyPracticeCard({
   reflection?: DailyReflection;
   portfolio: Portfolio;
   disabled: boolean;
-  onSelect: (stance: DailyReflection["stance"], quantity?: number) => void;
+  onSelect: (stance: DailyReflection["stance"], quantity?: number) => Promise<void>;
 }) {
   const [draftStance, setDraftStance] = useState<DailyReflection["stance"]>(reflection?.stance ?? "HOLD_WATCH");
   const [draftQuantity, setDraftQuantity] = useState(reflection?.quantity ? String(reflection.quantity) : "");
@@ -869,10 +869,10 @@ function DailyPracticeCard({
       onSelect(stance, 0);
     }
   };
-  const submitDecision = () => {
+  const submitDecision = async () => {
     const quantity = Number.parseInt(draftQuantity, 10);
     if (!Number.isInteger(quantity) || quantity < 1) return;
-    onSelect(draftStance, quantity);
+    await onSelect(draftStance, quantity);
   };
   return (
     <div className="paper-daily-practice">
@@ -934,11 +934,11 @@ function DailyPracticeCard({
               step="1"
               value={draftQuantity}
               onChange={(input) => setDraftQuantity(input.target.value)}
-              onBlur={submitDecision}
+              onBlur={() => { void submitDecision(); }}
               onKeyDown={(input) => {
                 if (input.key === "Enter") {
                   input.preventDefault();
-                  submitDecision();
+                  void submitDecision();
                 }
               }}
               placeholder="수량 입력"
@@ -2306,7 +2306,7 @@ function TradingScreen({
   error: string | null;
   orderSubmitting: boolean;
   onOrder: (input: { side: "BUY" | "SELL"; quantity: number; rationale: string; confidence: number }) => void;
-  onDailyReflection: (stance: DailyReflection["stance"], quantity?: number) => void;
+  onDailyReflection: (stance: DailyReflection["stance"], quantity?: number) => Promise<void>;
   onAdvance: (days?: number) => void;
 }) {
   // 모달은 사용자가 열었을 때만 마운트되므로 첫 렌더에서 바로 읽어도 안전하다.
@@ -2333,6 +2333,16 @@ function TradingScreen({
   const latestReflection = useMemo(() => {
     return (game.daily_reflections ?? []).find((item) => item.market_date === reflectionMarketDate);
   }, [game.daily_reflections, reflectionMarketDate]);
+  const reflectionSaveRef = useRef<Promise<void>>(Promise.resolve());
+  const saveDailyReflection = useCallback((stance: DailyReflection["stance"], quantity?: number) => {
+    const request = onDailyReflection(stance, quantity);
+    reflectionSaveRef.current = request;
+    return request;
+  }, [onDailyReflection]);
+  const advanceAfterReflection = useCallback(async (days?: number) => {
+    await reflectionSaveRef.current;
+    onAdvance(days);
+  }, [onAdvance]);
   const startFromCoach = useCallback(() => {
     dismissCoach();
     if (worldMode && game.phase === "world_market" && (game.current_day_index ?? 0) === 0 && !busy) {
@@ -2388,7 +2398,7 @@ function TradingScreen({
                   reflection={latestReflection}
                   portfolio={game.portfolio}
                   disabled={busy || !["world_market", "world_decision"].includes(game.phase)}
-                  onSelect={onDailyReflection}
+                  onSelect={saveDailyReflection}
                 />
               </>
             )}
@@ -2434,17 +2444,17 @@ function TradingScreen({
               <button
                 className="paper-advance-fast"
                 type="button"
-                onClick={() => onAdvance(Math.max(1, (game.simulation_days ?? 1) - (game.current_day_index ?? 0)))}
+                onClick={() => { void advanceAfterReflection(Math.max(1, (game.simulation_days ?? 1) - (game.current_day_index ?? 0))); }}
               >
                 자동 진행
               </button>
             )}
             {meta.action === "advance_days" && !busy && (
-              <button className="paper-advance-day" type="button" onClick={() => onAdvance(1)}>
+              <button className="paper-advance-day" type="button" onClick={() => { void advanceAfterReflection(1); }}>
                 <CalendarClock size={15} /> 하루 진행
               </button>
             )}
-            <button className="paper-advance" type="button" onClick={() => onAdvance()} disabled={busy}>
+            <button className="paper-advance" type="button" onClick={() => { void advanceAfterReflection(); }} disabled={busy}>
               {busy
                 ? <><LoaderCircle size={16} className="spin" /> 오늘의 시장을 준비하는 중</>
                 : <>{worldMode && meta.action === "advance" ? "하루 진행" : meta.cta} <ChevronRight size={16} /></>}
