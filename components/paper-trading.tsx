@@ -997,12 +997,13 @@ function SetupScreen({
   const step2Ref = useRef<HTMLElement | null>(null);
   const step3Ref = useRef<HTMLElement | null>(null);
   const step4Ref = useRef<HTMLElement | null>(null);
+  const previewReady = Boolean(previewCandles && previewCandles.length >= 2 && !previewError);
   const collectionReady = Boolean(collectionSources?.every((source) => source.status === "ready"));
   const collectionStepComplete = collectionReady && collectionDwellComplete;
   const investmentReady = investmentMode === "new"
     ? initialCash > 0
     : investmentMode === "holding" && averagePrice > 0 && holdingQuantity > 0;
-  const activeStep = investmentConfirmed ? 4 : collectionStepComplete ? 3 : pickedTicker ? 2 : 1;
+  const activeStep = investmentConfirmed ? 4 : collectionStepComplete ? 3 : previewReady ? 2 : 1;
 
   useEffect(() => {
     let cancelled = false;
@@ -1062,15 +1063,15 @@ function SetupScreen({
   }, [pickedTicker]);
 
   useEffect(() => {
-    if (!pickedTicker) return;
+    if (!pickedTicker || !previewReady) return;
     const timer = window.setTimeout(() => {
       setCollectionDwellComplete(true);
     }, COLLECTION_STEP_MIN_MS);
     return () => window.clearTimeout(timer);
-  }, [pickedTicker]);
+  }, [pickedTicker, previewReady]);
 
   useEffect(() => {
-    if (!pickedTicker) return;
+    if (!pickedTicker || !previewReady) return;
     let cancelled = false;
     callApi<{ data: { sources: CollectionSource[] } }>(`/securities/${encodeURIComponent(pickedTicker)}/scenario-context`)
       .then((payload) => {
@@ -1080,7 +1081,7 @@ function SetupScreen({
         if (!cancelled) setCollectionError(cause instanceof Error ? cause.message : "시나리오 자료를 수집하지 못했습니다.");
       });
     return () => { cancelled = true; };
-  }, [pickedTicker]);
+  }, [pickedTicker, previewReady]);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1263,7 +1264,7 @@ function SetupScreen({
         )}
       </section>
 
-      {picked && (
+      {picked && previewReady && (
       <section ref={step2Ref} className="paper-setup-block paper-setup-reveal">
         <div className="paper-setup-heading"><span>02 · 자료 수집</span><h3>{picked.name} 시나리오 자료를 준비하고 있어요</h3></div>
         <div className={`paper-collection-status ${collectionReady ? "ready" : ""}`} aria-live="polite">
