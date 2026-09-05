@@ -14,7 +14,6 @@ import {
   MessageSquare,
   Radio,
   Search,
-  Sparkles,
   TrendingDown,
   TrendingUp,
   Users,
@@ -351,25 +350,6 @@ type Job = {
 // 하나가 수 분 걸리므로 넉넉히 잡되, 이 시간을 넘기면 사용자에게 알린다.
 const STALL_NOTICE_MS = 8 * 60 * 1000;
 
-type LlmReport = {
-  quantitative_summary?: string;
-  executive_summary?: string;
-  investor_profile?: string;
-  event_reviews?: { event: string; market_reaction: string; user_decision: string; lesson: string }[];
-  strengths?: string[];
-  risk_patterns?: string[];
-  action_plan?: string[];
-};
-
-type Assessment = {
-  style?: string;
-  metrics?: Record<string, number | null>;
-  findings?: string[];
-  lessons?: { topic: string; message: string }[];
-  llm_report?: LlmReport | null;
-  disclaimer?: string;
-};
-
 type GameSummary = {
   game_id: string;
   ticker: string;
@@ -617,7 +597,6 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
       maxVolume: Math.max(...bars.map((bar) => bar.volume), 1),
       simStart: historicalCount,
       futureSlots,
-      totalSlots,
       y: (value: number) => ((top - value) / span) * PRICE_H,
       cx: (index: number) => index * slot + slot / 2,
     };
@@ -633,7 +612,7 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
     );
   }
 
-  const { top, span, slot, bodyW, maxVolume, simStart, futureSlots, totalSlots, y, cx } = layout;
+  const { top, span, slot, bodyW, maxVolume, simStart, futureSlots, y, cx } = layout;
   const gridValues = [0, 0.25, 0.5, 0.75, 1].map((ratio) => top - span * ratio);
 
   // 사용자 체결은 해당 이벤트가 반응한 봉 위에 표시한다. 사전 판단은 왼쪽,
@@ -706,19 +685,25 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
           </g>
         )}
 
-        {!preview && futureSlots > 0 && Array.from({ length: futureSlots }, (_, index) => {
-          const slotIndex = bars.length + index;
-          return (
+        {!preview && futureSlots > 0 && (
+          <g className="paper-candle-future-block">
             <rect
-              key={`future-${slotIndex}`}
               className="paper-candle-future"
-              x={slotIndex * slot + 1}
+              x={bars.length * slot + 1}
               y={8}
-              width={Math.max(1, slot - 2)}
+              width={Math.max(1, futureSlots * slot - 2)}
               height={PRICE_H + VOLUME_H - 3}
             />
-          );
-        })}
+            <text
+              className="paper-candle-future-label"
+              x={bars.length * slot + (futureSlots * slot) / 2}
+              y={PRICE_H / 2}
+              textAnchor="middle"
+            >
+              앞으로 {futureSlots}거래일
+            </text>
+          </g>
+        )}
 
         {bars.map((bar, index) => {
           const rising = bar.close >= bar.open;
@@ -767,7 +752,7 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
       <div className="paper-chart-dates">
         <span>{bars[0].date}</span>
         {simStart > 0 && <span>{bars[simStart]?.date}</span>}
-        <span>{preview ? bars[bars.length - 1].date : `${totalSlots - simStart}거래일 구간`}</span>
+        <span>{preview ? bars[bars.length - 1].date : futureSlots ? `남은 ${futureSlots}거래일` : "연습 완료"}</span>
       </div>
 
       <div className="paper-chart-legend">
@@ -915,6 +900,60 @@ function DailyPracticeCard({
 
 /* ---------------------------------------------------------- reaction feed */
 
+function EventLog({
+  currentEvent,
+  revealedEvents,
+  worldMode,
+}: {
+  currentEvent: ScenarioEvent | null;
+  revealedEvents?: ScenarioEvent[];
+  worldMode: boolean;
+}) {
+  const events = useMemo(() => {
+    const byId = new Map<string, ScenarioEvent>();
+    for (const event of revealedEvents ?? []) byId.set(event.event_id, event);
+    if (currentEvent) byId.set(currentEvent.event_id, currentEvent);
+    return [...byId.values()].sort((left, right) => right.sequence - left.sequence);
+  }, [currentEvent, revealedEvents]);
+
+  if (!events.length) return null;
+
+  return (
+    <section className="paper-event-log" aria-label="시나리오 이벤트 기록">
+      <header>
+        <div><CalendarClock size={13} /><strong>이벤트 기록</strong></div>
+        <em>{events.length}건</em>
+      </header>
+      {events.map((event) => {
+        const visible = event.status !== "hidden" || worldMode;
+        const type = event.event_type === "seasonal" ? "계절성" : event.event_type === "surprise" ? "서프라이즈" : "모멘텀";
+        return (
+          <article className={`paper-event-card ${event.status}`} key={event.event_id}>
+            <div className="paper-event-top">
+              <span><CalendarClock size={13} /> 이벤트 {event.sequence}</span>
+              <em>{worldMode ? `${event.event_date} · ${type}` : visible ? `${event.event_date} 공개` : `${event.event_date} 예정`}</em>
+            </div>
+            {visible && event.title
+              ? <strong>{event.title}</strong>
+              : <strong className="masked">아직 공개되지 않은 이벤트</strong>}
+            <p>{visible && event.description ? event.description : event.pre_brief}</p>
+            {worldMode && event.public_signal && <div className="paper-provenance pending"><Landmark size={12} /><span>{event.public_signal}</span></div>}
+            {worldMode && event.analogue_title && <div className="paper-provenance"><Landmark size={12} /><span>시작 전 실제 유사 사례 기반 · {event.analogue_title}</span></div>}
+            {visible && event.ontology_source
+              ? <EventProvenanceStrip source={event.ontology_source} />
+              : event.ontology_source && (
+                  <div className="paper-provenance pending">
+                    <Landmark size={12} />
+                    <span>실제로 일어난 사건입니다. 내용은 공개 시점에 드러납니다.</span>
+                  </div>
+                )}
+          </article>
+        );
+      })}
+    </section>
+  );
+}
+
 function ReactionFeed({ game, busy, job }: { game: ScenarioGame; busy: boolean; job: Job | null }) {
   const rounds = useMemo(
     () => [...(game.agent_rounds ?? [])].reverse(), [game.agent_rounds]);
@@ -1030,128 +1069,6 @@ function SignalCard({ signal }: { signal: LeadSignal }) {
           <span>신뢰도 {Math.round((signal.reliability ?? 0) * 100)}%</span>
         </footer>
       </div>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------ report view */
-
-const METRIC_LABEL: [string, string, (value: number) => string][] = [
-  ["total_return_pct", "총 수익률", (value) => signedPct(value)],
-  ["completed_events", "완료 이벤트", (value) => `${value}건`],
-  ["pre_event_trades", "이벤트 전 거래", (value) => `${value}회`],
-  ["post_event_trades", "이벤트 후 거래", (value) => `${value}회`],
-  ["autonomous_market_days", "자율 거래일", (value) => `${value}일`],
-  ["max_price_drawdown_pct", "최대 낙폭", (value) => `${value.toFixed(2)}%`],
-  ["turnover_ratio", "자본 회전율", (value) => `${value.toFixed(2)}배`],
-  ["average_confidence", "평균 확신도", (value) => `${value}%`],
-];
-
-function ReportView({
-  assessment, canGenerate, generating, onGenerate,
-}: {
-  assessment: Assessment;
-  canGenerate: boolean;
-  generating: boolean;
-  onGenerate: () => void;
-}) {
-  const report = assessment.llm_report;
-  const metrics = assessment.metrics ?? {};
-
-  return (
-    <div className="paper-report">
-      <div className="paper-report-head">
-        <div>
-          <span>투자 성향</span>
-          <strong>{assessment.style ?? "분석 중"}</strong>
-        </div>
-        {typeof metrics.total_return_pct === "number" && (
-          <b className={toneOf(metrics.total_return_pct)}>{signedPct(metrics.total_return_pct)}</b>
-        )}
-      </div>
-
-      <div className="paper-report-metrics">
-        {METRIC_LABEL.map(([key, label, format]) => {
-          const value = metrics[key];
-          if (typeof value !== "number") return null;
-          return (
-            <div key={key}>
-              <span>{label}</span>
-              <strong className={key.endsWith("_pct") ? toneOf(value) : ""}>{format(value)}</strong>
-            </div>
-          );
-        })}
-      </div>
-
-      {Boolean(assessment.findings?.length) && (
-        <ul className="paper-report-findings">
-          {assessment.findings?.map((finding) => <li key={finding}>{finding}</li>)}
-        </ul>
-      )}
-
-      {Boolean(assessment.lessons?.length) && (
-        <div className="paper-report-lessons">
-          {assessment.lessons?.map((lesson) => (
-            <div key={lesson.topic}>
-              <b>{lesson.topic}</b>
-              <p>{lesson.message}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {report ? (
-        <div className="paper-report-llm">
-          {report.quantitative_summary && (
-            <p className="paper-report-verified">{report.quantitative_summary}</p>
-          )}
-          {report.executive_summary && <p className="paper-report-summary">{report.executive_summary}</p>}
-          {report.investor_profile && (
-            <blockquote className="paper-report-profile">{report.investor_profile}</blockquote>
-          )}
-
-          {Boolean(report.event_reviews?.length) && (
-            <div className="paper-report-events">
-              {report.event_reviews?.map((review) => (
-                <article key={review.event}>
-                  <b>{review.event}</b>
-                  <p><span>시장 반응</span>{review.market_reaction}</p>
-                  <p><span>내 판단</span>{review.user_decision}</p>
-                  <em>{review.lesson}</em>
-                </article>
-              ))}
-            </div>
-          )}
-
-          <div className="paper-report-lists">
-            {([["강점", report.strengths, "good"], ["주의 패턴", report.risk_patterns, "risk"],
-               ["다음 원칙", report.action_plan, "plan"]] as const).map(([title, items, tone]) =>
-              items?.length ? (
-                <div className={tone} key={title}>
-                  <b>{title}</b>
-                  {items.map((item) => <p key={item}>{item}</p>)}
-                </div>
-              ) : null)}
-          </div>
-        </div>
-      ) : (
-        <div className="paper-report-cta">
-          <p>
-            {canGenerate
-              ? "여기까지의 판단 기록으로 AI 종합 리포트를 만들 수 있습니다. 매 이벤트에서 무엇을 보고 어떻게 움직였는지 근거 중심으로 되짚어줍니다."
-              : "모든 이벤트를 마치면 AI 종합 리포트를 만들 수 있습니다. 위 지표는 지금까지의 판단을 계산한 값입니다."}
-          </p>
-          {canGenerate && (
-            <button type="button" onClick={onGenerate} disabled={generating}>
-              {generating
-                ? <><LoaderCircle size={14} className="spin" /> 리포트 작성 중</>
-                : <><Sparkles size={14} /> AI 종합 리포트 생성</>}
-            </button>
-          )}
-        </div>
-      )}
-
-      {assessment.disclaimer && <p className="paper-report-disclaimer">{assessment.disclaimer}</p>}
     </div>
   );
 }
@@ -2130,7 +2047,6 @@ function TradingScreen({
   busy,
   stalled,
   error,
-  assessment,
   orderSubmitting,
   onOrder,
   onDailyReflection,
@@ -2143,7 +2059,6 @@ function TradingScreen({
   busy: boolean;
   stalled: boolean;
   error: string | null;
-  assessment: Assessment | null;
   orderSubmitting: boolean;
   onOrder: (input: { side: "BUY" | "SELL"; quantity: number; rationale: string; confidence: number }) => void;
   onDailyReflection: (stance: DailyReflection["stance"]) => void;
@@ -2160,10 +2075,6 @@ function TradingScreen({
     setCoach(false);
     try { window.localStorage.setItem(COACH_KEY, "done"); } catch { /* 무시 */ }
   }, []);
-
-  // 사용자가 직접 고르기 전까지는 시나리오가 끝났을 때 회고를 먼저 보여준다.
-  const [tabChoice, setTabChoice] = useState<"feed" | "report" | null>(null);
-  const tab = tabChoice ?? (game.phase === "completed" && assessment ? "report" : "feed");
 
   const meta = PHASE_META[game.phase] ?? PHASE_META.inter_event_market;
   const worldMode = game.mode === "world";
@@ -2340,56 +2251,13 @@ function TradingScreen({
 
         <section className="paper-panel paper-feed-panel" aria-label="시장 반응">
           <div className="paper-panel-heading">
-            <div className="paper-tabs">
-              <button type="button" className={tab === "feed" ? "active" : ""} onClick={() => setTabChoice("feed")}>
-                <Radio size={13} /> 시장 반응
-              </button>
-              <button type="button" className={tab === "report" ? "active" : ""} onClick={() => setTabChoice("report")}>
-                <Sparkles size={13} /> 투자 회고
-              </button>
-            </div>
+            <div><Radio size={13} /><span>시장 반응과 이벤트 기록</span></div>
             <em>{game.agent_rounds?.length ? `${game.agent_rounds.length}개 거래일` : "대기"}</em>
           </div>
 
-          {tab === "feed" && event && (
-            <div className={`paper-event-card ${event.status}`}>
-              <div className="paper-event-top">
-                <span><CalendarClock size={13} /> 이벤트 {event.sequence}</span>
-                <em>{worldMode ? `${event.event_date} · ${event.event_type === "seasonal" ? "계절성" : event.event_type === "surprise" ? "서프라이즈" : "모멘텀"}` : `${event.event_date} 예정 · ${event.trading_days_until}거래일 남음`}</em>
-              </div>
-              {(event.status === "revealed" || worldMode) && event.title
-                ? <strong>{event.title}</strong>
-                : <strong className="masked">아직 공개되지 않은 이벤트</strong>}
-              <p>{(event.status === "revealed" || worldMode) && event.description ? event.description : event.pre_brief}</p>
-              {worldMode && event.public_signal && <div className="paper-provenance pending"><Landmark size={12} /><span>{event.public_signal}</span></div>}
-              {worldMode && event.analogue_title && <div className="paper-provenance"><Landmark size={12} /><span>시작 전 실제 유사 사례 기반 · {event.analogue_title}</span></div>}
-              {event.status === "revealed" && event.ontology_source
-                ? <EventProvenanceStrip source={event.ontology_source} />
-                : event.ontology_source && (
-                    // 공개 전에는 내용을 숨기되, 지어낸 사건이 아니라는 것은 알린다.
-                    <div className="paper-provenance pending">
-                      <Landmark size={12} />
-                      <span>실제로 일어난 사건입니다. 내용은 공개 시점에 드러납니다.</span>
-                    </div>
-                  )}
-            </div>
-          )}
-
           <div className="paper-feed-scroll">
-            {tab === "feed"
-              ? <ReactionFeed game={game} busy={busy} job={job} />
-              : assessment
-                ? <ReportView
-                    assessment={assessment}
-                    canGenerate={game.phase === "completed"}
-                    generating={busy && job?.kind === "report"}
-                    onGenerate={() => onAdvance()}
-                  />
-                : <div className="paper-feed-empty">
-                    <Sparkles size={22} />
-                    <strong>회고를 준비하는 중입니다</strong>
-                    <p>거래 기록이 쌓이면 판단 성향과 지표가 여기에 정리됩니다.</p>
-                  </div>}
+            <EventLog currentEvent={event} revealedEvents={game.revealed_events} worldMode={worldMode} />
+            <ReactionFeed game={game} busy={busy} job={job} />
           </div>
         </section>
       </div>
@@ -2417,7 +2285,6 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [job, setJob] = useState<Job | null>(null);
   const [orderSubmitting, setOrderSubmitting] = useState(false);
-  const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [stalled, setStalled] = useState(false);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -2431,15 +2298,6 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const refreshAssessment = useCallback(async (gameId: string) => {
-    try {
-      const report = await callApi<{ data: Assessment }>(`/scenarios/${gameId}/assessment`);
-      setAssessment(report.data);
-    } catch {
-      // 회고는 부가 정보다. 실패해도 진행을 막지 않는다.
-    }
-  }, []);
-
   const refreshGame = useCallback(async (gameId: string) => {
     const payload = await callApi<{ data: ScenarioGame }>(`/games/${gameId}`);
     setGame(payload.data);
@@ -2451,13 +2309,12 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
     setError(null);
     try {
       await refreshGame(gameId);
-      await refreshAssessment(gameId);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "저장된 시나리오를 불러오지 못했습니다.");
     } finally {
       setStarting(false);
     }
-  }, [refreshGame, refreshAssessment]);
+  }, [refreshGame]);
 
   const start = useCallback(async (input: {
     ticker: string; name: string; initialCash: number;
@@ -2484,19 +2341,17 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
         }),
       });
       setGame(payload.data);
-      await refreshAssessment(payload.data.game_id);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "시나리오를 만들지 못했습니다.");
     } finally {
       setStarting(false);
     }
-  }, [refreshAssessment]);
+  }, []);
 
   // 진행 중인 게임은 서버에 저장되어 있다. 목록에서 언제든 이어서 할 수 있다.
   const reset = useCallback(() => {
     if (pollRef.current) clearTimeout(pollRef.current);
     setGame(null);
-    setAssessment(null);
     setJob(null);
     setError(null);
     setStalled(false);
@@ -2531,7 +2386,6 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
           await refreshGame(gameId);
           setJob(null);
           setStalled(false);
-          await refreshAssessment(gameId);
           return;
         }
         if (next.status === "failed") {
@@ -2549,7 +2403,7 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
       }
     };
     pollRef.current = setTimeout(tick, 900);
-  }, [refreshGame, refreshAssessment]);
+  }, [refreshGame]);
 
   const advance = useCallback(async (days?: number) => {
     if (!game || busy) return;
@@ -2615,7 +2469,6 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
               busy={busy}
               stalled={stalled}
               error={error}
-              assessment={assessment}
               orderSubmitting={orderSubmitting}
               onOrder={submitOrder}
               onDailyReflection={recordDailyReflection}
