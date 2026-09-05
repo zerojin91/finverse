@@ -1302,14 +1302,19 @@ function SetupScreen({
 
   useEffect(() => {
     if (!investmentConfirmed || !contextDwellComplete) return;
-    const timer = window.setTimeout(() => setSimulationSetupStage(2), 0);
+    // 초기 상황과 에이전트 완료 효과는 비동기로 교차한다. 이미 다음 단계가 열렸다면
+    // 늦게 실행된 이전 단계 효과가 화면을 다시 가리지 않도록 단계는 앞으로만 이동한다.
+    const timer = window.setTimeout(() => setSimulationSetupStage((stage) => Math.max(stage, 2)), 0);
     return () => window.clearTimeout(timer);
   }, [investmentConfirmed, contextDwellComplete]);
 
   useEffect(() => {
-    if (!investmentConfirmed || !agentProfilesReady || !agentProfileStartedAt) return;
-    const remaining = Math.max(0, AGENT_PROFILE_MIN_MS - (Date.now() - agentProfileStartedAt));
-    const timer = window.setTimeout(() => setSimulationSetupStage(3), remaining);
+    if (!investmentConfirmed || !agentProfilesReady) return;
+    // 캐시된 프로필 응답에서도 1.5초의 준비 화면을 유지하되, 이전 렌더에서 시작
+    // 시각이 유실돼도 완료 화면이 영구히 막히지 않도록 현재 시각을 안전한 기준으로 쓴다.
+    const startedAt = agentProfileStartedAt ?? Date.now();
+    const remaining = Math.max(0, AGENT_PROFILE_MIN_MS - (Date.now() - startedAt));
+    const timer = window.setTimeout(() => setSimulationSetupStage((stage) => Math.max(stage, 3)), remaining);
     return () => window.clearTimeout(timer);
   }, [investmentConfirmed, agentProfilesReady, agentProfileStartedAt]);
 
