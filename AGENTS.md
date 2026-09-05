@@ -45,7 +45,7 @@
 - 사건 개수와 시장 참여자 수는 사용자 설정이 아니다. 백엔드가 기간별로 `10일=2개`, `20일=3개`, `60일=5개` 사건을 고르고, 개인 8·외국인 4·기관 4·연기금 2 에이전트를 내부 구성한다. 사건 사이 거래일을 재배치해 선택한 전체 기간과 일치시킨다.
 - 기존 보유로 시작하면 `initial_position.quantity`와 `initial_position.average_price`가 게임에 반영된다. 미실현 손익은 평단 기준으로 보여주며 시뮬레이션 수익률은 시작 시점의 현금+현재가 평가액(`initial_equity`)을 기준으로 0%에서 시작한다.
 - 모의투자 2단계 `자료 수집`은 `GET /api/paper-trading/securities/:ticker/scenario-context`로 시나리오 엔진과 동일한 종목별 DB 조회를 미리 수행한다. 시장·경제·사건·커뮤니티 네 도메인의 건수·최신 시점을 표시하며, 결과는 로컬 이력 캐시에 남아 시나리오 생성 시 재사용된다. 이 단계는 OpenRouter·온톨로지·MiroFish를 실행하지 않는다.
-- 모의투자 4단계는 `GET /api/paper-trading/securities/:ticker/initial-context`로 같은 실제 이력의 시장·경제·사건·커뮤니티 데이터를 축약해 OpenRouter에 분석시키고, 현재 추세·수급·위험·주요 이슈·불확실성을 표시한다. 분석 결과는 `var/market_cache/initial-context-<지문>.json`에 12시간 캐시되며, 시나리오 시작 시 동일 캐시 결과를 게임에 `initial_context`로 저장한다. 캐시 지문은 입력 데이터와 분석 스키마 버전으로 계산하고, 실제 데이터와 미래 예측을 구분한다.
+- 모의투자 4단계는 `GET /api/paper-trading/securities/:ticker/initial-context`로 같은 실제 이력에서 종목 타깃형 `market/economy/events/community` Evidence Markdown을 먼저 만들고, 이 문서를 OpenRouter에 분석시켜 현재 추세·수급·위험·주요 이슈·불확실성을 표시한다. 문서와 분석 결과는 `var/market_cache/initial-context-<지문>/` 및 `initial-context-<지문>.json`에 12시간 캐시되며, 시나리오 시작 시 동일 분석을 게임에 `initial_context`로 저장한다. 캐시 지문은 입력 데이터와 분석 스키마 버전으로 계산하고, 실제 데이터와 미래 예측을 구분한다.
 
 ### 데이터·AI 흐름
 

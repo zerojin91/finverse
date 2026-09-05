@@ -11,11 +11,12 @@ import time
 from typing import Any
 
 from .config import Config
+from .evidence_documents import build_target_documents
 from .kospi_paper_trading import TradingError
 from .llm_client import LLMClient
 
 
-CONTEXT_SCHEMA_VERSION = "initial-context-v2"
+CONTEXT_SCHEMA_VERSION = "initial-context-v3"
 CONTEXT_CACHE_TTL_SECONDS = 12 * 60 * 60
 
 
@@ -202,6 +203,12 @@ def get_initial_context(history: dict[str, Any]) -> dict[str, Any]:
     source = _compact_input(history)
     fingerprint = hashlib.sha256(_json({"schema": CONTEXT_SCHEMA_VERSION, "source": source}).encode()).hexdigest()[:24]
     path = _cache_path(fingerprint)
+    document_dir = path.parent / f"initial-context-{fingerprint}"
+    document_files = build_target_documents(history, document_dir)
+    source["evidence_documents"] = {
+        key: (document_dir / filename).read_text(encoding="utf-8")[:16_000]
+        for key, filename in document_files.items()
+    }
     cached = _read_cache(path)
     if cached:
         return {**cached, "context_id": f"ctx_{fingerprint}", "cached": True}
@@ -224,6 +231,7 @@ def get_initial_context(history: dict[str, Any]) -> dict[str, Any]:
             "events": source["events"]["event_count"],
             "community_days": source["community"]["observed_days"],
             "as_of": source["provenance"],
+            "documents": list(document_files.values()),
         },
     }
     _write_cache(path, result)
