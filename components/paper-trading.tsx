@@ -694,14 +694,6 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
               width={Math.max(1, futureSlots * slot - 2)}
               height={PRICE_H + VOLUME_H - 3}
             />
-            <text
-              className="paper-candle-future-label"
-              x={bars.length * slot + (futureSlots * slot) / 2}
-              y={PRICE_H / 2}
-              textAnchor="middle"
-            >
-              앞으로 {futureSlots}거래일
-            </text>
           </g>
         )}
 
@@ -2107,10 +2099,9 @@ function TradingScreen({
       {coach && <CoachOverlay onDone={startFromCoach} worldMode={worldMode} />}
 
       <header className="paper-run-header">
-        <div>
+        <div className="paper-run-identity">
           <span>FINVERSE · PAPER TRADING</span>
           <h2 id="paper-trading-title">{game.name} <em>{game.ticker}</em></h2>
-          <p>{worldMode ? "World Agent · 59개 독립 시장 참여 에이전트" : game.scenario_premise || "이벤트 시나리오 모의 투자"}</p>
         </div>
         <div className="paper-run-header-actions">
           <div className="paper-quote">
