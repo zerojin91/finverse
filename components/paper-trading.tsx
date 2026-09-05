@@ -342,6 +342,7 @@ type ScenarioGame = {
   scenario_premise?: string;
   simulation_days?: number;
   investment_mode?: InvestmentMode;
+  initial_cash?: number;
   initial_equity?: number;
   data_source?: string;
   last_market_date?: string;
@@ -362,6 +363,9 @@ type DailyReflection = {
   event_id?: string | null;
   stance: "BUY_WATCH" | "HOLD_WATCH" | "SELL_WATCH";
   label: string;
+  quantity?: number;
+  order_side?: "BUY" | "SELL" | null;
+  order_id?: string | null;
   market_return_pct?: number;
   market_summary?: string;
   recorded_at?: string;
@@ -484,7 +488,7 @@ const PHASE_META: Record<Phase, {
     guide: "중요 사건이 공개됐습니다. 같은 공개 정보를 확인하고 세 가지 방향성 중 하나를 선택하면 시장이 진행됩니다.",
     todo: [
       "공개된 사건과 과거 유사 사례의 관계를 확인합니다.",
-      "매수 고려·관찰 계속·매도 고려 중 하나를 선택합니다. 수량이나 주문은 필요하지 않습니다.",
+      "매수 고려·관찰 계속·매도 고려 중 하나를 선택합니다. 매수·매도 시 개인 계좌에 반영할 수량을 입력합니다.",
       "선택한 판단은 학습 기록으로 남고, 59개 에이전트의 반응과 시장 결과가 이어집니다.",
     ],
     canOrder: false,
@@ -838,14 +842,18 @@ const DAILY_SUMMARY_GROUPS = [
 ] as const;
 
 function DailyPracticeCard({
-  round, event, reflection, disabled, onSelect,
+  round, event, reflection, portfolio, disabled, onSelect,
 }: {
   round?: AgentRound;
   event?: ScenarioEvent | null;
   reflection?: DailyReflection;
+  portfolio: Portfolio;
   disabled: boolean;
-  onSelect: (stance: DailyReflection["stance"]) => void;
+  onSelect: (stance: DailyReflection["stance"], quantity?: number) => void;
 }) {
+  const [draftStance, setDraftStance] = useState<DailyReflection["stance"]>(reflection?.stance ?? "HOLD_WATCH");
+  const [draftQuantity, setDraftQuantity] = useState(reflection?.quantity ? String(reflection.quantity) : "");
+
   if (!round && !event) {
     return (
       <div className="paper-daily-practice waiting">
@@ -854,6 +862,18 @@ function DailyPracticeCard({
       </div>
     );
   }
+  const chooseStance = (stance: DailyReflection["stance"]) => {
+    setDraftStance(stance);
+    if (stance === "HOLD_WATCH") {
+      setDraftQuantity("");
+      onSelect(stance, 0);
+    }
+  };
+  const submitDecision = () => {
+    const quantity = Number.parseInt(draftQuantity, 10);
+    if (!Number.isInteger(quantity) || quantity < 1) return;
+    onSelect(draftStance, quantity);
+  };
   return (
     <div className="paper-daily-practice">
       <div className="paper-daily-practice-head">
@@ -895,15 +915,59 @@ function DailyPracticeCard({
           <button
             key={item.key}
             type="button"
-            className={`${item.key.toLowerCase()} ${(reflection?.stance ?? "HOLD_WATCH") === item.key ? "active" : ""}`}
-            onClick={() => onSelect(item.key)}
+            className={`${item.key.toLowerCase()} ${draftStance === item.key ? "active" : ""}`}
+            onClick={() => chooseStance(item.key)}
             disabled={disabled}
           >
             <b>{item.label}</b><span>{item.description}</span>
           </button>
         ))}
       </div>
-      <small>이 판단은 주문이 아니며 시장 가격을 움직이지 않습니다. 마지막 회고에서 다음 거래일 결과와 비교합니다.</small>
+      {draftStance !== "HOLD_WATCH" && (
+        <div className="paper-daily-quantity">
+          <label htmlFor="daily-decision-quantity">{draftStance === "BUY_WATCH" ? "다음 거래일 매수 수량" : "다음 거래일 매도 수량"}</label>
+          <div>
+            <input
+              id="daily-decision-quantity"
+              type="number"
+              min="1"
+              step="1"
+              value={draftQuantity}
+              onChange={(input) => setDraftQuantity(input.target.value)}
+              placeholder="수량 입력"
+              disabled={disabled}
+            />
+            <span>주</span>
+            <button type="button" onClick={submitDecision} disabled={disabled || !draftQuantity}>판단 기록</button>
+          </div>
+          <small>{draftStance === "BUY_WATCH"
+            ? `현재 현금 기준 약 ${Math.floor(portfolio.cash / Math.max(portfolio.mark_price, 1)).toLocaleString("ko-KR")}주까지 가능`
+            : `현재 보유 ${portfolio.quantity.toLocaleString("ko-KR")}주까지 가능`}</small>
+        </div>
+      )}
+      <small>관찰·매수·매도 판단은 시장 가격을 움직이지 않고 내 개인 포트폴리오에만 반영됩니다. 관찰을 유지하면 매매 없이 기록됩니다.</small>
+    </div>
+  );
+}
+
+function PortfolioSnapshot({ game }: { game: ScenarioGame }) {
+  const portfolio = game.portfolio;
+  const initialEquity = game.initial_equity ?? game.initial_cash ?? portfolio.equity;
+  return (
+    <div className="paper-portfolio-summary" aria-label="내 투자 상태">
+      <div className="paper-portfolio-summary-head">
+        <strong>내 투자 상태</strong>
+        <span>현재가 {won(portfolio.mark_price)}</span>
+      </div>
+      <div className="paper-portfolio-grid">
+        <div><span>시작 기준</span><strong>{won(initialEquity)}</strong></div>
+        <div><span>현재 총자산</span><strong>{won(portfolio.equity)}</strong></div>
+        <div><span>현금</span><strong>{won(portfolio.cash)}</strong></div>
+        <div><span>보유 평가액</span><strong>{won(portfolio.market_value)}</strong><small>{portfolio.quantity.toLocaleString("ko-KR")}주</small></div>
+      </div>
+      <div className={`paper-portfolio-return ${toneOf(portfolio.total_return_pct)}`}>
+        <span>현재 수익률</span><strong>{signedPct(portfolio.total_return_pct)}</strong>
+      </div>
     </div>
   );
 }
@@ -2236,7 +2300,7 @@ function TradingScreen({
   error: string | null;
   orderSubmitting: boolean;
   onOrder: (input: { side: "BUY" | "SELL"; quantity: number; rationale: string; confidence: number }) => void;
-  onDailyReflection: (stance: DailyReflection["stance"]) => void;
+  onDailyReflection: (stance: DailyReflection["stance"], quantity?: number) => void;
   onAdvance: (days?: number) => void;
 }) {
   // 모달은 사용자가 열었을 때만 마운트되므로 첫 렌더에서 바로 읽어도 안전하다.
@@ -2309,13 +2373,18 @@ function TradingScreen({
 
           <div className="paper-desk-scroll">
             {worldMode && (
-              <DailyPracticeCard
-                round={latestRound}
-                event={game.phase === "world_decision" ? game.current_event : null}
-                reflection={latestReflection}
-                disabled={busy || !["world_market", "world_decision"].includes(game.phase)}
-                onSelect={onDailyReflection}
-              />
+              <>
+                <PortfolioSnapshot game={game} />
+                <DailyPracticeCard
+                  key={`${reflectionMarketDate ?? "waiting"}-${game.phase}`}
+                  round={latestRound}
+                  event={game.phase === "world_decision" ? game.current_event : null}
+                  reflection={latestReflection}
+                  portfolio={game.portfolio}
+                  disabled={busy || !["world_market", "world_decision"].includes(game.phase)}
+                  onSelect={onDailyReflection}
+                />
+              </>
             )}
             {meta.canOrder && !worldMode
               ? <OrderDesk game={game} disabled={busy} onSubmit={onOrder} submitting={orderSubmitting} />
@@ -2572,13 +2641,13 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
     }
   }, [game]);
 
-  const recordDailyReflection = useCallback(async (stance: DailyReflection["stance"]) => {
+  const recordDailyReflection = useCallback(async (stance: DailyReflection["stance"], quantity = 0) => {
     if (!game || busy) return;
     setError(null);
     try {
       const payload = await callApi<{ game: ScenarioGame }>(`/scenarios/${game.game_id}/daily-reflections`, {
         method: "POST",
-        body: JSON.stringify({ stance }),
+        body: JSON.stringify({ stance, quantity }),
       });
       setGame(payload.game);
       if (payload.game.phase === "world_decision") {
