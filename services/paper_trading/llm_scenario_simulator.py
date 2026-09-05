@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 from typing import Any, Callable
 
+from .config import Config
+from .financial_actions import allowed_actions_for, normalize_financial_action
 from .kospi_paper_trading import TradingError
 from .llm_market_simulator import (
     LLMMarketUnavailable, _decision_prompt, _normalize, _parse_json,
@@ -198,3 +201,125 @@ def run_scenario_agent_round(
         recovered = _parse_json(repair).get("observations") or []
         parsed["observations"] = (parsed.get("observations") or []) + recovered
     return _normalize(parsed, persona_ids)
+
+
+def _individual_round_context(
+    game: dict[str, Any], persona: dict[str, Any], market_date: str,
+    world_information: dict[str, Any],
+) -> dict[str, Any]:
+    """Expose one agent's private state plus the same public world to it.
+
+    No other agent's portfolio or same-round decision appears here.  This is
+    the key distinction from the older aggregate JSON prompt.
+    """
+    group_state = ((game.get("market_psychology") or {}).get("groups") or {}).get(persona["group"], {})
+    return {
+        "ticker": game["ticker"], "name": game["name"], "trade_date": market_date,
+        "previous_close": game["current_price"],
+        "recent_sessions": [{"date": row.get("market_date"), "return_pct": row.get("return_pct", 0), "price": row.get("price")}
+                            for row in game.get("price_history", [])[-5:]],
+        "public_world": world_information,
+        "group_state": {key: value for key, value in group_state.items() if key != "memory"},
+        "agent": {
+            "persona_id": persona["persona_id"], "group": persona["group"],
+            "role": persona.get("role_key") or persona.get("strategy"),
+            "profile": persona.get("profile") or {},
+            "cash": persona["cash"], "quantity": persona["quantity"],
+            "average_price": persona["average_price"], "realized_pnl": persona.get("realized_pnl", 0),
+            "memory": (persona.get("memory") or [])[-8:],
+            "allowed_actions": allowed_actions_for(persona),
+        },
+    }
+
+
+def _individual_decision_messages(context: dict[str, Any]) -> list[dict[str, str]]:
+    return [
+        {"role": "system", "content": "당신은 한국 개별 종목 교육용 시뮬레이션의 독립 투자 에이전트 한 명이다. 공개된 정보와 자신의 프로필·자산·기억만 근거로 판단한다. 다른 에이전트의 주문을 알 수 없으며, 미래 사실·가격 예측·투자 권유를 만들지 않는다. 허용된 금융 액션만 선택하고 반드시 JSON 객체 하나만 반환한다."},
+        {"role": "user", "content": f"""{json.dumps(context, ensure_ascii=False)}
+반환 형식:
+{{"action_type":"허용 액션 하나","side":"BUY|SELL|HOLD","allocation_pct":0부터0.05,
+"confidence":0부터100,"sentiment":-1부터1,"rationale":"현재 판단 근거","memory_note":"다음 거래일에 남길 짧은 기억"}}
+"""},
+    ]
+
+
+def _scheduled_hold(persona: dict[str, Any], reason: str) -> dict[str, Any]:
+    return normalize_financial_action({
+        "action_type": "HOLD", "side": "HOLD", "allocation_pct": 0,
+        "confidence": 0, "sentiment": 0, "rationale": reason,
+        "memory_note": reason,
+    }, persona) | {"decision_source": "scheduled_hold"}
+
+
+def _agent_is_active(persona: dict[str, Any], game: dict[str, Any], world_information: dict[str, Any]) -> bool:
+    frequency = str(persona.get("activity_frequency") or "medium")
+    event = world_information.get("event")
+    if frequency == "low":
+        # 연기금은 중요한 사건 또는 5거래일 단위의 전략 점검 때만 LLM 행동한다.
+        return bool(event) or int((game.get("world") or {}).get("current_day") or 0) % 5 == 0
+    return True
+
+
+def _run_individual_decision(
+    game: dict[str, Any], persona: dict[str, Any], market_date: str,
+    world_information: dict[str, Any], chat: Callable[..., str] | None,
+) -> dict[str, Any]:
+    if not _agent_is_active(persona, game, world_information):
+        return _scheduled_hold(persona, "저빈도 전략 일정상 이번 거래일은 관망합니다.")
+    context = _individual_round_context(game, persona, market_date, world_information)
+    try:
+        raw = _chat_callable(chat)(
+            _individual_decision_messages(context), temperature=.45, max_tokens=850,
+            response_format={"type": "json_object"},
+        )
+        parsed = _parse_json(raw)
+        decision = normalize_financial_action(parsed, persona)
+        return {**decision, "decision_source": "llm"}
+    except Exception as exc:  # 개별 실패는 전체 시장의 실패가 아니다.
+        return _scheduled_hold(persona, "개별 판단 호출에 실패해 안전하게 관망합니다.") | {"decision_error": str(exc)[:300]}
+
+
+def run_individual_agent_round(
+    game: dict[str, Any], *, market_date: str, world_information: dict[str, Any],
+    phase: str = "inter_event", chat: Callable[..., str] | None = None,
+    progress: Callable[[int, int, str], None] | None = None,
+) -> dict[str, Any]:
+    """Run independent LLM decisions, one request per active market agent.
+
+    Worker concurrency is a transport concern only.  Each future carries one
+    persona and one private context; results are gathered after all calls so
+    no same-day order can leak into another agent's prompt.
+    """
+    personas = list(game.get("personas") or [])
+    decisions: list[dict[str, Any] | None] = [None] * len(personas)
+    workers = max(1, min(int(Config.AGENT_ACTION_PARALLEL_COUNT), 8))
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="agent-action") as executor:
+        futures = {
+            executor.submit(_run_individual_decision, game, persona, market_date, world_information, chat): index
+            for index, persona in enumerate(personas)
+        }
+        completed = 0
+        for future in as_completed(futures):
+            index = futures[future]
+            decisions[index] = future.result()
+            completed += 1
+            if progress:
+                progress(completed, len(personas), personas[index]["persona_id"])
+
+    normalized = [decision for decision in decisions if decision]
+    observations = [{
+        "investor_group": persona["group"], "platform": "market",
+        "sentiment": decision.get("sentiment", 0),
+        "engagement": max(1, int(decision.get("confidence", 0)) * 10),
+        "content": decision.get("rationale", ""), "rationale": decision.get("rationale", ""),
+    } for persona, decision in zip(personas, normalized)]
+    failures = sum(1 for row in normalized if row.get("decision_error"))
+    event = world_information.get("event") or {}
+    return {
+        "market_summary": str(event.get("description") or "공개된 시장 환경 아래 개별 에이전트가 독립 판단했습니다."),
+        "risk_flags": ([f"에이전트 {failures}명의 LLM 판단이 실패해 안전 관망 처리됐습니다."] if failures else []),
+        "observations": observations,
+        "persona_decisions": normalized,
+        "context_mode": "individual_agent_world",
+        "phase": phase,
+    }

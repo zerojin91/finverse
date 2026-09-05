@@ -58,12 +58,16 @@ type LeadSignal = {
 type ScenarioEvent = {
   event_id: string;
   sequence: number;
-  status: "hidden" | "revealed";
+  status: "hidden" | "revealed" | "public" | "absorbed";
   event_date: string;
-  pre_brief: string;
-  trading_days_until: number;
+  pre_brief?: string;
+  trading_days_until?: number;
   title?: string;
   description?: string;
+  public_signal?: string;
+  event_type?: "momentum" | "seasonal" | "surprise";
+  is_simulated?: boolean;
+  analogue_title?: string;
   released_signals?: LeadSignal[];
   ontology_source?: OntologySource;
 };
@@ -171,6 +175,25 @@ type InitialContextDocuments = {
   source_summary: InitialContextSourceSummary;
 };
 
+type AgentProfileGroup = {
+  key: "retail" | "foreign" | "institution" | "pension";
+  label: string;
+  count: number;
+  description: string;
+  strategies: string[];
+  average_risk_tolerance: number;
+  activity_frequency: string;
+  market_impact_tier: string;
+};
+
+type AgentProfiles = {
+  context_id: string;
+  schema_version: string;
+  profile_count: number;
+  cached: boolean;
+  groups: AgentProfileGroup[];
+};
+
 type ContextDocumentProgress = { key: "market" | "economy" | "events" | "community"; label: string; file: string; status: "waiting" | "generating" | "ready" };
 
 const INITIAL_CONTEXT_DOCUMENTS: ContextDocumentProgress[] = [
@@ -245,10 +268,11 @@ type PendingOrder = {
   confidence?: number | null;
 };
 
-type Phase = "inter_event_market" | "pre_event_decision" | "post_event_decision" | "completed";
+type Phase = "inter_event_market" | "pre_event_decision" | "post_event_decision" | "world_market" | "world_decision" | "completed";
 
 type ScenarioGame = {
   game_id: string;
+  mode?: "scenario" | "world";
   ticker: string;
   name: string;
   phase: Phase;
@@ -257,6 +281,7 @@ type ScenarioGame = {
   initial_reference_price: number;
   current_event: ScenarioEvent | null;
   current_event_index: number;
+  current_day_index?: number;
   total_events: number;
   portfolio: Portfolio;
   price_history: PricePoint[];
@@ -264,7 +289,6 @@ type ScenarioGame = {
   released_signals: LeadSignal[];
   scenario_premise?: string;
   simulation_days?: number;
-  practice_mode?: PracticeMode;
   investment_mode?: InvestmentMode;
   initial_equity?: number;
   data_source?: string;
@@ -355,7 +379,7 @@ const PLATFORM_LABEL: Record<string, string> = { reddit: "커뮤니티", x: "X" 
 const PHASE_META: Record<Phase, {
   label: string;
   eyebrow: string;
-  action: "advance_days" | "reveal" | "continue" | "report";
+  action: "advance_days" | "reveal" | "continue" | "advance" | "resolve" | "report";
   cta: string;
   guide: string;
   todo: string[];
@@ -400,6 +424,32 @@ const PHASE_META: Record<Phase, {
     ],
     canOrder: true,
   },
+  world_market: {
+    label: "다음 거래일 준비",
+    eyebrow: "WORLD AGENT MARKET",
+    action: "advance",
+    cta: "다음 거래일 진행",
+    guide: "World Agent가 초기 맥락과 직전 시장 반응을 기억해 다음 거래일의 공개 환경을 엽니다. 중대 사건이 나오면 사용자 판단을 먼저 기다립니다.",
+    todo: [
+      "다음 거래일을 열면 World Agent가 외부 환경을 갱신합니다.",
+      "59명의 개별 에이전트는 같은 공개 정보와 각자의 기억으로 독립 판단합니다.",
+      "중요 사건이 발생하면 시장 반응 전에 주문 티켓이 열립니다.",
+    ],
+    canOrder: false,
+  },
+  world_decision: {
+    label: "중요 사건 판단",
+    eyebrow: "WORLD EVENT DECISION",
+    action: "resolve",
+    cta: "판단 반영하고 시장 진행",
+    guide: "중요 사건이 공개됐습니다. 사용자와 59개 에이전트가 같은 공개 정보를 보고 각각 판단한 뒤 시장이 체결됩니다.",
+    todo: [
+      "공개된 사건과 과거 유사 사례의 관계를 확인합니다.",
+      "주문 티켓에서 매수·매도 또는 관망을 기록하고 판단 근거를 남깁니다.",
+      "판단 반영 후 에이전트 주문과 시장 체결 결과가 다음 WorldState에 기록됩니다.",
+    ],
+    canOrder: true,
+  },
   completed: {
     label: "시나리오 종료",
     eyebrow: "SCENARIO COMPLETE",
@@ -414,13 +464,15 @@ const PHASE_META: Record<Phase, {
   },
 };
 
-const STEP_ORDER: Phase[] = [
+const LEGACY_STEP_ORDER: Phase[] = [
   "inter_event_market", "pre_event_decision", "post_event_decision", "completed",
 ];
 const STEP_LABEL: Record<Phase, string> = {
   inter_event_market: "관망",
   pre_event_decision: "사전 판단",
   post_event_decision: "사후 대응",
+  world_market: "시장 진행",
+  world_decision: "중요 판단",
   completed: "회고",
 };
 
@@ -995,42 +1047,18 @@ function ReportView({
 /* ---------------------------------------------------------------- setup */
 
 type InvestmentMode = "new" | "holding";
-type PracticeMode = "balanced" | "stress" | "opportunity" | "random";
 
 const CASH_PRESETS = [10_000_000, 50_000_000, 100_000_000];
 const PREVIEW_STEP_MIN_MS = 1_500;
 const COLLECTION_STEP_MIN_MS = 1_500;
+const AGENT_PROFILE_MIN_MS = 1_500;
 const DURATION_OPTIONS = [
   { days: 10, label: "10거래일", caption: "단기 흐름" },
   { days: 20, label: "20거래일", caption: "한 달 연습" },
   { days: 60, label: "60거래일", caption: "중기 판단" },
 ];
-const AGENT_GROUP_CARDS = [
-  {
-    key: "retail", label: "개인 투자자", count: 8, icon: Users,
-    description: "가격 흐름과 뉴스에 빠르게 반응하는 단기 참여자",
-    strategies: ["모멘텀", "뉴스 반응형", "손실 회피", "가치"],
-    riskAversion: "0.45", halfLife: "2일", eventReaction: "1.05x",
-  },
-  {
-    key: "foreign", label: "외국인", count: 4, icon: TrendingUp,
-    description: "환율·글로벌 흐름과 대형주 비중을 함께 보는 참여자",
-    strategies: ["거시 민감", "환율 민감", "글로벌 대형주"],
-    riskAversion: "0.50", halfLife: "5일", eventReaction: "1.00x",
-  },
-  {
-    key: "institution", label: "기관", count: 4, icon: Landmark,
-    description: "펀드 흐름과 펀더멘털을 기준으로 포지션을 조정하는 참여자",
-    strategies: ["액티브 펀드", "단기 수급", "펀더멘털"],
-    riskAversion: "0.48", halfLife: "4일", eventReaction: "0.90x",
-  },
-  {
-    key: "pension", label: "연기금", count: 2, icon: Wallet,
-    description: "장기 보유와 리밸런싱을 우선하는 안정형 참여자",
-    strategies: ["장기 투자", "리밸런싱", "저변동성"],
-    riskAversion: "0.62", halfLife: "8일", eventReaction: "0.55x",
-  },
-];
+const AGENT_GROUP_ICON = { retail: Users, foreign: TrendingUp, institution: Landmark, pension: Wallet };
+const agentStrategyLabel = (value: string) => value.replaceAll("_", " ");
 
 const parsePositiveInteger = (value: string) => Number(value.replace(/[^0-9]/g, "")) || 0;
 
@@ -1075,6 +1103,11 @@ function SetupScreen({
   const [contextDocuments, setContextDocuments] = useState<ContextDocumentProgress[]>(INITIAL_CONTEXT_DOCUMENTS);
   const [contextDocumentSource, setContextDocumentSource] = useState<InitialContextDocuments | null>(null);
   const [contextDwellComplete, setContextDwellComplete] = useState(false);
+  const [agentProfiles, setAgentProfiles] = useState<AgentProfiles | null>(null);
+  const [agentProfileJob, setAgentProfileJob] = useState<Job | null>(null);
+  const [agentProfileError, setAgentProfileError] = useState<string | null>(null);
+  const [agentProfileRequestContextId, setAgentProfileRequestContextId] = useState<string | null>(null);
+  const [agentProfileStartedAt, setAgentProfileStartedAt] = useState<number | null>(null);
   const [simulationSetupStage, setSimulationSetupStage] = useState(0);
   const [resettingSetup, setResettingSetup] = useState(false);
   const [resetSetupError, setResetSetupError] = useState<string | null>(null);
@@ -1089,7 +1122,8 @@ function SetupScreen({
   const collectionReady = Boolean(collectionSources?.every((source) => source.status === "ready"));
   const collectionStepComplete = collectionReady && collectionDwellComplete;
   const initialContextReady = Boolean(initialContext?.analysis?.summary);
-  const initialContextReadyForStart = initialContextReady && contextDwellComplete;
+  const agentProfilesReady = Boolean(agentProfiles && agentProfiles.profile_count === 59);
+  const initialContextReadyForStart = initialContextReady && contextDwellComplete && agentProfilesReady;
   const openContextDocument = (domain: ContextDocumentProgress["key"]) => {
     if (!pickedTicker) return;
     const document = contextDocuments.find((item) => item.key === domain);
@@ -1120,6 +1154,11 @@ function SetupScreen({
       setContextDocumentSource(null);
       setContextDocuments(INITIAL_CONTEXT_DOCUMENTS);
       setContextDwellComplete(false);
+      setAgentProfiles(null);
+      setAgentProfileJob(null);
+      setAgentProfileError(null);
+      setAgentProfileRequestContextId(null);
+      setAgentProfileStartedAt(null);
       setSimulationSetupStage(0);
       setInvestmentConfirmed(false);
       window.setTimeout(() => step3Ref.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 180);
@@ -1255,15 +1294,65 @@ function SetupScreen({
 
   useEffect(() => {
     if (!investmentConfirmed || !contextDwellComplete) return;
-    const timer = window.setTimeout(() => setSimulationSetupStage(2), 1_500);
+    const timer = window.setTimeout(() => setSimulationSetupStage(2), 0);
     return () => window.clearTimeout(timer);
   }, [investmentConfirmed, contextDwellComplete]);
 
   useEffect(() => {
-    if (!investmentConfirmed || simulationSetupStage !== 2) return;
-    const timer = window.setTimeout(() => setSimulationSetupStage(3), 1_500);
+    if (!investmentConfirmed || !agentProfilesReady || !agentProfileStartedAt) return;
+    const remaining = Math.max(0, AGENT_PROFILE_MIN_MS - (Date.now() - agentProfileStartedAt));
+    const timer = window.setTimeout(() => setSimulationSetupStage(3), remaining);
     return () => window.clearTimeout(timer);
-  }, [investmentConfirmed, simulationSetupStage]);
+  }, [investmentConfirmed, agentProfilesReady, agentProfileStartedAt]);
+
+  useEffect(() => {
+    if (!pickedTicker || !initialContext || !contextDwellComplete || agentProfileRequestContextId === initialContext.context_id) return;
+    let cancelled = false;
+    setAgentProfileRequestContextId(initialContext.context_id);
+    setAgentProfileStartedAt(Date.now());
+    setAgentProfiles(null);
+    setAgentProfileError(null);
+    const prepare = async () => {
+      try {
+        const payload = await callApi<{ data: { status: "ready" | "running"; job?: Job } & AgentProfiles }>(
+          `/securities/${encodeURIComponent(pickedTicker)}/agent-profiles/prepare`, { method: "POST" });
+        if (cancelled) return;
+        if (payload.data.status === "ready") {
+          setAgentProfiles(payload.data);
+          setAgentProfileJob(null);
+        } else {
+          setAgentProfileJob(payload.data.job ?? null);
+        }
+      } catch (cause) {
+        if (!cancelled) setAgentProfileError(cause instanceof Error ? cause.message : "시장 참여 에이전트 프로필을 만들지 못했습니다.");
+      }
+    };
+    void prepare();
+    return () => { cancelled = true; };
+  }, [pickedTicker, initialContext, contextDwellComplete, agentProfileRequestContextId]);
+
+  useEffect(() => {
+    if (!pickedTicker || !agentProfileJob || agentProfileJob.status === "completed" || agentProfileJob.status === "failed") return;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const payload = await callApi<{ data: Job }>(`/scenario-jobs/${agentProfileJob.job_id}`);
+        if (cancelled) return;
+        const next = payload.data;
+        setAgentProfileJob(next);
+        if (next.status === "completed") {
+          const ready = await callApi<{ data: { status: "ready" } & AgentProfiles }>(`/securities/${encodeURIComponent(pickedTicker)}/agent-profiles`);
+          if (!cancelled && ready.data.status === "ready") setAgentProfiles(ready.data);
+        } else if (next.status === "failed") {
+          setAgentProfileError(next.error ?? "시장 참여 에이전트 프로필 생성에 실패했습니다.");
+        }
+      } catch (cause) {
+        if (!cancelled) setAgentProfileError(cause instanceof Error ? cause.message : "프로필 생성 진행 상태를 확인하지 못했습니다.");
+      }
+    };
+    const timer = window.setTimeout(() => { void poll(); }, 900);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [pickedTicker, agentProfileJob]);
 
   useEffect(() => {
     if (!pickedTicker || !previewStepVisible) return;
@@ -1315,6 +1404,12 @@ function SetupScreen({
     setContextDocumentSource(null);
     setResetSetupError(null);
     setContextDwellComplete(false);
+    setAgentProfiles(null);
+    setAgentProfileJob(null);
+    setAgentProfileError(null);
+    setAgentProfileRequestContextId(null);
+    setAgentProfileStartedAt(null);
+    setSimulationSetupStage(0);
     setPicked(item);
     setQuery(item.name);
     setResults([]);
@@ -1415,6 +1510,12 @@ function SetupScreen({
                 setInitialContextError(null);
                 setContextDocuments(INITIAL_CONTEXT_DOCUMENTS);
                 setContextDwellComplete(false);
+                setAgentProfiles(null);
+                setAgentProfileJob(null);
+                setAgentProfileError(null);
+                setAgentProfileRequestContextId(null);
+                setAgentProfileStartedAt(null);
+                setSimulationSetupStage(0);
               }
             }}
             placeholder="종목명 또는 티커로 검색 (예: 삼성전자, 005930)"
@@ -1602,30 +1703,38 @@ function SetupScreen({
         {simulationSetupStage >= 2 && <div className="paper-agent-field paper-setup-reveal">
           <div className="paper-simulation-label">
             <span>시장 참여 에이전트</span>
-            <small>총 18명 · 시나리오 시작 시 실제 설정으로 생성</small>
+            <small>{agentProfilesReady ? "총 59명 · 개별 프로필 준비 완료" : agentProfileJob ? `개별 프로필 생성 ${agentProfileJob.progress}%` : "초기 맥락을 바탕으로 개별 프로필 준비 중"}</small>
           </div>
-          <div className="paper-agent-grid">
-            {AGENT_GROUP_CARDS.map((agent) => {
-              const Icon = agent.icon;
-              return (
-                <article className={`paper-agent-card ${agent.key}`} key={agent.key}>
-                  <header>
-                    <div className="paper-agent-title"><Icon size={15} /><strong>{agent.label}</strong></div>
-                    <b>{agent.count}명</b>
-                  </header>
-                  <p>{agent.description}</p>
-                  <div className="paper-agent-tags">
-                    {agent.strategies.map((strategy) => <span key={strategy}>{strategy}</span>)}
-                  </div>
-                  <dl className="paper-agent-metrics">
-                    <div><dt>위험 회피</dt><dd>{agent.riskAversion}</dd></div>
-                    <div><dt>심리 반감기</dt><dd>{agent.halfLife}</dd></div>
-                    <div><dt>이벤트 반응</dt><dd>{agent.eventReaction}</dd></div>
-                  </dl>
-                </article>
-              );
-            })}
-          </div>
+          {agentProfilesReady ? (
+            <div className="paper-agent-grid">
+              {agentProfiles?.groups.map((agent) => {
+                const Icon = AGENT_GROUP_ICON[agent.key];
+                return (
+                  <article className={`paper-agent-card ${agent.key}`} key={agent.key}>
+                    <header>
+                      <div className="paper-agent-title"><Icon size={15} /><strong>{agent.label}</strong></div>
+                      <b>{agent.count}명</b>
+                    </header>
+                    <p>{agent.description}</p>
+                    <div className="paper-agent-tags">
+                      {agent.strategies.slice(0, 4).map((strategy) => <span key={strategy}>{agentStrategyLabel(strategy)}</span>)}
+                    </div>
+                    <dl className="paper-agent-metrics">
+                      <div><dt>위험 허용</dt><dd>{agent.average_risk_tolerance.toFixed(2)}</dd></div>
+                      <div><dt>행동 빈도</dt><dd>{agent.activity_frequency === "high" ? "높음" : agent.activity_frequency === "medium" ? "보통" : "낮음"}</dd></div>
+                      <div><dt>시장 영향</dt><dd>{agent.market_impact_tier === "very_high" ? "매우 큼" : agent.market_impact_tier === "high" ? "큼" : agent.market_impact_tier === "medium" ? "중간" : "낮음"}</dd></div>
+                    </dl>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="paper-agent-progress" role="status">
+              <LoaderCircle size={16} className="spin" />
+              <div><strong>{agentProfileJob?.message ?? "59개 개별 에이전트가 초기 상황을 읽고 있습니다."}</strong><span>각 에이전트는 다른 에이전트와 분리된 LLM 호출과 자신의 투자 특성으로 생성됩니다.</span></div>
+            </div>
+          )}
+          {agentProfileError && <p className="paper-inline-error">{agentProfileError}</p>}
         </div>}
       </section>
       )}
@@ -1646,7 +1755,7 @@ function SetupScreen({
             </div>
             <div className="paper-ready-hint">
               <CalendarClock size={13} />
-              초기 맥락과 실제 자료를 바탕으로 시장 참여자와 사건을 구성합니다. 거래일 하나를 넘기는 데 15~25초 정도 걸립니다.
+              World Agent가 실제 과거 근거를 바탕으로 매 거래일 외부 환경을 갱신합니다. 중요한 사건은 사용자 판단을 받은 뒤 59개 에이전트의 반응과 함께 체결됩니다.
             </div>
             <div className="paper-ready-actions">
               <button className="paper-reset-button" type="button" onClick={() => void restartSetup()} disabled={starting || resettingSetup}>
@@ -1654,14 +1763,14 @@ function SetupScreen({
               </button>
               <button className="paper-start-button" type="submit" disabled={starting || resettingSetup || !initialContextReadyForStart}>
                 {starting
-                  ? <><LoaderCircle size={17} className="spin" /> 수집한 자료로 시나리오를 만들고 있습니다</>
+                  ? <><LoaderCircle size={17} className="spin" /> World Agent 시뮬레이션을 준비하고 있습니다</>
                   : <><CircleDollarSign size={17} /> 모의 투자 시작하기 <ArrowRight size={16} /></>}
               </button>
             </div>
             {resetSetupError && <p className="paper-inline-error">{resetSetupError}</p>}
             {starting && (
               <p className="paper-start-note">
-                수집한 시장·경제·사건·커뮤니티 자료를 바탕으로 시나리오를 구성합니다. 최초 조회는 30초 정도 걸릴 수 있습니다.
+                초기 상황과 59개 개별 에이전트 프로필을 불러오고 있습니다. 최초 생성은 잠시 걸릴 수 있습니다.
               </p>
             )}
           </section>
@@ -1805,29 +1914,41 @@ function OrderDesk({
 
 const COACH_KEY = "finverse.paper-trading.coach";
 
-function CoachOverlay({ onDone }: { onDone: () => void }) {
+function CoachOverlay({ onDone, worldMode = false }: { onDone: () => void; worldMode?: boolean }) {
   return (
     <div className="paper-coach" role="dialog" aria-label="모의 투자 사용 방법">
       <div className="paper-coach-card">
         <span>HOW IT WORKS</span>
-        <h3>한 번의 이벤트를 네 단계로 겪습니다</h3>
+        <h3>{worldMode ? "World Agent와 거래일을 함께 진행합니다" : "한 번의 이벤트를 네 단계로 겪습니다"}</h3>
+        {worldMode ? (
+          <ol>
+            <li><b>외부 환경</b><p>World Agent가 초기 상황과 직전 시장 반응을 기억해 다음 거래일의 공개 환경을 만듭니다.</p></li>
+            <li><b>독립 판단</b><p>59명의 에이전트가 서로의 주문을 보지 않고 각자 프로필·포트폴리오·기억만으로 판단합니다.</p></li>
+            <li><b>중요 사건</b><p>중요한 사건은 사용자에게 먼저 공개됩니다. 매수·매도 또는 관망 이유와 확신을 남겨주세요.</p></li>
+            <li><b>회고</b><p>완료 후 사용자 판단의 추격·손실 회피·과신·과매매 패턴을 중심으로 돌아봅니다.</p></li>
+          </ol>
+        ) : (
         <ol>
           <li><b>관망</b><p>이벤트 직전까지 하루씩 장이 열립니다. 18명의 에이전트가 스스로 거래하고, 뉴스·루머가 순서대로 흘러나옵니다. 주문은 낼 수 없습니다.</p></li>
           <li><b>사전 판단</b><p>이벤트 내용은 아직 비공개입니다. 신호만 보고 매수·매도를 담습니다. 담지 않으면 관망으로 기록됩니다.</p></li>
           <li><b>공개와 대응</b><p>이벤트가 드러나고 시장이 반응합니다. 과잉 반응인지 추세인지 판단해 다시 주문합니다.</p></li>
           <li><b>회고</b><p>모든 이벤트가 끝나면 매 판단의 근거와 결과를 묶은 리포트를 받습니다.</p></li>
         </ol>
+        )}
         <button type="button" onClick={onDone}>시작하기 <ArrowRight size={15} /></button>
       </div>
     </div>
   );
 }
 
-function PhaseStepper({ phase }: { phase: Phase }) {
-  const active = STEP_ORDER.indexOf(phase);
+function PhaseStepper({ phase, worldMode = false }: { phase: Phase; worldMode?: boolean }) {
+  const steps: Phase[] = worldMode
+    ? ["world_market", "world_decision", "completed"]
+    : LEGACY_STEP_ORDER;
+  const active = steps.indexOf(phase);
   return (
     <ol className="paper-stepper">
-      {STEP_ORDER.map((step, index) => (
+      {steps.map((step, index) => (
         <li key={step} className={index < active ? "done" : index === active ? "active" : ""}>
           <i>{index < active ? <CheckCircle2 size={12} /> : index + 1}</i>
           <span>{STEP_LABEL[step]}</span>
@@ -1877,27 +1998,30 @@ function TradingScreen({
   const tab = tabChoice ?? (game.phase === "completed" && assessment ? "report" : "feed");
 
   const meta = PHASE_META[game.phase] ?? PHASE_META.inter_event_market;
+  const worldMode = game.mode === "world";
   const portfolio = game.portfolio;
   const returnTone = toneOf(portfolio.total_return_pct);
   const priceChangePct = game.initial_reference_price
     ? ((game.current_price - game.initial_reference_price) / game.initial_reference_price) * 100
     : 0;
   const priceTone = toneOf(priceChangePct);
-  const eventProgress = game.total_events
-    ? Math.min(100, ((game.phase === "completed" ? game.total_events : game.current_event_index) / game.total_events) * 100)
-    : 0;
+  const totalProgressUnits = worldMode ? (game.simulation_days ?? 0) : game.total_events;
+  const currentProgressUnits = worldMode
+    ? (game.phase === "completed" ? totalProgressUnits : game.current_day_index ?? 0)
+    : (game.phase === "completed" ? game.total_events : game.current_event_index);
+  const eventProgress = totalProgressUnits ? Math.min(100, (currentProgressUnits / totalProgressUnits) * 100) : 0;
   const latestRound = game.agent_rounds?.[game.agent_rounds.length - 1];
   const event = game.current_event;
 
   return (
     <div className="paper-run">
-      {coach && <CoachOverlay onDone={dismissCoach} />}
+      {coach && <CoachOverlay onDone={dismissCoach} worldMode={worldMode} />}
 
       <header className="paper-run-header">
         <div>
           <span>FINVERSE · PAPER TRADING</span>
           <h2 id="paper-trading-title">{game.name} <em>{game.ticker}</em></h2>
-          <p>{game.scenario_premise || "이벤트 시나리오 모의 투자"}</p>
+          <p>{worldMode ? "World Agent · 59개 독립 시장 참여 에이전트" : game.scenario_premise || "이벤트 시나리오 모의 투자"}</p>
         </div>
         <div className="paper-run-header-actions">
           <div className="paper-quote">
@@ -1912,8 +2036,10 @@ function TradingScreen({
 
       <section className="paper-run-overview" aria-label="시나리오 진행 현황">
         <div className="paper-progress-copy">
-          <PhaseStepper phase={game.phase} />
-          <strong>{game.phase === "completed" ? game.total_events : game.current_event_index + 1} / {game.total_events} 이벤트</strong>
+          <PhaseStepper phase={game.phase} worldMode={worldMode} />
+          <strong>{worldMode
+            ? `${currentProgressUnits} / ${totalProgressUnits} 거래일`
+            : `${game.phase === "completed" ? game.total_events : game.current_event_index + 1} / ${game.total_events} 이벤트`}</strong>
         </div>
         <div className="paper-progress"><i style={{ width: `${busy && job ? job.progress : eventProgress}%` }} className={busy ? "busy" : ""} /></div>
         <div className="paper-metrics">
@@ -1947,7 +2073,7 @@ function TradingScreen({
         <section className="paper-panel paper-chart-panel" aria-label="가격 차트">
           <div className="paper-panel-heading">
             <div><CandlestickChart size={15} /><span>시나리오 캔들</span></div>
-            <em>{game.last_market_date ? `${game.last_market_date} 기준` : "시작 전"}</em>
+            <em>{(game.last_market_date ?? latestRound?.market_date) ? `${game.last_market_date ?? latestRound?.market_date} 기준` : "시작 전"}</em>
           </div>
           <CandleChart game={game} />
           <PsychologyStrip round={latestRound} />
@@ -2050,12 +2176,14 @@ function TradingScreen({
             <div className={`paper-event-card ${event.status}`}>
               <div className="paper-event-top">
                 <span><CalendarClock size={13} /> 이벤트 {event.sequence}</span>
-                <em>{event.event_date} 예정 · {event.trading_days_until}거래일 남음</em>
+                <em>{worldMode ? `${event.event_date} · ${event.event_type === "seasonal" ? "계절성" : event.event_type === "surprise" ? "서프라이즈" : "모멘텀"}` : `${event.event_date} 예정 · ${event.trading_days_until}거래일 남음`}</em>
               </div>
-              {event.status === "revealed" && event.title
+              {(event.status === "revealed" || worldMode) && event.title
                 ? <strong>{event.title}</strong>
                 : <strong className="masked">아직 공개되지 않은 이벤트</strong>}
-              <p>{event.status === "revealed" && event.description ? event.description : event.pre_brief}</p>
+              <p>{(event.status === "revealed" || worldMode) && event.description ? event.description : event.pre_brief}</p>
+              {worldMode && event.public_signal && <div className="paper-provenance pending"><Landmark size={12} /><span>{event.public_signal}</span></div>}
+              {worldMode && event.analogue_title && <div className="paper-provenance"><Landmark size={12} /><span>시작 전 실제 유사 사례 기반 · {event.analogue_title}</span></div>}
               {event.status === "revealed" && event.ontology_source
                 ? <EventProvenanceStrip source={event.ontology_source} />
                 : event.ontology_source && (
@@ -2090,7 +2218,9 @@ function TradingScreen({
       <footer className="paper-run-footer">
         <span>GAME {game.game_id.slice(0, 22)}</span>
         <span>
-          {game.event_provenance?.mode === "ontology_events"
+          {worldMode
+            ? "World Agent의 사건은 시작 전 실제 유사 사례를 검색해 만든 교육용 가상 전개"
+            : game.event_provenance?.mode === "ontology_events"
             ? `실제 시장 사건 기반${game.event_provenance.sector ? ` · ${game.event_provenance.sector}` : ""}` +
               ` · 후보 ${(game.event_provenance.macro_candidates ?? 0) + (game.event_provenance.micro_candidates ?? 0)}건`
             : "AI 생성 가상 이벤트"} · 실제 투자 결과를 보장하지 않는 교육용 시뮬레이션입니다.
@@ -2169,7 +2299,6 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
           investment_mode: input.investmentMode,
           simulation_days: input.simulationDays,
           context_id: input.initialContextId,
-          event_source: "ontology",
           // 캐시 리플레이 이력은 종가만 있어 캔들이 선으로 뭉개진다.
           // finverse는 실제 OHLC를 쓰고, DB가 죽었을 때만 백엔드가 캐시로 내려간다.
           prefer_live_finverse: true,

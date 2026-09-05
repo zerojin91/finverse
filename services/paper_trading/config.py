@@ -61,6 +61,11 @@ class Config:
     OPENROUTER_APP_URL = os.environ.get("OPENROUTER_APP_URL", "https://finverse.local").strip()
     OPENROUTER_APP_TITLE = os.environ.get("OPENROUTER_APP_TITLE", "FINVERSE Paper Trading").strip()
 
+    # 독립 에이전트는 각각 LLM 호출을 하지만, 프로필 생성과 거래일 행동의
+    # 동시 실행 수는 제한한다. 한 요청에 여러 에이전트를 합치는 값이 아니다.
+    AGENT_PROFILE_PARALLEL_COUNT = int(os.environ.get("FINVERSE_AGENT_PROFILE_PARALLEL_COUNT", 5))
+    AGENT_ACTION_PARALLEL_COUNT = int(os.environ.get("FINVERSE_AGENT_ACTION_PARALLEL_COUNT", 4))
+
     @classmethod
     def use_openrouter(cls) -> bool:
         return bool(cls.OPENROUTER_API_KEY)

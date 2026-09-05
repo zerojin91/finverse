@@ -21,7 +21,7 @@ class PaperGameStore:
         self.root.mkdir(parents=True, exist_ok=True)
 
     def _path(self, game_id: str) -> Path:
-        if not game_id.startswith(("kospi_", "scenario_")) or not game_id.replace("_", "").isalnum():
+        if not game_id.startswith(("kospi_", "scenario_", "world_")) or not game_id.replace("_", "").isalnum():
             raise ValueError("올바르지 않은 게임 ID입니다.")
         return self.root / f"{game_id}.json"
 
@@ -49,7 +49,8 @@ class PaperGameStore:
     def list(self, limit: int = 50) -> list[dict[str, Any]]:
         games = []
         with self._lock:
-            paths = sorted([*self.root.glob("kospi_*.json"), *self.root.glob("scenario_*.json")],
+            paths = sorted([*self.root.glob("kospi_*.json"), *self.root.glob("scenario_*.json"),
+                            *self.root.glob("world_*.json")],
                            key=lambda p: p.stat().st_mtime, reverse=True)
             for path in paths[:max(1, min(limit, 100))]:
                 with path.open("r", encoding="utf-8") as handle:

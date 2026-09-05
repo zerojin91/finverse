@@ -254,11 +254,25 @@ def new_scenario_game(
 
 
 def current_event(game: dict[str, Any]) -> dict[str, Any] | None:
+    if game.get("mode") == "world":
+        return (game.get("world") or {}).get("active_event")
     index = game["current_event_index"]
     return game["events"][index] if index < len(game["events"]) else None
 
 
 def public_scenario_game(game: dict[str, Any]) -> dict[str, Any]:
+    if game.get("mode") == "world":
+        # World Agent 사건은 사용자와 모든 에이전트에게 동시에 공개되는 정보다.
+        # 미래용 내부 기획 정보는 없으므로 현재 활성 사건만 안전하게 돌려준다.
+        result = {key: value for key, value in game.items() if key not in ("events", "personas")}
+        event = current_event(game)
+        result["current_event"] = dict(event) if event else None
+        result["total_events"] = len(((game.get("world") or {}).get("memory") or {}).get("event_ledger") or [])
+        result["portfolio"] = scenario_portfolio(game)
+        model = dict(result.get("impact_model") or {})
+        model.pop("return_distribution_pct", None)
+        result["impact_model"] = model
+        return result
     result = {key: value for key, value in game.items() if key != "events"}
     event = current_event(game)
     if event:
@@ -484,7 +498,7 @@ def apply_agent_round(game: dict[str, Any], round_data: dict[str, Any], *,
         sell += notional if side == "SELL" else 0
         orders.append({**decision, "group": persona["group"], "strategy": persona["strategy"],
                        "side": side, "quantity": quantity, "notional": notional,
-                       "decision_source": "llm"})
+                       "decision_source": decision.get("decision_source", "llm")})
     gross = buy + sell
     imbalance = (buy - sell) / gross if gross else 0.0
     total_persona_equity = sum(
@@ -541,6 +555,16 @@ def apply_agent_round(game: dict[str, Any], round_data: dict[str, Any], *,
                 persona["average_price"] = 0
         order["filled_quantity"] = quantity
         order["fill_price"] = next_price if quantity else None
+        # 에이전트 메모리는 프로필과 분리해 게임 파일에 영속한다. 다음 거래일
+        # 프롬프트에는 자신의 최근 판단과 결과만 들어가며 타인의 주문은 들어가지 않는다.
+        persona.setdefault("memory", []).append({
+            "market_date": market_date, "phase": phase,
+            "action_type": order.get("action_type", "HOLD"), "side": order["side"],
+            "quantity": quantity, "fill_price": order["fill_price"],
+            "rationale": str(order.get("rationale") or "")[:300],
+            "note": str(order.get("memory_note") or "")[:300],
+        })
+        persona["memory"] = persona["memory"][-12:]
     game["current_price"] = next_price
     result = {"round_id": f"rnd_{uuid.uuid4().hex[:10]}", "phase": phase,
               "label": label, "market_date": market_date,

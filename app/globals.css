@@ -1076,6 +1076,11 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-duration-options strong { font-size: 10px; }
 .paper-duration-options small { color: var(--light); font-size: 8px; }
 .paper-agent-field { width: 100%; display: flex; flex-direction: column; gap: 10px; padding: 13px 14px 14px; border: 1px solid var(--line); border-radius: 10px; background: #fafafa; }
+.paper-agent-progress { min-height: 112px; display: flex; align-items: center; gap: 10px; padding: 16px; border: 1px dashed #cbd5e1; border-radius: 9px; color: #475569; background: #fff; }
+.paper-agent-progress > svg { flex: 0 0 auto; color: #2563eb; }
+.paper-agent-progress > div { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
+.paper-agent-progress strong { color: var(--ink); font-size: 10px; line-height: 1.5; }
+.paper-agent-progress span { color: var(--muted); font-size: 9px; line-height: 1.55; }
 .paper-agent-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; }
 .paper-agent-card { min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid #e4e4e7; border-radius: 9px; background: #fff; }
 .paper-agent-card > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -1128,6 +1133,8 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-phase-pill { display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; border-radius: 999px; color: #3730a3; background: #eef2ff; font-size: 9px; font-weight: 900; letter-spacing: .06em; white-space: nowrap; }
 .paper-phase-pill.pre_event_decision { color: #9a3412; background: #fff7ed; }
 .paper-phase-pill.post_event_decision { color: #1d4ed8; background: #eff6ff; }
+.paper-phase-pill.world_market { color: #1d4ed8; background: #eff6ff; }
+.paper-phase-pill.world_decision { color: #9a3412; background: #fff7ed; }
 .paper-phase-pill.completed { color: #166534; background: #ecfdf3; }
 .paper-phase-pill i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: livePulse 1.8s ease-out infinite; }
 .paper-run-overview { flex: 0 0 auto; padding: 11px 24px 12px; border-bottom: 1px solid var(--line); background: #fff; }
