@@ -12,6 +12,14 @@
 - 변경 기록: 신규·수정·삭제 상태, 이전/현재 레코드 해시, 관측 시각
 - 실행 상태: 업로드·댓글·답글별 다음 페이지 토큰, 남은 영상 수, 호출 수와 종료 사유
 
+모든 YouTube 채널·영상·댓글 레코드에는 데이터 영역과 원천을 명시하는 다음 필드가 들어간다.
+
+```json
+{"category":"community_v2","tags":{"source":"youtube"}}
+```
+
+YouTube API 원본의 `source=youtube_data_api`는 수집 방식 식별용으로 유지하고, `tags.source=youtube`는 여러 커뮤니티 원천을 같은 `community_v2` 영역에서 구분하는 조회 태그로 사용한다.
+
 작성자 이름, 작성자 채널 ID, 프로필 URL은 API 응답 필드에서 제외한다. 원본 댓글 ID와 댓글 deep-link도 저장하지 않는다. 댓글·부모·스레드 ID는 `YOUTUBE_ID_HASH_SALT`를 사용한 HMAC-SHA256으로 가명화한다. 본문의 이메일, 국내 휴대전화 번호와 IPv4 주소는 대체 문자열로 가린다.
 
 ## 채널 30개 선정과 고정
@@ -272,18 +280,19 @@ data/youtube_comments/
 {"record_id":"youtube:video:VIDEO_ID","record_type":"youtube_video","video_id":"VIDEO_ID","channel_id":"UC...","title":"HBM 시장 전망","video_filter":"semiconductor","video_filter_terms":["hbm"],"published_at":"2026-08-01T00:00:00+00:00","record_hash":"..."}
 ```
 
-회사 검색으로 발견된 영상과 댓글에는 같은 `search_tags`, `search_matches`가 추가된다. PostgreSQL 적재 후에는 다음처럼 회사별 댓글을 확인할 수 있다.
+회사 검색으로 발견된 영상과 댓글에는 같은 `search_tags`, `search_matches`가 추가된다. PostgreSQL 적재 후에는 `psychology.community_v2`에서 다음처럼 회사별 YouTube 댓글을 확인할 수 있다. 기존 소비자를 위한 `psychology.youtube_comment`는 같은 데이터의 호환 뷰로 유지된다.
 
 ```sql
 SELECT published_at, video_title, comment_text, search_tags
-FROM psychology.youtube_comment
+FROM psychology.community_v2
 WHERE search_tags ? '삼성전자'
+  AND tags->>'source' = 'youtube'
 ORDER BY published_at DESC
 LIMIT 100;
 ```
 
 ```json
-{"record_id":"youtube:comment:hmac-sha256:...","record_type":"youtube_comment","channel_id":"UC...","video_id":"VIDEO_ID","comment_id":"hmac-sha256:...","parent_comment_id":null,"thread_id":"hmac-sha256:...","text":"댓글 본문","like_count":3,"reply_count":1,"published_at":"2026-08-01T01:02:03Z","updated_at":"2026-08-02T01:02:03Z","refreshed_at":"...","expires_at":"...","record_hash":"..."}
+{"record_id":"youtube:comment:hmac-sha256:...","record_type":"youtube_comment","category":"community_v2","tags":{"source":"youtube"},"channel_id":"UC...","video_id":"VIDEO_ID","comment_id":"hmac-sha256:...","parent_comment_id":null,"thread_id":"hmac-sha256:...","text":"댓글 본문","like_count":3,"reply_count":1,"published_at":"2026-08-01T01:02:03Z","updated_at":"2026-08-02T01:02:03Z","refreshed_at":"...","expires_at":"...","record_hash":"..."}
 ```
 
 ## 29일 보관과 쿼터 조건

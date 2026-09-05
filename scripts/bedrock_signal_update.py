@@ -27,7 +27,7 @@ SOURCE_SCOPES = {
     "economy": ["economy.observation"],
     "country": ["events.news.country_codes"],
     "event": ["events.news.event_types", "lake.records.market_investor_flow_daily"],
-    "community": ["lake.records.youtube_comment"],
+    "community": ["psychology.community_v2"],
 }
 
 SYSTEM_PROMPT = """당신은 FINVERSE의 금융 데이터 요약 엔진이다.
@@ -201,6 +201,8 @@ def snapshot() -> dict:
           SELECT payload
           FROM lake.records
           WHERE record_type = 'youtube_comment'
+            AND payload->>'category' = 'community_v2'
+            AND payload->'tags'->>'source' = 'youtube'
           ORDER BY collected_at DESC NULLS LAST
           LIMIT 5000
         ),

@@ -42,6 +42,7 @@ API_ROOT = "https://www.googleapis.com/youtube/v3"
 DEFAULT_QUERY = "국내주식|코스피|코스닥|한국증시"
 RETENTION_DAYS = 29
 REFRESH_CYCLE_DAYS = 28
+COMMUNITY_FIELDS = {"category": "community_v2", "tags": {"source": "youtube"}}
 
 SEARCH_FIELDS = "nextPageToken,items(id/channelId,snippet/channelId)"
 VIDEO_SEARCH_FIELDS = (
@@ -618,6 +619,7 @@ def tombstone(record: dict[str, Any], reason: str) -> dict[str, Any]:
             "record_id": record["record_id"],
             "record_type": record.get("record_type"),
             "source": "youtube_data_api",
+            **COMMUNITY_FIELDS,
             "channel_id": record.get("channel_id"),
             "video_id": record.get("video_id"),
             "comment_id": record.get("comment_id"),
@@ -962,6 +964,7 @@ def select_channels(
                 "record_id": f"youtube:channel:{row['channel_id']}",
                 "record_type": "youtube_channel",
                 "source": "youtube_data_api",
+                **COMMUNITY_FIELDS,
                 **row,
                 "rank": rank,
                 "selection_method": method,
@@ -996,6 +999,7 @@ def normalize_video(
         "record_id": f"youtube:video:{identity}",
         "record_type": "youtube_video",
         "source": "youtube_data_api",
+        **COMMUNITY_FIELDS,
         "video_id": identity,
         "channel_id": channel["channel_id"],
         "channel_title": channel["channel_title"],
@@ -1106,6 +1110,7 @@ def normalize_company_video(
         "record_id": f"youtube:video:{identity}",
         "record_type": "youtube_video",
         "source": "youtube_data_api",
+        **COMMUNITY_FIELDS,
         "video_id": identity,
         "channel_id": channel,
         "channel_title": str(snippet.get("channelTitle", "")),
@@ -1181,6 +1186,7 @@ def normalize_comment(
         "record_id": f"youtube:comment:{comment_identity}",
         "record_type": "youtube_comment",
         "source": "youtube_data_api",
+        **COMMUNITY_FIELDS,
         "comment_id": comment_identity,
         "parent_comment_id": (
             private_id("comment", parent_raw_id, salt) if parent_raw_id else None

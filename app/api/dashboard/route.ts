@@ -252,6 +252,8 @@ export async function GET() {
           select c.payload
           from lake.records as c
           where c.record_type = 'youtube_comment'
+            and c.payload->>'category' = 'community_v2'
+            and c.payload->'tags'->>'source' = 'youtube'
             and exists (
               select 1
               from lake.records as v

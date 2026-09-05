@@ -749,6 +749,8 @@ class YouTubeCollectorTest(unittest.TestCase):
             youtube.apply_absence([retry], "missing", "scan", totals, "scan-2")
             deleted = store.get_latest(record["record_id"])
             self.assertTrue(deleted["is_deleted"])
+            self.assertEqual("community_v2", deleted["category"])
+            self.assertEqual({"source": "youtube"}, deleted["tags"])
             with closing(store.connect()) as connection, connection:
                 versions = connection.execute(
                     "SELECT COUNT(*) FROM versions WHERE record_id = ?",
@@ -916,7 +918,11 @@ class YouTubeCollectorTest(unittest.TestCase):
         self.assertEqual("channel-checkpoint", channel_operation["sentinel"])
         self.assertEqual(["삼성전자 주식", "SK하이닉스 주식"], CompanySearchClient.queries)
         self.assertEqual(["SK하이닉스", "삼성전자"], video["search_tags"])
+        self.assertEqual("community_v2", video["category"])
+        self.assertEqual({"source": "youtube"}, video["tags"])
         self.assertEqual(1, len(comments))
+        self.assertEqual("community_v2", comments[0]["category"])
+        self.assertEqual({"source": "youtube"}, comments[0]["tags"])
         self.assertEqual(video["search_tags"], comments[0]["search_tags"])
         self.assertEqual(
             ["000660", "005930"],

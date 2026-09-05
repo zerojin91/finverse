@@ -83,6 +83,7 @@ CREATE ROLE hacker LOGIN;                  -> ERROR: permission denied to create
 | `events.news` | 매크로·지정학 뉴스 (Fed·한국은행·기재부 보도자료, 연합뉴스, BBC, MarketWatch, Google 뉴스) |
 | `events.news_daily` | 날짜·피드·이벤트유형별 기사 건수 |
 | `psychology.youtube_comment` | 공개 YouTube 투자 댓글 원천 데이터 |
+| `psychology.community_v2` | `category=community_v2`, `tags.source=youtube`로 분류된 YouTube 댓글 |
 | `psychology.sentiment_daily` | 댓글 키워드 기반 일별 상승·하락 심리 보조지표 |
 | `psychology.narratives` | 반도체·국내증시·개인투자 행동별 일별 커뮤니티 내러티브 |
 | `lake.coverage` | 수집기·유형·소스별 적재 현황과 기간 |
