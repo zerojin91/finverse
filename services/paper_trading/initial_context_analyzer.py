@@ -18,7 +18,7 @@ from .kospi_paper_trading import TradingError
 from .llm_client import LLMClient
 
 
-CONTEXT_SCHEMA_VERSION = "initial-context-v9"
+CONTEXT_SCHEMA_VERSION = "initial-context-v10-domain-grounded"
 CONTEXT_CACHE_TTL_SECONDS = 12 * 60 * 60
 
 
