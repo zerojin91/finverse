@@ -1551,9 +1551,8 @@ function SetupScreen({
 
       {investmentConfirmed && (
       <section ref={step4Ref} className="paper-setup-block paper-setup-reveal">
-        <div className="paper-setup-heading"><span>04 · 시뮬레이션 설정</span></div>
+        <div className="paper-setup-heading"><span>04 · 시뮬레이션 설정</span><h3>초기 상황</h3></div>
         <section className="paper-context-field" aria-live="polite">
-          <h3 className="paper-context-title">초기 상황</h3>
           <div className="paper-context-documents" aria-label="초기 맥락 문서 생성 상태">
             {contextDocuments.map((document) => (
               <button key={document.key} type="button" className={`paper-context-document ${document.status}`} onClick={() => openContextDocument(document.key)} disabled={document.status !== "ready"} aria-label={`${document.label} Evidence Markdown 열기`}>
@@ -1632,38 +1631,40 @@ function SetupScreen({
       )}
 
       {investmentConfirmed && simulationSetupStage >= 3 && (
-        <section className="paper-setup-block paper-ready-block paper-setup-reveal">
+        <section className="paper-setup-block paper-setup-reveal">
           <div className="paper-setup-heading"><span>05 · 시작 준비</span><h3>연습 기간을 정하고 모의 투자를 시작하세요</h3></div>
-          <div className="paper-simulation-field">
-            <div className="paper-simulation-label"><span>연습 기간</span><small>거래일 기준</small></div>
-            <div className="paper-duration-options">
-              {DURATION_OPTIONS.map((option) => (
-                <button key={option.days} type="button" className={simulationDays === option.days ? "active" : ""} aria-pressed={simulationDays === option.days} onClick={() => setSimulationDays(option.days)}>
-                  <strong>{option.label}</strong><small>{option.caption}</small>
-                </button>
-              ))}
+          <section className="paper-ready-block">
+            <div className="paper-simulation-field">
+              <div className="paper-simulation-label"><span>연습 기간</span><small>거래일 기준</small></div>
+              <div className="paper-duration-options">
+                {DURATION_OPTIONS.map((option) => (
+                  <button key={option.days} type="button" className={simulationDays === option.days ? "active" : ""} aria-pressed={simulationDays === option.days} onClick={() => setSimulationDays(option.days)}>
+                    <strong>{option.label}</strong><small>{option.caption}</small>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-          <div className="paper-hint paper-setup-reveal">
-            <CalendarClock size={13} />
-            초기 맥락과 실제 자료를 바탕으로 시장 참여자와 사건을 구성합니다. 거래일 하나를 넘기는 데 15~25초 정도 걸립니다.
-          </div>
-          <div className="paper-ready-actions">
-            <button className="paper-reset-button" type="button" onClick={() => void restartSetup()} disabled={starting || resettingSetup}>
-              {resettingSetup ? <><LoaderCircle size={15} className="spin" /> 초기화 중</> : <>다시 설정하기</>}
-            </button>
-            <button className="paper-start-button" type="submit" disabled={starting || resettingSetup || !initialContextReadyForStart}>
-              {starting
-                ? <><LoaderCircle size={17} className="spin" /> 수집한 자료로 시나리오를 만들고 있습니다</>
-                : <><CircleDollarSign size={17} /> 모의 투자 시작하기 <ArrowRight size={16} /></>}
-            </button>
-          </div>
-          {resetSetupError && <p className="paper-inline-error">{resetSetupError}</p>}
-          {starting && (
-            <p className="paper-start-note">
-              수집한 시장·경제·사건·커뮤니티 자료를 바탕으로 시나리오를 구성합니다. 최초 조회는 30초 정도 걸릴 수 있습니다.
-            </p>
-          )}
+            <div className="paper-hint paper-setup-reveal">
+              <CalendarClock size={13} />
+              초기 맥락과 실제 자료를 바탕으로 시장 참여자와 사건을 구성합니다. 거래일 하나를 넘기는 데 15~25초 정도 걸립니다.
+            </div>
+            <div className="paper-ready-actions">
+              <button className="paper-reset-button" type="button" onClick={() => void restartSetup()} disabled={starting || resettingSetup}>
+                {resettingSetup ? <><LoaderCircle size={15} className="spin" /> 초기화 중</> : <>다시 설정하기</>}
+              </button>
+              <button className="paper-start-button" type="submit" disabled={starting || resettingSetup || !initialContextReadyForStart}>
+                {starting
+                  ? <><LoaderCircle size={17} className="spin" /> 수집한 자료로 시나리오를 만들고 있습니다</>
+                  : <><CircleDollarSign size={17} /> 모의 투자 시작하기 <ArrowRight size={16} /></>}
+              </button>
+            </div>
+            {resetSetupError && <p className="paper-inline-error">{resetSetupError}</p>}
+            {starting && (
+              <p className="paper-start-note">
+                수집한 시장·경제·사건·커뮤니티 자료를 바탕으로 시나리오를 구성합니다. 최초 조회는 30초 정도 걸릴 수 있습니다.
+              </p>
+            )}
+          </section>
         </section>
       )}
 
