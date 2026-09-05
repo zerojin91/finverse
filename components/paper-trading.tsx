@@ -1503,7 +1503,7 @@ function SetupScreen({
 
       {investmentConfirmed && (
       <section ref={step4Ref} className="paper-setup-block paper-setup-reveal">
-        <div className="paper-setup-heading"><span>04 · 시뮬레이션 설정</span><h3>초기 상황</h3></div>
+        <div className="paper-setup-heading"><span>04 · 시뮬레이션 설정</span></div>
         {simulationSetupStage >= 2 && <div className="paper-simulation-field paper-setup-reveal">
           <div className="paper-simulation-label"><span>연습 기간</span><small>거래일 기준</small></div>
           <div className="paper-duration-options">
@@ -1515,6 +1515,7 @@ function SetupScreen({
           </div>
         </div>}
         <section className="paper-context-field" aria-live="polite">
+          <h3 className="paper-context-title">초기 상황</h3>
           <div className="paper-context-documents" aria-label="초기 맥락 문서 생성 상태">
             {contextDocuments.map((document) => (
               <button key={document.key} type="button" className={`paper-context-document ${document.status}`} onClick={() => openContextDocument(document.key)} disabled={document.status !== "ready"} aria-label={`${document.label} Evidence Markdown 전체 보기`}>
