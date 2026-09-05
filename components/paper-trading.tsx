@@ -1069,7 +1069,7 @@ function EventTimeline({ game, worldMode }: { game: ScenarioGame; worldMode: boo
   );
 }
 
-function AgentActivityFeed({ game, busy, job }: { game: ScenarioGame; busy: boolean; job: Job | null }) {
+function AgentActivityFeed({ game, busy }: { game: ScenarioGame; busy: boolean }) {
   const rounds = useMemo(() => [...(game.agent_rounds ?? [])].reverse(), [game.agent_rounds]);
   const [selectedGroup, setSelectedGroup] = useState<(typeof AGENT_GROUPS)[number]["key"]>("retail");
   const [expandedRoundId, setExpandedRoundId] = useState<string | null>(null);
@@ -1107,9 +1107,6 @@ function AgentActivityFeed({ game, busy, job }: { game: ScenarioGame; busy: bool
           </button>
         ))}
       </div>
-      {busy && (
-        <div className="paper-feed-live"><i /><i /><i /><span>{job?.message ?? "에이전트들이 오늘 장을 판단하는 중"}</span></div>
-      )}
       {!rounds.length && !busy ? (
         <div className="paper-record-empty compact">
           <MessageSquare size={20} />
@@ -2263,7 +2260,7 @@ function TradingScreen({
             )}
             <button className="paper-advance" type="button" onClick={() => onAdvance()} disabled={busy}>
               {busy
-                ? <><LoaderCircle size={16} className="spin" /> {job?.message ?? "진행 중"}</>
+                ? <><LoaderCircle size={16} className="spin" /> 오늘의 시장을 준비하는 중</>
                 : <>{worldMode && meta.action === "advance" ? "하루씩 보기" : meta.cta} <ChevronRight size={16} /></>}
             </button>
           </div>
@@ -2278,7 +2275,7 @@ function TradingScreen({
           <div className="paper-feed-scroll">
             <div className="paper-record-layout">
               <EventTimeline game={game} worldMode={worldMode} />
-              <AgentActivityFeed game={game} busy={busy} job={job} />
+              <AgentActivityFeed game={game} busy={busy} />
             </div>
           </div>
         </section>
