@@ -48,10 +48,16 @@ FINVERSE_DATABASE_TUNNEL_PORT=15432
 ```
 
 ```bash
+npm run db:tunnel
+```
+
+이 명령은 `.env`의 `FINVERSE_SSH_KEY` PEM 파일과 `FINVERSE_SSH_HOST`를 사용해 원격 DB의 Tailscale 주소로 SSH 포트 포워딩을 유지합니다. 직접 실행이 필요할 때만 아래 형식을 사용합니다.
+
+```bash
 ssh -i "$FINVERSE_SSH_KEY" -N -L 15432:<DB_TAILSCALE_HOST>:5432 "$FINVERSE_SSH_HOST"
 ```
 
-그 다음 `npm run dev`를 실행하면 `scripts/dev_local.mjs`가 Next.js와 Flask 모의투자 API 모두에 `127.0.0.1:15432`를 사용하게 합니다. 터널이 닫혔거나 15432 포트가 열려 있지 않으면 종목 조회·대시보드가 PostgreSQL 연결 타임아웃을 반환하므로, 재시작 직후 `/health`와 캔들 API를 확인합니다.
+그 다음 `npm run dev`를 실행하면 `scripts/dev_local.mjs`가 Next.js와 Flask 모의투자 API 모두에 `127.0.0.1:15432`를 사용하게 합니다. Flask 단독 재시작도 같은 환경 설정을 읽어 터널 주소를 사용합니다. 터널이 닫혔거나 15432 포트가 열려 있지 않으면 종목 조회·대시보드가 PostgreSQL 연결 타임아웃을 반환하므로, 재시작 직후 `/health`와 캔들 API를 확인합니다.
 
 | 항목 | 값 |
 | --- | --- |

@@ -37,7 +37,7 @@
 
 - 프론트엔드 진입점은 `app/page.tsx`이고, Next.js API 라우트는 `app/api/`에 있다.
 - 로컬 개발은 `npm run dev`로 시작한다. Next.js, MiroFish 로컬 게이트웨이, 모의 투자 Flask API를 함께 띄운다.
-- 로컬 DB 연결은 SSH 터널을 표준으로 한다. `.env`에 `FINVERSE_DATABASE_TUNNEL=1`, `FINVERSE_DATABASE_TUNNEL_PORT=15432`를 설정하면 `scripts/dev_local.mjs`가 Next.js와 Flask 양쪽의 `FINVERSE_DATABASE_URL`을 실행 시점에 `127.0.0.1:15432`로 통일한다. 터널은 별도 터미널에서 `ssh -i "$FINVERSE_SSH_KEY" -N -L 15432:<DB_TAILSCALE_HOST>:5432 "$FINVERSE_SSH_HOST"`로 먼저 띄운다. 비밀번호·전체 URL은 문서나 로그에 기록하지 않는다.
+- 로컬 DB 연결은 PEM SSH 터널을 표준으로 한다. `.env`에 `FINVERSE_DATABASE_TUNNEL=1`, `FINVERSE_DATABASE_TUNNEL_PORT=15432`, `FINVERSE_SSH_KEY`, `FINVERSE_SSH_HOST`를 설정하고 별도 터미널에서 `npm run db:tunnel`을 먼저 실행한다. `scripts/dev_local.mjs`와 Flask 설정은 모두 실행 시점에 `FINVERSE_DATABASE_URL`의 계정 정보를 보존한 채 `127.0.0.1:15432`로 통일한다. 단독 Flask 재시작도 이 규칙을 따른다. 비밀번호·전체 URL은 문서나 로그에 기록하지 않는다.
 - DB는 원격 서버의 Docker 컨테이너 `finverse-db`, 데이터베이스 `finverse`다. 수집 원본과 AI 분석 결과의 중심 저장소는 `lake.records`다.
 - 대시보드·KOSPI·장중지수·모의투자·MiroFish A2A의 DB 접근은 모두 `FINVERSE_DATABASE_URL`을 사용한다. 이 값은 `.env`에만 두며, 코드·문서·로그에는 값 자체를 기록하지 않는다.
 - 모의투자 종목 선택 화면은 `GET /api/paper-trading/securities/:ticker/candles`로 선택 종목의 최근 36거래일 실제 OHLC를 읽어 시작 전 캔들 미리보기를 표시한다. 이 미리보기에는 시뮬레이션·미래 가격을 섞지 않는다.

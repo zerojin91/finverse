@@ -38,6 +38,12 @@
 
 ## 작업 기록
 
+### 2026-09-05 — 로컬 DB 연결을 PEM SSH 터널로 고정
+
+- 로컬 개발의 표준 DB 경로를 PEM SSH 터널로 명시하고, `npm run db:tunnel`이 `.env`의 SSH 키·호스트 설정으로 15432 포트를 유지하도록 추가했다.
+- Flask는 통합 실행기 밖에서 단독 재시작해도 `FINVERSE_DATABASE_TUNNEL=1`이면 계정 정보는 보존하고 DB 호스트·포트만 `127.0.0.1:15432`로 전환한다.
+- 이 규칙으로 맥북이 DB Tailnet에 직접 등록되지 않아도 AWS SSH 서버를 통해 원격 PostgreSQL에 접근한다.
+
 ### 2026-09-05 — World Agent·59개 독립 투자 에이전트 아키텍처 확정
 
 - 초기 상황의 실제 Evidence Markdown 4종과 종합 분석을 `WorldState(t0)`로 승격하고, 이를 바탕으로 59개 독립 투자 에이전트 프로필을 생성하는 구조를 확정했다.
