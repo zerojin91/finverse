@@ -1569,12 +1569,18 @@ function SetupScreen({
         const payload = await callApi<{ data: Job }>(`/scenario-jobs/${agentProfileJob.job_id}`);
         if (cancelled) return;
         const next = payload.data;
-        setAgentProfileJob(next);
         if (next.status === "completed") {
           const ready = await callApi<{ data: { status: "ready" } & AgentProfiles }>(`/securities/${encodeURIComponent(pickedTicker)}/agent-profiles`);
-          if (!cancelled && ready.data.status === "ready") setAgentProfiles(ready.data);
+          // 완료 상태를 먼저 반영하면 effect cleanup이 실행되어 같은 턴의
+          // 프로필 조회 결과가 취소될 수 있다. 프로필을 먼저 저장한 뒤
+          // 작업 상태를 갱신해야 완료 화면이 확실히 열린다.
+          if (ready.data.status === "ready") setAgentProfiles(ready.data);
+          if (!cancelled) setAgentProfileJob(next);
         } else if (next.status === "failed") {
+          setAgentProfileJob(next);
           setAgentProfileError(next.error ?? "시장 참여 에이전트 프로필 생성에 실패했습니다.");
+        } else {
+          setAgentProfileJob(next);
         }
       } catch (cause) {
         if (!cancelled) setAgentProfileError(cause instanceof Error ? cause.message : "프로필 생성 진행 상태를 확인하지 못했습니다.");
