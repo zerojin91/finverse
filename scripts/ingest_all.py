@@ -104,6 +104,10 @@ JOBS = [
         backfill=("--company-file", "config/youtube_companies.json"),
         update=("--company-file", "config/youtube_companies.json"),
         note="심리. Company-name video search and tagged comments."),
+    Job("apify_comment_ingest", "apify_comment_ingest.py",
+        provider="apify",
+        requires=("APIFY_TOKEN",),
+        note="심리. Instagram and X comments for curated company posts."),
 ]
 
 

@@ -1,0 +1,27 @@
+{
+  "instagram": [
+    {"url": "https://www.instagram.com/p/DZwayUcgRA2/", "stock_codes": ["005380"]},
+    {"url": "https://www.instagram.com/p/DUfzVCakmAn/", "stock_codes": ["005930"]},
+    {"url": "https://www.instagram.com/p/DYEpMxEzcMQ/", "stock_codes": ["005380"]},
+    {"url": "https://www.instagram.com/p/Db96G2cprPB/", "stock_codes": ["009150"]},
+    {"url": "https://www.instagram.com/p/DV0jTP4j5Ax/", "stock_codes": ["005930", "000660", "207940"]},
+    {"url": "https://www.instagram.com/p/DZUsXv1SJO9/", "stock_codes": ["373220"]},
+    {"url": "https://www.instagram.com/p/DciryC1JEAe/", "stock_codes": ["000660", "005380", "207940"]},
+    {"url": "https://www.instagram.com/p/DQT3RYlj-68/", "stock_codes": ["373220"]},
+    {"url": "https://www.instagram.com/p/Dc5fXhAAQEc/", "stock_codes": ["005930", "000660", "005380", "009150", "373220", "207940", "105560", "028260", "402340"]},
+    {"url": "https://www.instagram.com/p/Dcvkzd7gUKp/", "stock_codes": ["005930", "005935"]},
+    {"url": "https://www.instagram.com/p/DcsQSkfk-9m/", "stock_codes": ["000660", "009150", "005935"]},
+    {"url": "https://www.instagram.com/p/Dcp5-tzk5-0/", "stock_codes": ["000660", "005935", "402340"]}
+  ],
+  "x": [
+    {"url": "https://x.com/i/status/2096026770189451561", "stock_codes": ["005930", "000660", "009150"]},
+    {"url": "https://x.com/i/status/2095828217768657265", "stock_codes": ["005930"]},
+    {"url": "https://x.com/i/status/2095773367076892989", "stock_codes": ["000660", "373220", "105560"]},
+    {"url": "https://x.com/i/status/2095750172643078613", "stock_codes": ["005380"]},
+    {"url": "https://x.com/i/status/2095622493524644298", "stock_codes": ["005380", "207940", "005935", "402340"]},
+    {"url": "https://x.com/i/status/2095638596892172424", "stock_codes": ["009150", "373220"]},
+    {"url": "https://x.com/i/status/2093130968723018072", "stock_codes": ["207940", "028260", "005935"]},
+    {"url": "https://x.com/i/status/2095771272693305561", "stock_codes": ["105560", "028260"]},
+    {"url": "https://x.com/i/status/2095011912186737026", "stock_codes": ["402340"]}
+  ]
+}

@@ -63,6 +63,7 @@ COLLECTOR_DIRS = {
     "fincept_events": "fincept_event_ingest",
     "saveticker": "saveticker_ingest",
     "youtube_comments": "youtube_comment_ingest",
+    "apify_comments": "apify_comment_ingest",
 }
 
 

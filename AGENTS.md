@@ -54,6 +54,18 @@
 - `scripts/bedrock_signal_update.py`라는 파일명은 과거 호환 이름일 뿐, 현재 구현은 AWS Bedrock이 아니라 OpenRouter Chat Completions API를 사용한다.
 - 요약·시나리오·모의 투자 LLM은 `OPENROUTER_API_KEY`를 사용한다. 키나 `.env` 값은 절대로 로그·커밋·응답에 노출하지 않는다.
 
+### Apify 커뮤니티 댓글 연결
+
+- `collectors/apify_comment_ingest.py`는 Apify API로 `config/apify_community_targets.json`의 Instagram·X 댓글을 수집하고 `data/apify_comments`의 `IndexedJsonlStore`로 정규화한다. 로컬 export를 위한 `import` 호환 명령도 유지한다. Python 3.12 이상과 실행법은 [수집기 문서](docs/collectors/apify_comment_ingest.md)를 따른다.
+- 저장값은 `category=community_v2`, `source=apify`, `tags.source=instagram|x`다. X 원문·리트윗은 제외하고 답글만 저장한다. SNS도 export에서 원게시물당 좋아요 Top 5를 선택하고 `selection_scope=collected_comments`, `post_like_rank`, `comments_per_post`를 기록한다. 과거행·이력은 삭제하지 않으며 조회 뷰가 누적 저장행의 게시물별 Top 5를 고른다. 수집 전량·원사이트 절대 Top 5는 보장하지 않는다.
+- 종목 목록은 `config/youtube_companies.json`의 10종목을 재사용하고, 승인된 원게시물과 종목 연결은 `config/apify_community_targets.json`에서 관리한다.
+- API 인증은 `APIFY_TOKEN`, ID 가명화는 `COMMUNITY_ID_HASH_SALT` 우선·`YOUTUBE_ID_HASH_SALT` 대체값을 사용한다. 기존 salt를 유지하며 작성자는 저장하지 않는다. 토큰·계정·원문 응답은 커밋하지 않는다.
+- `backfill`은 등록 대상의 사용 가능한 과거 댓글을 처음 수집하고, `update`는 같은 대상을 재조회해 최신 댓글과 다시 반환된 과거 댓글의 변경을 반영한다. `--dry-run`은 API를 호출하지 않는다. 이후 `python3 scripts/load_postgres.py --collector apify_comment_ingest`로 `lake.records`에 적재한다.
+- 기존 DB에는 `db/migrations/2026-09-05-apify-community-comments.sql`만 적용해 필요한 뷰를 확장한다. 전체 schema 재적용으로 운영 loader 함수를 덮어쓰지 않는다. 로컬 SQL 검증은 `tests/apify_community_views.sql`이다.
+- 무료 시험은 확인한 `$5` 잔액 안에서 시작하고 Apify UI run 최대 비용을 `$0.10`/`$0.50`로 제한한다. 플랜 제한·0건·실패를 성공으로 보고하지 않으며 실제 수집과 운영 DB 적재는 각각 결과·건수를 확인해야 완료다.
+- 2026-09-05 실제 수집은 Instagram 원게시물 12개·댓글 106개 → 게시물별 Top 5 46개, X 원게시물 9개·답글 71개 → 45개다. 사용자 승인 후 최소 필드·본문 마스킹 staging을 서버로 전달해 `psychology.community_v2`에 Instagram 46개·X 45개를 적재하고 조회 건수를 확인했다.
+- 이번 Apify 실행은 토큰 복사에 대한 승인이 없어 로그인된 브라우저 UI를 사용했다. Xquik 원문 검색의 정렬 키는 `queryType`이며 `sort`가 아니다. `maxItems`는 검색어 전체 상한이고 `maxItemsPerTarget`는 검색어별 할당을 보장하지 않는다. X export는 `outputVariant=legacy`로 importer 필드명과 맞추고 실제 `type=reply`도 처리한다. 이번 답글 실행은 원게시물별 최대 20개 요청에 각각 5~10개를 반환했으며 이 결과를 일반적인 수집 한도로 간주하지 않는다.
+
 ### 데이터 연결과 원격 배포
 
 - `FINVERSE_DATABASE_URL`은 서버 사이드 전용 읽기 계정으로 사용한다. 브라우저에는 절대 전달하지 않으며 Tailscale 사설망에서만 연결한다.
@@ -77,11 +89,18 @@ scripts/run_bedrock_signal_update.sh --dry-run
 
 ### 현재 배포 기준과 점검 순서
 
-- 2026-08-30 기준 원격 코드는 `origin/main`의 `df294d8`로 배포됐다. 이후 로컬에서 만든 커밋은 사용자의 푸시 요청 전까지 원격 GitHub에는 올리지 않는다.
+- 2026-09-05 원격 서버의 로컬 `main`에는 Apify Instagram·X 댓글 수집기와 `community_v2` 뷰가 포함됐다. 로컬에서 만든 커밋은 사용자의 푸시 요청 전까지 원격 GitHub에는 올리지 않는다.
 - 원격에는 배포 전 상태 백업과 stash가 있을 수 있다. 복구가 필요할 때만 해당 백업을 사용하며, 일상 작업에서는 건드리지 않는다.
 - UI 이상은 다음 순서로 본다: `GET /api/dashboard` 응답 → `FINVERSE_DATABASE_URL` 연결 상태 → `lake.records` 데이터/배치 로그 → OpenRouter 키·모델 설정.
 
 ### 운영 변경·사고 기록
+
+#### 2026-09-05 — Apify 실제 댓글 수집과 운영 적재
+
+- 증상: API Dojo V2 무료 실행은 10건에서 종료됐고, Xquik 원문 검색은 `sort=Top` 입력에도 기본 `Latest`로 실행되며 일부 검색어가 전체 수량을 먼저 채웠다. 이후 기존 수집 서버로의 원본 데이터 전송이 자동 승인 검토에서 거부됐다.
+- 원인: API Dojo V2의 무료 데모 제한, Xquik의 정렬 키 차이(`queryType`)와 전체 실행 수량 상한을 검색어별 할당으로 해석한 것이 수집 조건에 영향을 줬다. 원본에는 전송에 불필요한 작성자·프로필 정보가 포함돼 있었다.
+- 조치: 무료 크레딧 사용이 가능한 Xquik으로 전환하고 브라우저 UI에서 정확한 입력으로 실제 댓글을 확보했다. 종목을 본문으로 확인하고 게시물별 좋아요 Top 5를 선별했다. 작성자·프로필을 제거하고 본문을 마스킹한 뒤 사용자 승인 범위로 서버에 전달해 Instagram 46개·X 45개를 적재했다.
+- 재발 방지: Actor별 입력 키와 실제 로그·검색어별 분포를 확인한다. 이번 자동 승인 검토가 요구한 전송 대상·데이터 범위를 명시해 확인하고, 이미 받은 사용자 승인은 같은 범위에서 재사용한다. 수집·로컬 검증·운영 적재의 완료 상태를 각각 기록하고, 승인 후 실제 DB 조회 건수를 확인한다.
 
 #### 2026-09-03 — 새 모의투자 CSS 규칙이 개발 서버 번들에서 누락
 
