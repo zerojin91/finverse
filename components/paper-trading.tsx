@@ -1055,16 +1055,17 @@ function SetupScreen({
   const [initialContextLoading, setInitialContextLoading] = useState(false);
   const [initialContextError, setInitialContextError] = useState<string | null>(null);
   const [contextDocuments, setContextDocuments] = useState<ContextDocumentProgress[]>(INITIAL_CONTEXT_DOCUMENTS);
+  const [contextDwellComplete, setContextDwellComplete] = useState(false);
   const pickedTicker = picked?.ticker;
   const step2Ref = useRef<HTMLElement | null>(null);
   const step3Ref = useRef<HTMLElement | null>(null);
   const step4Ref = useRef<HTMLElement | null>(null);
-  const initialContextRef = useRef<HTMLElement | null>(null);
   const previewReady = Boolean(previewCandles && previewCandles.length >= 2 && !previewError);
   const previewStepVisible = previewReady && previewDwellComplete;
   const collectionReady = Boolean(collectionSources?.every((source) => source.status === "ready"));
   const collectionStepComplete = collectionReady && collectionDwellComplete;
   const initialContextReady = Boolean(initialContext?.analysis?.summary);
+  const initialContextReadyForStart = initialContextReady && contextDwellComplete;
   const openContextDocument = (domain: ContextDocumentProgress["key"]) => {
     if (!pickedTicker) return;
     window.open(`/api/paper-trading/securities/${encodeURIComponent(pickedTicker)}/initial-context/documents/${domain}`, `_blank`, "noopener,noreferrer");
@@ -1183,6 +1184,12 @@ function SetupScreen({
   }, [pickedTicker, collectionStepComplete]);
 
   useEffect(() => {
+    if (!investmentConfirmed) return;
+    const timer = window.setTimeout(() => setContextDwellComplete(true), 1_500);
+    return () => window.clearTimeout(timer);
+  }, [investmentConfirmed]);
+
+  useEffect(() => {
     if (!pickedTicker || !previewStepVisible) return;
     let cancelled = false;
     callApi<{ data: { sources: CollectionSource[] } }>(`/securities/${encodeURIComponent(pickedTicker)}/scenario-context`)
@@ -1197,7 +1204,7 @@ function SetupScreen({
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!picked || !investmentMode || !investmentConfirmed || !initialContextReady || starting || initialCash < 0) return;
+    if (!picked || !investmentMode || !investmentConfirmed || !initialContextReadyForStart || starting || initialCash < 0) return;
     if (investmentMode === "new" && initialCash <= 0) return;
     if (investmentMode === "holding" && (!averagePrice || !holdingQuantity)) return;
     onStart({
@@ -1215,6 +1222,7 @@ function SetupScreen({
     if (picked?.ticker !== item.ticker) {
       setInvestmentMode(null);
       setInvestmentConfirmed(false);
+      setContextDwellComplete(false);
       setAveragePrice(0);
       setHoldingQuantity(0);
     }
@@ -1228,6 +1236,7 @@ function SetupScreen({
     setInitialContextError(null);
     setInitialContextLoading(false);
     setContextDocuments(INITIAL_CONTEXT_DOCUMENTS);
+    setContextDwellComplete(false);
     setPicked(item);
     setQuery(item.name);
     setResults([]);
@@ -1241,8 +1250,8 @@ function SetupScreen({
     const timer = window.setTimeout(() => {
       const target = activeStep === 2 ? step2Ref.current
         : activeStep === 3 ? step3Ref.current
-          : initialContextRef.current ?? step4Ref.current;
-      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+          : step4Ref.current;
+      target?.scrollIntoView({ behavior: "smooth", block: activeStep === 4 ? "start" : "center" });
     }, 220);
     return () => window.clearTimeout(timer);
   }, [activeStep]);
@@ -1327,6 +1336,7 @@ function SetupScreen({
                 setInitialContext(null);
                 setInitialContextError(null);
                 setContextDocuments(INITIAL_CONTEXT_DOCUMENTS);
+                setContextDwellComplete(false);
               }
             }}
             placeholder="종목명 또는 티커로 검색 (예: 삼성전자, 005930)"
@@ -1420,10 +1430,10 @@ function SetupScreen({
       <section ref={step3Ref} className="paper-setup-block paper-setup-reveal">
         <div className="paper-setup-heading"><span>03 · 투자 상태</span><h3>지금 내 투자 조건을 입력해주세요</h3></div>
         <div className="paper-investment-mode" aria-label="투자 상태">
-          <button type="button" className={investmentMode === "new" ? "active" : ""} aria-pressed={investmentMode === "new"} onClick={() => { setInvestmentMode("new"); setInvestmentConfirmed(false); }}>
+          <button type="button" className={investmentMode === "new" ? "active" : ""} aria-pressed={investmentMode === "new"} onClick={() => { setInvestmentMode("new"); setInvestmentConfirmed(false); setContextDwellComplete(false); }}>
             <CircleDollarSign size={15} /><span><strong>새로 투자하기</strong><small>현금으로 처음 시작</small></span>
           </button>
-          <button type="button" className={investmentMode === "holding" ? "active" : ""} aria-pressed={investmentMode === "holding"} onClick={() => { setInvestmentMode("holding"); setInvestmentConfirmed(false); }}>
+          <button type="button" className={investmentMode === "holding" ? "active" : ""} aria-pressed={investmentMode === "holding"} onClick={() => { setInvestmentMode("holding"); setInvestmentConfirmed(false); setContextDwellComplete(false); }}>
             <Wallet size={15} /><span><strong>이미 보유 중</strong><small>내 평단과 수량 반영</small></span>
           </button>
         </div>
@@ -1434,20 +1444,20 @@ function SetupScreen({
               <small>실제 연습에 사용할 수 있는 현금</small>
             </label>
             <div className="paper-money-input">
-              <input id="paper-initial-cash" inputMode="numeric" value={initialCash ? initialCash.toLocaleString("ko-KR") : ""} onChange={(event) => { setInitialCash(parsePositiveInteger(event.target.value)); setInvestmentConfirmed(false); }} aria-label="투자할 금액" />
+              <input id="paper-initial-cash" inputMode="numeric" value={initialCash ? initialCash.toLocaleString("ko-KR") : ""} onChange={(event) => { setInitialCash(parsePositiveInteger(event.target.value)); setInvestmentConfirmed(false); setContextDwellComplete(false); }} aria-label="투자할 금액" />
               <span>원</span>
             </div>
             <div className="paper-money-presets" aria-label="투자 금액 빠른 선택">
               {CASH_PRESETS.map((cash) => (
-                <button key={cash} type="button" className={initialCash === cash ? "active" : ""} aria-pressed={initialCash === cash} onClick={() => { setInitialCash(cash); setInvestmentConfirmed(false); }}>+ {compactWon(cash)}원</button>
+                <button key={cash} type="button" className={initialCash === cash ? "active" : ""} aria-pressed={initialCash === cash} onClick={() => { setInitialCash(cash); setInvestmentConfirmed(false); setContextDwellComplete(false); }}>+ {compactWon(cash)}원</button>
               ))}
             </div>
           </div>
         )}
         {investmentMode === "holding" && (
           <div className="paper-holding-inputs">
-            <label htmlFor="paper-average-price"><span>평균 매입가</span><div><input id="paper-average-price" inputMode="numeric" value={averagePrice ? averagePrice.toLocaleString("ko-KR") : ""} onChange={(event) => { setAveragePrice(parsePositiveInteger(event.target.value)); setInvestmentConfirmed(false); }} /><em>원</em></div></label>
-            <label htmlFor="paper-holding-quantity"><span>보유 수량</span><div><input id="paper-holding-quantity" inputMode="numeric" value={holdingQuantity ? holdingQuantity.toLocaleString("ko-KR") : ""} onChange={(event) => { setHoldingQuantity(parsePositiveInteger(event.target.value)); setInvestmentConfirmed(false); }} /><em>주</em></div></label>
+            <label htmlFor="paper-average-price"><span>평균 매입가</span><div><input id="paper-average-price" inputMode="numeric" value={averagePrice ? averagePrice.toLocaleString("ko-KR") : ""} onChange={(event) => { setAveragePrice(parsePositiveInteger(event.target.value)); setInvestmentConfirmed(false); setContextDwellComplete(false); }} /><em>원</em></div></label>
+            <label htmlFor="paper-holding-quantity"><span>보유 수량</span><div><input id="paper-holding-quantity" inputMode="numeric" value={holdingQuantity ? holdingQuantity.toLocaleString("ko-KR") : ""} onChange={(event) => { setHoldingQuantity(parsePositiveInteger(event.target.value)); setInvestmentConfirmed(false); setContextDwellComplete(false); }} /><em>주</em></div></label>
           </div>
         )}
         {investmentMode && (
@@ -1474,7 +1484,7 @@ function SetupScreen({
             ))}
           </div>
         </div>
-        <section ref={initialContextRef} className="paper-context-field" aria-live="polite">
+        <section className="paper-context-field" aria-live="polite">
           <div className="paper-context-documents" aria-label="초기 맥락 문서 생성 상태">
             {contextDocuments.map((document) => (
               <article key={document.key} className={`paper-context-document ${document.status}`}>
@@ -1552,7 +1562,7 @@ function SetupScreen({
             초기 맥락과 실제 자료를 바탕으로 시장 참여자와 사건을 구성합니다. 거래일 하나를 넘기는 데 15~25초 정도 걸립니다.
           </div>
 
-          <button className="paper-start-button paper-setup-reveal" type="submit" disabled={starting || !initialContextReady}>
+          <button className="paper-start-button paper-setup-reveal" type="submit" disabled={starting || !initialContextReadyForStart}>
             {starting
               ? <><LoaderCircle size={17} className="spin" /> 수집한 자료로 시나리오를 만들고 있습니다</>
               : <><CircleDollarSign size={17} /> 모의 투자 시작하기 <ArrowRight size={16} /></>}
