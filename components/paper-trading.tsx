@@ -2487,7 +2487,7 @@ function CompletedReports({ reports, portfolio, initialEquity, game, onBack }: {
         </section>
         {scenario.environment_evolution && <p className="paper-report-detail"><b>World State 변화</b>{scenario.environment_evolution}</p>}
         {scenario.stock_flow && <p className="paper-report-detail"><b>종목 흐름</b>{scenario.stock_flow}</p>}
-        {scenario.event_reviews?.length ? <div className="paper-report-events"><b>발생 이벤트</b>{scenario.event_reviews.map((row, index) => <p key={`${row.date}-${index}`}><strong>{row.date} · {row.event}</strong>{row.impact}</p>)}</div> : null}
+        {scenario.event_reviews?.length ? <div className="paper-report-events"><b>발생 이벤트</b>{scenario.event_reviews.map((row, index) => <article key={`${row.date}-${index}`}><div><span>{row.date}</span><strong>{row.event}</strong></div><p>{row.impact}</p></article>)}</div> : null}
         {scenario.group_behavior && <div className="paper-report-groups">{Object.entries(scenario.group_behavior).map(([key, value]) => <p key={key}><b>{GROUP_LABEL[key] ?? key}</b>{value}</p>)}</div>}
         <ReportList title="주요 전환점" items={scenario.key_turning_points} tone="plan" />
       </article>}

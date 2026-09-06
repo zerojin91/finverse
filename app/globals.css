@@ -1865,6 +1865,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .journal-report-dialog h5 { margin: 3px 0 0; color: var(--ink); font-size: 17px; }
 .journal-report-dialog header button { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid var(--line); border-radius: 7px; color: var(--muted); background: #fff; font: 24px/1 Arial,sans-serif; cursor: pointer; }
 .journal-report-dialog .evidence-markdown { min-height: 0; padding: 22px 28px 34px; background: #fff; font-size: 13px; }
+.journal-report-dialog .journal-scenario-report { min-height: 0; overflow-y: auto; padding: 22px 28px 34px; border: 0; border-radius: 0; box-shadow: none; }
 .journal-report-regenerate { min-height: 28px; margin-left: auto; padding: 0; border: 0; color: var(--light); background: transparent; font: inherit; font-size: 10px; font-weight: 700; cursor: pointer; }
 .journal-report-regenerate:hover:not(:disabled) { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
 .journal-report-regenerate:disabled { cursor: wait; opacity: .55; }
@@ -1904,6 +1905,11 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-report-daily,.paper-report-events { display: grid; gap: 5px; }
 .paper-report-daily > b,.paper-report-events > b { color: var(--ink); font-size: 10px; }
 .paper-report-daily p,.paper-report-events p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
+.paper-report-events article { display: grid; grid-template-columns: minmax(180px,.8fr) minmax(0,2.2fr); gap: 14px; padding: 12px 13px; border: 1px solid var(--line); border-radius: 9px; background: #fff; }
+.paper-report-events article > div { display: grid; align-content: start; gap: 4px; min-width: 0; }
+.paper-report-events article span { color: var(--light); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9px; font-weight: 800; }
+.paper-report-events article strong { color: var(--ink); font-size: 11px; line-height: 1.45; }
+.paper-report-events article p { display: block; min-width: 0; margin: 0; padding-left: 14px; border-left: 1px solid #edf0f5; color: var(--muted); font-size: 10px; line-height: 1.65; }
 .paper-report-daily p strong { display: inline-block; min-width: 82px; color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .paper-report-daily p span { color: var(--ink); font-weight: 750; }
 .paper-report-columns { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 7px; }

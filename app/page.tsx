@@ -1626,6 +1626,7 @@ type TwinGameDetail = {
   phase: string;
   current_price: number;
   initial_reference_price: number;
+  simulation_days?: number;
   scenario_premise?: string;
   history_candles?: TwinHistoryCandle[];
   price_history?: TwinPricePoint[];
@@ -1639,7 +1640,15 @@ type TwinGameDetail = {
   portfolio?: { total_return_pct: number };
   llm_reports?: {
     investment?: { report_markdown?: string; summary?: string; behavior_pattern?: string; investor_type?: "anchor" | "adapter" | "defender" | "chaser" };
-    scenario?: { report_markdown?: string; summary?: string };
+    scenario?: {
+      report_markdown?: string;
+      summary?: string;
+      environment_evolution?: string;
+      event_reviews?: { date?: string; event?: string; impact?: string }[];
+      stock_flow?: string;
+      group_behavior?: Record<string, string>;
+      key_turning_points?: string[];
+    };
   };
 };
 
@@ -1673,6 +1682,13 @@ const TWIN_INVESTOR_TYPE_META = {
   chaser: { label: "추격형 · The Chaser", image: "/investor-types/chaser.png" },
 } as const;
 
+const TWIN_GROUP_LABEL: Record<string, string> = {
+  retail: "개인",
+  foreign: "외국인",
+  institution: "기관",
+  pension: "연기금",
+};
+
 function inferTwinInvestorType(report?: NonNullable<TwinGameDetail["llm_reports"]>["investment"]): keyof typeof TWIN_INVESTOR_TYPE_META | null {
   if (report?.investor_type && report.investor_type in TWIN_INVESTOR_TYPE_META) return report.investor_type;
   const text = `${report?.report_markdown ?? ""} ${report?.behavior_pattern ?? ""} ${report?.summary ?? ""}`;
@@ -1683,11 +1699,47 @@ function inferTwinInvestorType(report?: NonNullable<TwinGameDetail["llm_reports"
   return null;
 }
 
-function TwinStoredReports({ reports, regenerating, onRegenerate }: {
-  reports?: TwinGameDetail["llm_reports"];
+function TwinScenarioReport({ detail, scenario }: {
+  detail: TwinGameDetail;
+  scenario?: NonNullable<TwinGameDetail["llm_reports"]>["scenario"];
+}) {
+  if (!scenario) return null;
+  const hasStructuredContent = Boolean(
+    scenario.summary || scenario.environment_evolution || scenario.stock_flow || scenario.event_reviews?.length || scenario.group_behavior || scenario.key_turning_points?.length,
+  );
+  if (!hasStructuredContent) {
+    return scenario.report_markdown
+      ? <PaperEvidenceMarkdown content={scenario.report_markdown} />
+      : <p className="journal-history-note">저장된 시나리오 보고서를 불러오지 못했습니다.</p>;
+  }
+  const eventCount = scenario.event_reviews?.length ?? detail.revealed_events?.length ?? 0;
+  return (
+    <article className="paper-report-card scenario journal-scenario-report">
+      <header><div><span>02 · WORLD REPORT</span><h3>시나리오 보고서</h3></div><span>환경 변화·에이전트 흐름</span></header>
+      <section className="paper-scenario-overview" aria-label="시나리오 핵심 요약">
+        <div className="paper-scenario-highlight"><span>시뮬레이션 기간</span><strong>{detail.simulation_days ?? 0}<small>거래일</small></strong><p>{scenario.summary ?? "기록된 시장 환경을 바탕으로 시나리오 경로를 정리했습니다."}</p></div>
+        <div className="paper-scenario-summary-grid">
+          <div><span>시작 기준가</span><strong>{detail.initial_reference_price.toLocaleString("ko-KR")}원</strong><small>{detail.name} · 시뮬레이션 시작</small></div>
+          <div><span>종료 기준가</span><strong>{detail.current_price.toLocaleString("ko-KR")}원</strong><small>종료 시점 종가</small></div>
+          <div><span>World State 변화</span><p>{scenario.environment_evolution ?? "기록된 환경 변화가 없습니다."}</p></div>
+          <div><span>공개 이벤트</span><strong>{eventCount}<small>개</small></strong><small>실제 유사 근거 확인 후 공개</small></div>
+        </div>
+      </section>
+      {scenario.environment_evolution && <p className="paper-report-detail"><b>World State 변화</b>{scenario.environment_evolution}</p>}
+      {scenario.stock_flow && <p className="paper-report-detail"><b>종목 흐름</b>{scenario.stock_flow}</p>}
+      {scenario.event_reviews?.length ? <div className="paper-report-events"><b>발생 이벤트</b>{scenario.event_reviews.map((row, index) => <article key={`${row.date}-${index}`}><div><span>{row.date}</span><strong>{row.event}</strong></div><p>{row.impact}</p></article>)}</div> : null}
+      {scenario.group_behavior && <div className="paper-report-groups">{Object.entries(scenario.group_behavior).map(([key, value]) => <p key={key}><b>{TWIN_GROUP_LABEL[key] ?? key}</b>{value}</p>)}</div>}
+      {scenario.key_turning_points?.length ? <div className="paper-report-list plan"><b>주요 전환점</b><ul>{scenario.key_turning_points.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul></div> : null}
+    </article>
+  );
+}
+
+function TwinStoredReports({ detail, regenerating, onRegenerate }: {
+  detail: TwinGameDetail;
   regenerating?: boolean;
   onRegenerate?: () => void;
 }) {
+  const reports = detail.llm_reports;
   const [openReport, setOpenReport] = useState<"investment" | "scenario" | null>(null);
   const investment = reports?.investment;
   const scenario = reports?.scenario;
@@ -1710,7 +1762,11 @@ function TwinStoredReports({ reports, regenerating, onRegenerate }: {
             <figcaption><span>나의 투자 유형</span><strong>{TWIN_INVESTOR_TYPE_META[investorType].label}</strong></figcaption>
             <img src={TWIN_INVESTOR_TYPE_META[investorType].image} alt={TWIN_INVESTOR_TYPE_META[investorType].label} />
           </figure>}
-          {active?.report_markdown ? <PaperEvidenceMarkdown content={active.report_markdown} /> : <p className="journal-history-note">저장된 요약: {active?.summary ?? "보고서 내용을 불러오지 못했습니다."}</p>}
+          {openReport === "scenario"
+            ? <TwinScenarioReport detail={detail} scenario={scenario} />
+            : active?.report_markdown
+              ? <PaperEvidenceMarkdown content={active.report_markdown} />
+              : <p className="journal-history-note">저장된 요약: {active?.summary ?? "보고서 내용을 불러오지 못했습니다."}</p>}
         </section>
       </div>}
     </section>
@@ -2364,7 +2420,7 @@ function TwinPage({ onRequireAuth }: { onRequireAuth?: (action: () => void) => v
                     </div>
                     <TwinPotentialEventRail detail={selectedDetail} />
                   </div>
-                  <TwinStoredReports reports={selectedDetail.llm_reports} regenerating={regeneratingReportId === selectedDetail.game_id} onRegenerate={() => { void regenerateReports(selectedDetail.game_id); }} />
+                  <TwinStoredReports detail={selectedDetail} regenerating={regeneratingReportId === selectedDetail.game_id} onRegenerate={() => { void regenerateReports(selectedDetail.game_id); }} />
                 </>
               )}
             </div>
