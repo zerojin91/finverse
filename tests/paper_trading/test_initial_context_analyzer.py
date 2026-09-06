@@ -63,6 +63,8 @@ def test_document_preparation_returns_four_target_evidence_previews(tmp_path, mo
 
     assert result["context_id"].startswith("ctx_")
     assert set(result["source_summary"]["document_previews"]) == {"market", "economy", "events", "community"}
+    assert set(result["document_contents"]) == {"market", "economy", "events", "community"}
+    assert "# Market Evidence" in result["document_contents"]["market"]
     market_document = tmp_path / "market_cache" / f"initial-context-{result['context_id'][4:]}" / "market-evidence.md"
     assert market_document.is_file()
     assert "## AI Interpretation" in market_document.read_text(encoding="utf-8")

@@ -338,12 +338,21 @@ def clear_initial_context_cache(history: dict[str, Any]) -> dict[str, Any]:
 
 
 def get_initial_context_documents(history: dict[str, Any]) -> dict[str, Any]:
-    """Return document metadata without starting the aggregate LLM analysis."""
+    """Return prepared document metadata and content without aggregate analysis.
+
+    The setup page already waits for all four Evidence MDs to be written.  Put
+    their bounded local text in that response so opening a ready card is
+    instant, instead of making the learner wait for a second file request.
+    """
     prepared = prepare_initial_context_documents(history)
     return {
         "context_id": prepared["context_id"],
         "schema_version": prepared["schema_version"],
         "source_summary": prepared["source_summary"],
+        "document_contents": {
+            key: (prepared["document_dir"] / filename).read_text(encoding="utf-8")
+            for key, filename in prepared["document_files"].items()
+        },
     }
 
 

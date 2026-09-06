@@ -20,7 +20,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 
 /* ---------------------------------------------------------------- types */
 
@@ -171,7 +171,62 @@ type InitialContextDocuments = {
   context_id: string;
   schema_version: string;
   source_summary: InitialContextSourceSummary;
+  document_contents?: Record<string, string>;
 };
+
+function PaperEvidenceMarkdown({ content }: { content: string }) {
+  const inline = (value: string): ReactNode => value.split(/(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g).filter(Boolean).map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) return <strong key={index}>{part.slice(2, -2)}</strong>;
+    if (part.startsWith("`") && part.endsWith("`")) return <code key={index}>{part.slice(1, -1)}</code>;
+    const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+    if (link) return <a key={index} href={link[2]} target="_blank" rel="noreferrer">{link[1]}</a>;
+    return part;
+  });
+  const lines = content.replace(/\r\n/g, "\n").split("\n");
+  const blocks: ReactNode[] = [];
+  const isTableDivider = (value: string) => /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(value);
+  const tableCells = (value: string) => value.trim().replace(/^\||\|$/g, "").split("|").map((cell) => cell.trim());
+  let index = 0;
+  while (index < lines.length) {
+    const line = lines[index].trim();
+    if (!line) { index += 1; continue; }
+    const heading = line.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      const Tag = `h${heading[1].length}` as "h1" | "h2" | "h3";
+      blocks.push(<Tag key={`heading-${index}`}>{inline(heading[2])}</Tag>);
+      index += 1;
+      continue;
+    }
+    if (/^(-{3,}|\*{3,}|_{3,})$/.test(line)) { blocks.push(<hr key={`rule-${index}`} />); index += 1; continue; }
+    if (line.includes("|") && index + 1 < lines.length && isTableDivider(lines[index + 1])) {
+      const headers = tableCells(line);
+      index += 2;
+      const rows: string[][] = [];
+      while (index < lines.length && lines[index].trim().includes("|")) { rows.push(tableCells(lines[index])); index += 1; }
+      blocks.push(<div className="evidence-markdown-table-wrap" key={`table-${index}`}><table><thead><tr>{headers.map((cell, cellIndex) => <th key={cellIndex}>{inline(cell)}</th>)}</tr></thead><tbody>{rows.map((row, rowIndex) => <tr key={rowIndex}>{headers.map((_, cellIndex) => <td key={cellIndex}>{inline(row[cellIndex] ?? "")}</td>)}</tr>)}</tbody></table></div>);
+      continue;
+    }
+    const listMatch = line.match(/^([-*]|\d+\.)\s+(.+)$/);
+    if (listMatch) {
+      const ordered = /\d+\./.test(listMatch[1]);
+      const items: string[] = [];
+      while (index < lines.length) {
+        const item = lines[index].trim().match(ordered ? /^\d+\.\s+(.+)$/ : /^[-*]\s+(.+)$/);
+        if (!item) break;
+        items.push(item[1]);
+        index += 1;
+      }
+      const List = ordered ? "ol" : "ul";
+      blocks.push(<List key={`list-${index}`}>{items.map((item, itemIndex) => <li key={itemIndex}>{inline(item)}</li>)}</List>);
+      continue;
+    }
+    const paragraph: string[] = [line];
+    index += 1;
+    while (index < lines.length && lines[index].trim() && !/^(#{1,3})\s+|^([-*]|\d+\.)\s+|^(-{3,}|\*{3,}|_{3,})$/.test(lines[index].trim())) { paragraph.push(lines[index].trim()); index += 1; }
+    blocks.push(<p key={`paragraph-${index}`}>{inline(paragraph.join(" "))}</p>);
+  }
+  return <div className="evidence-markdown paper-evidence-markdown">{blocks}</div>;
+}
 
 type AgentProfileGroup = {
   key: "retail" | "foreign" | "institution" | "pension";
@@ -1410,6 +1465,11 @@ function SetupScreen({
     if (!pickedTicker) return;
     const document = contextDocuments.find((item) => item.key === domain);
     if (!document) return;
+    const preparedContent = contextDocumentSource?.document_contents?.[domain];
+    if (preparedContent) {
+      setSelectedContextDocument({ label: document.label, content: preparedContent });
+      return;
+    }
     setContextDocumentLoading(true);
     fetch(`/api/paper-trading/securities/${encodeURIComponent(pickedTicker)}/initial-context/documents/${domain}`, { cache: "no-store" })
       .then(async (response) => {
@@ -2076,7 +2136,7 @@ function SetupScreen({
               <div><span>EVIDENCE DOCUMENT</span><h3 id="paper-document-title">{picked?.name} · {selectedContextDocument.label}</h3><p>선택 종목의 실제 자료를 정리한 Markdown 문서입니다.</p></div>
               <button className="scenario-modal-close" type="button" onClick={() => setSelectedContextDocument(null)} aria-label="Evidence 문서 닫기"><X size={18} /></button>
             </header>
-            <pre>{selectedContextDocument.content}</pre>
+            <PaperEvidenceMarkdown content={selectedContextDocument.content} />
           </section>
         </div>
       )}

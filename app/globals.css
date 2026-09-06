@@ -1036,7 +1036,10 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-document-modal > header span { color: var(--light); font-size: 9px; font-weight: 800; letter-spacing: .12em; }
 .paper-document-modal h3 { margin: 7px 0 5px; color: var(--ink); font-size: 17px; }
 .paper-document-modal > header p { margin: 0; color: var(--muted); font-size: 10px; }
-.paper-document-modal pre { flex: 1; overflow: auto; margin: 0; padding: 24px 28px 34px; color: #3f3f46; background: #fff; font-family: inherit; font-size: 10px; line-height: 1.75; white-space: pre-wrap; }
+.paper-evidence-markdown { flex: 1; min-height: 0; padding: 24px 28px 34px; font-size: 13px; line-height: 1.72; }
+.paper-evidence-markdown h1 { font-size: 22px; }
+.paper-evidence-markdown h2 { margin-top: 30px; }
+.paper-evidence-markdown td { min-width: 116px; }
 .paper-context-summary { display: flex; flex-direction: column; gap: 8px; padding: 12px 13px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); background: #fff; }
 .paper-context-summary h4 { margin: 0; color: var(--ink); font-size: 11px; }
 .paper-context-summary ul { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
@@ -1749,7 +1752,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
   .paper-document-backdrop { padding: 12px; }
   .paper-document-modal { height: calc(100vh - 24px); border-radius: 12px; }
   .paper-document-modal > header { padding: 20px 18px 16px; }
-  .paper-document-modal pre { padding: 18px; }
+  .paper-evidence-markdown { padding: 18px; font-size: 12px; }
 }
 
 @media (min-width: 1101px) {
