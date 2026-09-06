@@ -695,17 +695,19 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
     const historicalCount = simStart < 0 ? bars.length : simStart;
     const simulatedCount = bars.length - historicalCount;
     const futureSlots = preview ? 0 : Math.max(0, (game.simulation_days ?? 20) - simulatedCount);
-    const totalSlots = preview ? Math.max(20, bars.length) : Math.max(20, bars.length + futureSlots);
+    const contentSlots = preview ? bars.length : bars.length + futureSlots;
+    const totalSlots = Math.max(20, contentSlots);
+    const leadingSlots = preview ? 0 : Math.max(0, totalSlots - contentSlots);
     const slot = (CHART_W - AXIS_W) / 20;
     const chartWidth = preview ? CHART_W : Math.max(CHART_W, totalSlots * slot + AXIS_W);
     return {
-      top, bottom, span, slot, chartWidth,
+      top, bottom, span, slot, chartWidth, leadingSlots,
       bodyW: Math.max(2, Math.min(13, slot * 0.6)),
       simStart: historicalCount,
       futureSlots,
       remainingSimulationDays: Math.max(0, (game.simulation_days ?? 20) - simulatedCount),
       y: (value: number) => ((top - value) / span) * PRICE_H,
-      cx: (index: number) => index * slot + slot / 2,
+      cx: (index: number) => (leadingSlots + index) * slot + slot / 2,
     };
   }, [bars, game.initial_reference_price, game.simulation_days, preview]);
 
@@ -731,7 +733,7 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
     );
   }
 
-  const { top, span, slot, chartWidth, bodyW, simStart, futureSlots, remainingSimulationDays, y, cx } = layout;
+  const { top, span, slot, chartWidth, bodyW, simStart, futureSlots, remainingSimulationDays, leadingSlots, y, cx } = layout;
   const gridValues = [0, 0.25, 0.5, 0.75, 1].map((ratio) => top - span * ratio);
 
   // 사용자 체결은 해당 이벤트가 반응한 봉 위에 표시한다. 사전 판단은 왼쪽,
@@ -829,7 +831,7 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
           <g className="paper-candle-future-block">
             <rect
               className="paper-candle-future"
-              x={bars.length * slot + 1}
+              x={(leadingSlots + bars.length) * slot + 1}
               y={8}
               width={Math.max(1, futureSlots * slot - 2)}
               height={PRICE_H - 3}
@@ -856,7 +858,7 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
                 )}
               <rect
                 className="paper-candle-hit"
-                x={index * slot} y={0} width={slot} height={PRICE_H + 12}
+                x={(leadingSlots + index) * slot} y={0} width={slot} height={PRICE_H + 12}
                 onMouseEnter={() => setHovered(index)}
               />
             </g>
