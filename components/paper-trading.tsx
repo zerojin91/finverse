@@ -1308,12 +1308,14 @@ function SetupScreen({
   const [initialContext, setInitialContext] = useState<InitialContext | null>(null);
   const [initialContextLoading, setInitialContextLoading] = useState(false);
   const [initialContextError, setInitialContextError] = useState<string | null>(null);
+  const [initialContextRetryToken, setInitialContextRetryToken] = useState(0);
   const [contextDocuments, setContextDocuments] = useState<ContextDocumentProgress[]>(INITIAL_CONTEXT_DOCUMENTS);
   const [contextDocumentSource, setContextDocumentSource] = useState<InitialContextDocuments | null>(null);
   const [contextDwellComplete, setContextDwellComplete] = useState(false);
   const [agentProfiles, setAgentProfiles] = useState<AgentProfiles | null>(null);
   const [agentProfileJob, setAgentProfileJob] = useState<Job | null>(null);
   const [agentProfileError, setAgentProfileError] = useState<string | null>(null);
+  const [agentProfileRetryToken, setAgentProfileRetryToken] = useState(0);
   const [agentProfileStartedAt, setAgentProfileStartedAt] = useState<number | null>(null);
   const [simulationSetupStage, setSimulationSetupStage] = useState(0);
   const [resettingSetup, setResettingSetup] = useState(false);
@@ -1488,7 +1490,7 @@ function SetupScreen({
     };
     void loadInitialContext();
     return () => { cancelled = true; };
-  }, [pickedTicker, collectionStepComplete, investmentConfirmed]);
+  }, [pickedTicker, collectionStepComplete, investmentConfirmed, initialContextRetryToken]);
 
   useEffect(() => {
     if (!investmentConfirmed || !initialContextReady) return;
@@ -1559,7 +1561,7 @@ function SetupScreen({
     };
     void prepare();
     return () => { cancelled = true; };
-  }, [pickedTicker, initialContext?.context_id, contextDwellComplete, agentProfilesReady]);
+  }, [pickedTicker, initialContext?.context_id, contextDwellComplete, agentProfilesReady, agentProfileRetryToken]);
 
   useEffect(() => {
     if (!pickedTicker || !agentProfileJob || agentProfileJob.status === "completed" || agentProfileJob.status === "failed") return;
@@ -1877,7 +1879,12 @@ function SetupScreen({
             ))}
           </div>
           {initialContextLoading && contextDocuments.every((document) => document.status === "ready") && <div className="paper-context-loading"><LoaderCircle size={15} className="spin" /> 네 개의 근거 문서를 바탕으로 종목 전체 현황과 최근 이벤트 흐름을 분석하고 있습니다.</div>}
-          {initialContextError && <p className="paper-inline-error">{initialContextError}</p>}
+          {initialContextError && (
+            <p className="paper-inline-error">
+              <span>{initialContextError}</span>
+              <button type="button" onClick={() => { setInitialContextError(null); setInitialContextRetryToken((token) => token + 1); }}>다시 시도</button>
+            </p>
+          )}
           {initialContext && (
             <>
               <section className="paper-context-summary" aria-label="초기 상황 5줄 요약">
@@ -1951,7 +1958,12 @@ function SetupScreen({
               <div><strong>{agentProfileJob?.message ?? "59개 개별 에이전트가 초기 상황을 읽고 있습니다."}</strong><span>각 에이전트는 다른 에이전트와 분리된 LLM 호출과 자신의 투자 특성으로 생성됩니다.</span></div>
             </div>
           )}
-          {agentProfileError && <p className="paper-inline-error">{agentProfileError}</p>}
+          {agentProfileError && (
+            <p className="paper-inline-error">
+              <span>{agentProfileError}</span>
+              <button type="button" onClick={() => { setAgentProfileError(null); setAgentProfileJob(null); setAgentProfileRetryToken((token) => token + 1); }}>다시 시도</button>
+            </p>
+          )}
         </div>}
       </section>
       )}
