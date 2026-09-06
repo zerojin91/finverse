@@ -530,10 +530,10 @@ const PHASE_META: Record<Phase, {
     label: "자율 거래 구간",
     eyebrow: "INTER-EVENT MARKET",
     action: "advance_days",
-    cta: "이벤트 직전까지 자동 진행",
+    cta: "다음 거래일 진행",
     guide: "에이전트들이 사전 신호만 보고 스스로 거래합니다. 지금은 주문을 낼 수 없고, 흘러나오는 신호를 읽는 것이 과제입니다.",
     todo: [
-      "*하루 진행*으로 한 거래일씩 넘기며 반응을 보거나, *자동 진행*으로 이벤트 직전까지 한 번에 갈 수 있습니다.",
+      "*다음 거래일 진행*으로 한 거래일씩 넘기며 반응을 확인합니다.",
       "하루가 지날 때마다 캔들이 쌓이고, 59명의 에이전트 반응이 오른쪽 피드에 올라옵니다.",
       "이 구간은 관찰 전용입니다. 누가 사고 누가 파는지 보고 다음 판단의 근거를 모으세요.",
     ],
@@ -660,6 +660,9 @@ function buildBars(game: CandleChartData, preview = false): Bar[] {
   }
 
   for (const point of game.price_history ?? []) {
+    // price_history의 0일차는 실제 이력 끝값을 다시 담는 기준점이다.
+    // 실제 봉이 있는 화면에서는 별도 봉으로 그리지 않아 경계선에 겹치지 않게 한다.
+    if (point.step === 0 && history.length > 0) continue;
     const close = point.close ?? point.price;
     if (!close) continue;
     // 시작 봉은 실제 이력의 마지막 날과 같은 날짜다. 두 번 그리지 않는다.
@@ -2395,7 +2398,7 @@ function CoachOverlay({ onDone, worldMode = false }: { onDone: () => void; world
         <h3>{worldMode ? "거래일마다 이렇게 연습하세요" : "한 번의 이벤트를 네 단계로 겪습니다"}</h3>
         {worldMode ? (
           <ol>
-            <li><b>오늘의 시장 확인</b><p className="paper-coach-lines"><span>‘하루 진행’을 누르면 오늘의 시황과 새로 공개된 정보를 확인합니다.</span><span>평소 거래일에는 내 포트폴리오 변화와 시장 흐름을 읽는 데 집중하면 됩니다.</span></p></li>
+            <li><b>오늘의 시장 확인</b><p className="paper-coach-lines"><span>‘다음 거래일 진행’을 누르면 오늘의 시황과 새로 공개된 정보를 확인합니다.</span><span>평소 거래일에는 내 포트폴리오 변화와 시장 흐름을 읽는 데 집중하면 됩니다.</span></p></li>
             <li><b>중요 사건에서 직접 판단</b><p className="paper-coach-lines"><span>가격에 큰 영향을 줄 사건이 오면 게임이 멈추고 판단 화면이 열립니다.</span><span>매수 고려·관찰 계속·매도 고려 중 하나를 선택합니다. 매수·매도 고려를 고르면 다음 거래일 개인 계좌에 반영할 수량도 입력합니다.</span></p></li>
             <li><b>내 선택은 기록으로 남음</b><p className="paper-coach-lines"><span>내 판단과 개인 계좌 주문은 학습 기록으로 저장되며 시장 가격이나 수급을 직접 움직이지 않습니다.</span><span>시장 변화는 World Agent가 갱신한 환경·공개 사건과 59개 에이전트의 전체 반응으로 만들어집니다.</span></p></li>
             <li><b>다음 거래일로 이어가기</b><p className="paper-coach-lines"><span>각 거래일에는 개인·외국인·기관·연기금이 각자 다른 방식으로 반응합니다.</span><span>결과를 확인한 뒤 다음 거래일을 열어 변화가 이어지는 모습을 관찰하세요.</span></p></li>
@@ -2481,7 +2484,6 @@ function TradingScreen({
   onOrder,
   onDailyReflection,
   onAdvance,
-  onAutoAdvance,
 }: {
   game: ScenarioGame;
   busy: boolean;
@@ -2491,7 +2493,6 @@ function TradingScreen({
   onOrder: (input: { side: "BUY" | "SELL"; quantity: number; rationale: string; confidence: number }) => void;
   onDailyReflection: (stance: DailyReflection["stance"], quantity?: number) => Promise<void>;
   onAdvance: (days?: number) => void;
-  onAutoAdvance: () => void;
 }) {
   // 모달은 사용자가 열었을 때만 마운트되므로 첫 렌더에서 바로 읽어도 안전하다.
   // 저장소 접근이 막힌 브라우저에서는 안내를 띄우지 않는다.
@@ -2548,10 +2549,6 @@ function TradingScreen({
     await reflectionSaveRef.current;
     onAdvance(days);
   }, [onAdvance]);
-  const startAutoAdvance = useCallback(async () => {
-    await reflectionSaveRef.current;
-    onAutoAdvance();
-  }, [onAutoAdvance]);
   const reportView = game.phase === "completed" && Boolean(game.llm_reports) && showReports;
   const startFromCoach = useCallback(() => {
     dismissCoach();
@@ -2680,18 +2677,9 @@ function TradingScreen({
                 보고서 다시 보기
               </button>
             )}
-            {worldMode && meta.action === "advance" && !busy && (
-              <button
-                className="paper-advance-fast"
-                type="button"
-                onClick={() => { void startAutoAdvance(); }}
-              >
-                자동 진행
-              </button>
-            )}
             {meta.action === "advance_days" && !busy && (
               <button className="paper-advance-day" type="button" onClick={() => { void advanceAfterReflection(1); }}>
-                <CalendarClock size={15} /> 하루 진행
+                <CalendarClock size={15} /> 다음 거래일 진행
               </button>
             )}
             <button
@@ -2702,7 +2690,7 @@ function TradingScreen({
             >
               {busy
                 ? <><LoaderCircle size={16} className="spin" /> 오늘의 시장을 준비하는 중</>
-                : <>{game.phase === "completed" && game.llm_reports ? "AI 투자 리포트 생성 완료" : worldMode && meta.action === "advance" ? "하루 진행" : meta.cta} {!game.llm_reports && <ChevronRight size={16} />}</>}
+                : <>{game.phase === "completed" && game.llm_reports ? "AI 투자 리포트 생성 완료" : worldMode && meta.action === "advance" ? "다음 거래일 진행" : meta.cta} {!game.llm_reports && <ChevronRight size={16} />}</>}
             </button>
           </div>
         </section>
@@ -2857,7 +2845,7 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
       setGame(payload.data);
 
       // 시작 화면에서는 0일차를 보여주지 않고 첫 거래일을 한 번 자동 진행한다.
-      // 이후 거래일은 사용자가 `하루 진행` 또는 `자동 진행`으로 선택한다.
+      // 이후 거래일은 사용자가 다음 거래일 진행 버튼으로 한 번씩 연다.
       const firstAction = payload.data.mode === "world"
         ? "advance"
         : payload.data.phase === "inter_event_market"
@@ -2874,7 +2862,7 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
         } catch (cause) {
           setError(cause instanceof Error
             ? `첫 거래일을 자동으로 진행하지 못했습니다: ${cause.message}`
-            : "첫 거래일을 자동으로 진행하지 못했습니다. 하루 진행 버튼으로 다시 시도해주세요.");
+            : "첫 거래일을 자동으로 진행하지 못했습니다. 다음 거래일 진행 버튼으로 다시 시도해주세요.");
         }
       }
     } catch (cause) {
@@ -2901,17 +2889,6 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
       return null;
     }
   }, [game, busy, pollJob]);
-
-  const autoAdvance = useCallback(async () => {
-    if (!game || busy || game.mode !== "world") return;
-    let latest = game;
-    const remaining = Math.max(0, (latest.simulation_days ?? 0) - (latest.current_day_index ?? 0));
-    for (let index = 0; index < remaining; index += 1) {
-      const next = await advance(1);
-      if (!next || next.phase !== "world_market") return;
-      latest = next;
-    }
-  }, [advance, busy, game]);
 
   const submitOrder = useCallback(async (input: { side: "BUY" | "SELL"; quantity: number; rationale: string; confidence: number }) => {
     if (!game) return;
@@ -2971,7 +2948,6 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
               onOrder={submitOrder}
               onDailyReflection={recordDailyReflection}
               onAdvance={advance}
-              onAutoAdvance={autoAdvance}
             />
           : <SetupScreen onStart={start} starting={starting} error={error} onClose={onClose} />}
       </section>
