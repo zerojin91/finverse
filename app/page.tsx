@@ -2470,7 +2470,7 @@ function ServiceIntro({ onEnter, onOpenJournal }: { onEnter: () => void; onOpenJ
       <section className="intro-smoke-feature">
         <div className="intro-smoke-wrap intro-smoke-feature-grid">
           <div><span className="intro-smoke-tag">아는 것</span><h2>가격이 아니라<br />조건을 봅니다</h2><p>종목을 고르면 시장·경제·사건·커뮤니티에서 모은 근거로 지금 그 종목이 <b>어떤 조건 위에 서 있는지</b> 정리합니다.</p><p>숫자를 정답처럼 던지지 않고, 조건이 깨지는 신호까지 함께 보여줍니다.</p></div>
-          <div className="intro-smoke-mock"><header><span>시장 시뮬레이션 · 초기 상황</span><span>실제 근거</span></header><strong>삼성전자 <small>005930</small></strong><ul><li><b>A</b> 외국인 수급이 순매수로 전환하는지</li><li><b>B</b> 실적과 가이던스가 기대를 충족하는지</li><li><b>C</b> 가격이 관찰 구간을 지키는지</li></ul><footer>시장 · 경제 · 사건 · 커뮤니티 근거를 구분해 확인합니다.</footer></div>
+          <div className="intro-smoke-mock"><header><span>시장 시뮬레이션 · 초기 상황</span><span>최근 한 달 · 실제 근거 기반</span></header><strong>삼성전자 <small>005930</small></strong><ul><li><b>A</b> 주주환원 확대 기대가 실제 자금 흐름으로 이어지는지</li><li><b>B</b> 외국인·기관 동반 순매도가 이어지며 주가를 누르는지</li><li><b>C</b> 기준금리 인상과 반도체 실적이 가격에 미치는 영향은 무엇인지</li></ul><footer>주주환원·수급·금리·실적 관련 실제 사건을 시간순으로 확인합니다.</footer></div>
         </div>
       </section>
 
