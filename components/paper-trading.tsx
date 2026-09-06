@@ -756,39 +756,27 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
   const { top, span, slot, chartWidth, bodyW, simStart, futureSlots, remainingSimulationDays, leadingSlots, y, cx } = layout;
   const gridValues = [0, 0.25, 0.5, 0.75, 1].map((ratio) => top - span * ratio);
 
-  // 주문·체결 기록의 시장일을 기준으로 표시한다. 이벤트 순서로 역추적하면
-  // 일반 거래일 주문이 마지막 이벤트 봉에 붙는 문제가 생긴다.
-  const fillMarkers = (game.fills ?? []).flatMap((fill, index) => {
-    const barIndex = bars.findIndex((bar) => !bar.real && bar.date === fill.market_date);
-    if (barIndex < 0) return [];
-    return [{
-      key: fill.order_id ?? `fill-${index}`,
-      side: fill.side,
-      quantity: fill.quantity,
-      price: fill.price,
-      x: cx(barIndex) + (fill.phase === "pre_event_decision" ? -bodyW : bodyW),
-      y: y(fill.price),
-      title: `내 ${fill.side === "BUY" ? "매수" : "매도"} ${fill.quantity.toLocaleString("ko-KR")}주 · ${won(fill.price)}${fill.market_date ? ` · ${fill.market_date}` : ""}`,
-    }];
-  });
+  // 이 마커는 체결가·체결일이 아니라 사용자가 방향성 판단을 남긴 날을 뜻한다.
+  // 그래서 매수는 해당 캔들의 저가 아래, 매도는 고가 위에 고정해 가격과 분리한다.
   const reflectionMarkers = (game.daily_reflections ?? [])
     .filter((reflection) => reflection.stance !== "HOLD_WATCH")
     .flatMap((reflection, index) => {
       const barIndex = bars.findIndex((bar) => !bar.real && bar.date === reflection.market_date);
       if (barIndex < 0) return [];
       const side = reflection.stance === "BUY_WATCH" ? "BUY" : "SELL";
-      const price = bars[barIndex].close;
+      const candle = bars[barIndex];
+      const markerY = side === "BUY"
+        ? Math.min(PRICE_H - 7, y(candle.low) + 12)
+        : Math.max(7, y(candle.high) - 12);
       return [{
         key: `reflection-${reflection.market_date}-${index}`,
         side,
-        quantity: 0,
-        price,
-        x: cx(barIndex) + (side === "BUY" ? -bodyW : bodyW),
-        y: y(price),
+        x: cx(barIndex),
+        y: markerY,
         title: `${reflection.label} · ${reflection.market_date}`,
       }];
     });
-  const markers = [...fillMarkers, ...reflectionMarkers];
+  const markers = reflectionMarkers;
 
   const active = hovered !== null ? bars[hovered] : bars[bars.length - 1];
 
