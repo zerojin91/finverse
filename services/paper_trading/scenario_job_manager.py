@@ -56,7 +56,10 @@ class ScenarioJobManager:
             if active_id:
                 active = self.get(active_id)
                 if active and active["status"] in ("queued", "running"):
-                    raise TradingError("이 게임에서 이미 LLM 작업이 진행 중입니다.")
+                    # 브라우저 재렌더링·네트워크 재시도는 같은 논리 작업을 두 번
+                    # 시작하면 안 된다. 진행 중인 작업을 그대로 돌려주면 호출자는
+                    # 같은 job_id를 폴링해 완료 결과를 화면에 복구할 수 있다.
+                    return active
             now = datetime.now().isoformat()
             job = {"job_id": f"job_{uuid.uuid4().hex[:12]}", "game_id": game_id,
                    "kind": kind, "status": "queued", "progress": 0,

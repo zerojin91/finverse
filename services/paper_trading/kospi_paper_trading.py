@@ -17,6 +17,7 @@ from typing import Any
 import uuid
 
 from .ontology import standardize_market_context
+from .participant_sizing import calibrate_participant_sizing
 
 
 INVESTOR_GROUPS = ("retail", "foreign", "institution", "pension")
@@ -233,7 +234,8 @@ def calibrate_impact_model(history: list[dict[str, Any]]) -> dict[str, Any]:
         return {"method": "historical_return_unavailable", "sample_days": len(closes),
                 "daily_rms_pct": 0.0, "absolute_return_p90_pct": 0.0,
                 "history_start": dates[0] if dates else None,
-                "history_end": dates[-1] if dates else None}
+                "history_end": dates[-1] if dates else None,
+                "participant_sizing": calibrate_participant_sizing(history)}
     rms = math.sqrt(sum(value * value for value in returns) / len(returns))
     ordered = sorted(abs(value) for value in returns)
     p90 = ordered[min(len(ordered) - 1, math.ceil(len(ordered) * .9) - 1)]
@@ -242,7 +244,8 @@ def calibrate_impact_model(history: list[dict[str, Any]]) -> dict[str, Any]:
             "daily_rms_pct": round(rms, 4),
             "absolute_return_p90_pct": round(p90, 4),
             "return_distribution_pct": [round(value, 6) for value in sorted(returns)],
-            "history_start": dates[0], "history_end": dates[-1]}
+            "history_start": dates[0], "history_end": dates[-1],
+            "participant_sizing": calibrate_participant_sizing(history)}
 
 
 def public_game(game: dict[str, Any], include_market_days: bool = False) -> dict[str, Any]:

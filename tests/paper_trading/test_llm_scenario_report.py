@@ -1,6 +1,6 @@
 import json
 
-from services.paper_trading.llm_scenario_report import enforce_verified_report_metrics, generate_llm_scenario_report
+from services.paper_trading.llm_scenario_report import enforce_verified_report_metrics, generate_llm_reports, generate_llm_scenario_report
 from services.paper_trading.scenario_trading import advance_inter_event_market, finish_event, new_scenario_game, reveal_and_react
 
 
@@ -41,3 +41,34 @@ def test_report_corrects_100x_total_return_narration_and_keeps_raw_text():
     assert "0.1311%" in corrected["executive_summary"]
     assert "13.11%" in corrected["raw_executive_summary"]
     assert corrected["metric_corrections"][0]["reason"] == "100x_percentage_scale_error"
+
+
+def test_reports_split_user_review_from_world_review_and_include_action_log():
+    game = new_scenario_game(
+        "005930", "삼성전자", 10100,
+        [{"trade_date": "2026-08-01", "close": 10000}, {"trade_date": "2026-08-02", "close": 10100}],
+        [{"pre_brief": "일정", "title": "발표", "description": "내용", "autonomous_rounds": 0}],
+        persona_counts={"retail": 1, "foreign": 1, "institution": 1, "pension": 1})
+    game["daily_reflections"] = [{"market_date": "2026-08-03", "stance": "HOLD_WATCH", "label": "관찰 계속"}]
+    game["agent_rounds"] = [{"market_date": "2026-08-03", "phase": "inter_event", "return_pct": 1.2,
+                              "previous_price": 10100, "price": 10200, "order_imbalance": .2,
+                              "market_pressure": .3, "market_summary": "요약",
+                              "persona_orders": [{"persona_id": "retail_001", "group": "retail",
+                                                  "side": "BUY", "quantity": 10, "filled_quantity": 10,
+                                                  "notional": 102000}]}]
+    responses = [
+        {"summary": "사용자 요약", "daily_action_review": [], "behavior_pattern": "관찰형",
+         "strengths": [], "risk_patterns": [], "next_practice": []},
+        {"summary": "환경 요약", "environment_evolution": "변화", "event_reviews": [],
+         "stock_flow": "흐름", "group_behavior": {"retail": "매수"}, "key_turning_points": []},
+    ]
+    prompts = []
+    def chat(messages, **kwargs):
+        prompts.append(messages[-1]["content"])
+        return json.dumps(responses[len(prompts) - 1], ensure_ascii=False)
+
+    reports = generate_llm_reports(game, chat)
+    assert reports["investment"]["summary"] == "사용자 요약"
+    assert reports["scenario"]["summary"] == "환경 요약"
+    assert '"group_behavior":{"retail":"개인"' in prompts[1]
+    assert "retail_001" in prompts[0]
