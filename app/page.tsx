@@ -2874,12 +2874,9 @@ export default function Home() {
                     </article>
                   ))}
                   <article className="custom-scenario-card">
-                    <button type="button" onClick={openBuilder}>
+                    <button type="button" onClick={() => setPaperTradingOpen(true)}>
                       <Plus size={26} />
                       <span>내가 생각한<br />시나리오로 보기</span>
-                    </button>
-                    <button type="button" className="custom-scenario-card-alt" onClick={() => setPaperTradingOpen(true)}>
-                      모의투자로 바로 연습하기 →
                     </button>
                   </article>
                 </div>
