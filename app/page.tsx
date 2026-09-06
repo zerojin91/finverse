@@ -2414,6 +2414,13 @@ function ServiceIntro({ onEnter, onOpenJournal }: { onEnter: () => void; onOpenJ
         </div>
       </header>
 
+      <section className="intro-smoke-product-preview" aria-label="조건부 시뮬레이션 화면 예시">
+        <div className="intro-smoke-wrap">
+          <img src="/intro/conditional-simulation.png" alt="삼성전자 조건부 반등 시뮬레이션과 발생 가능 이벤트 예시" />
+          <p>실제 서비스 화면 예시 · 결과를 예측하는 화면이 아니라 판단을 연습하는 가상 경로입니다.</p>
+        </div>
+      </section>
+
       <section className="intro-smoke-hero" aria-labelledby="service-intro-title">
         <div className="intro-smoke-wrap intro-smoke-hero-inner">
           <div>
