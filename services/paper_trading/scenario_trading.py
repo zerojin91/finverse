@@ -320,8 +320,12 @@ def submit_scenario_order(game: dict[str, Any], side: str, quantity: int,
     return order
 
 
-def _execute_user_orders(game: dict[str, Any]) -> list[dict[str, Any]]:
+def _execute_user_orders(game: dict[str, Any], market_date: str | None = None) -> list[dict[str, Any]]:
     fills, price = [], game["current_price"]
+    # 주문 제출 시각은 사용자가 버튼을 누른 시각일 뿐이다. 체결은 다음
+    # 시장 단계에서 이뤄지므로, 보고서와 UI가 같은 거래일을 쓰도록 체결일을
+    # 명시적으로 원장에 남긴다.
+    fill_date = str(market_date or game.get("last_market_date") or "")
     settings = game["settings"]
     for order in game["pending_orders"]:
         direction = 1 if order["side"] == "BUY" else -1
@@ -354,7 +358,8 @@ def _execute_user_orders(game: dict[str, Any]) -> list[dict[str, Any]]:
                                 "average_price": average if remaining else 0}
         order["status"] = "filled"
         fill = {**order, "price": fill_price, "gross_amount": gross,
-                "fee": fee, "tax": tax, "realized_pnl": realized}
+                "fee": fee, "tax": tax, "realized_pnl": realized,
+                "market_date": fill_date}
         game["fills"].append(fill)
         fills.append(fill)
     game["pending_orders"] = []
@@ -809,7 +814,7 @@ def reveal_and_react(game: dict[str, Any], round_data: dict[str, Any]) -> dict[s
     if game["phase"] != PHASE_PRE_EVENT:
         raise TradingError("현재는 이벤트 공개 단계가 아닙니다.")
     event = current_event(game)
-    user_fills = _execute_user_orders(game)
+    user_fills = _execute_user_orders(game, event["event_date"])
     event["status"] = "revealed"
     game["revealed_events"].append({**event})
     reaction = apply_agent_round(game, round_data, phase="event_reaction",
@@ -828,7 +833,7 @@ def finish_event(game: dict[str, Any], autonomous_rounds: Any = None) -> dict[st
     if game["phase"] != PHASE_POST_EVENT:
         raise TradingError("현재는 이벤트 사후 판단 단계가 아닙니다.")
     event = current_event(game)
-    user_fills = _execute_user_orders(game)
+    user_fills = _execute_user_orders(game, event["event_date"])
     game["decision_log"].append({"event_id": event["event_id"], "phase": PHASE_POST_EVENT,
                                  "user_fills": user_fills,
                                  "price_after_autonomous": game["current_price"]})

@@ -1603,6 +1603,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-fills b.up { color: var(--up); }
 .paper-fills b.down { color: var(--down); }
 .paper-fills strong { color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+.paper-fills span:not(:first-child) { color: var(--muted); font-size: 9px; white-space: nowrap; }
 .paper-fills em { margin-left: auto; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9px; font-style: normal; }
 
 /* collection */

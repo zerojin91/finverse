@@ -345,6 +345,7 @@ type Fill = {
   rationale?: string;
   confidence?: number | null;
   realized_pnl?: number;
+  market_date?: string;
 };
 
 type PendingOrder = {
@@ -704,7 +705,7 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
       price: fill.price,
       x: cx(barIndex) + (fill.phase === "pre_event_decision" ? -bodyW : bodyW),
       y: y(fill.price),
-      title: `내 ${fill.side === "BUY" ? "매수" : "매도"} ${fill.quantity.toLocaleString("ko-KR")}주 · ${won(fill.price)}`,
+      title: `내 ${fill.side === "BUY" ? "매수" : "매도"} ${fill.quantity.toLocaleString("ko-KR")}주 · ${won(fill.price)}${fill.market_date ? ` · ${fill.market_date}` : ""}`,
     }];
   });
   const reflectionMarkers = (game.daily_reflections ?? [])
@@ -2495,6 +2496,7 @@ function TradingScreen({
                   <div key={fill.order_id ?? index}>
                     <b className={fill.side === "BUY" ? "up" : "down"}>{fill.side === "BUY" ? "매수" : "매도"}</b>
                     <strong>{fill.quantity.toLocaleString("ko-KR")}주</strong>
+                    <span>{fill.market_date ? `${fill.market_date} 체결` : "체결일 미상"}</span>
                     <em>{fill.price.toLocaleString("ko-KR")}원</em>
                   </div>
                 ))}

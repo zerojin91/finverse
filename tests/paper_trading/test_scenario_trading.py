@@ -98,6 +98,25 @@ def test_event_pre_and_post_decisions_with_autonomous_market_rounds():
     assert len(game["price_history"]) == 3
 
 
+def test_user_fill_records_execution_market_date_and_net_return():
+    game = new_scenario_game(
+        "005930", "삼성전자", 10000, HISTORY,
+        [{"pre_brief": "일정", "title": "발표", "description": "내용",
+          "trading_days_until": 1}],
+        initial_cash=1_000_000,
+        persona_counts={"retail": 1, "foreign": 1, "institution": 1, "pension": 1},
+    )
+    _advance(game)
+    submit_scenario_order(game, "BUY", 10)
+    revealed = reveal_and_react(game, _round(game, "HOLD"))
+
+    assert revealed["user_fills"][0]["market_date"] == game["events"][0]["event_date"]
+    portfolio = public_scenario_game(game)["portfolio"]
+    assert portfolio["equity"] == portfolio["cash"] + portfolio["market_value"]
+    assert portfolio["total_return_pct"] == round(
+        (portfolio["equity"] / game["initial_equity"] - 1) * 100, 4)
+
+
 def test_inter_event_days_release_signals_without_allowing_user_orders():
     game = new_scenario_game(
         "005930", "삼성전자", 10200, HISTORY,
