@@ -2588,7 +2588,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .intro-smoke-brand span { color:var(--intro-down); }
 .intro-smoke-topbar-inner > span { color:var(--intro-faint); font-family:var(--font-mono,monospace); font-size:11px; letter-spacing:.05em; }
 .intro-smoke-hero { border-bottom:1px solid var(--intro-line); background:linear-gradient(180deg,#fff 0%,#fbfcfe 100%); }
-.intro-smoke-hero-inner { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,.85fr); gap:56px; align-items:center; padding-top:76px; padding-bottom:68px; }
+.intro-smoke-hero-inner { display:grid; grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr); gap:40px; align-items:center; padding-top:76px; padding-bottom:68px; }
 .intro-smoke-hero h1,.intro-smoke h2 { margin:0; color:var(--intro-ink); font-weight:900; letter-spacing:-.055em; line-height:1.18; }
 .intro-smoke-hero h1 { font-size:clamp(32px,3.9vw,45px); }
 .intro-smoke-rule { width:56px; height:3px; margin:30px 0 24px; border-radius:999px; background:linear-gradient(112deg,#0050d8,#0769ff 52%,#3d8bff); }
