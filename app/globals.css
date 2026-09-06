@@ -1464,6 +1464,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-advance:disabled { cursor: wait; opacity: .55; }
 .paper-run-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 11px 24px; border-top: 1px solid var(--line); background: #fff; color: var(--light); font-size: 9px; }
 .paper-run-footer span:first-child { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.paper-run.report-view .paper-run-grid { display: none; }
 
 /* header quote, stepper, coach, now panel */
 .paper-quote { display: flex; align-items: baseline; gap: 7px; padding-right: 4px; }

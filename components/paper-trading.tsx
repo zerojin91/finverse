@@ -2496,6 +2496,7 @@ function TradingScreen({
     await reflectionSaveRef.current;
     onAutoAdvance();
   }, [onAutoAdvance]);
+  const reportView = game.phase === "completed" && Boolean(game.llm_reports) && showReports;
   const startFromCoach = useCallback(() => {
     dismissCoach();
     if (worldMode && game.phase === "world_market" && (game.current_day_index ?? 0) === 0 && !busy) {
@@ -2504,7 +2505,7 @@ function TradingScreen({
   }, [busy, dismissCoach, game.current_day_index, game.phase, onAdvance, worldMode]);
 
   return (
-    <div className="paper-run">
+    <div className={`paper-run${reportView ? " report-view" : ""}`}>
       {coach && <CoachOverlay onDone={startFromCoach} worldMode={worldMode} />}
 
       <header className="paper-run-header">
