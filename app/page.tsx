@@ -2770,7 +2770,11 @@ export default function Home() {
   if (activeTab === "market") {
     return (
       <>
-        <MockMarketSimulation onOpenJournal={() => activateTab("twin")} onOpenJudgement={() => requireAuth(() => setPaperTradingOpen(true))} />
+        <MockMarketSimulation
+          onOpenJournal={() => activateTab("twin")}
+          onOpenJudgement={() => requireAuth(() => setPaperTradingOpen(true))}
+          onOpenLogin={() => setAuthOpen(true)}
+        />
         {paperTradingOpen && <PaperTradingModal onClose={() => setPaperTradingOpen(false)} />}
       </>
     );

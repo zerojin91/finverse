@@ -5,9 +5,10 @@ import { useEffect, useState } from "react";
 type MockMarketSimulationProps = {
   onOpenJournal: () => void;
   onOpenJudgement: () => void;
+  onOpenLogin: () => void;
 };
 
-type MockAction = "journal" | "judgement";
+type MockAction = "journal" | "judgement" | "login";
 
 const bridgeScript = String.raw`<script>
   document.addEventListener("click", function (event) {
@@ -15,10 +16,11 @@ const bridgeScript = String.raw`<script>
     if (!target) return;
     var nav = target.closest('[data-page="twin"]');
     var judgement = target.closest('[data-custom-scenario]');
-    if (!nav && !judgement) return;
+    var login = target.closest('[data-user]');
+    if (!nav && !judgement && !login) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    window.parent.postMessage({ channel: "finverse-mock", action: nav ? "journal" : "judgement" }, "*");
+    window.parent.postMessage({ channel: "finverse-mock", action: nav ? "journal" : judgement ? "judgement" : "login" }, "*");
   }, true);
 </script>`;
 
@@ -31,7 +33,7 @@ function extractMockDocument(source: string) {
   return srcDoc.replace("</body>", `${bridgeScript}</body>`);
 }
 
-export function MockMarketSimulation({ onOpenJournal, onOpenJudgement }: MockMarketSimulationProps) {
+export function MockMarketSimulation({ onOpenJournal, onOpenJudgement, onOpenLogin }: MockMarketSimulationProps) {
   const [srcDoc, setSrcDoc] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,10 +57,11 @@ export function MockMarketSimulation({ onOpenJournal, onOpenJudgement }: MockMar
       if (event.data?.channel !== "finverse-mock") return;
       if (event.data.action === "journal") onOpenJournal();
       if (event.data.action === "judgement") onOpenJudgement();
+      if (event.data.action === "login") onOpenLogin();
     };
     window.addEventListener("message", receive);
     return () => window.removeEventListener("message", receive);
-  }, [onOpenJournal, onOpenJudgement]);
+  }, [onOpenJournal, onOpenJudgement, onOpenLogin]);
 
   if (srcDoc === null) return <main aria-busy="true" style={{ minHeight: "100vh", background: "#fff" }} />;
   if (!srcDoc) return <main role="alert">목업 화면을 불러오지 못했습니다.</main>;
