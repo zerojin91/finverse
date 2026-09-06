@@ -2425,6 +2425,7 @@ function ServiceIntro({ onEnter, onOpenJournal }: { onEnter: () => void; onOpenJ
             <button className="intro-smoke-cta" type="button" onClick={onEnter}>시장 시뮬레이션 시작하기 <ArrowRight size={17} /></button>
             <p className="intro-smoke-note">실제 계좌와 연결하지 않는 모의투자 학습 서비스입니다.</p>
           </div>
+          <div className="intro-smoke-hero-visual">
           <figure className="intro-smoke-hidden-chart">
             <div><span>삼성전자 · 005930</span><span>모의투자</span></div>
             <svg viewBox="0 0 420 192" role="img" aria-label="실제 캔들과 미공개 미래 구간을 구분한 예시 차트">
@@ -2442,6 +2443,8 @@ function ServiceIntro({ onEnter, onOpenJournal }: { onEnter: () => void; onOpenJ
             </svg>
             <figcaption><span><i className="up" />상승</span><span><i className="down" />하락</span><span><i className="void" />미공개 구간</span></figcaption>
           </figure>
+          <img className="intro-smoke-overlap-shot" src="/intro/agent-profiles.png" alt="시장 참여 에이전트 프로필 화면" />
+          </div>
         </div>
       </section>
 
@@ -2470,14 +2473,14 @@ function ServiceIntro({ onEnter, onOpenJournal }: { onEnter: () => void; onOpenJ
       <section className="intro-smoke-feature">
         <div className="intro-smoke-wrap intro-smoke-feature-grid">
           <div><span className="intro-smoke-tag">아는 것</span><h2>가격이 아니라<br />조건을 봅니다</h2><p>종목을 고르면 시장·경제·사건·커뮤니티에서 모은 근거로 지금 그 종목이 <b>어떤 조건 위에 서 있는지</b> 정리합니다.</p><p>숫자를 정답처럼 던지지 않고, 조건이 깨지는 신호까지 함께 보여줍니다.</p></div>
-          <div className="intro-smoke-mock"><header><span>시장 시뮬레이션 · 초기 상황</span><span>실제 근거</span></header><strong>삼성전자 <small>005930</small></strong><ul><li><b>A</b> 외국인 수급이 순매수로 전환하는지</li><li><b>B</b> 실적과 가이던스가 기대를 충족하는지</li><li><b>C</b> 가격이 관찰 구간을 지키는지</li></ul><footer>시장 · 경제 · 사건 · 커뮤니티 근거를 구분해 확인합니다.</footer></div>
+          <img className="intro-smoke-feature-shot" src="/intro/event-sequence.png" alt="삼성전자 종목 이벤트 시퀀스 화면" />
         </div>
       </section>
 
       <section className="intro-smoke-feature intro-smoke-primary">
         <div className="intro-smoke-wrap intro-smoke-feature-grid">
           <div><span className="intro-smoke-tag">하는 것</span><h2>결과를 모른 채,<br />판단을 남깁니다</h2><p>실제 근거를 바탕으로 만들어진 World Agent 시뮬레이션이 하루씩 진행됩니다. 중요한 사건은 공개되기 전 사용자의 판단을 먼저 남깁니다.</p><p>개인·외국인·기관·연기금의 반응은 다음 거래일 환경에 반영되고, 사용자의 판단은 학습 기록으로만 보존됩니다.</p></div>
-          <div className="intro-smoke-mock"><header><span>투자 시뮬레이션 · 오늘의 판단</span><span>D-1</span></header><strong>중요한 사건이 다가오고 있습니다.</strong><p>내용은 아직 공개되지 않았습니다.</p><div className="intro-smoke-choice"><span>내일 매수 고려</span><b>관찰 계속</b><span>내일 매도 고려</span></div><footer>사용자 판단은 시장 가격이나 수급에 영향을 주지 않는 학습 기록입니다.</footer></div>
+          <img className="intro-smoke-feature-shot intro-smoke-judgement-shot" src="/intro/judgement-panel.png" alt="투자 시뮬레이션의 사용자 판단 화면" />
         </div>
       </section>
 
