@@ -156,6 +156,7 @@ type InitialContextSourceSummary = {
   macro_observations: number;
   events: number;
   community_days: number;
+  community_comment_count?: number;
   as_of?: { latest_market_date?: string | null };
   document_previews?: Record<string, string>;
 };
@@ -2101,7 +2102,7 @@ function SetupScreen({
                 <div><strong>위험 요인</strong><span>{initialContext.analysis.risk_factors.slice(0, 3).join(" · ") || "추가 확인 필요"}</span></div>
                 <div><strong>관찰 포인트</strong><span>{initialContext.analysis.watch_points.slice(0, 3).join(" · ") || "시나리오 진행 중 변화"}</span></div>
               </div>
-              <small className="paper-context-source">시장 {initialContext.source_summary.market_days}일 · 경제 {initialContext.source_summary.macro_observations}개 · 사건 {initialContext.source_summary.events}건 · 커뮤니티 {initialContext.source_summary.community_days}일 · {initialContext.cached ? "캐시된 분석" : "새로 분석"}</small>
+              <small className="paper-context-source">시장 {initialContext.source_summary.market_days}일 · 경제 {initialContext.source_summary.macro_observations}개 · 사건 {initialContext.source_summary.events}건 · 커뮤니티 {initialContext.source_summary.community_comment_count ?? initialContext.source_summary.community_days}{initialContext.source_summary.community_comment_count != null ? "댓글" : "일"} · {initialContext.cached ? "캐시된 분석" : "새로 분석"}</small>
             </>
           )}
         </section>

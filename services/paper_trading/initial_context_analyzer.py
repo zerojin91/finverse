@@ -19,7 +19,7 @@ from .kospi_paper_trading import TradingError
 from .llm_client import LLMClient
 
 
-CONTEXT_SCHEMA_VERSION = "initial-context-v11-community-comments"
+CONTEXT_SCHEMA_VERSION = "initial-context-v12-complete-context"
 CONTEXT_CACHE_TTL_SECONDS = 12 * 60 * 60
 
 
@@ -258,6 +258,58 @@ def _normalize(value: dict[str, Any]) -> dict[str, Any]:
     return normalized
 
 
+def _complete_context(analysis: dict[str, Any], source: dict[str, Any]) -> dict[str, Any]:
+    """Fill learner-facing fields from observed inputs when an LLM omits them.
+
+    The fallback must not invent future events or price targets.  It only turns
+    the already selected event, market, and macro observations into the same
+    UI contract the structured LLM response uses.
+    """
+    recent_events = [
+        event for event in (source.get("events", {}).get("recent_events") or [])
+        if str(event.get("title") or "").strip() and str(event.get("date") or "").strip()
+    ]
+    recent_events.sort(key=lambda event: str(event.get("date") or ""))
+
+    if not analysis.get("event_sequence"):
+        sequence = []
+        for event in recent_events[-6:]:
+            scope = str(event.get("scope") or "market")
+            sequence.append({
+                "date": str(event.get("date") or ""),
+                "title": str(event.get("title") or "").strip(),
+                "description": str(event.get("summary") or "문서에서 사건 제목만 확인됐습니다.").strip(),
+                "domain": "사건" if scope in {"security", "market"} else scope,
+                "market_reaction": "직접 확인 불가",
+                "basis": "observed",
+            })
+        analysis["event_sequence"] = sequence
+
+    market = source.get("market") or {}
+    economy = source.get("economy") or {}
+    latest_event = recent_events[-1] if recent_events else None
+    if not analysis.get("risk_factors"):
+        risks: list[str] = []
+        if latest_event:
+            risks.append(f"최근 사건 이후 수급·가격 반응의 지속성: {str(latest_event.get('title') or '').strip()[:80]}")
+        if market.get("recent_return_samples_pct"):
+            risks.append("최근 가격 변동성과 투자자 수급 방향 변화")
+        if economy.get("recent_observations"):
+            risks.append("금리·환율 등 거시 지표 변화가 종목에 미치는 영향")
+        analysis["risk_factors"] = risks[:3]
+    if not analysis.get("watch_points"):
+        watch_points: list[str] = []
+        latest_market_date = str(source.get("provenance", {}).get("latest_market_date") or "")
+        if latest_market_date:
+            watch_points.append(f"{latest_market_date} 이후 종가·거래량·투자자 수급 변화")
+        if latest_event:
+            watch_points.append(f"최근 사건 관련 후속 공시·뉴스와 시장 반응: {str(latest_event.get('title') or '').strip()[:60]}")
+        if economy.get("recent_observations"):
+            watch_points.append("금리·환율 등 거시 지표의 추가 변화")
+        analysis["watch_points"] = watch_points[:3]
+    return analysis
+
+
 def _event_title_key(value: Any) -> str:
     """Compare source headlines despite spaces and punctuation differences."""
     return re.sub(r"[^0-9a-z가-힣]", "", str(value or "").lower())
@@ -311,6 +363,10 @@ def prepare_initial_context_documents(history: dict[str, Any]) -> dict[str, Any]
             "events": source["events"]["event_count"],
             "community_days": source["community"]["observed_days"],
             "target_video_comments": source["community"]["target_video_comment_count"],
+            "community_comment_count": (
+                source["community"]["target_video_comment_count"]
+                or source["community"]["total_comments"]
+            ),
             "as_of": source["provenance"],
             "documents": list(document_files.values()),
             "document_previews": {
@@ -375,7 +431,10 @@ def get_initial_context(history: dict[str, Any]) -> dict[str, Any]:
         return {**cached, "context_id": context_id, "cached": True}
 
     try:
-        analysis = _normalize(LLMClient().chat_json(_messages(source, evidence_documents), temperature=.25, max_tokens=3800))
+        analysis = _complete_context(
+            _normalize(LLMClient().chat_json(_messages(source, evidence_documents), temperature=.25, max_tokens=3800)),
+            source,
+        )
         _mark_direct_event_evidence(analysis, source["events"]["recent_events"])
     except Exception as exc:  # noqa: BLE001 - API 계층에서 사용자용 503으로 변환한다.
         raise InitialContextUnavailable("초기 시장 맥락 분석을 생성하지 못했습니다.") from exc

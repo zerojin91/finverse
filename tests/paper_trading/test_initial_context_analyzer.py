@@ -1,5 +1,7 @@
 from services.paper_trading.config import Config
 from services.paper_trading.initial_context_analyzer import (
+    _complete_context,
+    _compact_input,
     _mark_direct_event_evidence,
     _normalize,
     clear_initial_context_cache,
@@ -147,3 +149,13 @@ def test_source_news_marks_matching_inferred_timeline_item_as_observed():
     }])
 
     assert analysis["event_sequence"][0]["basis"] == "observed"
+
+
+def test_incomplete_llm_analysis_uses_observed_context_for_required_sections():
+    source = _compact_input(_history())
+    result = _complete_context(_normalize({"summary": "요약", "summary_points": ["요약"] * 5}), source)
+
+    assert result["event_sequence"]
+    assert result["event_sequence"][0]["basis"] == "observed"
+    assert result["risk_factors"]
+    assert result["watch_points"]
