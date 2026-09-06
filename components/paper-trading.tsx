@@ -2376,6 +2376,7 @@ function TradingScreen({
   onOrder,
   onDailyReflection,
   onAdvance,
+  onAutoAdvance,
 }: {
   game: ScenarioGame;
   busy: boolean;
@@ -2385,6 +2386,7 @@ function TradingScreen({
   onOrder: (input: { side: "BUY" | "SELL"; quantity: number; rationale: string; confidence: number }) => void;
   onDailyReflection: (stance: DailyReflection["stance"], quantity?: number) => Promise<void>;
   onAdvance: (days?: number) => void;
+  onAutoAdvance: () => void;
 }) {
   // 모달은 사용자가 열었을 때만 마운트되므로 첫 렌더에서 바로 읽어도 안전하다.
   // 저장소 접근이 막힌 브라우저에서는 안내를 띄우지 않는다.
@@ -2420,6 +2422,10 @@ function TradingScreen({
     await reflectionSaveRef.current;
     onAdvance(days);
   }, [onAdvance]);
+  const startAutoAdvance = useCallback(async () => {
+    await reflectionSaveRef.current;
+    onAutoAdvance();
+  }, [onAutoAdvance]);
   const startFromCoach = useCallback(() => {
     dismissCoach();
     if (worldMode && game.phase === "world_market" && (game.current_day_index ?? 0) === 0 && !busy) {
@@ -2535,7 +2541,7 @@ function TradingScreen({
               <button
                 className="paper-advance-fast"
                 type="button"
-                onClick={() => { void advanceAfterReflection(Math.max(1, (game.simulation_days ?? 1) - (game.current_day_index ?? 0))); }}
+                onClick={() => { void startAutoAdvance(); }}
               >
                 자동 진행
               </button>
@@ -2612,12 +2618,13 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
     return payload.data;
   }, []);
 
-  const pollJob = useCallback((jobId: string, gameId: string) => {
+  const pollJob = useCallback((jobId: string, gameId: string): Promise<ScenarioGame | null> => {
     let lastStamp = "";
     let lastMessage = "";
     let lastChangeAt = Date.now();
-    const tick = async () => {
-      try {
+    return new Promise((resolve) => {
+      const tick = async () => {
+        try {
         const payload = await callApi<{ data: Job }>(`/scenario-jobs/${jobId}`);
         const next = payload.data;
         setJob(next);
@@ -2638,9 +2645,10 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
           setStalled(true);
         }
         if (next.status === "completed") {
-          await refreshGame(gameId);
+          const latest = await refreshGame(gameId);
           setJob(null);
           setStalled(false);
+          resolve(latest);
           return;
         }
         if (next.status === "failed") {
@@ -2648,6 +2656,7 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
           setJob(null);
           setStalled(false);
           await refreshGame(gameId).catch(() => undefined);
+          resolve(null);
           return;
         }
         pollRef.current = setTimeout(tick, 1400);
@@ -2655,9 +2664,11 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
         setError(cause instanceof Error ? cause.message : "진행 상태를 확인하지 못했습니다.");
         setJob(null);
         setStalled(false);
+        resolve(null);
+        }
       }
-    };
-    pollRef.current = setTimeout(tick, 900);
+      pollRef.current = setTimeout(tick, 900);
+    });
   }, [refreshGame]);
 
   const start = useCallback(async (input: {
@@ -2714,8 +2725,8 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
     }
   }, [pollJob]);
 
-  const advance = useCallback(async (days?: number) => {
-    if (!game || busy) return;
+  const advance = useCallback(async (days?: number): Promise<ScenarioGame | null> => {
+    if (!game || busy) return null;
     setError(null);
     setStalled(false);
     const meta = PHASE_META[game.phase];
@@ -2725,11 +2736,23 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
         body: JSON.stringify({ action: meta.action, ...(days ? { days } : {}) }),
       });
       setJob(payload.data);
-      pollJob(payload.data.job_id, game.game_id);
+      return await pollJob(payload.data.job_id, game.game_id);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "다음 단계를 시작하지 못했습니다.");
+      return null;
     }
   }, [game, busy, pollJob]);
+
+  const autoAdvance = useCallback(async () => {
+    if (!game || busy || game.mode !== "world") return;
+    let latest = game;
+    const remaining = Math.max(0, (latest.simulation_days ?? 0) - (latest.current_day_index ?? 0));
+    for (let index = 0; index < remaining; index += 1) {
+      const next = await advance(1);
+      if (!next || next.phase !== "world_market") return;
+      latest = next;
+    }
+  }, [advance, busy, game]);
 
   const submitOrder = useCallback(async (input: { side: "BUY" | "SELL"; quantity: number; rationale: string; confidence: number }) => {
     if (!game) return;
@@ -2789,6 +2812,7 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
               onOrder={submitOrder}
               onDailyReflection={recordDailyReflection}
               onAdvance={advance}
+              onAutoAdvance={autoAdvance}
             />
           : <SetupScreen onStart={start} starting={starting} error={error} onClose={onClose} />}
       </section>
