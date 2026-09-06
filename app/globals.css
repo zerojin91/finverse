@@ -1226,7 +1226,8 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-chart-readout b.up, .paper-chart-readout em.up { color: var(--up); }
 .paper-chart-readout b.down, .paper-chart-readout em.down { color: var(--down); }
 .paper-chart-readout em { margin-left: auto; font-size: 11px; font-style: normal; font-weight: 700; }
-.paper-chart-svg { width: 100%; min-height: 120px; flex: 1; display: block; }
+.paper-chart-scroll { min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+.paper-chart-svg { width: 100%; min-width: 100%; min-height: 120px; flex: 1; display: block; }
 .paper-chart-grid { stroke: #f1f1f3; stroke-width: 1; vector-effect: non-scaling-stroke; }
 .paper-chart-axis { fill: #a1a1aa; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 8px; }
 .paper-chart-reference { stroke: #d4d4d8; stroke-width: 1; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }

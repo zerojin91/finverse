@@ -653,15 +653,15 @@ function buildBars(game: CandleChartData, preview = false): Bar[] {
 
   // 실제 이력은 방향을 읽을 수 있는 만큼만 남기고, 선택한 연습 기간은 오른쪽의
   // 빈 슬롯으로 확보한다. 진행될 때마다 그 슬롯이 시뮬레이션 캔들로 채워진다.
-  const historyLimit = Math.max(8, Math.min(14, Math.ceil((game.simulation_days ?? 20) * 0.6)));
-  // 차트는 항상 최대 20칸만 사용한다. 20일을 넘기면 가장 오래된 봉을
-  // 왼쪽에서 제거하고 새 봉을 오른쪽에 붙여, 봉 너비가 계속 좁아지지 않게 한다.
-  return [...history.slice(-historyLimit), ...simulation].slice(-20);
+  // 실제 이력은 항상 최근 10거래일만 보여준다. 시뮬레이션 전체 기간은
+  // 잘라내지 않고 남겨 두어, 20개 슬롯을 넘으면 가로 스크롤로 확인한다.
+  return [...history.slice(-10), ...simulation];
 }
 
 function CandleChart({ game, preview = false }: { game: CandleChartData; preview?: boolean }) {
   const bars = useMemo(() => buildBars(game, preview), [game, preview]);
   const [hovered, setHovered] = useState<number | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const layout = useMemo(() => {
     if (bars.length < 2) return null;
@@ -675,11 +675,12 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
     const simStart = bars.findIndex((bar) => !bar.real);
     const historicalCount = simStart < 0 ? bars.length : simStart;
     const simulatedCount = bars.length - historicalCount;
-    const futureSlots = preview ? 0 : Math.max(0, 20 - bars.length);
-    const totalSlots = Math.max(20, bars.length + futureSlots);
-    const slot = (CHART_W - AXIS_W) / totalSlots;
+    const futureSlots = preview ? 0 : Math.max(0, (game.simulation_days ?? 20) - simulatedCount);
+    const totalSlots = preview ? Math.max(20, bars.length) : Math.max(20, bars.length + futureSlots);
+    const slot = (CHART_W - AXIS_W) / 20;
+    const chartWidth = preview ? CHART_W : Math.max(CHART_W, totalSlots * slot + AXIS_W);
     return {
-      top, bottom, span, slot,
+      top, bottom, span, slot, chartWidth,
       bodyW: Math.max(2, Math.min(13, slot * 0.6)),
       simStart: historicalCount,
       futureSlots,
@@ -688,6 +689,12 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
       cx: (index: number) => index * slot + slot / 2,
     };
   }, [bars, game.initial_reference_price, game.simulation_days, preview]);
+
+  useEffect(() => {
+    if (!preview && scrollRef.current) {
+      scrollRef.current.scrollLeft = scrollRef.current.scrollWidth - scrollRef.current.clientWidth;
+    }
+  }, [bars.length, preview]);
 
   if (!layout) {
     return (
@@ -699,7 +706,7 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
     );
   }
 
-  const { top, span, slot, bodyW, simStart, futureSlots, remainingSimulationDays, y, cx } = layout;
+  const { top, span, slot, chartWidth, bodyW, simStart, futureSlots, remainingSimulationDays, y, cx } = layout;
   const gridValues = [0, 0.25, 0.5, 0.75, 1].map((ratio) => top - span * ratio);
 
   // 사용자 체결은 해당 이벤트가 반응한 봉 위에 표시한다. 사전 판단은 왼쪽,
@@ -753,18 +760,20 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
         {!active.real && <em className={toneOf(active.returnPct)}>{signedPct(active.returnPct)}</em>}
       </div>
 
-      <svg
-        className="paper-chart-svg"
-        viewBox={`0 0 ${CHART_W} ${PRICE_H + 22}`}
-        preserveAspectRatio="none"
-        role="img"
-        aria-label={preview ? "최근 실제 캔들 차트" : "시나리오 캔들 차트"}
-        onMouseLeave={() => setHovered(null)}
-      >
+      <div className="paper-chart-scroll" ref={scrollRef}>
+        <svg
+          className="paper-chart-svg"
+          style={{ width: `${chartWidth}px` }}
+          viewBox={`0 0 ${chartWidth} ${PRICE_H + 22}`}
+          preserveAspectRatio="none"
+          role="img"
+          aria-label={preview ? "최근 실제 캔들 차트" : "시나리오 캔들 차트"}
+          onMouseLeave={() => setHovered(null)}
+        >
         {gridValues.map((value) => (
           <g key={value}>
-            <line className="paper-chart-grid" x1={0} y1={y(value)} x2={CHART_W - AXIS_W} y2={y(value)} />
-            <text className="paper-chart-axis" x={CHART_W - AXIS_W + 6} y={y(value) + 3}>
+            <line className="paper-chart-grid" x1={0} y1={y(value)} x2={chartWidth - AXIS_W} y2={y(value)} />
+            <text className="paper-chart-axis" x={chartWidth - AXIS_W + 6} y={y(value) + 3}>
               {Math.round(value).toLocaleString("ko-KR")}
             </text>
           </g>
@@ -773,7 +782,7 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
         {!preview && (
           <line
             className="paper-chart-reference"
-            x1={0} x2={CHART_W - AXIS_W}
+            x1={0} x2={chartWidth - AXIS_W}
             y1={y(game.initial_reference_price)} y2={y(game.initial_reference_price)}
           />
         )}
@@ -837,7 +846,8 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
               : `M ${marker.x} ${marker.y + 7} l 5 -8 l -10 0 z`} />
           </g>
         ))}
-      </svg>
+        </svg>
+      </div>
 
       <div className="paper-chart-dates">
         <span>{bars[0].date}</span>
