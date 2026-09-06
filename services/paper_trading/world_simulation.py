@@ -50,8 +50,8 @@ def new_world_game(
     initial_cash: int = 100_000_000, initial_position: dict[str, Any] | None = None,
     fee_rate: float = .00015, sell_tax_rate: float = .0018, slippage_bps: float = 5.0,
 ) -> dict[str, Any]:
-    if simulation_days not in (5, 10, 20, 60):
-        raise TradingError("시뮬레이션 기간은 5일, 10일, 20일, 60일 중에서 선택해주세요.")
+    if simulation_days not in (10, 20, 60):
+        raise TradingError("시뮬레이션 기간은 10일, 20일, 60일 중에서 선택해주세요.")
     if int(previous_close) <= 0:
         raise TradingError("시작 기준 가격이 필요합니다.")
     if not impact_history:

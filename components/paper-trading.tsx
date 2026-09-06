@@ -1446,7 +1446,6 @@ const PREVIEW_STEP_MIN_MS = 1_500;
 const COLLECTION_STEP_MIN_MS = 1_500;
 const AGENT_PROFILE_MIN_MS = 1_500;
 const DURATION_OPTIONS = [
-  { days: 5, label: "5거래일", caption: "빠른 체험" },
   { days: 10, label: "10거래일", caption: "단기 흐름" },
   { days: 20, label: "20거래일", caption: "한 달 연습" },
   { days: 60, label: "60거래일", caption: "중기 판단" },
