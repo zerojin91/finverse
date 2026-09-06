@@ -2420,11 +2420,11 @@ function ServiceIntro({ onEnter, onOpenJournal }: { onEnter: () => void; onOpenJ
       <section className="intro-smoke-hero" aria-labelledby="service-intro-title">
         <div className="intro-smoke-wrap intro-smoke-hero-inner">
           <div>
-            <h1 id="service-intro-title">투자 공부는 했는데,<br />막상 그 순간엔<br />다르게 행동합니다.</h1>
+            <h1 id="service-intro-title">아는 것과,<br />행동하는 것은<br />다릅니다.</h1>
             <div className="intro-smoke-rule" />
-            <p className="intro-smoke-hero-close">FINVERSE는 그 간격을 좁힙니다.</p>
-            <p className="intro-smoke-hero-lede">실제 시장 근거를 읽고, 결과를 알 수 없는 모의투자에서 판단을 남긴 뒤 그 행동을 보고서로 돌아보세요.</p>
-            <button className="intro-smoke-cta" type="button" onClick={onEnter}>시장 인사이트 시작하기 <ArrowRight size={17} /></button>
+            <p className="intro-smoke-hero-close">FINVERSE는 판단과 행동의 간격을 훈련합니다.</p>
+            <p className="intro-smoke-hero-lede">사람은 불안, 손실 회피, 군집 심리와 정보 과부하 속에서 세워 둔 원칙을 지키기 어렵습니다. FINVERSE는 그 판단 오류를 안전하게 발견하고 다음 행동 기준으로 바꾸도록 돕습니다.</p>
+            <button className="intro-smoke-cta" type="button" onClick={onEnter}>시장 시뮬레이션 시작하기 <ArrowRight size={17} /></button>
             <p className="intro-smoke-note">실제 계좌와 연결하지 않는 모의투자 학습 서비스입니다.</p>
           </div>
           <figure className="intro-smoke-hidden-chart">
@@ -2457,7 +2457,7 @@ function ServiceIntro({ onEnter, onOpenJournal }: { onEnter: () => void; onOpenJ
       <section className="intro-smoke-feature">
         <div className="intro-smoke-wrap intro-smoke-feature-grid">
           <div><span className="intro-smoke-tag">아는 것</span><h2>가격이 아니라<br />조건을 봅니다</h2><p>종목을 고르면 시장·경제·사건·커뮤니티에서 모은 근거로 지금 그 종목이 <b>어떤 조건 위에 서 있는지</b> 정리합니다.</p><p>숫자를 정답처럼 던지지 않고, 조건이 깨지는 신호까지 함께 보여줍니다.</p></div>
-          <div className="intro-smoke-mock"><header><span>시장 인사이트 · 초기 상황</span><span>실제 근거</span></header><strong>삼성전자 <small>005930</small></strong><ul><li><b>A</b> 외국인 수급이 순매수로 전환하는지</li><li><b>B</b> 실적과 가이던스가 기대를 충족하는지</li><li><b>C</b> 가격이 관찰 구간을 지키는지</li></ul><footer>시장 · 경제 · 사건 · 커뮤니티 근거를 구분해 확인합니다.</footer></div>
+          <div className="intro-smoke-mock"><header><span>시장 시뮬레이션 · 초기 상황</span><span>실제 근거</span></header><strong>삼성전자 <small>005930</small></strong><ul><li><b>A</b> 외국인 수급이 순매수로 전환하는지</li><li><b>B</b> 실적과 가이던스가 기대를 충족하는지</li><li><b>C</b> 가격이 관찰 구간을 지키는지</li></ul><footer>시장 · 경제 · 사건 · 커뮤니티 근거를 구분해 확인합니다.</footer></div>
         </div>
       </section>
 
@@ -2475,7 +2475,23 @@ function ServiceIntro({ onEnter, onOpenJournal }: { onEnter: () => void; onOpenJ
         </div>
       </section>
 
-      <section className="intro-smoke-closing"><h2>지금, 당신의 판단을 실험해보세요.</h2><button className="intro-smoke-cta" type="button" onClick={onEnter}>모의투자 시작하기 <ArrowRight size={17} /></button></section>
+      <section className="intro-smoke-solution">
+        <div className="intro-smoke-wrap">
+          <span className="intro-smoke-tag">FINVERSE의 해결</span>
+          <h2>정답을 주는 대신,<br />판단하는 힘을 기릅니다.</h2>
+          <p>FINVERSE는 금융소비자의 비합리성을 없애거나 미래 시장을 정확히 예측하려 하지 않습니다. 시장을 이해하는 단계부터 개인의 판단을 돌아보는 단계까지 하나의 경험으로 연결합니다.</p>
+          <ol>
+            <li><b>01</b><strong>사건과 뉴스를 구조화합니다</strong><span>복잡한 시장 정보와 금융 용어를 근거별로 나누어 현재 맥락을 읽기 쉽게 만듭니다.</span></li>
+            <li><b>02</b><strong>시장과 종목의 환경을 확인합니다</strong><span>가격만 보지 않고 수급·경제·사건·심리의 조건을 함께 살펴봅니다.</span></li>
+            <li><b>03</b><strong>조건과 불확실성을 함께 봅니다</strong><span>단일 숫자를 정답처럼 제시하지 않고, 관찰할 조건과 경로가 달라지는 신호를 확인합니다.</span></li>
+            <li><b>04</b><strong>시장 변화 속에서 판단을 연습합니다</strong><span>World Agent 시뮬레이션에서 중요한 사건과 시장 참여자 반응을 마주하며 판단을 기록합니다.</span></li>
+            <li><b>05</b><strong>나의 가상 투자 상태에 연결합니다</strong><span>시작 자금 또는 기존 보유를 기준으로, 시장 변화가 내 가상 포트폴리오에 미치는 영향을 확인합니다.</span></li>
+            <li><b>06</b><strong>AI가 판단 과정을 되돌려 줍니다</strong><span>완료 보고서에서 선택의 흐름과 반복된 판단 패턴을 살피고 다음 행동 기준을 정리합니다.</span></li>
+          </ol>
+        </div>
+      </section>
+
+      <section className="intro-smoke-closing"><h2>불확실한 시장에서도,<br />나의 기준으로 판단해 보세요.</h2><button className="intro-smoke-cta" type="button" onClick={onEnter}>시장 시뮬레이션 시작하기 <ArrowRight size={17} /></button></section>
       <footer className="intro-smoke-footer">AI 분석 기반 참고 자료이며 투자 판단의 최종 책임은 본인에게 있습니다. FINVERSE는 실제 계좌와 연동하지 않습니다.</footer>
     </main>
   );
@@ -3129,7 +3145,7 @@ export default function Home() {
           FINVERSE<span>.</span>
         </button>
         <nav className="top-nav" aria-label="FINVERSE 탐색">
-          <button className={activeTab === "market" ? "active" : ""} onClick={() => activateTab("market")} aria-current={activeTab === "market" ? "page" : undefined}>시장 인사이트</button>
+          <button className={activeTab === "market" ? "active" : ""} onClick={() => activateTab("market")} aria-current={activeTab === "market" ? "page" : undefined}>시장 시뮬레이션</button>
           <button className={activeTab === "twin" ? "active" : ""} onClick={() => activateTab("twin")} aria-current={activeTab === "twin" ? "page" : undefined}>나의 투자 일지</button>
           <button onClick={() => setPaperTradingOpen(true)}>모의 투자</button>
           <button onClick={() => setIntroVisible(true)}>서비스 소개</button>
@@ -3431,7 +3447,7 @@ export default function Home() {
       </main>
 
       <nav className="mobile-tabs" aria-label="모바일 주요 메뉴">
-        <button className={activeTab === "market" ? "active" : ""} onClick={() => activateTab("market")}><BarChart3 size={18} /><span>시장 인사이트</span></button>
+        <button className={activeTab === "market" ? "active" : ""} onClick={() => activateTab("market")}><BarChart3 size={18} /><span>시장 시뮬레이션</span></button>
         <button className={activeTab === "twin" ? "active" : ""} onClick={() => activateTab("twin")}><UserRound size={18} /><span>나의 투자 일지</span></button>
       </nav>
 
