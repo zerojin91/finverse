@@ -1,4 +1,4 @@
-import { authDb } from "@/lib/auth-db";
+import { createSession, createUser, findUserByEmail } from "@/lib/auth-db";
 import { hashPassword, newSessionToken, sessionCookie } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -19,17 +19,11 @@ export async function POST(request: Request) {
   if (!password || password.length < 8) return Response.json({ error: "비밀번호는 8자 이상이어야 합니다." }, { status: 400 });
 
   try {
-    const sql = authDb();
-    const existing = await sql`select id from auth.users where email = ${email}`;
-    if (existing.length) return Response.json({ error: "이미 등록된 이메일입니다." }, { status: 409 });
+    if (findUserByEmail(email)) return Response.json({ error: "이미 등록된 이메일입니다." }, { status: 409 });
 
-    const passwordHash = hashPassword(password);
-    const [user] = await sql<{ id: number; email: string }[]>`
-      insert into auth.users (email, password_hash) values (${email}, ${passwordHash})
-      returning id, email
-    `;
+    const user = createUser(email, hashPassword(password));
     const { raw, hash, expiresAt } = newSessionToken();
-    await sql`insert into auth.sessions (user_id, token_hash, expires_at) values (${user.id}, ${hash}, ${expiresAt})`;
+    createSession(user.id, hash, expiresAt);
 
     return Response.json({ user }, { headers: { "Set-Cookie": sessionCookie(raw, expiresAt) } });
   } catch (error) {

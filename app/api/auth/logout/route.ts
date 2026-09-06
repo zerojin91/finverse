@@ -1,4 +1,4 @@
-import { authDb } from "@/lib/auth-db";
+import { deleteSessionByTokenHash } from "@/lib/auth-db";
 import { clearSessionCookie, hashToken, readSessionToken } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -7,7 +7,7 @@ export async function POST(request: Request) {
   const raw = readSessionToken(request);
   if (raw) {
     try {
-      await authDb()`delete from auth.sessions where token_hash = ${hashToken(raw)}`;
+      deleteSessionByTokenHash(hashToken(raw));
     } catch (error) {
       console.error("FINVERSE logout failed", error);
     }
