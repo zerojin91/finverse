@@ -681,6 +681,31 @@ def apply_agent_round(game: dict[str, Any], round_data: dict[str, Any], *,
             "note": str(order.get("memory_note") or "")[:300],
         })
         persona["memory"] = persona["memory"][-12:]
+    # 요약·화면에 표시하는 체결 금액은 주문 의도 금액이 아니라 실제 체결
+    # 수량과 체결 가격으로 다시 계산한다. 현금/보유수량 제한으로 수량이
+    # 줄어든 경우에도 제한 전 금액이 남으면 가격 설명과 포트폴리오 기록이
+    # 서로 어긋난다.
+    settled_buy = sum(
+        int(order.get("filled_quantity") or 0) * float(order.get("fill_price") or 0)
+        for order in orders if order["side"] == "BUY"
+    )
+    settled_sell = sum(
+        int(order.get("filled_quantity") or 0) * float(order.get("fill_price") or 0)
+        for order in orders if order["side"] == "SELL"
+    )
+    settled_group_actuals = {
+        group: {
+            "buy": round(sum(
+                int(order.get("filled_quantity") or 0) * float(order.get("fill_price") or 0)
+                for order in orders if order["group"] == group and order["side"] == "BUY"
+            )),
+            "sell": round(sum(
+                int(order.get("filled_quantity") or 0) * float(order.get("fill_price") or 0)
+                for order in orders if order["group"] == group and order["side"] == "SELL"
+            )),
+        }
+        for group in INVESTOR_GROUPS
+    }
     game["current_price"] = next_price
     result = {"round_id": f"rnd_{uuid.uuid4().hex[:10]}", "phase": phase,
               "label": label, "market_date": market_date,
@@ -702,15 +727,10 @@ def apply_agent_round(game: dict[str, Any], round_data: dict[str, Any], *,
               "psychology": psychology,
               "max_round_capacity": round(max_round_capacity),
               "context_mode": game.get("settings", {}).get("context_mode", CONTEXT_MODE),
-              "buy_notional": buy, "sell_notional": sell, "persona_orders": orders,
+              "buy_notional": round(settled_buy), "sell_notional": round(settled_sell),
+              "persona_orders": orders,
               "group_notional_targets": representative_targets,
-              "group_notional_actuals": {
-                  group: {"buy": sum(order["notional"] for order in orders
-                                     if order["group"] == group and order["side"] == "BUY"),
-                          "sell": sum(order["notional"] for order in orders
-                                      if order["group"] == group and order["side"] == "SELL")}
-                  for group in INVESTOR_GROUPS
-              },
+              "group_notional_actuals": settled_group_actuals,
               "market_summary": round_data.get("market_summary", ""),
               "observations": round_data.get("observations", []),
               "risk_flags": round_data.get("risk_flags", [])}

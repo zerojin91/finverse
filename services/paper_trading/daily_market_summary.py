@@ -75,9 +75,10 @@ def _aggregate_orders(result: dict[str, Any]) -> dict[str, dict[str, Any]]:
         row["agent_count"] += 1
         side = str(order.get("side") or "HOLD").upper()
         quantity = int(_number(order.get("filled_quantity", order.get("quantity"))))
-        notional = _number(order.get("notional"))
-        if notional <= 0 and quantity:
-            notional = quantity * _number(order.get("fill_price", result.get("price")))
+        # 체결 후 수량·가격을 우선한다. order.notional은 가격 계산 전의
+        # 의도 금액일 수 있어 실제 체결액과 다를 수 있다.
+        fill_price = _number(order.get("fill_price", result.get("price")))
+        notional = quantity * fill_price if quantity and fill_price else _number(order.get("notional"))
         if side == "BUY":
             row["buy_count"] += 1
             row["buy_quantity"] += quantity
@@ -203,13 +204,15 @@ def generate_daily_market_summary(
                 "그룹 키는 retail, foreign, institution, pension을 그대로 사용한다. "
                 "각 그룹은 전체 시장의 대표 표본이므로 실제 시장의 주문 건수나 참여자 수가 아니다. "
                 "group_actions에는 매수세·매도세·관망의 건수, 명수, 개수를 절대 쓰지 말고, "
-                "매수 우위·매도 우위·관망·방향성 혼재 같은 전반적 흐름과 주요 판단 배경만 설명한다."
+                "매수 우위·매도 우위·관망·방향성 혼재 같은 전반적 흐름과 주요 판단 배경만 설명한다. "
+                "반드시 closing_price와 previous_price로 당일 방향을 확인하고, price_components_pct의 부호와 크기를 대조한다. "
+                "주문 흐름과 가격 방향이 반대라면 고유 충격·시장 맥락·심리·이벤트 중 실제 기여도가 큰 항목을 명시한다."
             ),
         },
         {
             "role": "user",
             "content": f"""다음은 {payload['stock']}의 {payload['market_date']} 거래일이 체결된 뒤의 집계다.
-개인·외국인·기관·연기금이 어떤 방향으로 행동했는지 각각 설명하고, 그 주문 흐름·가격 구성요소·공개 이벤트·환경을 바탕으로 주가가 왜 변했는지 추론하라. 각 그룹은 전체 시장의 대표 표본이므로 주문 건수나 에이전트 수를 시장 전체 수치처럼 쓰지 말라. group_actions에는 건수·명수·개수 표현을 넣지 말고 전반적인 방향성, 주요 행동, 판단 배경만 작성하라. 확인되지 않은 원인을 사실처럼 단정하지 말고 '추론'으로 표현하라.
+개인·외국인·기관·연기금이 어떤 방향으로 행동했는지 각각 설명하고, 그 주문 흐름·가격 구성요소·공개 이벤트·환경을 바탕으로 주가가 왜 변했는지 추론하라. 각 그룹은 전체 시장의 대표 표본이므로 주문 건수나 에이전트 수를 시장 전체 수치처럼 쓰지 말라. group_actions에는 건수·명수·개수 표현을 넣지 말고 전반적인 방향성, 주요 행동, 판단 배경만 작성하라. 확인되지 않은 원인을 사실처럼 단정하지 말고 '추론'으로 표현하라. closing_price와 previous_price가 가리키는 당일 방향을 summary에 정확히 반영하고, 가격 구성요소의 부호·상대적 크기와 주문 흐름이 반대라면 어느 구성요소가 상쇄하거나 주도했는지 구체적으로 설명하라. 입력의 buy_notional·sell_notional은 체결 후 실제 금액이므로 다른 금액을 만들어내지 말라.
 
 {json.dumps(payload, ensure_ascii=False)}
 
