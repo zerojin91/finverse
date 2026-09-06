@@ -2483,7 +2483,7 @@ function ServiceIntro({ onEnter, onOpenJournal }: { onEnter: () => void; onOpenJ
 
       <section className="intro-smoke-feature">
         <div className="intro-smoke-wrap intro-smoke-feature-grid intro-smoke-reverse">
-          <div><span className="intro-smoke-tag">그 사이</span><h2>당신은 어떤<br />투자자인가요?</h2><p><b>수익률만 보지 않습니다.</b> 사건 전후에 어떻게 판단했는지, 어느 시점에 기준이 바뀌었는지를 함께 돌아봅니다.</p><p>완료된 모의투자의 나의 투자 일지와 시나리오 보고서에서 행동과 결과를 나란히 확인할 수 있습니다.</p><button className="intro-smoke-link" type="button" onClick={onOpenJournal}>나의 투자 일지 보기 <ArrowRight size={16} /></button></div>
+          <div><span className="intro-smoke-tag">그 사이</span><h2>당신은 어떤<br />투자자인가요?</h2><p><b>수익률만 보지 않습니다.</b> 알고 있던 원칙을 실제 시장 상황에서도 행동으로 옮겼는지, 사건 전후에 판단 기준이 어떻게 바뀌었는지를 함께 돌아봅니다.</p><p>급등할 때 계획보다 크게 추격했는지, 급락할 때 근거를 확인하기 전에 포기했는지, 점검을 미뤘는지, 다른 사람의 확신을 내 판단처럼 따랐는지를 실제 일자별 기록과 비교합니다.</p><p>완료된 모의투자의 나의 투자 일지와 시나리오 보고서에서 <b>내가 알고 있던 것·실제로 선택한 행동·그 다음 결과</b>를 나란히 확인할 수 있습니다.</p><button className="intro-smoke-link" type="button" onClick={onOpenJournal}>나의 투자 일지 보기 <ArrowRight size={16} /></button></div>
           <div className="intro-smoke-mock"><header><span>나의 투자 일지</span><span>완료 보고서</span></header><p>현재 나의 투자 성향</p><strong className="intro-smoke-type">판단 패턴을 돌아볼 차례입니다.</strong><div className="intro-smoke-report-lines"><i /><i /><i /></div><footer>가상 시나리오의 행동을 바탕으로 한 교육용 분석입니다.</footer></div>
         </div>
       </section>
