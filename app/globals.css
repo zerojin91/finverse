@@ -2537,3 +2537,43 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
   .daily-story-card,.daily-story-card.layout-hero,.daily-story-card.layout-spotlight { grid-template-columns: 1fr; }
   .daily-card-art,.daily-story-card.layout-stacked .daily-card-art { min-height: 160px; border-right: 0; border-bottom: 1px solid var(--line); }
 }
+
+/* First-visit service introduction. */
+.service-intro { min-height: 100vh; color: #10141d; background: #fbfbfa; }
+.service-intro-header { height: 78px; display: flex; align-items: center; gap: 20px; padding: 0 clamp(24px,5vw,78px); border-bottom: 1px solid #e5e7eb; background: rgba(251,251,250,.94); }
+.service-intro-brand { border: 0; padding: 0; color: #10141d; background: transparent; font-size: 21px; font-weight: 900; letter-spacing: -.07em; cursor: pointer; }
+.service-intro-brand span { color: #1769ff; }
+.service-intro-header-note { color: #7a8391; font-size: 11px; font-weight: 800; letter-spacing: .12em; }
+.service-intro-text-action { margin-left: auto; display: inline-flex; align-items: center; gap: 7px; border: 0; padding: 8px 0; color: #273248; background: transparent; font-size: 14px; font-weight: 700; cursor: pointer; }
+.service-intro-hero { max-width: 1160px; margin: 0 auto; padding: clamp(92px,13vw,172px) clamp(24px,5vw,54px) 84px; }
+.service-intro-eyebrow,.service-intro-principle > p { margin: 0 0 24px; color: #1769ff; font-size: 12px; font-weight: 900; letter-spacing: .12em; }
+.service-intro-hero h1 { max-width: 800px; margin: 0; color: #0c111b; font-size: clamp(48px,6.3vw,88px); line-height: 1.08; letter-spacing: -.07em; }
+.service-intro-lede { max-width: 610px; margin: 32px 0 0; color: #5c6675; font-size: clamp(17px,1.7vw,21px); line-height: 1.7; letter-spacing: -.025em; }
+.service-intro-cta-row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 38px; }
+.service-intro-primary { display: inline-flex; align-items: center; justify-content: center; gap: 11px; min-height: 54px; border: 1px solid #10141d; border-radius: 4px; padding: 0 23px; color: #fff; background: #10141d; font-size: 15px; font-weight: 800; cursor: pointer; }
+.service-intro-secondary { min-height: 54px; border: 1px solid #d9dee7; border-radius: 4px; padding: 0 22px; color: #273248; background: #fff; font-size: 15px; font-weight: 800; cursor: pointer; }
+.service-intro-disclaimer { margin: 17px 0 0; color: #8a93a1; font-size: 13px; }
+.service-intro-flow { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); max-width: 1160px; margin: 0 auto; border-top: 1px solid #dfe3ea; border-bottom: 1px solid #dfe3ea; }
+.service-intro-flow-card { position: relative; min-height: 300px; padding: 33px clamp(24px,3vw,42px); border-right: 1px solid #dfe3ea; }
+.service-intro-flow-card:last-child { border-right: 0; }
+.service-intro-flow-card > span { position: absolute; top: 30px; right: 33px; color: #a1a9b5; font-size: 13px; font-weight: 800; }
+.service-intro-flow-card svg { color: #1769ff; }
+.service-intro-flow-card h2 { margin: 29px 0 13px; font-size: 23px; letter-spacing: -.045em; }
+.service-intro-flow-card p { max-width: 290px; margin: 0; color: #697384; font-size: 15px; line-height: 1.7; letter-spacing: -.02em; }
+.service-intro-principle { display: grid; grid-template-columns: 260px minmax(0,1fr); gap: 24px; max-width: 1160px; margin: 0 auto; padding: 112px clamp(24px,5vw,54px); }
+.service-intro-principle > p { margin: 5px 0 0; }
+.service-intro-principle strong { display: block; max-width: 680px; font-size: clamp(28px,3.1vw,42px); line-height: 1.25; letter-spacing: -.06em; }
+.service-intro-principle span { display: block; max-width: 650px; margin-top: 22px; color: #667080; font-size: 17px; line-height: 1.75; letter-spacing: -.025em; }
+.service-intro-footer-cta { display: flex; align-items: center; justify-content: space-between; gap: 22px; padding: 52px max(24px,calc((100vw - 1052px) / 2)); color: #fff; background: #10141d; }
+.service-intro-footer-cta p { margin: 0; font-size: clamp(23px,2.5vw,34px); font-weight: 800; letter-spacing: -.05em; }
+.service-intro-footer-cta .service-intro-primary { border-color: #fff; color: #10141d; background: #fff; white-space: nowrap; }
+@media (max-width: 760px) {
+  .service-intro-header { height: 65px; padding-inline: 22px; }
+  .service-intro-header-note { display: none; }
+  .service-intro-hero { padding: 86px 24px 70px; }
+  .service-intro-flow { grid-template-columns: 1fr; margin-inline: 24px; }
+  .service-intro-flow-card { min-height: 0; padding: 31px 28px 34px; border-right: 0; border-bottom: 1px solid #dfe3ea; }
+  .service-intro-flow-card:last-child { border-bottom: 0; }
+  .service-intro-principle { grid-template-columns: 1fr; gap: 12px; padding: 82px 24px; }
+  .service-intro-footer-cta { flex-direction: column; align-items: flex-start; padding: 42px 24px; }
+}

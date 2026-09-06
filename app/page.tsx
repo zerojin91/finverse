@@ -2377,9 +2377,10 @@ function TwinPage({ onRequireAuth }: { onRequireAuth?: (action: () => void) => v
   );
 }
 
-function MockNavigation({ activeTab, onActivate, user, onLogin, onLogout }: {
+function MockNavigation({ activeTab, onActivate, onShowIntro, user, onLogin, onLogout }: {
   activeTab: MainTab;
   onActivate: (tab: MainTab) => void;
+  onShowIntro: () => void;
   user: AuthUser | null;
   onLogin: () => void;
   onLogout: () => void;
@@ -2392,6 +2393,7 @@ function MockNavigation({ activeTab, onActivate, user, onLogin, onLogout }: {
       <nav className="mock-journal-nav" aria-label="주 메뉴">
         <button type="button" onClick={() => onActivate("market")} aria-current={activeTab === "market" ? "page" : undefined}>시장 시뮬레이션</button>
         <button type="button" onClick={() => onActivate("twin")} aria-current={activeTab === "twin" ? "page" : undefined}>나의 투자 일지</button>
+        <button type="button" onClick={onShowIntro}>서비스 소개</button>
       </nav>
       {user ? (
         <div className="mock-journal-account">
@@ -2403,8 +2405,70 @@ function MockNavigation({ activeTab, onActivate, user, onLogin, onLogout }: {
   );
 }
 
+const FINVERSE_INTRO_STORAGE_KEY = "finverse-service-intro-seen-v1";
+
+function ServiceIntro({ onEnter, onOpenJournal }: { onEnter: () => void; onOpenJournal: () => void }) {
+  return (
+    <main className="service-intro">
+      <header className="service-intro-header">
+        <button className="service-intro-brand" type="button" onClick={onEnter} aria-label="FINVERSE 서비스 시작">
+          FINVERSE<span>.</span>
+        </button>
+        <span className="service-intro-header-note">MARKET JUDGMENT LAB</span>
+        <button className="service-intro-text-action" type="button" onClick={onEnter}>서비스 들어가기 <ArrowRight size={15} /></button>
+      </header>
+
+      <section className="service-intro-hero" aria-labelledby="service-intro-title">
+        <p className="service-intro-eyebrow">FINVERSE · MARKET JUDGMENT LAB</p>
+        <h1 id="service-intro-title">정보가 많을수록,<br />판단의 기준이 필요합니다.</h1>
+        <p className="service-intro-lede">FINVERSE는 실제 시장 근거를 읽고, 결과를 알 수 없는 모의투자에서 나만의 판단을 연습한 뒤 행동 기록으로 돌아보는 금융 판단 학습 서비스입니다.</p>
+        <div className="service-intro-cta-row">
+          <button className="service-intro-primary" type="button" onClick={onEnter}>시장 인사이트 시작하기 <ArrowRight size={19} /></button>
+          <button className="service-intro-secondary" type="button" onClick={onOpenJournal}>나의 투자 일지 보기</button>
+        </div>
+        <p className="service-intro-disclaimer">실제 계좌와 연결하지 않는 모의투자 학습 서비스입니다.</p>
+      </section>
+
+      <section className="service-intro-flow" aria-label="FINVERSE 서비스 흐름">
+        <div className="service-intro-flow-card">
+          <span>01</span>
+          <Database size={21} />
+          <h2>실제 근거를 읽습니다</h2>
+          <p>시장·경제·사건·커뮤니티 데이터를 분리해 지금 확인할 수 있는 사실과 관찰 포인트를 정리합니다.</p>
+        </div>
+        <div className="service-intro-flow-card">
+          <span>02</span>
+          <UsersRound size={21} />
+          <h2>결과를 모른 채 연습합니다</h2>
+          <p>월드와 시장 참여 에이전트의 반응 속에서 매수·관찰·매도 판단을 남기며 흐름을 경험합니다.</p>
+        </div>
+        <div className="service-intro-flow-card">
+          <span>03</span>
+          <FileUp size={21} />
+          <h2>행동을 기록으로 돌아봅니다</h2>
+          <p>완료된 모의투자의 나의 투자 일지와 시나리오 보고서로 판단 과정과 결과를 함께 비교합니다.</p>
+        </div>
+      </section>
+
+      <section className="service-intro-principle" aria-label="FINVERSE 학습 원칙">
+        <p>FINVERSE PRINCIPLES</p>
+        <div>
+          <strong>예측을 정답처럼 말하지 않습니다.</strong>
+          <span>실제 과거 근거와 시뮬레이션의 가상 사건을 구분하고, 수익률만이 아니라 판단의 일관성과 변화도 함께 살펴봅니다.</span>
+        </div>
+      </section>
+
+      <section className="service-intro-footer-cta">
+        <p>오늘의 시장을 읽고, 나의 기준을 만들어 보세요.</p>
+        <button className="service-intro-primary" type="button" onClick={onEnter}>FINVERSE 시작하기 <ArrowRight size={19} /></button>
+      </section>
+    </main>
+  );
+}
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState<MainTab>("market");
+  const [introVisible, setIntroVisible] = useState(true);
   const [paperTradingOpen, setPaperTradingOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [authIntent, setAuthIntent] = useState<(() => void) | null>(null);
@@ -2474,6 +2538,20 @@ export default function Home() {
   const kospiAsOf = liveKospiLatest?.date.slice(0, 10) ?? kospiData?.latestDate ?? "2026-07-28";
   const kospiAsOfDigits = kospiAsOf.replace(/-/g, "");
   const kospiAsOfLabel = `${kospiAsOfDigits.slice(0, 4)}.${Number(kospiAsOfDigits.slice(4, 6))}.${Number(kospiAsOfDigits.slice(6, 8))}`;
+
+  useEffect(() => {
+    try {
+      setIntroVisible(window.localStorage.getItem(FINVERSE_INTRO_STORAGE_KEY) !== "seen");
+    } catch {
+      // 저장소를 사용할 수 없는 환경에서는 방문마다 소개를 보여준다.
+    }
+  }, []);
+
+  const enterService = useCallback((tab: MainTab = "market") => {
+    try { window.localStorage.setItem(FINVERSE_INTRO_STORAGE_KEY, "seen"); } catch { /* 저장 실패는 서비스 진입을 막지 않는다. */ }
+    setActiveTab(tab);
+    setIntroVisible(false);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -2997,10 +3075,14 @@ export default function Home() {
     }
   };
 
+  if (introVisible) {
+    return <ServiceIntro onEnter={() => enterService("market")} onOpenJournal={() => enterService("twin")} />;
+  }
+
   if (activeTab === "market") {
     return (
       <div className="mock-journal-app">
-        <MockNavigation activeTab={activeTab} onActivate={activateProtectedTab} user={authUser} onLogin={() => setAuthOpen(true)} onLogout={logoutAuthUser} />
+        <MockNavigation activeTab={activeTab} onActivate={activateProtectedTab} onShowIntro={() => setIntroVisible(true)} user={authUser} onLogin={() => setAuthOpen(true)} onLogout={logoutAuthUser} />
         <MockMarketSimulation
           onOpenJournal={() => requireAuth(() => activateTab("twin"))}
           onOpenJudgement={() => requireAuth(() => setPaperTradingOpen(true))}
@@ -3016,7 +3098,7 @@ export default function Home() {
   if (activeTab === "twin") {
     return (
       <div className="mock-journal-app">
-        <MockNavigation activeTab={activeTab} onActivate={activateProtectedTab} user={authUser} onLogin={() => setAuthOpen(true)} onLogout={logoutAuthUser} />
+        <MockNavigation activeTab={activeTab} onActivate={activateProtectedTab} onShowIntro={() => setIntroVisible(true)} user={authUser} onLogin={() => setAuthOpen(true)} onLogout={logoutAuthUser} />
         <main className="mock-journal-main">
           <TwinPage onRequireAuth={requireAuth} />
         </main>
@@ -3035,6 +3117,7 @@ export default function Home() {
           <button className={activeTab === "market" ? "active" : ""} onClick={() => activateTab("market")} aria-current={activeTab === "market" ? "page" : undefined}>시장 인사이트</button>
           <button className={activeTab === "twin" ? "active" : ""} onClick={() => activateTab("twin")} aria-current={activeTab === "twin" ? "page" : undefined}>나의 투자 일지</button>
           <button onClick={() => setPaperTradingOpen(true)}>모의 투자</button>
+          <button onClick={() => setIntroVisible(true)}>서비스 소개</button>
         </nav>
         <div className="top-header-actions">
           <button className="header-help" type="button" onClick={() => setPaperTradingOpen(true)} aria-label="모의 투자 열기"><UserRound size={16} /></button>
