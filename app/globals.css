@@ -1071,6 +1071,14 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-profile-gate .paper-profile-survey-choices button:hover { border-color: var(--brand); color: var(--brand); box-shadow: 0 3px 10px rgba(7,105,255,.08); }
 .paper-profile-gate .paper-profile-survey-back { min-height: auto; margin: 14px 0 0; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 11px; font-weight: 600; text-decoration: underline; }
 .paper-profile-survey-error { margin-top: 12px !important; color: #d64c53 !important; }
+.paper-profile-survey-saving { display: flex; min-height: 260px; align-items: center; gap: 10px; color: var(--muted); font-size: 14px; }
+.paper-profile-survey-saving svg { color: var(--brand); }
+.paper-profile-survey-result { display: grid; gap: 13px; max-width: 560px; }
+.paper-profile-survey-result > span { color: var(--brand); font-size: 10px; font-weight: 900; letter-spacing: .1em; }
+.paper-profile-gate .paper-profile-survey-result h2 { margin: 0; font-size: 27px; }
+.paper-profile-survey-result p { max-width: none; font-size: 14px; }
+.paper-profile-survey-result p strong { color: var(--brand); }
+.paper-profile-survey-result small { margin-top: 3px; }
 .paper-trading-modal.running { height: min(1020px,calc(100vh - 24px)); max-height: calc(100vh - 24px); overflow-x: hidden; overflow-y: auto; }
 
 /* setup */

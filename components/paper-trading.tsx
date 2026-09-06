@@ -105,8 +105,17 @@ const PROFILE_SURVEY_QUESTIONS: ProfileSurveyQuestion[] = [
   { prompt: "두 투자안 중 더 마음이 가는 쪽은 무엇인가요?", choices: [{ label: "수익은 낮아도 결과가 안정적인 투자", score: 1 }, { label: "안정성과 수익을 균형 있게 고려한 투자", score: 2 }, { label: "손실 가능성은 있지만 성장 여지가 큰 투자", score: 3 }, { label: "손실 가능성이 커도 기대수익이 높은 투자", score: 4 }] },
 ];
 
+function profileSurveyResult(score: number) {
+  if (score <= 8) return { label: "안정형", description: "손실 가능성을 낮추고 자금 안정성을 우선하는 성향입니다." };
+  if (score <= 12) return { label: "안정추구형", description: "안정성을 우선하되 충분한 근거가 있으면 제한적인 변동은 감수하는 성향입니다." };
+  if (score <= 16) return { label: "위험중립형", description: "성장 기회와 손실 가능성을 함께 비교하는 성향입니다." };
+  return { label: "적극투자형", description: "장기 성장 기회와 높은 기대수익을 더 중시하는 성향입니다." };
+}
+
 function ProfileGateSurvey({ onComplete }: { onComplete: () => void }) {
   const [answers, setAnswers] = useState<number[]>([]);
+  const [phase, setPhase] = useState<"questions" | "saving" | "result">("questions");
+  const [resultScore, setResultScore] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const questionIndex = answers.length;
@@ -116,20 +125,37 @@ function ProfileGateSurvey({ onComplete }: { onComplete: () => void }) {
     const next = [...answers, score];
     setAnswers(next);
     if (next.length !== PROFILE_SURVEY_QUESTIONS.length) return;
+    setPhase("saving");
     setSaving(true);
     setError(null);
     try {
-      const response = await fetch("/api/investor-profile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ score: next.reduce((sum, value) => sum + value, 0) }) });
+      const scoreTotal = next.reduce((sum, value) => sum + value, 0);
+      const response = await fetch("/api/investor-profile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ score: scoreTotal }) });
       const payload = await response.json().catch(() => null) as { profile?: unknown; error?: string } | null;
       if (!response.ok || !payload?.profile) throw new Error(payload?.error ?? "투자 성향 기록을 저장하지 못했습니다.");
-      onComplete();
+      setResultScore(scoreTotal);
+      setPhase("result");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "투자 성향 기록을 저장하지 못했습니다.");
       setAnswers((current) => current.slice(0, -1));
+      setPhase("questions");
     } finally {
       setSaving(false);
     }
   };
+
+  if (phase === "saving") return <div className="paper-profile-survey-saving"><LoaderCircle size={22} className="spin" /><strong>투자 성향 결과를 저장하는 중입니다.</strong></div>;
+
+  if (phase === "result" && resultScore !== null) {
+    const profile = profileSurveyResult(resultScore);
+    return <div className="paper-profile-survey-result">
+      <span>INVESTOR PROFILE · 저장 완료</span>
+      <h2>투자 성향 테스트가 끝났습니다.</h2>
+      <p>당신은 <strong>{profile.label}</strong>입니다. {profile.description}</p>
+      <button type="button" onClick={onComplete}>시뮬레이션 시작 <ArrowRight size={16} /></button>
+      <small>이 결과는 로그인한 계정의 나의 투자 일지에 저장되었습니다.</small>
+    </div>;
+  }
 
   return <div className="paper-profile-survey" aria-live="polite">
     <div className="paper-profile-survey-head"><span>투자 성향 진단</span><b>{questionIndex + 1} / {PROFILE_SURVEY_QUESTIONS.length}</b></div>
