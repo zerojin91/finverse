@@ -48,7 +48,7 @@ DEFAULT_HISTORY_DAYS = 240
 # 같은 종목·기간을 다시 부를 때 그 값을 다시 치르지 않도록 디스크에 남긴다.
 HISTORY_CACHE_TTL_SECONDS = 12 * 60 * 60
 # 뉴스 분류 규칙이 바뀌면 이전의 전체-뉴스 캐시를 재사용하면 안 된다.
-HISTORY_CACHE_SCHEMA_VERSION = "targeted-news-community-v3"
+HISTORY_CACHE_SCHEMA_VERSION = "targeted-news-community-v4"
 
 # ``events.news``에는 종목 ticker 태그가 비어 있는 경우가 많다. 따라서 선택
 # 종목명으로 직접 확인되는 기사와 명백한 시장 전체 기사만 시나리오에 넣는다.
@@ -469,7 +469,7 @@ class FinverseMarketData:
             WHERE sentiment_date BETWEEN %s AND %s
             ORDER BY sentiment_date
         """
-        # 종목별 YouTube 검색에서 영상마다 좋아요 상위 댓글을 보존한다.
+        # 종목 태그가 일치하는 YouTube 댓글을 전체 보존한다.
         # 일별 감성 집계만으로는 어떤 논점이 실제로 고반응을 얻었는지 알 수
         # 없으므로, 종목 태그가 일치하는 원문을 초기 맥락 문서에도 함께 준다.
         # youtube_video는 댓글 payload에 없는 제목을 보완하기 위한 선택적 조인이다.
@@ -479,6 +479,7 @@ class FinverseMarketData:
                    COALESCE(NULLIF(c.payload->>'like_count', '')::int, 0) AS like_count,
                    COALESCE(NULLIF(c.payload->>'reply_count', '')::int, 0) AS reply_count,
                    NULLIF(c.payload->>'video_like_rank', '')::int AS video_like_rank,
+                   c.payload->>'video_id' AS video_id,
                    c.payload->>'source_url' AS source_url,
                    v.payload->>'title' AS video_title,
                    c.payload->'search_tags' AS search_tags
@@ -498,7 +499,6 @@ class FinverseMarketData:
                      COALESCE(NULLIF(c.payload->>'like_count', '')::int, 0) DESC,
                      COALESCE(NULLIF(c.payload->>'reply_count', '')::int, 0) DESC,
                      (c.payload->>'published_at')::timestamptz DESC
-            LIMIT 20
         """
         # 기사 ticker 태그는 비어 있는 경우가 많아 SQL에서 종목으로 거르지 않는다.
         # 대신 아래에서 선택 종목명 또는 명백한 거시·시장 키워드로 좁힌다.
@@ -695,6 +695,7 @@ class FinverseMarketData:
                 "like_count": int(row.get("like_count") or 0),
                 "reply_count": int(row.get("reply_count") or 0),
                 "video_like_rank": int(row["video_like_rank"]) if row.get("video_like_rank") is not None else None,
+                "video_id": row.get("video_id"),
                 "video_title": plain_text(row.get("video_title"), 180),
                 "source_url": row.get("source_url"),
                 "search_tags": row.get("search_tags") or [],

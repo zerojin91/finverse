@@ -13,6 +13,7 @@ import time
 from typing import Any
 
 from .config import Config
+from .community_selection import select_representative_comments
 from .evidence_documents import build_target_documents
 from .kospi_paper_trading import TradingError
 from .llm_client import LLMClient
@@ -98,7 +99,7 @@ def _compact_input(history: dict[str, Any]) -> dict[str, Any]:
     social = history.get("social_signals") or []
     social_recent = social[-30:]
     sentiment_values = [float(row["sentiment"]) for row in social_recent if row.get("sentiment") is not None]
-    target_comments = (history.get("community_comments") or [])[:12]
+    target_comments = select_representative_comments(history.get("community_comments") or [])
 
     return {
         "ticker": history.get("ticker"),

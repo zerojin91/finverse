@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .community_selection import select_representative_comments
 from .llm_client import LLMClient
 
 
@@ -120,7 +121,7 @@ def _domain_input(domain: str, history: dict[str, Any]) -> tuple[dict[str, Any],
     ]
     comment_rows = [
         {**row, "evidence_kind": "target_top_comment"}
-        for row in (history.get("community_comments") or [])[:12]
+        for row in select_representative_comments(history.get("community_comments") or [])
     ]
     rows = aggregate_rows + comment_rows
     return {
