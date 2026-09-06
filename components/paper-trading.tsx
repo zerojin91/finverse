@@ -696,6 +696,7 @@ function buildBars(game: CandleChartData, preview = false): Bar[] {
 function CandleChart({ game, preview = false }: { game: CandleChartData; preview?: boolean }) {
   const bars = useMemo(() => buildBars(game, preview), [game, preview]);
   const [hovered, setHovered] = useState<number | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const layout = useMemo(() => {
     if (bars.length < 2) return null;
@@ -721,12 +722,26 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
       top, bottom, span, slot, chartWidth, leadingSlots,
       bodyW: Math.max(2, Math.min(13, slot * 0.6)),
       simStart: historicalCount,
+      simulatedCount,
       futureSlots,
       remainingSimulationDays: Math.max(0, (game.simulation_days ?? 20) - simulatedCount),
       y: (value: number) => ((top - value) / span) * PRICE_H,
       cx: (index: number) => (leadingSlots + index) * slot + slot / 2,
     };
   }, [bars, game.initial_reference_price, game.simulation_days, preview]);
+
+  useEffect(() => {
+    if (preview || !scrollRef.current || !layout) return;
+    const container = scrollRef.current;
+    // 패널 폭보다 차트가 넓은 화면에서는 새 거래일마다 한 슬롯만큼 최신
+    // 캔들을 따라간다. 아직 진행되지 않은 미래 구간 때문에 마지막 봉이
+    // 화면 밖에 고정되는 일을 막는다.
+    const maxScroll = Math.max(0, container.scrollWidth - container.clientWidth);
+    const target = Math.min(maxScroll, Math.max(0, layout.simulatedCount - 1) * layout.slot);
+    if (Math.abs(container.scrollLeft - target) < 1) return;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    container.scrollTo({ left: target, behavior: reduceMotion ? "auto" : "smooth" });
+  }, [layout?.simulatedCount, layout?.slot, preview]);
 
   if (!layout) {
     return (
@@ -788,7 +803,7 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
         {!active.real && <em className={toneOf(active.returnPct)}>{signedPct(active.returnPct)}</em>}
       </div>
 
-      <div className="paper-chart-scroll">
+      <div className="paper-chart-scroll" ref={scrollRef}>
         <svg
           className="paper-chart-svg"
           style={{ width: `${chartWidth}px` }}
