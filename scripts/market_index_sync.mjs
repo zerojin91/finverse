@@ -66,7 +66,7 @@ try {
   if (rows.length) await db`
     insert into lake.records (record_id, collector, record_type, source, schema_version, record_hash, collected_at, payload)
     select record_id, collector, record_type, source, schema_version, record_hash, collected_at::timestamptz, payload::jsonb
-    from jsonb_to_recordset(${JSON.stringify(rows)}::jsonb) as x(record_id text, collector text, record_type text, source text, schema_version text, record_hash text, collected_at text, payload text)
+    from jsonb_to_recordset(${db.json(rows)}::jsonb) as x(record_id text, collector text, record_type text, source text, schema_version text, record_hash text, collected_at text, payload text)
     on conflict (record_id) do update set record_hash = excluded.record_hash, collected_at = excluded.collected_at, payload = excluded.payload, loaded_at = now()
     where lake.records.record_hash is distinct from excluded.record_hash;
   `;
