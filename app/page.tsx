@@ -34,6 +34,7 @@ import type { ChangeEvent, CSSProperties, FormEvent, PointerEvent as ReactPointe
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation";
 import { PaperTradingModal, type Security } from "@/components/paper-trading";
 import { AuthModal, useAuthUser } from "@/components/auth";
+import { MockMarketSimulation } from "@/components/mock-market-simulation";
 
 const SimulationMessageResponse = dynamic(
   () => import("@/components/ai-elements/message").then((module) => module.MessageResponse),
@@ -2765,6 +2766,15 @@ export default function Home() {
       setSimulationChatSending(false);
     }
   };
+
+  if (activeTab === "market") {
+    return (
+      <>
+        <MockMarketSimulation onOpenJournal={() => activateTab("twin")} onOpenJudgement={() => requireAuth(() => setPaperTradingOpen(true))} />
+        {paperTradingOpen && <PaperTradingModal onClose={() => setPaperTradingOpen(false)} />}
+      </>
+    );
+  }
 
   return (
     <div className="finverse-app">
