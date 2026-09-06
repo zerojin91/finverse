@@ -516,9 +516,10 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .journal-lab-body { display: grid; grid-template-columns: 236px minmax(0,1fr); }
 .journal-lab-sidebar { border-right: 1px solid var(--line); padding: 12px 10px 16px; max-height: 620px; overflow-y: auto; }
 .journal-lab-stock-group { margin-bottom: 6px; }
-.journal-lab-stock-group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 9px 8px 5px; }
+.journal-lab-stock-group + .journal-lab-stock-group { margin-top: 18px; padding-top: 16px; border-top: 1px solid #dfe7f1; }
+.journal-lab-stock-group-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; padding: 9px 10px; border: 1px solid #e1e8f2; border-left: 3px solid var(--brand); border-radius: 7px; background: #f7faff; }
 .journal-lab-stock-group-head strong { color: var(--ink); font-size: 12.5px; font-weight: 750; }
-.journal-lab-stock-group-head span { color: var(--light); font-size: 9px; }
+.journal-lab-stock-group-head span { padding: 2px 5px; border-radius: 4px; background: #fff; color: var(--muted); font-size: 9px; }
 .journal-lab-run-btn { display: block; width: 100%; margin-bottom: 4px; padding: 9px 10px; border: 1px solid transparent; border-radius: 8px; background: transparent; text-align: left; cursor: pointer; }
 .journal-lab-run-btn:hover { background: var(--soft); }
 .journal-lab-run-btn.active { background: #fff; border-color: var(--ink); box-shadow: 0 5px 14px rgba(11,13,20,.08); }
