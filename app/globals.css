@@ -1836,6 +1836,17 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-completed-reports-heading h2 { margin: 5px 0 3px; color: var(--ink); font-size: 19px; letter-spacing: -.03em; }
 .paper-completed-reports-heading p { margin: 0; color: var(--muted); font-size: 10px; }
 .paper-report-card { display: grid; gap: 11px; padding: 16px; border: 1px solid var(--line); border-radius: 11px; background: #fff; }
+.paper-scenario-overview { display: grid; grid-template-columns: 168px minmax(0,1fr); gap: 10px; }
+.paper-scenario-highlight { display: grid; align-content: start; gap: 6px; padding: 15px; border-radius: 10px; background: #edf4ff; }
+.paper-scenario-highlight > span,.paper-scenario-summary-grid > div > span { color: var(--muted); font-size: 9px; font-weight: 800; }
+.paper-scenario-highlight strong { color: #0769ff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 25px; letter-spacing: -.06em; }
+.paper-scenario-highlight strong small { margin-left: 4px; font-family: inherit; font-size: 10px; letter-spacing: 0; }
+.paper-scenario-highlight p { margin: 2px 0 0; color: #475569; font-size: 9px; line-height: 1.6; }
+.paper-scenario-summary-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.paper-scenario-summary-grid > div { display: grid; align-content: start; gap: 5px; min-height: 76px; padding: 13px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.paper-scenario-summary-grid strong { color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 15px; letter-spacing: -.04em; }
+.paper-scenario-summary-grid strong small { margin-left: 3px; color: var(--muted); font-family: inherit; font-size: 9px; letter-spacing: 0; }
+.paper-scenario-summary-grid p,.paper-scenario-summary-grid small { margin: 0; color: var(--muted); font-size: 9px; line-height: 1.55; }
 .paper-investor-type-card { display: grid; gap: 8px; margin: 0; padding: 0; }
 .paper-investor-type-card figcaption { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .paper-investor-type-card figcaption span { color: var(--light); font-size: 9px; font-weight: 800; letter-spacing: .06em; }
@@ -1879,6 +1890,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
   .paper-panel { min-height: 340px; }
   .paper-posts,.paper-round-orders > div { grid-template-columns: minmax(0,1fr); }
   .paper-report-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .paper-scenario-overview { grid-template-columns: minmax(0,1fr); }
   .paper-report-lists { grid-template-columns: minmax(0,1fr); }
   .paper-completed-reports { padding-right: 18px; padding-left: 18px; }
   .paper-report-metrics,.paper-report-groups { grid-template-columns: repeat(2,minmax(0,1fr)); }

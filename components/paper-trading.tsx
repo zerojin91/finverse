@@ -2393,7 +2393,7 @@ function ReportList({ title, items, tone = "" }: { title: string; items?: string
   return <div className={`paper-report-list ${tone}`}><b>{title}</b><ul>{items.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul></div>;
 }
 
-function CompletedReports({ reports, portfolio, initialEquity, onBack }: { reports?: LlmReports; portfolio: Portfolio; initialEquity?: number; onBack: () => void }) {
+function CompletedReports({ reports, portfolio, initialEquity, game, onBack }: { reports?: LlmReports; portfolio: Portfolio; initialEquity?: number; game: ScenarioGame; onBack: () => void }) {
   const investment = reports?.investment;
   const scenario = reports?.scenario;
   const investorType = inferInvestorType(investment);
@@ -2407,7 +2407,7 @@ function CompletedReports({ reports, portfolio, initialEquity, onBack }: { repor
       <div className="paper-completed-reports-heading"><div className="paper-report-heading-row"><div><span>SIMULATION REPORTS</span><h2>시뮬레이션이 끝났습니다</h2><p>기록된 판단과 변화한 시장 환경을 바탕으로 두 가지 보고서를 만들었습니다.</p></div><button type="button" className="paper-report-back" onClick={onBack}>시뮬레이션으로 돌아가기</button></div></div>
       <nav className="paper-report-tabs" aria-label="보고서 종류">
         <button type="button" className={tab === "investment" ? "active" : ""} onClick={() => setTab("investment")} disabled={!investment}>나의 투자 일지</button>
-        <button type="button" className={tab === "scenario" ? "active" : ""} onClick={() => setTab("scenario")} disabled={!scenario}>해당 시나리오</button>
+        <button type="button" className={tab === "scenario" ? "active" : ""} onClick={() => setTab("scenario")} disabled={!scenario}>시나리오</button>
       </nav>
       {investment && tab === "investment" && <article className="paper-report-card">
         {investorType && <figure className="paper-investor-type-card">
@@ -2426,7 +2426,15 @@ function CompletedReports({ reports, portfolio, initialEquity, onBack }: { repor
       </article>}
       {scenario && tab === "scenario" && <article className="paper-report-card scenario">
         <header><div><span>02 · WORLD REPORT</span><h3>시나리오 보고서</h3></div><span>환경 변화·에이전트 흐름</span></header>
-        <p className="paper-report-summary">{scenario.summary}</p>
+        <section className="paper-scenario-overview" aria-label="시나리오 핵심 요약">
+          <div className="paper-scenario-highlight"><span>시뮬레이션 기간</span><strong>{game.simulation_days ?? 0}<small>거래일</small></strong><p>{scenario.summary ?? "기록된 시장 환경을 바탕으로 시나리오 경로를 정리했습니다."}</p></div>
+          <div className="paper-scenario-summary-grid">
+            <div><span>시작 기준가</span><strong>{won(game.initial_reference_price)}</strong><small>{game.name} · 시뮬레이션 시작</small></div>
+            <div><span>종료 기준가</span><strong>{won(game.current_price)}</strong><small>종료 시점 종가</small></div>
+            <div><span>World State 변화</span><p>{scenario.environment_evolution ?? "기록된 환경 변화가 없습니다."}</p></div>
+            <div><span>공개 이벤트</span><strong>{scenario.event_reviews?.length ?? game.revealed_events?.length ?? 0}<small>개</small></strong><small>실제 유사 근거 확인 후 공개</small></div>
+          </div>
+        </section>
         {scenario.environment_evolution && <p className="paper-report-detail"><b>World State 변화</b>{scenario.environment_evolution}</p>}
         {scenario.stock_flow && <p className="paper-report-detail"><b>종목 흐름</b>{scenario.stock_flow}</p>}
         {scenario.event_reviews?.length ? <div className="paper-report-events"><b>발생 이벤트</b>{scenario.event_reviews.map((row, index) => <p key={`${row.date}-${index}`}><strong>{row.date} · {row.event}</strong>{row.impact}</p>)}</div> : null}
@@ -2692,6 +2700,7 @@ function TradingScreen({
           reports={game.llm_reports}
           portfolio={game.portfolio}
           initialEquity={game.initial_equity}
+          game={game}
           onBack={() => {
             setShowReports(false);
             window.scrollTo({ top: 0, behavior: "smooth" });
