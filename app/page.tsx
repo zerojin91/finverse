@@ -1733,7 +1733,6 @@ function TwinScenarioReport({ detail, scenario }: {
           <div><span>공개 이벤트</span><strong>{eventCount}<small>개</small></strong><small>실제 유사 근거 확인 후 공개</small></div>
         </div>
       </section>
-      {scenario.environment_evolution && <p className="paper-report-detail"><b>World State 변화</b>{scenario.environment_evolution}</p>}
       {scenario.stock_flow && <p className="paper-report-detail"><b>종목 흐름</b>{scenario.stock_flow}</p>}
       {scenario.event_reviews?.length ? <div className="paper-report-events"><b>발생 이벤트</b>{scenario.event_reviews.map((row, index) => <article key={`${row.date}-${index}`}><div><span>{row.date}</span><strong>{row.event}</strong></div><p>{row.impact}</p></article>)}</div> : null}
       {scenario.group_behavior && <div className="paper-report-groups">{Object.entries(scenario.group_behavior).map(([key, value]) => <p key={key}><b>{TWIN_GROUP_LABEL[key] ?? key}</b>{value}</p>)}</div>}
