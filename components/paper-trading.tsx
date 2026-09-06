@@ -8,13 +8,11 @@ import {
   CheckCircle2,
   ChevronRight,
   CircleDollarSign,
-  Flag,
   Landmark,
   LoaderCircle,
   MessageSquare,
   Radio,
   Search,
-  Sparkles,
   TrendingDown,
   TrendingUp,
   Users,
@@ -58,12 +56,16 @@ type LeadSignal = {
 type ScenarioEvent = {
   event_id: string;
   sequence: number;
-  status: "hidden" | "revealed";
+  status: "hidden" | "revealed" | "public" | "absorbed";
   event_date: string;
-  pre_brief: string;
-  trading_days_until: number;
+  pre_brief?: string;
+  trading_days_until?: number;
   title?: string;
   description?: string;
+  public_signal?: string;
+  event_type?: "momentum" | "seasonal" | "surprise";
+  is_simulated?: boolean;
+  analogue_title?: string;
   released_signals?: LeadSignal[];
   ontology_source?: OntologySource;
 };
@@ -127,6 +129,104 @@ type CollectionSource = {
   detail: string;
 };
 
+type InitialContextAnalysis = {
+  summary: string;
+  summary_points: string[];
+  market: { trend?: string; assessment?: string; signals?: string[] };
+  economy: { condition?: string; assessment?: string; signals?: string[] };
+  events: { assessment?: string; themes?: string[]; signals?: string[] };
+  community: { sentiment?: string; assessment?: string; signals?: string[] };
+  positive_factors: string[];
+  risk_factors: string[];
+  tensions: string[];
+  uncertainties: string[];
+  watch_points: string[];
+  event_sequence: {
+    date: string;
+    title: string;
+    description: string;
+    domain: string;
+    market_reaction: string;
+    basis: "observed" | "inferred";
+  }[];
+};
+
+type InitialContextSourceSummary = {
+  market_days: number;
+  macro_observations: number;
+  events: number;
+  community_days: number;
+  as_of?: { latest_market_date?: string | null };
+  document_previews?: Record<string, string>;
+};
+
+type InitialContext = {
+  context_id: string;
+  cached: boolean;
+  analysis: InitialContextAnalysis;
+  source_summary: InitialContextSourceSummary;
+};
+
+type InitialContextDocuments = {
+  context_id: string;
+  schema_version: string;
+  source_summary: InitialContextSourceSummary;
+};
+
+type AgentProfileGroup = {
+  key: "retail" | "foreign" | "institution" | "pension";
+  label: string;
+  count: number;
+  description: string;
+  strategies: string[];
+  average_risk_tolerance: number;
+  activity_frequency: string;
+  market_impact_tier: string;
+};
+
+type AgentProfiles = {
+  context_id: string;
+  schema_version: string;
+  profile_count: number;
+  cached: boolean;
+  groups: AgentProfileGroup[];
+};
+
+type AgentProfileDetail = {
+  persona_id: string;
+  group: AgentProfileGroup["key"];
+  group_label: string;
+  role_description: string;
+  risk_tolerance: number;
+  profile: {
+    display_name: string;
+    investment_thesis: string;
+    focus_signals: string[];
+    bias: string;
+    holding_horizon: string;
+    event_response: string;
+    risk_rule: string;
+    initial_stance: "bullish" | "bearish" | "neutral" | "mixed";
+  };
+};
+
+type AgentProfileGroupDetails = {
+  group: AgentProfileGroup["key"];
+  label: string;
+  profiles: AgentProfileDetail[];
+};
+
+type ContextDocumentProgress = { key: "market" | "economy" | "events" | "community"; label: string; file: string; status: "waiting" | "generating" | "ready" };
+
+const INITIAL_CONTEXT_DOCUMENTS: ContextDocumentProgress[] = [
+  { key: "market", label: "시장", file: "market-evidence.md", status: "waiting" },
+  { key: "economy", label: "경제", file: "economic-evidence.md", status: "waiting" },
+  { key: "events", label: "사건", file: "external-event-evidence.md", status: "waiting" },
+  { key: "community", label: "커뮤니티", file: "community-evidence.md", status: "waiting" },
+];
+const CONTEXT_DOCUMENT_STEP_MS = 1_000;
+const CONTEXT_ANALYSIS_MIN_MS = 1_500;
+
 type Observation = {
   investor_group: string;
   platform: string;
@@ -140,8 +240,18 @@ type PersonaOrder = {
   strategy?: string;
   side: "BUY" | "SELL" | "HOLD";
   quantity: number;
+  fill_price?: number;
+  notional?: number;
   rationale?: string;
   filled_quantity?: number;
+};
+
+type DailyMarketSummaryDetail = {
+  summary: string;
+  group_actions?: Record<string, string>;
+  price_reason?: string;
+  uncertainties?: string[];
+  source?: string;
 };
 
 type GroupState = { sentiment: number; risk_aversion: number; event_conviction?: number };
@@ -159,6 +269,7 @@ type AgentRound = {
   order_imbalance: number;
   market_pressure: number;
   market_summary?: string;
+  market_summary_detail?: DailyMarketSummaryDetail;
   observations?: Observation[];
   persona_orders?: PersonaOrder[];
   risk_flags?: string[];
@@ -190,10 +301,30 @@ type PendingOrder = {
   confidence?: number | null;
 };
 
-type Phase = "inter_event_market" | "pre_event_decision" | "post_event_decision" | "completed";
+type LlmReport = {
+  summary?: string;
+  daily_action_review?: { date?: string; action?: string; result?: string }[];
+  behavior_pattern?: string;
+  strengths?: string[];
+  risk_patterns?: string[];
+  next_practice?: string[];
+  environment_evolution?: string;
+  event_reviews?: { date?: string; event?: string; impact?: string }[];
+  stock_flow?: string;
+  group_behavior?: Record<string, string>;
+  key_turning_points?: string[];
+  verified_metrics?: { total_return_pct?: number; trade_count?: number; daily_reflection_count?: number; max_price_drawdown_pct?: number };
+  portfolio_at_end?: Portfolio;
+  initial_equity?: number;
+};
+
+type LlmReports = { investment?: LlmReport; scenario?: LlmReport };
+
+type Phase = "inter_event_market" | "pre_event_decision" | "post_event_decision" | "world_market" | "world_decision" | "completed";
 
 type ScenarioGame = {
   game_id: string;
+  mode?: "scenario" | "world";
   ticker: string;
   name: string;
   phase: Phase;
@@ -202,6 +333,7 @@ type ScenarioGame = {
   initial_reference_price: number;
   current_event: ScenarioEvent | null;
   current_event_index: number;
+  current_day_index?: number;
   total_events: number;
   portfolio: Portfolio;
   price_history: PricePoint[];
@@ -209,7 +341,6 @@ type ScenarioGame = {
   released_signals: LeadSignal[];
   scenario_premise?: string;
   simulation_days?: number;
-  practice_mode?: PracticeMode;
   investment_mode?: InvestmentMode;
   initial_equity?: number;
   data_source?: string;
@@ -221,6 +352,19 @@ type ScenarioGame = {
   agent_rounds?: AgentRound[];
   fills?: Fill[];
   revealed_events?: ScenarioEvent[];
+  daily_reflections?: DailyReflection[];
+  world?: { memory?: { event_ledger?: ScenarioEvent[] } };
+  llm_reports?: LlmReports;
+};
+
+type DailyReflection = {
+  market_date: string;
+  event_id?: string | null;
+  stance: "BUY_WATCH" | "HOLD_WATCH" | "SELL_WATCH";
+  label: string;
+  market_return_pct?: number;
+  market_summary?: string;
+  recorded_at?: string;
 };
 
 type Job = {
@@ -237,38 +381,6 @@ type Job = {
 // 작업 상태는 running 그대로 굳어 UI가 영원히 기다리게 된다. 정상 라운드
 // 하나가 수 분 걸리므로 넉넉히 잡되, 이 시간을 넘기면 사용자에게 알린다.
 const STALL_NOTICE_MS = 8 * 60 * 1000;
-
-type LlmReport = {
-  quantitative_summary?: string;
-  executive_summary?: string;
-  investor_profile?: string;
-  event_reviews?: { event: string; market_reaction: string; user_decision: string; lesson: string }[];
-  strengths?: string[];
-  risk_patterns?: string[];
-  action_plan?: string[];
-};
-
-type Assessment = {
-  style?: string;
-  metrics?: Record<string, number | null>;
-  findings?: string[];
-  lessons?: { topic: string; message: string }[];
-  llm_report?: LlmReport | null;
-  disclaimer?: string;
-};
-
-type GameSummary = {
-  game_id: string;
-  ticker: string;
-  name: string;
-  phase: Phase;
-  scenario_premise?: string;
-  current_event_index: number;
-  total_events: number;
-  market_days: number;
-  total_return_pct: number | null;
-  updated_at?: string;
-};
 
 /* -------------------------------------------------------------- helpers */
 
@@ -295,12 +407,18 @@ const toneOf = (value: number) => (value > 0 ? "up" : value < 0 ? "down" : "flat
 const GROUP_LABEL: Record<string, string> = {
   retail: "개인", foreign: "외국인", institution: "기관", pension: "연기금",
 };
+const AGENT_GROUPS = [
+  { key: "retail", label: "개인" },
+  { key: "foreign", label: "외국인" },
+  { key: "institution", label: "기관" },
+  { key: "pension", label: "연기금" },
+] as const;
 const PLATFORM_LABEL: Record<string, string> = { reddit: "커뮤니티", x: "X" };
 
 const PHASE_META: Record<Phase, {
   label: string;
   eyebrow: string;
-  action: "advance_days" | "reveal" | "continue" | "report";
+  action: "advance_days" | "reveal" | "continue" | "advance" | "resolve" | "report";
   cta: string;
   guide: string;
   todo: string[];
@@ -310,11 +428,11 @@ const PHASE_META: Record<Phase, {
     label: "자율 거래 구간",
     eyebrow: "INTER-EVENT MARKET",
     action: "advance_days",
-    cta: "이벤트 직전까지 장 진행",
+    cta: "이벤트 직전까지 자동 진행",
     guide: "에이전트들이 사전 신호만 보고 스스로 거래합니다. 지금은 주문을 낼 수 없고, 흘러나오는 신호를 읽는 것이 과제입니다.",
     todo: [
-      "*하루만* 버튼으로 한 거래일씩 넘기며 반응을 보거나, *장 진행*으로 이벤트 직전까지 한 번에 갈 수 있습니다.",
-      "하루가 지날 때마다 캔들이 쌓이고, 40명의 에이전트 반응이 오른쪽 피드에 올라옵니다.",
+      "*하루 진행*으로 한 거래일씩 넘기며 반응을 보거나, *자동 진행*으로 이벤트 직전까지 한 번에 갈 수 있습니다.",
+      "하루가 지날 때마다 캔들이 쌓이고, 59명의 에이전트 반응이 오른쪽 피드에 올라옵니다.",
       "이 구간은 관찰 전용입니다. 누가 사고 누가 파는지 보고 다음 판단의 근거를 모으세요.",
     ],
     canOrder: false,
@@ -345,35 +463,45 @@ const PHASE_META: Record<Phase, {
     ],
     canOrder: true,
   },
+  world_market: {
+    label: "다음 거래일 준비",
+    eyebrow: "WORLD AGENT MARKET",
+    action: "advance",
+    cta: "다음 거래일 진행",
+    guide: "World Agent가 초기 맥락과 직전 시장 반응을 기억해 다음 거래일의 공개 환경을 엽니다. 중대 사건이 나오면 사용자 판단을 먼저 기다립니다.",
+    todo: [
+      "다음 거래일을 열면 World Agent가 외부 환경을 갱신합니다.",
+      "59명의 개별 에이전트는 같은 공개 정보와 각자의 기억으로 독립 판단합니다.",
+      "중요 사건이 발생하면 시장 반응 전에 내 판단을 기록하는 화면이 열립니다.",
+    ],
+    canOrder: false,
+  },
+  world_decision: {
+    label: "중요 사건 판단",
+    eyebrow: "WORLD EVENT DECISION",
+    action: "resolve",
+    cta: "판단 반영하고 시장 진행",
+    guide: "중요 사건이 공개됐습니다. 같은 공개 정보를 확인하고 세 가지 방향성 중 하나를 선택하면 시장이 진행됩니다.",
+    todo: [
+      "공개된 사건과 과거 유사 사례의 관계를 확인합니다.",
+      "매수 고려·관찰 계속·매도 고려 중 하나를 선택합니다. 수량이나 주문은 필요하지 않습니다.",
+      "선택한 판단은 학습 기록으로 남고, 59개 에이전트의 반응과 시장 결과가 이어집니다.",
+    ],
+    canOrder: false,
+  },
   completed: {
     label: "시나리오 종료",
     eyebrow: "SCENARIO COMPLETE",
     action: "report",
     cta: "AI 투자 리포트 생성",
-    guide: "모든 이벤트가 끝났습니다. 매 판단의 근거와 결과를 묶어 교육용 리포트를 만들 수 있습니다.",
+    guide: "모든 이벤트가 끝났습니다. 매일 남긴 방향성 판단과 시장 결과를 묶어 교육용 리포트를 만들 수 있습니다.",
     todo: [
       "모든 이벤트가 끝났습니다. 최종 수익률과 캔들 전체 경로를 확인하세요.",
-      "*AI 투자 리포트 생성*을 누르면 매 판단의 근거와 결과를 묶어 회고를 만듭니다.",
+      "*AI 투자 리포트 생성*을 누르면 매일의 판단과 결과를 묶어 회고를 만듭니다.",
     ],
     canOrder: false,
   },
 };
-
-const STEP_ORDER: Phase[] = [
-  "inter_event_market", "pre_event_decision", "post_event_decision", "completed",
-];
-const STEP_LABEL: Record<Phase, string> = {
-  inter_event_market: "관망",
-  pre_event_decision: "사전 판단",
-  post_event_decision: "사후 대응",
-  completed: "회고",
-};
-
-/** `*강조*` 표기만 굵게 바꿔 안내 문구를 읽기 쉽게 만든다. */
-function emphasise(text: string) {
-  return text.split(/\*([^*]+)\*/g).map((chunk, index) =>
-    index % 2 ? <b key={index}>{chunk}</b> : <span key={index}>{chunk}</span>);
-}
 
 async function callApi<T = Record<string, unknown>>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api/paper-trading${path}`, {
@@ -407,19 +535,19 @@ type Bar = {
 const CHART_W = 760;
 const AXIS_W = 52;
 const PRICE_H = 210;
-const VOLUME_H = 42;
 
 /** 실제 이력 봉과 시뮬레이션 봉을 하나의 시계열로 합친다. */
-type CandleChartData = Pick<ScenarioGame, "history_candles" | "price_history" | "initial_reference_price" | "revealed_events" | "fills">;
+type CandleChartData = Pick<ScenarioGame, "history_candles" | "price_history" | "initial_reference_price" | "revealed_events" | "fills" | "daily_reflections" | "simulation_days">;
 
-function buildBars(game: CandleChartData, limit = 46): Bar[] {
-  const bars: Bar[] = [];
+function buildBars(game: CandleChartData, preview = false): Bar[] {
+  const history: Bar[] = [];
+  const simulation: Bar[] = [];
   const seen = new Set<string>();
 
   for (const row of game.history_candles ?? []) {
     if (!row.close || seen.has(row.market_date)) continue;
     seen.add(row.market_date);
-    bars.push({
+    history.push({
       key: `real-${row.market_date}`,
       date: row.market_date,
       label: "시나리오 이전 실제 이력",
@@ -433,7 +561,7 @@ function buildBars(game: CandleChartData, limit = 46): Bar[] {
     if (!close) continue;
     // 시작 봉은 실제 이력의 마지막 날과 같은 날짜다. 두 번 그리지 않는다.
     if (point.step === 0 && seen.has(point.market_date ?? "")) continue;
-    bars.push({
+    simulation.push({
       key: `sim-${point.step}`,
       date: point.market_date ?? "",
       label: point.label,
@@ -448,11 +576,18 @@ function buildBars(game: CandleChartData, limit = 46): Bar[] {
     });
   }
 
-  return bars.slice(-limit);
+  if (preview) return [...history, ...simulation].slice(-20);
+
+  // 실제 이력은 방향을 읽을 수 있는 만큼만 남기고, 선택한 연습 기간은 오른쪽의
+  // 빈 슬롯으로 확보한다. 진행될 때마다 그 슬롯이 시뮬레이션 캔들로 채워진다.
+  const historyLimit = Math.max(8, Math.min(14, Math.ceil((game.simulation_days ?? 20) * 0.6)));
+  // 차트는 항상 최대 20칸만 사용한다. 20일을 넘기면 가장 오래된 봉을
+  // 왼쪽에서 제거하고 새 봉을 오른쪽에 붙여, 봉 너비가 계속 좁아지지 않게 한다.
+  return [...history.slice(-historyLimit), ...simulation].slice(-20);
 }
 
 function CandleChart({ game, preview = false }: { game: CandleChartData; preview?: boolean }) {
-  const bars = useMemo(() => buildBars(game), [game]);
+  const bars = useMemo(() => buildBars(game, preview), [game, preview]);
   const [hovered, setHovered] = useState<number | null>(null);
 
   const layout = useMemo(() => {
@@ -464,16 +599,22 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
     const top = rawTop + pad;
     const bottom = Math.max(rawBottom - pad, 0);
     const span = top - bottom || 1;
-    const slot = (CHART_W - AXIS_W) / bars.length;
+    const simStart = bars.findIndex((bar) => !bar.real);
+    const historicalCount = simStart < 0 ? bars.length : simStart;
+    const simulatedCount = bars.length - historicalCount;
+    const futureSlots = preview ? 0 : Math.max(0, 20 - bars.length);
+    const totalSlots = Math.max(20, bars.length + futureSlots);
+    const slot = (CHART_W - AXIS_W) / totalSlots;
     return {
       top, bottom, span, slot,
       bodyW: Math.max(2, Math.min(13, slot * 0.6)),
-      maxVolume: Math.max(...bars.map((bar) => bar.volume), 1),
-      simStart: bars.findIndex((bar) => !bar.real),
+      simStart: historicalCount,
+      futureSlots,
+      remainingSimulationDays: Math.max(0, (game.simulation_days ?? 20) - simulatedCount),
       y: (value: number) => ((top - value) / span) * PRICE_H,
       cx: (index: number) => index * slot + slot / 2,
     };
-  }, [bars, game.initial_reference_price]);
+  }, [bars, game.initial_reference_price, game.simulation_days, preview]);
 
   if (!layout) {
     return (
@@ -485,7 +626,7 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
     );
   }
 
-  const { top, span, slot, bodyW, maxVolume, simStart, y, cx } = layout;
+  const { top, span, slot, bodyW, simStart, futureSlots, remainingSimulationDays, y, cx } = layout;
   const gridValues = [0, 0.25, 0.5, 0.75, 1].map((ratio) => top - span * ratio);
 
   // 사용자 체결은 해당 이벤트가 반응한 봉 위에 표시한다. 사전 판단은 왼쪽,
@@ -493,7 +634,7 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
   const eventBars = bars.reduce<number[]>(
     (acc, bar, index) => (bar.event ? [...acc, index] : acc), []);
   const eventOrder = (game.revealed_events ?? []).map((item) => item.event_id);
-  const markers = (game.fills ?? []).flatMap((fill, index) => {
+  const fillMarkers = (game.fills ?? []).flatMap((fill, index) => {
     const position = eventOrder.indexOf(fill.event_id ?? "");
     const barIndex = eventBars[position >= 0 ? position : eventBars.length - 1];
     if (barIndex === undefined) return [];
@@ -504,8 +645,27 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
       price: fill.price,
       x: cx(barIndex) + (fill.phase === "pre_event_decision" ? -bodyW : bodyW),
       y: y(fill.price),
+      title: `내 ${fill.side === "BUY" ? "매수" : "매도"} ${fill.quantity.toLocaleString("ko-KR")}주 · ${won(fill.price)}`,
     }];
   });
+  const reflectionMarkers = (game.daily_reflections ?? [])
+    .filter((reflection) => reflection.stance !== "HOLD_WATCH")
+    .flatMap((reflection, index) => {
+      const barIndex = bars.findIndex((bar) => !bar.real && bar.date === reflection.market_date);
+      if (barIndex < 0) return [];
+      const side = reflection.stance === "BUY_WATCH" ? "BUY" : "SELL";
+      const price = bars[barIndex].close;
+      return [{
+        key: `reflection-${reflection.market_date}-${index}`,
+        side,
+        quantity: 0,
+        price,
+        x: cx(barIndex) + (side === "BUY" ? -bodyW : bodyW),
+        y: y(price),
+        title: `${reflection.label} · ${reflection.market_date}`,
+      }];
+    });
+  const markers = [...fillMarkers, ...reflectionMarkers];
 
   const active = hovered !== null ? bars[hovered] : bars[bars.length - 1];
 
@@ -522,7 +682,7 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
 
       <svg
         className="paper-chart-svg"
-        viewBox={`0 0 ${CHART_W} ${PRICE_H + VOLUME_H + 22}`}
+        viewBox={`0 0 ${CHART_W} ${PRICE_H + 22}`}
         preserveAspectRatio="none"
         role="img"
         aria-label={preview ? "최근 실제 캔들 차트" : "시나리오 캔들 차트"}
@@ -545,16 +705,28 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
           />
         )}
 
-        {simStart > 0 && (
+        {!preview && simStart > 0 && (
           <g>
             <line
               className="paper-chart-divider"
               x1={cx(simStart) - slot / 2} x2={cx(simStart) - slot / 2}
-              y1={0} y2={PRICE_H + VOLUME_H + 6}
+              y1={0} y2={PRICE_H + 6}
             />
-            <text className="paper-chart-divider-label" x={cx(simStart) - slot / 2 + 5} y={11}>
+            <text className="paper-chart-start-label" x={cx(simStart) - slot / 2 + 5} y={11}>
               시뮬레이션 시작
             </text>
+          </g>
+        )}
+
+        {!preview && futureSlots > 0 && (
+          <g className="paper-candle-future-block">
+            <rect
+              className="paper-candle-future"
+              x={bars.length * slot + 1}
+              y={8}
+              width={Math.max(1, futureSlots * slot - 2)}
+              height={PRICE_H - 3}
+            />
           </g>
         )}
 
@@ -563,10 +735,9 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
           const flat = bar.high === bar.low && bar.open === bar.close;
           const bodyTop = y(Math.max(bar.open, bar.close));
           const bodyHeight = Math.max(1.4, Math.abs(y(bar.open) - y(bar.close)));
-          const tone = preview ? (rising ? "up" : "down") : (bar.real ? "real" : rising ? "up" : "down");
+          const tone = rising ? "up" : "down";
           return (
-            <g key={bar.key} className={`paper-candle ${tone} ${hovered === index ? "hovered" : ""}`}>
-              {bar.event && <line className="paper-candle-event" x1={cx(index)} x2={cx(index)} y1={0} y2={PRICE_H} />}
+            <g key={bar.key} className={`paper-candle ${tone} ${bar.real ? "historical" : "simulated"} ${hovered === index ? "hovered" : ""}`}>
               {flat
                 // 캐시 이력은 종가만 있어 봉을 그릴 수 없다. 종가선으로 표시한다.
                 ? <line className="paper-candle-flat" x1={cx(index) - bodyW / 2} x2={cx(index) + bodyW / 2} y1={y(bar.close)} y2={y(bar.close)} />
@@ -577,15 +748,8 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
                   </>
                 )}
               <rect
-                className="paper-candle-volume"
-                x={cx(index) - bodyW / 2}
-                y={PRICE_H + 10 + (VOLUME_H - (bar.volume / maxVolume) * VOLUME_H)}
-                width={bodyW}
-                height={Math.max(0.8, (bar.volume / maxVolume) * VOLUME_H)}
-              />
-              <rect
                 className="paper-candle-hit"
-                x={index * slot} y={0} width={slot} height={PRICE_H + VOLUME_H + 12}
+                x={index * slot} y={0} width={slot} height={PRICE_H + 12}
                 onMouseEnter={() => setHovered(index)}
               />
             </g>
@@ -594,7 +758,7 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
 
         {markers.map((marker) => (
           <g key={marker.key} className={`paper-fill-marker ${marker.side === "BUY" ? "buy" : "sell"}`}>
-            <title>{`내 ${marker.side === "BUY" ? "매수" : "매도"} ${marker.quantity.toLocaleString("ko-KR")}주 · ${won(marker.price)}`}</title>
+            <title>{marker.title}</title>
             <path d={marker.side === "BUY"
               ? `M ${marker.x} ${marker.y - 7} l 5 8 l -10 0 z`
               : `M ${marker.x} ${marker.y + 7} l 5 -8 l -10 0 z`} />
@@ -605,14 +769,14 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
       <div className="paper-chart-dates">
         <span>{bars[0].date}</span>
         {simStart > 0 && <span>{bars[simStart]?.date}</span>}
-        <span>{bars[bars.length - 1].date}</span>
+        <span>{preview ? bars[bars.length - 1].date : remainingSimulationDays ? `남은 ${remainingSimulationDays}거래일` : "연습 완료"}</span>
       </div>
 
       <div className="paper-chart-legend">
         {preview ? (
-          <><span className="up">양봉</span><span className="down">음봉</span><span className="real">실제 일봉</span></>
+          <><span className="up">양봉</span><span className="down">음봉</span></>
         ) : (
-          <><span className="real">시나리오 이전 이력</span><span className="up">양봉</span><span className="down">음봉</span><span className="event">이벤트 공개일</span><span className="buy">내 매수</span><span className="sell">내 매도</span></>
+          <><span className="real">실제 이력</span><span className="up">상승 캔들</span><span className="down">하락 캔들</span><span className="future">앞으로의 거래일</span><span className="event">이벤트 공개일</span><span className="buy">내 매수 판단</span><span className="sell">내 매도 판단</span></>
         )}
       </div>
     </div>
@@ -660,43 +824,147 @@ function EventProvenanceStrip({ source }: { source: OntologySource }) {
   );
 }
 
-/* ------------------------------------------------------------ psychology */
+const DAILY_STANCES: { key: DailyReflection["stance"]; label: string; description: string }[] = [
+  { key: "BUY_WATCH", label: "내일 매수 고려", description: "상승 가능성을 더 확인" },
+  { key: "HOLD_WATCH", label: "관찰 계속", description: "지금은 근거를 더 모음" },
+  { key: "SELL_WATCH", label: "내일 매도 고려", description: "위험 확대 가능성을 점검" },
+];
 
-function PsychologyStrip({ round }: { round?: AgentRound }) {
-  const groups = round?.psychology?.groups;
-  if (!groups) return null;
+const DAILY_SUMMARY_GROUPS = [
+  ["retail", "개인 투자자"],
+  ["foreign", "외국인"],
+  ["institution", "기관"],
+  ["pension", "연기금"],
+] as const;
+
+function DailyPracticeCard({
+  round, event, reflection, disabled, onSelect,
+}: {
+  round?: AgentRound;
+  event?: ScenarioEvent | null;
+  reflection?: DailyReflection;
+  disabled: boolean;
+  onSelect: (stance: DailyReflection["stance"]) => void;
+}) {
+  if (!round && !event) {
+    return (
+      <div className="paper-daily-practice waiting">
+        <span>오늘의 시장 요약</span>
+        <strong>첫 거래일을 열면 그날의 시장 상황과 에이전트 반응을 바탕으로 판단을 남길 수 있습니다.</strong>
+      </div>
+    );
+  }
   return (
-    <div className="paper-psych">
-      <div className="paper-psych-title">
-        <Users size={12} />
-        <span>투자자별 심리</span>
-        <em>{round?.market_date ?? round?.label}</em>
+    <div className="paper-daily-practice">
+      <div className="paper-daily-practice-head">
+        <span>{event ? "중요 사건 판단" : "오늘의 시장 요약"}</span>
+        <em>{event?.event_date ?? round?.market_date}</em>
       </div>
-      <div className="paper-psych-rows">
-        {Object.entries(GROUP_LABEL).map(([key, label]) => {
-          const state = groups[key];
-          if (!state) return null;
-          const width = Math.min(50, Math.abs(state.sentiment) * 50);
-          return (
-            <div className={`paper-psych-row ${toneOf(state.sentiment)}`} key={key}>
-              <span>{label}</span>
-              <i>
-                <b style={state.sentiment >= 0
-                  ? { left: "50%", width: `${width}%` }
-                  : { right: "50%", width: `${width}%` }} />
-              </i>
-              <em>{signedPct(state.sentiment * 100)}</em>
+      {event ? (
+        <div className="paper-daily-event">
+          <b>{event.title || "공개된 중요 사건"}</b>
+          <span>{event.description || event.public_signal || "공개된 사건의 내용을 확인하고 다음 방향을 선택하세요."}</span>
+        </div>
+      ) : (
+        <p>{round?.market_summary_detail?.summary || round?.market_summary || "오늘의 공개 정보와 시장 참여자 반응을 확인하세요."}</p>
+      )}
+      {!event && round?.market_summary_detail?.group_actions && (
+        <div className="paper-daily-summary-groups" aria-label="수급 주체별 오늘의 행동 요약">
+          {DAILY_SUMMARY_GROUPS.map(([key, label]) => (
+            <div className="paper-daily-summary-group" key={key}>
+              <b>{label}</b>
+              <span>{round?.market_summary_detail?.group_actions?.[key]}</span>
             </div>
-          );
-        })}
+          ))}
+        </div>
+      )}
+      {!event && round?.market_summary_detail?.price_reason && (
+        <div className="paper-daily-reason">
+          <b>주가 변동 이유 추론</b>
+          <span>{round?.market_summary_detail?.price_reason}</span>
+        </div>
+      )}
+      {round && (
+        <div className="paper-daily-practice-flow">
+          <b className={toneOf(round.return_pct)}>{signedPct(round.return_pct)}</b>
+          <span>59개 에이전트 반응 후 형성된 오늘의 종가</span>
+        </div>
+      )}
+      <div className="paper-daily-choices" role="group" aria-label="오늘의 방향성 판단">
+        {DAILY_STANCES.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            className={`${item.key.toLowerCase()} ${(reflection?.stance ?? "HOLD_WATCH") === item.key ? "active" : ""}`}
+            onClick={() => onSelect(item.key)}
+            disabled={disabled}
+          >
+            <b>{item.label}</b><span>{item.description}</span>
+          </button>
+        ))}
       </div>
+      <small>이 판단은 주문이 아니며 시장 가격을 움직이지 않습니다. 마지막 회고에서 다음 거래일 결과와 비교합니다.</small>
     </div>
   );
 }
 
 /* ---------------------------------------------------------- reaction feed */
 
-function ReactionFeed({ game, busy, job }: { game: ScenarioGame; busy: boolean; job: Job | null }) {
+function LegacyEventLog({
+  currentEvent,
+  revealedEvents,
+  worldMode,
+}: {
+  currentEvent: ScenarioEvent | null;
+  revealedEvents?: ScenarioEvent[];
+  worldMode: boolean;
+}) {
+  const events = useMemo(() => {
+    const byId = new Map<string, ScenarioEvent>();
+    for (const event of revealedEvents ?? []) byId.set(event.event_id, event);
+    if (currentEvent) byId.set(currentEvent.event_id, currentEvent);
+    return [...byId.values()].sort((left, right) => right.sequence - left.sequence);
+  }, [currentEvent, revealedEvents]);
+
+  if (!events.length) return null;
+
+  return (
+    <section className="paper-event-log" aria-label="시나리오 이벤트 기록">
+      <header>
+        <div><CalendarClock size={13} /><strong>이벤트 기록</strong></div>
+        <em>{events.length}건</em>
+      </header>
+      {events.map((event) => {
+        const visible = event.status !== "hidden" || worldMode;
+        const type = event.event_type === "seasonal" ? "계절성" : event.event_type === "surprise" ? "서프라이즈" : "모멘텀";
+        return (
+          <article className={`paper-event-card ${event.status}`} key={event.event_id}>
+            <div className="paper-event-top">
+              <span><CalendarClock size={13} /> 이벤트 {event.sequence}</span>
+              <em>{worldMode ? `${event.event_date} · ${type}` : visible ? `${event.event_date} 공개` : `${event.event_date} 예정`}</em>
+            </div>
+            {visible && event.title
+              ? <strong>{event.title}</strong>
+              : <strong className="masked">아직 공개되지 않은 이벤트</strong>}
+            <p>{visible && event.description ? event.description : event.pre_brief}</p>
+            {worldMode && event.public_signal && <div className="paper-provenance pending"><Landmark size={12} /><span>{event.public_signal}</span></div>}
+            {worldMode && event.analogue_title && <div className="paper-provenance"><Landmark size={12} /><span>시작 전 실제 유사 사례 기반 · {event.analogue_title}</span></div>}
+            {visible && event.ontology_source
+              ? <EventProvenanceStrip source={event.ontology_source} />
+              : event.ontology_source && (
+                  <div className="paper-provenance pending">
+                    <Landmark size={12} />
+                    <span>실제로 일어난 사건입니다. 내용은 공개 시점에 드러납니다.</span>
+                  </div>
+                )}
+          </article>
+        );
+      })}
+    </section>
+  );
+}
+
+function LegacyReactionFeed({ game, busy, job }: { game: ScenarioGame; busy: boolean; job: Job | null }) {
   const rounds = useMemo(
     () => [...(game.agent_rounds ?? [])].reverse(), [game.agent_rounds]);
   const signalsByDate = useMemo(() => {
@@ -717,7 +985,7 @@ function ReactionFeed({ game, busy, job }: { game: ScenarioGame; busy: boolean; 
       <div className="paper-feed-empty">
         <MessageSquare size={22} />
         <strong>아직 시장이 열리지 않았습니다</strong>
-        <p>장을 진행하면 40명의 에이전트가 커뮤니티와 X에 남긴 반응, 그리고 그날의 수급이 여기에 쌓입니다.</p>
+        <p>장을 진행하면 59명의 에이전트가 독립적으로 판단한 주문과 그날의 수급이 여기에 쌓입니다.</p>
       </div>
     );
   }
@@ -800,6 +1068,178 @@ function ReactionFeed({ game, busy, job }: { game: ScenarioGame; busy: boolean; 
   );
 }
 
+function eventTypeLabel(event: ScenarioEvent) {
+  return event.event_type === "seasonal" ? "계절성" : event.event_type === "surprise" ? "서프라이즈" : "모멘텀";
+}
+
+// 이전 게임 데이터와의 호환을 위해 구현을 남겨 둔다. 새 화면은 아래의
+// EventTimeline과 AgentActivityFeed를 사용한다.
+void LegacyEventLog;
+void LegacyReactionFeed;
+
+function EventTimeline({ game, worldMode }: { game: ScenarioGame; worldMode: boolean }) {
+  const events = useMemo(() => {
+    const byId = new Map<string, ScenarioEvent>();
+    for (const event of game.world?.memory?.event_ledger ?? []) byId.set(event.event_id, event);
+    for (const event of game.revealed_events ?? []) byId.set(event.event_id, event);
+    if (game.current_event && (worldMode || game.current_event.status !== "hidden")) {
+      byId.set(game.current_event.event_id, game.current_event);
+    }
+    return [...byId.values()].sort((left, right) => right.sequence - left.sequence);
+  }, [game.current_event, game.revealed_events, game.world?.memory?.event_ledger, worldMode]);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+
+  const selectedEvent = events.find((event) => event.event_id === selectedEventId) ?? events[0] ?? null;
+  const visible = selectedEvent ? selectedEvent.status !== "hidden" || worldMode : false;
+
+  return (
+    <section className="paper-record-column paper-event-column" aria-label="시나리오 이벤트 기록">
+      <header className="paper-record-heading">
+        <div><CalendarClock size={14} /><strong>이벤트 기록</strong></div>
+        <em>{events.length ? events.length + "건 누적" : "발생 전"}</em>
+      </header>
+      {!events.length ? (
+        <div className="paper-record-empty">
+          <CalendarClock size={20} />
+          <strong>아직 발생한 이벤트가 없습니다</strong>
+          <p>시뮬레이션 중 중요한 이벤트가 발생하면 이곳에 계속 쌓입니다.</p>
+        </div>
+      ) : (
+        <>
+          <div className="paper-event-timeline">
+            {events.map((event) => {
+              const eventVisible = event.status !== "hidden" || worldMode;
+              return (
+                <button
+                  className={"paper-event-item " + (event.event_id === selectedEvent?.event_id ? "active" : "")}
+                  type="button"
+                  key={event.event_id}
+                  onClick={() => setSelectedEventId(event.event_id)}
+                >
+                  <i />
+                  <span>
+                    <small>{event.event_date} · {eventTypeLabel(event)}</small>
+                    <b>{eventVisible && event.title ? event.title : "공개 예정 이벤트"}</b>
+                  </span>
+                  <ChevronRight size={13} />
+                </button>
+              );
+            })}
+          </div>
+          {selectedEvent && (
+            <article className={"paper-event-detail " + selectedEvent.status}>
+              <div className="paper-event-detail-top">
+                <span>이벤트 {selectedEvent.sequence}</span>
+                <em>{selectedEvent.event_date} · {visible ? "공개" : "예정"}</em>
+              </div>
+              <h4>{visible && selectedEvent.title ? selectedEvent.title : "아직 공개되지 않은 이벤트"}</h4>
+              <p>{visible && selectedEvent.description ? selectedEvent.description : selectedEvent.pre_brief || "발생 시 공개되는 이벤트입니다."}</p>
+              {visible && selectedEvent.public_signal && <div className="paper-event-signal"><Landmark size={13} /><span>{selectedEvent.public_signal}</span></div>}
+              {selectedEvent.analogue_title && <div className="paper-event-source"><Landmark size={13} /><span>실제 유사 사례 기반 · {selectedEvent.analogue_title}</span></div>}
+              {visible && selectedEvent.ontology_source && <EventProvenanceStrip source={selectedEvent.ontology_source} />}
+            </article>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+function AgentActivityFeed({ game, busy }: { game: ScenarioGame; busy: boolean }) {
+  const rounds = useMemo(() => [...(game.agent_rounds ?? [])].reverse(), [game.agent_rounds]);
+  const [selectedGroup, setSelectedGroup] = useState<(typeof AGENT_GROUPS)[number]["key"]>("retail");
+  const [expandedRoundId, setExpandedRoundId] = useState<string | null>(null);
+
+  const groupCounts = useMemo(() => {
+    const counts = new Map<string, Set<string>>();
+    for (const round of rounds) {
+      for (const order of round.persona_orders ?? []) {
+        if (!counts.has(order.group)) counts.set(order.group, new Set());
+        counts.get(order.group)?.add(order.persona_id);
+      }
+    }
+    return counts;
+  }, [rounds]);
+  const totalAgentCount = [...groupCounts.values()].reduce((sum, ids) => sum + ids.size, 0);
+
+  return (
+    <section className="paper-record-column paper-agent-column" aria-label="거래일별 에이전트 활동">
+      <header className="paper-record-heading">
+        <div><Users size={14} /><strong>에이전트 활동</strong></div>
+        <em>{rounds.length ? totalAgentCount + "명 기록" : "거래일 대기"}</em>
+      </header>
+      <p className="paper-agent-intro">범주를 선택하면 해당 거래일에 그 그룹의 개별 에이전트가 내린 판단을 확인할 수 있습니다.</p>
+      <div className="paper-agent-tabs" role="tablist" aria-label="시장 참여자 범주">
+        {AGENT_GROUPS.map((group) => (
+          <button
+            className={selectedGroup === group.key ? "active" : ""}
+            type="button"
+            role="tab"
+            aria-selected={selectedGroup === group.key}
+            key={group.key}
+            onClick={() => setSelectedGroup(group.key)}
+          >
+            <span>{group.label}</span><em>{groupCounts.get(group.key)?.size ?? 0}명</em>
+          </button>
+        ))}
+      </div>
+      {!rounds.length && !busy ? (
+        <div className="paper-record-empty compact">
+          <MessageSquare size={20} />
+          <strong>아직 거래일 기록이 없습니다</strong>
+          <p>하루가 진행되면 4개 범주의 판단이 날짜별로 기록됩니다.</p>
+        </div>
+      ) : (
+        <div className="paper-agent-days">
+          {rounds.map((round) => {
+            const orders = (round.persona_orders ?? []).filter((order) => order.group === selectedGroup);
+            const buyOrders = orders.filter((order) => order.side === "BUY");
+            const sellOrders = orders.filter((order) => order.side === "SELL");
+            const holdOrders = orders.filter((order) => order.side === "HOLD");
+            const buyQuantity = buyOrders.reduce((sum, order) => sum + order.quantity, 0);
+            const sellQuantity = sellOrders.reduce((sum, order) => sum + order.quantity, 0);
+            const expanded = expandedRoundId === round.round_id;
+            return (
+              <article className={"paper-agent-day " + (expanded ? "expanded" : "")} key={round.round_id}>
+                <button className="paper-agent-day-summary" type="button" aria-expanded={expanded} onClick={() => setExpandedRoundId(expanded ? null : round.round_id)}>
+                  <span>
+                    <small>{round.phase === "event_reaction" ? "이벤트 반응" : "자율 거래"}</small>
+                    <b>{round.market_date || round.label}</b>
+                  </span>
+                  <span className="paper-agent-day-stats">
+                    <em className="up">매수 {buyOrders.length}</em>
+                    <em className="down">매도 {sellOrders.length}</em>
+                    <em>관망 {holdOrders.length}</em>
+                  </span>
+                  <ChevronRight size={14} />
+                </button>
+                {expanded && (
+                  <div className="paper-agent-day-body">
+                    {round.market_summary && <p className="paper-agent-market-summary">{round.market_summary}</p>}
+                    <div className="paper-agent-flow"><span>매수 {buyQuantity.toLocaleString("ko-KR")}주</span><span>매도 {sellQuantity.toLocaleString("ko-KR")}주</span><b className={toneOf(buyQuantity - sellQuantity)}>순 {Math.abs(buyQuantity - sellQuantity).toLocaleString("ko-KR")}주 {buyQuantity >= sellQuantity ? "매수 우위" : "매도 우위"}</b></div>
+                    {!orders.length ? <p className="paper-record-empty compact">이 거래일에는 선택한 범주의 기록이 없습니다.</p> : (
+                      <div className="paper-agent-order-grid">
+                        {orders.map((order) => (
+                          <div className={"paper-agent-order " + (order.side === "BUY" ? "up" : order.side === "SELL" ? "down" : "flat")} key={order.persona_id}>
+                            <header><b>{order.persona_id}</b><span>{order.strategy ? agentStrategyLabel(order.strategy) : "개별 판단"}</span><em>{order.side === "BUY" ? "매수" : order.side === "SELL" ? "매도" : "관망"}</em></header>
+                            <strong>{order.side === "HOLD" ? "포지션 유지" : order.quantity.toLocaleString("ko-KR") + "주"}</strong>
+                            {order.fill_price && <small>체결 기준 {order.fill_price.toLocaleString("ko-KR")}원</small>}
+                            <p>{order.rationale || "공개 정보와 개인 기억을 바탕으로 판단함"}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function SignalCard({ signal }: { signal: LeadSignal }) {
   return (
     <div className="paper-signal">
@@ -815,152 +1255,26 @@ function SignalCard({ signal }: { signal: LeadSignal }) {
   );
 }
 
-/* ------------------------------------------------------------ report view */
-
-const METRIC_LABEL: [string, string, (value: number) => string][] = [
-  ["total_return_pct", "총 수익률", (value) => signedPct(value)],
-  ["completed_events", "완료 이벤트", (value) => `${value}건`],
-  ["pre_event_trades", "이벤트 전 거래", (value) => `${value}회`],
-  ["post_event_trades", "이벤트 후 거래", (value) => `${value}회`],
-  ["autonomous_market_days", "자율 거래일", (value) => `${value}일`],
-  ["max_price_drawdown_pct", "최대 낙폭", (value) => `${value.toFixed(2)}%`],
-  ["turnover_ratio", "자본 회전율", (value) => `${value.toFixed(2)}배`],
-  ["average_confidence", "평균 확신도", (value) => `${value}%`],
-];
-
-function ReportView({
-  assessment, canGenerate, generating, onGenerate,
-}: {
-  assessment: Assessment;
-  canGenerate: boolean;
-  generating: boolean;
-  onGenerate: () => void;
-}) {
-  const report = assessment.llm_report;
-  const metrics = assessment.metrics ?? {};
-
-  return (
-    <div className="paper-report">
-      <div className="paper-report-head">
-        <div>
-          <span>투자 성향</span>
-          <strong>{assessment.style ?? "분석 중"}</strong>
-        </div>
-        {typeof metrics.total_return_pct === "number" && (
-          <b className={toneOf(metrics.total_return_pct)}>{signedPct(metrics.total_return_pct)}</b>
-        )}
-      </div>
-
-      <div className="paper-report-metrics">
-        {METRIC_LABEL.map(([key, label, format]) => {
-          const value = metrics[key];
-          if (typeof value !== "number") return null;
-          return (
-            <div key={key}>
-              <span>{label}</span>
-              <strong className={key.endsWith("_pct") ? toneOf(value) : ""}>{format(value)}</strong>
-            </div>
-          );
-        })}
-      </div>
-
-      {Boolean(assessment.findings?.length) && (
-        <ul className="paper-report-findings">
-          {assessment.findings?.map((finding) => <li key={finding}>{finding}</li>)}
-        </ul>
-      )}
-
-      {Boolean(assessment.lessons?.length) && (
-        <div className="paper-report-lessons">
-          {assessment.lessons?.map((lesson) => (
-            <div key={lesson.topic}>
-              <b>{lesson.topic}</b>
-              <p>{lesson.message}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {report ? (
-        <div className="paper-report-llm">
-          {report.quantitative_summary && (
-            <p className="paper-report-verified">{report.quantitative_summary}</p>
-          )}
-          {report.executive_summary && <p className="paper-report-summary">{report.executive_summary}</p>}
-          {report.investor_profile && (
-            <blockquote className="paper-report-profile">{report.investor_profile}</blockquote>
-          )}
-
-          {Boolean(report.event_reviews?.length) && (
-            <div className="paper-report-events">
-              {report.event_reviews?.map((review) => (
-                <article key={review.event}>
-                  <b>{review.event}</b>
-                  <p><span>시장 반응</span>{review.market_reaction}</p>
-                  <p><span>내 판단</span>{review.user_decision}</p>
-                  <em>{review.lesson}</em>
-                </article>
-              ))}
-            </div>
-          )}
-
-          <div className="paper-report-lists">
-            {([["강점", report.strengths, "good"], ["주의 패턴", report.risk_patterns, "risk"],
-               ["다음 원칙", report.action_plan, "plan"]] as const).map(([title, items, tone]) =>
-              items?.length ? (
-                <div className={tone} key={title}>
-                  <b>{title}</b>
-                  {items.map((item) => <p key={item}>{item}</p>)}
-                </div>
-              ) : null)}
-          </div>
-        </div>
-      ) : (
-        <div className="paper-report-cta">
-          <p>
-            {canGenerate
-              ? "여기까지의 판단 기록으로 AI 종합 리포트를 만들 수 있습니다. 매 이벤트에서 무엇을 보고 어떻게 움직였는지 근거 중심으로 되짚어줍니다."
-              : "모든 이벤트를 마치면 AI 종합 리포트를 만들 수 있습니다. 위 지표는 지금까지의 판단을 계산한 값입니다."}
-          </p>
-          {canGenerate && (
-            <button type="button" onClick={onGenerate} disabled={generating}>
-              {generating
-                ? <><LoaderCircle size={14} className="spin" /> 리포트 작성 중</>
-                : <><Sparkles size={14} /> AI 종합 리포트 생성</>}
-            </button>
-          )}
-        </div>
-      )}
-
-      {assessment.disclaimer && <p className="paper-report-disclaimer">{assessment.disclaimer}</p>}
-    </div>
-  );
-}
-
 /* ---------------------------------------------------------------- setup */
 
 type InvestmentMode = "new" | "holding";
-type PracticeMode = "balanced" | "stress" | "opportunity" | "random";
 
 const CASH_PRESETS = [10_000_000, 50_000_000, 100_000_000];
+const PREVIEW_STEP_MIN_MS = 1_500;
 const COLLECTION_STEP_MIN_MS = 1_500;
+const AGENT_PROFILE_MIN_MS = 1_500;
 const DURATION_OPTIONS = [
   { days: 10, label: "10거래일", caption: "단기 흐름" },
   { days: 20, label: "20거래일", caption: "한 달 연습" },
   { days: 60, label: "60거래일", caption: "중기 판단" },
 ];
-const PRACTICE_OPTIONS: { key: PracticeMode; label: string; caption: string }[] = [
-  { key: "balanced", label: "균형 판단", caption: "호재와 악재를 고르게 경험" },
-  { key: "stress", label: "위기 대응", caption: "악재와 변동성 대응에 집중" },
-  { key: "opportunity", label: "기회 포착", caption: "호재 신호와 진입 판단에 집중" },
-  { key: "random", label: "무작위 실전", caption: "사건 구성을 매번 다르게" },
-];
+const AGENT_GROUP_ICON = { retail: Users, foreign: TrendingUp, institution: Landmark, pension: Wallet };
+const agentStrategyLabel = (value: string) => value.replaceAll("_", " ");
 
 const parsePositiveInteger = (value: string) => Number(value.replace(/[^0-9]/g, "")) || 0;
 
 function SetupScreen({
   onStart,
-  onResume,
   starting,
   error,
   onClose,
@@ -968,14 +1282,12 @@ function SetupScreen({
   onStart: (input: {
     ticker: string; name: string; initialCash: number;
     investmentMode: InvestmentMode; initialPosition?: { quantity: number; averagePrice: number };
-    simulationDays: number; practiceMode: PracticeMode;
+    simulationDays: number; initialContextId: string;
   }) => void;
-  onResume: (gameId: string) => void;
   starting: boolean;
   error: string | null;
   onClose: () => void;
 }) {
-  const [saved, setSaved] = useState<GameSummary[]>([]);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Security[]>([]);
   const [searching, setSearching] = useState(false);
@@ -985,6 +1297,7 @@ function SetupScreen({
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [collectionSources, setCollectionSources] = useState<CollectionSource[] | null>(null);
   const [collectionError, setCollectionError] = useState<string | null>(null);
+  const [previewDwellComplete, setPreviewDwellComplete] = useState(false);
   const [collectionDwellComplete, setCollectionDwellComplete] = useState(false);
   const [investmentMode, setInvestmentMode] = useState<InvestmentMode | null>(null);
   const [investmentConfirmed, setInvestmentConfirmed] = useState(false);
@@ -992,29 +1305,90 @@ function SetupScreen({
   const [averagePrice, setAveragePrice] = useState(0);
   const [holdingQuantity, setHoldingQuantity] = useState(0);
   const [simulationDays, setSimulationDays] = useState(20);
-  const [practiceMode, setPracticeMode] = useState<PracticeMode>("balanced");
+  const [initialContext, setInitialContext] = useState<InitialContext | null>(null);
+  const [initialContextLoading, setInitialContextLoading] = useState(false);
+  const [initialContextError, setInitialContextError] = useState<string | null>(null);
+  const [contextDocuments, setContextDocuments] = useState<ContextDocumentProgress[]>(INITIAL_CONTEXT_DOCUMENTS);
+  const [contextDocumentSource, setContextDocumentSource] = useState<InitialContextDocuments | null>(null);
+  const [contextDwellComplete, setContextDwellComplete] = useState(false);
+  const [agentProfiles, setAgentProfiles] = useState<AgentProfiles | null>(null);
+  const [agentProfileJob, setAgentProfileJob] = useState<Job | null>(null);
+  const [agentProfileError, setAgentProfileError] = useState<string | null>(null);
+  const [agentProfileStartedAt, setAgentProfileStartedAt] = useState<number | null>(null);
+  const [simulationSetupStage, setSimulationSetupStage] = useState(0);
+  const [resettingSetup, setResettingSetup] = useState(false);
+  const [resetSetupError, setResetSetupError] = useState<string | null>(null);
+  const [selectedContextDocument, setSelectedContextDocument] = useState<{ label: string; content: string } | null>(null);
+  const [contextDocumentLoading, setContextDocumentLoading] = useState(false);
+  const [selectedAgentGroup, setSelectedAgentGroup] = useState<AgentProfileGroup | null>(null);
+  const [agentProfileDetails, setAgentProfileDetails] = useState<AgentProfileGroupDetails | null>(null);
+  const [agentProfileDetailsLoading, setAgentProfileDetailsLoading] = useState(false);
   const pickedTicker = picked?.ticker;
   const step2Ref = useRef<HTMLElement | null>(null);
   const step3Ref = useRef<HTMLElement | null>(null);
   const step4Ref = useRef<HTMLElement | null>(null);
+  const agentStepRef = useRef<HTMLDivElement | null>(null);
+  const readyStepRef = useRef<HTMLElement | null>(null);
+  const previewReady = Boolean(previewCandles && previewCandles.length >= 2 && !previewError);
+  const previewStepVisible = previewReady && previewDwellComplete;
   const collectionReady = Boolean(collectionSources?.every((source) => source.status === "ready"));
   const collectionStepComplete = collectionReady && collectionDwellComplete;
+  const initialContextReady = Boolean(initialContext?.analysis?.summary);
+  const agentProfilesReady = Boolean(agentProfiles && agentProfiles.profile_count === 59);
+  const initialContextReadyForStart = initialContextReady && contextDwellComplete && agentProfilesReady;
+  const openContextDocument = (domain: ContextDocumentProgress["key"]) => {
+    if (!pickedTicker) return;
+    const document = contextDocuments.find((item) => item.key === domain);
+    if (!document) return;
+    setContextDocumentLoading(true);
+    fetch(`/api/paper-trading/securities/${encodeURIComponent(pickedTicker)}/initial-context/documents/${domain}`, { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("문서를 불러오지 못했습니다.");
+        return response.text();
+      })
+      .then((content) => setSelectedContextDocument({ label: document.label, content }))
+      .catch(() => setSelectedContextDocument({ label: document.label, content: "문서를 불러오지 못했습니다." }))
+      .finally(() => setContextDocumentLoading(false));
+  };
+  const openAgentProfileGroup = (group: AgentProfileGroup) => {
+    if (!pickedTicker) return;
+    setSelectedAgentGroup(group);
+    setAgentProfileDetails(null);
+    setAgentProfileDetailsLoading(true);
+    callApi<{ data: AgentProfileGroupDetails }>(`/securities/${encodeURIComponent(pickedTicker)}/agent-profiles/${group.key}`)
+      .then((payload) => setAgentProfileDetails(payload.data))
+      .catch(() => setAgentProfileDetails({ group: group.key, label: group.label, profiles: [] }))
+      .finally(() => setAgentProfileDetailsLoading(false));
+  };
   const investmentReady = investmentMode === "new"
     ? initialCash > 0
     : investmentMode === "holding" && averagePrice > 0 && holdingQuantity > 0;
-  const activeStep = investmentConfirmed ? 4 : collectionStepComplete ? 3 : pickedTicker ? 2 : 1;
+  const activeStep = investmentConfirmed ? 4 : collectionStepComplete ? 3 : previewStepVisible ? 2 : 1;
 
-  useEffect(() => {
-    let cancelled = false;
-    callApi<{ data: GameSummary[] }>("/games?summary=1&limit=6")
-      .then((payload) => {
-        if (cancelled) return;
-        setSaved((payload.data ?? []).filter((row) => row.total_events > 0));
-      })
-      // 이어하기 목록은 부가 기능이다. 실패해도 새 시나리오 생성은 막지 않는다.
-      .catch(() => undefined);
-    return () => { cancelled = true; };
-  }, []);
+  const restartSetup = async () => {
+    if (!pickedTicker || resettingSetup) return;
+    setResettingSetup(true);
+    setResetSetupError(null);
+    try {
+      await callApi(`/securities/${encodeURIComponent(pickedTicker)}/initial-context/cache`, { method: "DELETE" });
+      setInitialContext(null);
+      setInitialContextError(null);
+      setContextDocumentSource(null);
+      setContextDocuments(INITIAL_CONTEXT_DOCUMENTS);
+      setContextDwellComplete(false);
+      setAgentProfiles(null);
+      setAgentProfileJob(null);
+      setAgentProfileError(null);
+      setAgentProfileStartedAt(null);
+      setSimulationSetupStage(0);
+      setInvestmentConfirmed(false);
+      window.setTimeout(() => step3Ref.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 180);
+    } catch (cause) {
+      setResetSetupError(cause instanceof Error ? cause.message : "초기 상황 캐시를 비우지 못했습니다.");
+    } finally {
+      setResettingSetup(false);
+    }
+  };
 
   useEffect(() => {
     const keyword = query.trim();
@@ -1062,15 +1436,162 @@ function SetupScreen({
   }, [pickedTicker]);
 
   useEffect(() => {
-    if (!pickedTicker) return;
+    if (!pickedTicker || !previewReady) return;
+    const timer = window.setTimeout(() => {
+      setPreviewDwellComplete(true);
+    }, PREVIEW_STEP_MIN_MS);
+    return () => window.clearTimeout(timer);
+  }, [pickedTicker, previewReady]);
+
+  useEffect(() => {
+    if (!pickedTicker || !previewStepVisible) return;
     const timer = window.setTimeout(() => {
       setCollectionDwellComplete(true);
     }, COLLECTION_STEP_MIN_MS);
     return () => window.clearTimeout(timer);
-  }, [pickedTicker]);
+  }, [pickedTicker, previewStepVisible]);
 
   useEffect(() => {
-    if (!pickedTicker) return;
+    if (!pickedTicker || !collectionStepComplete || !investmentConfirmed) return;
+    let cancelled = false;
+    const loadInitialContext = async () => {
+      setInitialContextLoading(true);
+      setInitialContextError(null);
+      setInitialContext(null);
+      setContextDocumentSource(null);
+      setContextDocuments(INITIAL_CONTEXT_DOCUMENTS.map((document, index) => ({ ...document, status: index === 0 ? "generating" : "waiting" })));
+      try {
+        const documentsPayload = await callApi<{ data: InitialContextDocuments }>(`/securities/${encodeURIComponent(pickedTicker)}/initial-context/documents`);
+        if (cancelled) return;
+        setContextDocumentSource(documentsPayload.data);
+        for (let index = 0; index < INITIAL_CONTEXT_DOCUMENTS.length; index += 1) {
+          if (index > 0) await new Promise((resolve) => window.setTimeout(resolve, CONTEXT_DOCUMENT_STEP_MS));
+          if (cancelled) return;
+          setContextDocuments(INITIAL_CONTEXT_DOCUMENTS.map((document, documentIndex) => ({
+            ...document,
+            status: documentIndex <= index ? "ready" : documentIndex === index + 1 ? "generating" : "waiting",
+          })));
+        }
+        // 네 Evidence MD가 화면에 모두 준비된 뒤, 그 문서 묶음만 OpenRouter에 전달한다.
+        const analysisStartedAt = Date.now();
+        const payload = await callApi<{ data: InitialContext }>(`/securities/${encodeURIComponent(pickedTicker)}/initial-context`);
+        const remaining = Math.max(0, CONTEXT_ANALYSIS_MIN_MS - (Date.now() - analysisStartedAt));
+        if (remaining) await new Promise((resolve) => window.setTimeout(resolve, remaining));
+        if (!cancelled) {
+          setInitialContext(payload.data);
+        }
+      } catch (cause) {
+        if (!cancelled) setInitialContextError(cause instanceof Error ? cause.message : "초기 상황을 분석하지 못했습니다.");
+      } finally {
+        if (!cancelled) setInitialContextLoading(false);
+      }
+    };
+    void loadInitialContext();
+    return () => { cancelled = true; };
+  }, [pickedTicker, collectionStepComplete, investmentConfirmed]);
+
+  useEffect(() => {
+    if (!investmentConfirmed || !initialContextReady) return;
+    const timer = window.setTimeout(() => setContextDwellComplete(true), 1_500);
+    return () => window.clearTimeout(timer);
+  }, [investmentConfirmed, initialContextReady]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSimulationSetupStage(investmentConfirmed ? 1 : 0), 0);
+    return () => window.clearTimeout(timer);
+  }, [investmentConfirmed]);
+
+  useEffect(() => {
+    if (!investmentConfirmed || !contextDwellComplete) return;
+    // 초기 상황과 에이전트 완료 효과는 비동기로 교차한다. 이미 다음 단계가 열렸다면
+    // 늦게 실행된 이전 단계 효과가 화면을 다시 가리지 않도록 단계는 앞으로만 이동한다.
+    const timer = window.setTimeout(() => setSimulationSetupStage((stage) => Math.max(stage, 2)), 0);
+    return () => window.clearTimeout(timer);
+  }, [investmentConfirmed, contextDwellComplete]);
+
+  useEffect(() => {
+    if (!investmentConfirmed || !agentProfilesReady) return;
+    // 캐시된 프로필 응답에서도 1.5초의 준비 화면을 유지하되, 이전 렌더에서 시작
+    // 시각이 유실돼도 완료 화면이 영구히 막히지 않도록 현재 시각을 안전한 기준으로 쓴다.
+    const startedAt = agentProfileStartedAt ?? Date.now();
+    const remaining = Math.max(0, AGENT_PROFILE_MIN_MS - (Date.now() - startedAt));
+    const timer = window.setTimeout(() => setSimulationSetupStage((stage) => Math.max(stage, 3)), remaining);
+    return () => window.clearTimeout(timer);
+  }, [investmentConfirmed, agentProfilesReady, agentProfileStartedAt]);
+
+  useEffect(() => {
+    if (simulationSetupStage < 2) return;
+    const target = simulationSetupStage >= 3 ? readyStepRef.current : agentStepRef.current;
+    const timer = window.setTimeout(() => target?.scrollIntoView({ behavior: "smooth", block: "start" }), 220);
+    return () => window.clearTimeout(timer);
+  }, [simulationSetupStage]);
+
+  useEffect(() => {
+    const contextId = initialContext?.context_id;
+    if (!pickedTicker || !contextId || !contextDwellComplete || agentProfilesReady) return;
+    let cancelled = false;
+    const prepare = async () => {
+      try {
+        // Strict Mode 재실행이나 화면 재진입으로 POST 응답을 놓쳐도, 완료된
+        // 프로필 매니페스트를 먼저 읽어 즉시 카드 화면을 복구한다.
+        const existing = await callApi<{ data: { status: "missing" | "ready" } & Partial<AgentProfiles> }>(
+          `/securities/${encodeURIComponent(pickedTicker)}/agent-profiles`);
+        if (cancelled) return;
+        setAgentProfileError(null);
+        if (existing.data.status === "ready" && existing.data.profile_count === 59) {
+          setAgentProfiles(existing.data as AgentProfiles);
+          setAgentProfileJob(null);
+          return;
+        }
+        setAgentProfileStartedAt((startedAt) => startedAt ?? Date.now());
+        const payload = await callApi<{ data: { status: "ready" | "running"; job?: Job } & AgentProfiles }>(
+          `/securities/${encodeURIComponent(pickedTicker)}/agent-profiles/prepare`, { method: "POST" });
+        if (cancelled) return;
+        if (payload.data.status === "ready") {
+          setAgentProfiles(payload.data);
+          setAgentProfileJob(null);
+        } else {
+          setAgentProfileJob(payload.data.job ?? null);
+        }
+      } catch (cause) {
+        if (!cancelled) setAgentProfileError(cause instanceof Error ? cause.message : "시장 참여 에이전트 프로필을 만들지 못했습니다.");
+      }
+    };
+    void prepare();
+    return () => { cancelled = true; };
+  }, [pickedTicker, initialContext?.context_id, contextDwellComplete, agentProfilesReady]);
+
+  useEffect(() => {
+    if (!pickedTicker || !agentProfileJob || agentProfileJob.status === "completed" || agentProfileJob.status === "failed") return;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const payload = await callApi<{ data: Job }>(`/scenario-jobs/${agentProfileJob.job_id}`);
+        if (cancelled) return;
+        const next = payload.data;
+        if (next.status === "completed") {
+          const ready = await callApi<{ data: { status: "ready" } & AgentProfiles }>(`/securities/${encodeURIComponent(pickedTicker)}/agent-profiles`);
+          // 완료 상태를 먼저 반영하면 effect cleanup이 실행되어 같은 턴의
+          // 프로필 조회 결과가 취소될 수 있다. 프로필을 먼저 저장한 뒤
+          // 작업 상태를 갱신해야 완료 화면이 확실히 열린다.
+          if (ready.data.status === "ready") setAgentProfiles(ready.data);
+          if (!cancelled) setAgentProfileJob(next);
+        } else if (next.status === "failed") {
+          setAgentProfileJob(next);
+          setAgentProfileError(next.error ?? "시장 참여 에이전트 프로필 생성에 실패했습니다.");
+        } else {
+          setAgentProfileJob(next);
+        }
+      } catch (cause) {
+        if (!cancelled) setAgentProfileError(cause instanceof Error ? cause.message : "프로필 생성 진행 상태를 확인하지 못했습니다.");
+      }
+    };
+    const timer = window.setTimeout(() => { void poll(); }, 900);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [pickedTicker, agentProfileJob]);
+
+  useEffect(() => {
+    if (!pickedTicker || !previewStepVisible) return;
     let cancelled = false;
     callApi<{ data: { sources: CollectionSource[] } }>(`/securities/${encodeURIComponent(pickedTicker)}/scenario-context`)
       .then((payload) => {
@@ -1080,17 +1601,18 @@ function SetupScreen({
         if (!cancelled) setCollectionError(cause instanceof Error ? cause.message : "시나리오 자료를 수집하지 못했습니다.");
       });
     return () => { cancelled = true; };
-  }, [pickedTicker]);
+  }, [pickedTicker, previewStepVisible]);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!picked || !investmentMode || !investmentConfirmed || starting || initialCash < 0) return;
+    if (!picked || !investmentMode || !investmentConfirmed || !initialContextReadyForStart || starting || initialCash < 0) return;
     if (investmentMode === "new" && initialCash <= 0) return;
     if (investmentMode === "holding" && (!averagePrice || !holdingQuantity)) return;
     onStart({
       ticker: picked.ticker, name: picked.name,
       initialCash: investmentMode === "new" ? initialCash : 0,
-      investmentMode, simulationDays, practiceMode,
+      investmentMode, simulationDays,
+      initialContextId: initialContext?.context_id ?? "",
       initialPosition: investmentMode === "holding"
         ? { quantity: holdingQuantity, averagePrice }
         : undefined,
@@ -1101,14 +1623,28 @@ function SetupScreen({
     if (picked?.ticker !== item.ticker) {
       setInvestmentMode(null);
       setInvestmentConfirmed(false);
+      setContextDwellComplete(false);
       setAveragePrice(0);
       setHoldingQuantity(0);
     }
     setPreviewCandles(null);
     setPreviewError(null);
+    setPreviewDwellComplete(false);
     setCollectionSources(null);
     setCollectionError(null);
     setCollectionDwellComplete(false);
+    setInitialContext(null);
+    setInitialContextError(null);
+    setInitialContextLoading(false);
+    setContextDocuments(INITIAL_CONTEXT_DOCUMENTS);
+    setContextDocumentSource(null);
+    setResetSetupError(null);
+    setContextDwellComplete(false);
+    setAgentProfiles(null);
+    setAgentProfileJob(null);
+    setAgentProfileError(null);
+    setAgentProfileStartedAt(null);
+    setSimulationSetupStage(0);
     setPicked(item);
     setQuery(item.name);
     setResults([]);
@@ -1123,7 +1659,7 @@ function SetupScreen({
       const target = activeStep === 2 ? step2Ref.current
         : activeStep === 3 ? step3Ref.current
           : step4Ref.current;
-      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+      target?.scrollIntoView({ behavior: "smooth", block: activeStep === 4 ? "start" : "center" });
     }, 220);
     return () => window.clearTimeout(timer);
   }, [activeStep]);
@@ -1138,29 +1674,6 @@ function SetupScreen({
         </div>
         <button className="scenario-modal-close" type="button" onClick={onClose} aria-label="모의 투자 닫기"><X size={20} /></button>
       </header>
-
-      {Boolean(saved.length) && (
-        <section className="paper-setup-block">
-          <div className="paper-setup-heading"><span>이어서 하기</span><h3>진행 중인 시나리오가 있습니다</h3></div>
-          <div className="paper-resume-list">
-            {saved.map((row) => (
-              <button key={row.game_id} type="button" onClick={() => onResume(row.game_id)} disabled={starting}>
-                <div>
-                  <strong>{row.name}</strong>
-                  <span>{PHASE_META[row.phase]?.label ?? row.phase}</span>
-                </div>
-                <p>{row.scenario_premise || "이벤트 시나리오 모의 투자"}</p>
-                <footer>
-                  <em>이벤트 {Math.min(row.current_event_index + 1, row.total_events)}/{row.total_events} · {row.market_days}거래일</em>
-                  {typeof row.total_return_pct === "number" && (
-                    <b className={toneOf(row.total_return_pct)}>{signedPct(row.total_return_pct)}</b>
-                  )}
-                </footer>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
 
       <section className="paper-setup-block">
         <div className="paper-setup-heading"><span>01 · 종목 선택</span><h3>어떤 종목으로 연습할까요?</h3></div>
@@ -1202,8 +1715,18 @@ function SetupScreen({
                 setPicked(null);
                 setPreviewCandles(null);
                 setPreviewError(null);
+                setPreviewDwellComplete(false);
                 setCollectionSources(null);
                 setCollectionError(null);
+                setInitialContext(null);
+                setInitialContextError(null);
+                setContextDocuments(INITIAL_CONTEXT_DOCUMENTS);
+                setContextDwellComplete(false);
+                setAgentProfiles(null);
+                setAgentProfileJob(null);
+                setAgentProfileError(null);
+                setAgentProfileStartedAt(null);
+                setSimulationSetupStage(0);
               }
             }}
             placeholder="종목명 또는 티커로 검색 (예: 삼성전자, 005930)"
@@ -1255,7 +1778,7 @@ function SetupScreen({
                   history_candles: previewCandles,
                   price_history: [],
                   initial_reference_price: previewCandles[previewCandles.length - 1].close,
-                  revealed_events: [], fills: [],
+                  revealed_events: [], fills: [], daily_reflections: [],
                 }}
               />
             )}
@@ -1263,7 +1786,7 @@ function SetupScreen({
         )}
       </section>
 
-      {picked && (
+      {picked && previewStepVisible && (
       <section ref={step2Ref} className="paper-setup-block paper-setup-reveal">
         <div className="paper-setup-heading"><span>02 · 자료 수집</span><h3>{picked.name} 시나리오 자료를 준비하고 있어요</h3></div>
         <div className={`paper-collection-status ${collectionReady ? "ready" : ""}`} aria-live="polite">
@@ -1297,10 +1820,10 @@ function SetupScreen({
       <section ref={step3Ref} className="paper-setup-block paper-setup-reveal">
         <div className="paper-setup-heading"><span>03 · 투자 상태</span><h3>지금 내 투자 조건을 입력해주세요</h3></div>
         <div className="paper-investment-mode" aria-label="투자 상태">
-          <button type="button" className={investmentMode === "new" ? "active" : ""} aria-pressed={investmentMode === "new"} onClick={() => { setInvestmentMode("new"); setInvestmentConfirmed(false); }}>
+          <button type="button" className={investmentMode === "new" ? "active" : ""} aria-pressed={investmentMode === "new"} onClick={() => { setInvestmentMode("new"); setInvestmentConfirmed(false); setContextDwellComplete(false); }}>
             <CircleDollarSign size={15} /><span><strong>새로 투자하기</strong><small>현금으로 처음 시작</small></span>
           </button>
-          <button type="button" className={investmentMode === "holding" ? "active" : ""} aria-pressed={investmentMode === "holding"} onClick={() => { setInvestmentMode("holding"); setInvestmentConfirmed(false); }}>
+          <button type="button" className={investmentMode === "holding" ? "active" : ""} aria-pressed={investmentMode === "holding"} onClick={() => { setInvestmentMode("holding"); setInvestmentConfirmed(false); setContextDwellComplete(false); }}>
             <Wallet size={15} /><span><strong>이미 보유 중</strong><small>내 평단과 수량 반영</small></span>
           </button>
         </div>
@@ -1311,79 +1834,204 @@ function SetupScreen({
               <small>실제 연습에 사용할 수 있는 현금</small>
             </label>
             <div className="paper-money-input">
-              <input id="paper-initial-cash" inputMode="numeric" value={initialCash ? initialCash.toLocaleString("ko-KR") : ""} onChange={(event) => { setInitialCash(parsePositiveInteger(event.target.value)); setInvestmentConfirmed(false); }} aria-label="투자할 금액" />
+              <input id="paper-initial-cash" inputMode="numeric" value={initialCash ? initialCash.toLocaleString("ko-KR") : ""} onChange={(event) => { setInitialCash(parsePositiveInteger(event.target.value)); setInvestmentConfirmed(false); setContextDwellComplete(false); }} aria-label="투자할 금액" />
               <span>원</span>
             </div>
             <div className="paper-money-presets" aria-label="투자 금액 빠른 선택">
               {CASH_PRESETS.map((cash) => (
-                <button key={cash} type="button" className={initialCash === cash ? "active" : ""} aria-pressed={initialCash === cash} onClick={() => { setInitialCash(cash); setInvestmentConfirmed(false); }}>+ {compactWon(cash)}원</button>
+                <button key={cash} type="button" className={initialCash === cash ? "active" : ""} aria-pressed={initialCash === cash} onClick={() => { setInitialCash(cash); setInvestmentConfirmed(false); setContextDwellComplete(false); }}>+ {compactWon(cash)}원</button>
               ))}
             </div>
           </div>
         )}
         {investmentMode === "holding" && (
           <div className="paper-holding-inputs">
-            <label htmlFor="paper-average-price"><span>평균 매입가</span><div><input id="paper-average-price" inputMode="numeric" value={averagePrice ? averagePrice.toLocaleString("ko-KR") : ""} onChange={(event) => { setAveragePrice(parsePositiveInteger(event.target.value)); setInvestmentConfirmed(false); }} /><em>원</em></div></label>
-            <label htmlFor="paper-holding-quantity"><span>보유 수량</span><div><input id="paper-holding-quantity" inputMode="numeric" value={holdingQuantity ? holdingQuantity.toLocaleString("ko-KR") : ""} onChange={(event) => { setHoldingQuantity(parsePositiveInteger(event.target.value)); setInvestmentConfirmed(false); }} /><em>주</em></div></label>
+            <label htmlFor="paper-average-price"><span>평균 매입가</span><div><input id="paper-average-price" inputMode="numeric" value={averagePrice ? averagePrice.toLocaleString("ko-KR") : ""} onChange={(event) => { setAveragePrice(parsePositiveInteger(event.target.value)); setInvestmentConfirmed(false); setContextDwellComplete(false); }} /><em>원</em></div></label>
+            <label htmlFor="paper-holding-quantity"><span>보유 수량</span><div><input id="paper-holding-quantity" inputMode="numeric" value={holdingQuantity ? holdingQuantity.toLocaleString("ko-KR") : ""} onChange={(event) => { setHoldingQuantity(parsePositiveInteger(event.target.value)); setInvestmentConfirmed(false); setContextDwellComplete(false); }} /><em>주</em></div></label>
           </div>
         )}
-        {investmentMode && <p className="paper-setting-note"><CheckCircle2 size={13} /> {investmentMode === "holding" ? "입력한 보유 종목만으로 시작하며 추가 투자금은 사용하지 않습니다." : "실제 주문이나 계좌 연결 없이 입력한 조건으로만 연습합니다."}</p>}
         {investmentMode && (
-          <button className="paper-start-button" type="button" disabled={!investmentReady} onClick={() => setInvestmentConfirmed(true)}>
-            투자 상태 설정 완료 <ArrowRight size={14} />
-          </button>
+          <div className="paper-investment-actions">
+            <p className="paper-setting-note"><CheckCircle2 size={13} /> {investmentMode === "holding" ? "입력한 보유 종목만으로 시작하며 추가 투자금은 사용하지 않습니다." : "실제 주문이나 계좌 연결 없이 입력한 조건으로만 연습합니다."}</p>
+            <button className="paper-start-button paper-investment-confirm-button" type="button" disabled={!investmentReady} onClick={() => setInvestmentConfirmed(true)}>
+              투자 상태 설정 완료 <ArrowRight size={14} />
+            </button>
+          </div>
         )}
       </section>
       )}
 
       {investmentConfirmed && (
       <section ref={step4Ref} className="paper-setup-block paper-setup-reveal">
-        <div className="paper-setup-heading"><span>04 · 시뮬레이션 설정</span><h3>어떤 방식으로 연습할까요?</h3></div>
-        <div className="paper-simulation-field">
-          <div className="paper-simulation-label"><span>연습 기간</span><small>거래일 기준</small></div>
-          <div className="paper-duration-options">
-            {DURATION_OPTIONS.map((option) => (
-              <button key={option.days} type="button" className={simulationDays === option.days ? "active" : ""} aria-pressed={simulationDays === option.days} onClick={() => setSimulationDays(option.days)}>
-                <strong>{option.label}</strong><small>{option.caption}</small>
+        <div className="paper-setup-heading"><span>04 · 시뮬레이션 설정</span><h3>초기 상황</h3></div>
+        <section className="paper-context-field" aria-live="polite">
+          <div className="paper-context-documents" aria-label="초기 맥락 문서 생성 상태">
+            {contextDocuments.map((document) => (
+              <button key={document.key} type="button" className={`paper-context-document ${document.status}`} onClick={() => openContextDocument(document.key)} disabled={document.status !== "ready"} aria-label={`${document.label} Evidence Markdown 열기`}>
+                {document.status === "ready" ? <CheckCircle2 size={14} /> : <LoaderCircle size={14} className="spin" />}
+                <div className="paper-context-document-body">
+                  <header><strong>{document.label}</strong><small>{document.status === "ready" ? "문서 준비 완료" : document.status === "generating" ? "문서 생성 중" : "생성 대기 중"}</small></header>
+                  <p>{contextDocumentSource?.source_summary.document_previews?.[document.key] || (document.status === "waiting" ? "자료를 확인하고 있습니다." : "수집된 자료를 문서로 정리하고 있습니다…")}</p>
+                </div>
               </button>
             ))}
           </div>
-        </div>
-        <div className="paper-simulation-field">
-          <div className="paper-simulation-label"><span>연습 유형</span><small>수집 자료에서 어떤 사건을 우선 구성할지 선택</small></div>
-          <div className="paper-practice-options">
-            {PRACTICE_OPTIONS.map((option) => (
-              <button key={option.key} type="button" className={practiceMode === option.key ? "active" : ""} aria-pressed={practiceMode === option.key} onClick={() => setPracticeMode(option.key)}>
-                <span>{practiceMode === option.key && <CheckCircle2 size={13} />}<strong>{option.label}</strong></span>
-                <small>{option.caption}</small>
-              </button>
-            ))}
+          {initialContextLoading && contextDocuments.every((document) => document.status === "ready") && <div className="paper-context-loading"><LoaderCircle size={15} className="spin" /> 네 개의 근거 문서를 바탕으로 종목 전체 현황과 최근 이벤트 흐름을 분석하고 있습니다.</div>}
+          {initialContextError && <p className="paper-inline-error">{initialContextError}</p>}
+          {initialContext && (
+            <>
+              <section className="paper-context-summary" aria-label="초기 상황 5줄 요약">
+                <h4>5줄 요약</h4>
+                <ul>{initialContext.analysis.summary_points.slice(0, 5).map((point, index) => <li key={`${index}-${point}`}>{point}</li>)}</ul>
+              </section>
+              <section className="paper-event-sequence" aria-label="종목 이벤트 시퀀스">
+                <header><strong>종목 이벤트 시퀀스</strong><small>최근 한 달 · 실제 근거 문서 기반</small></header>
+                {initialContext.analysis.event_sequence.length ? (
+                  <ol>
+                    {initialContext.analysis.event_sequence.map((item, index) => (
+                      <li key={`${item.date}-${item.title}-${index}`}>
+                        <span className={`paper-event-sequence-dot ${item.basis}`} />
+                        <article>
+                          <header><div><time>{item.date || "날짜 확인 필요"}</time><em>{item.domain}</em></div><small>{item.basis === "observed" ? "자료 확인" : "문서 종합"}</small></header>
+                          <strong>{item.title}</strong>
+                          {item.description && <p>{item.description}</p>}
+                          <footer><span>시장 반응</span><p>{item.market_reaction}</p></footer>
+                        </article>
+                      </li>
+                    ))}
+                  </ol>
+                ) : <p className="paper-event-sequence-empty">최근 한 달 내 순서화할 사건 근거가 충분하지 않습니다.</p>}
+                <small className="paper-event-sequence-note">표시된 이벤트는 수집 문서에서 확인된 흐름이며, 미래 사건이나 가격 예측이 아닙니다.</small>
+              </section>
+              <div className="paper-context-points">
+                <div><strong>위험 요인</strong><span>{initialContext.analysis.risk_factors.slice(0, 3).join(" · ") || "추가 확인 필요"}</span></div>
+                <div><strong>관찰 포인트</strong><span>{initialContext.analysis.watch_points.slice(0, 3).join(" · ") || "시나리오 진행 중 변화"}</span></div>
+              </div>
+              <small className="paper-context-source">시장 {initialContext.source_summary.market_days}일 · 경제 {initialContext.source_summary.macro_observations}개 · 사건 {initialContext.source_summary.events}건 · 커뮤니티 {initialContext.source_summary.community_days}일 · {initialContext.cached ? "캐시된 분석" : "새로 분석"}</small>
+            </>
+          )}
+        </section>
+        {simulationSetupStage >= 2 && <div ref={agentStepRef} className="paper-agent-field paper-setup-reveal">
+          <div className="paper-simulation-label">
+            <span>시장 참여 에이전트</span>
+            <small>{agentProfilesReady ? "총 59명 · 개별 프로필 준비 완료" : agentProfileJob ? `개별 프로필 생성 ${agentProfileJob.progress}%` : "초기 맥락을 바탕으로 개별 프로필 준비 중"}</small>
           </div>
-        </div>
+          {agentProfilesReady ? (
+            <div className="paper-agent-grid">
+              {agentProfiles?.groups.map((agent) => {
+                const Icon = AGENT_GROUP_ICON[agent.key];
+                return (
+                  <article className={`paper-agent-card ${agent.key}`} key={agent.key} role="button" tabIndex={0} onClick={() => openAgentProfileGroup(agent)} onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openAgentProfileGroup(agent);
+                    }
+                  }} aria-label={`${agent.label} ${agent.count}명 개별 프로필 보기`}>
+                    <header>
+                      <div className="paper-agent-title"><Icon size={15} /><strong>{agent.label}</strong></div>
+                      <b>{agent.count}명</b>
+                    </header>
+                    <p>{agent.description}</p>
+                    <div className="paper-agent-tags">
+                      {agent.strategies.slice(0, 4).map((strategy) => <span key={strategy}>{agentStrategyLabel(strategy)}</span>)}
+                    </div>
+                    <dl className="paper-agent-metrics">
+                      <div><dt>위험 허용</dt><dd>{agent.average_risk_tolerance.toFixed(2)}</dd></div>
+                      <div><dt>행동 빈도</dt><dd>{agent.activity_frequency === "high" ? "높음" : agent.activity_frequency === "medium" ? "보통" : "낮음"}</dd></div>
+                      <div><dt>시장 영향</dt><dd>{agent.market_impact_tier === "very_high" ? "매우 큼" : agent.market_impact_tier === "high" ? "큼" : agent.market_impact_tier === "medium" ? "중간" : "낮음"}</dd></div>
+                    </dl>
+                    <span className="paper-agent-card-link">개별 프로필 {agent.count}명 보기 <ArrowRight size={13} /></span>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="paper-agent-progress" role="status">
+              <LoaderCircle size={16} className="spin" />
+              <div><strong>{agentProfileJob?.message ?? "59개 개별 에이전트가 초기 상황을 읽고 있습니다."}</strong><span>각 에이전트는 다른 에이전트와 분리된 LLM 호출과 자신의 투자 특성으로 생성됩니다.</span></div>
+            </div>
+          )}
+          {agentProfileError && <p className="paper-inline-error">{agentProfileError}</p>}
+        </div>}
       </section>
       )}
 
-      {investmentConfirmed && (
-        <>
-          <div className="paper-hint paper-setup-reveal">
-            <CalendarClock size={13} />
-            사건 수와 시장 참여자는 선택한 기간과 수집 자료에 맞춰 자동으로 구성됩니다. 거래일 하나를 넘기는 데 15~25초 정도 걸립니다.
-          </div>
-
-          <button className="paper-start-button paper-setup-reveal" type="submit" disabled={starting}>
-            {starting
-              ? <><LoaderCircle size={17} className="spin" /> 수집한 자료로 시나리오를 만들고 있습니다</>
-              : <><CircleDollarSign size={17} /> 모의 투자 시작하기 <ArrowRight size={16} /></>}
-          </button>
-          {starting && (
-            <p className="paper-start-note">
-              수집한 시장·경제·사건·커뮤니티 자료를 바탕으로 시나리오를 구성합니다. 최초 조회는 30초 정도 걸릴 수 있습니다.
-            </p>
-          )}
-        </>
+      {investmentConfirmed && simulationSetupStage >= 3 && (
+        <section ref={readyStepRef} className="paper-setup-block paper-setup-reveal">
+          <div className="paper-setup-heading"><span>05 · 시작 준비</span><h3>연습 기간을 정하고 모의 투자를 시작하세요</h3></div>
+          <section className="paper-ready-block">
+            <div className="paper-ready-duration">
+              <div className="paper-ready-duration-head"><strong>연습 기간</strong><small>거래일 기준</small></div>
+              <div className="paper-duration-options">
+                {DURATION_OPTIONS.map((option) => (
+                  <button key={option.days} type="button" className={simulationDays === option.days ? "active" : ""} aria-pressed={simulationDays === option.days} onClick={() => setSimulationDays(option.days)}>
+                    <strong>{option.label}</strong><small>{option.caption}</small>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="paper-ready-hint">
+              <CalendarClock size={13} />
+              <div>
+                <span>World Agent가 실제 과거 근거를 바탕으로 매 거래일 외부 환경을 갱신합니다.</span>
+                <span>중요한 사건은 사용자 판단을 받은 뒤 59개 에이전트의 반응과 함께 체결됩니다.</span>
+              </div>
+            </div>
+            <div className="paper-ready-actions">
+              <button className="paper-reset-button" type="button" onClick={() => void restartSetup()} disabled={starting || resettingSetup}>
+                {resettingSetup ? <><LoaderCircle size={15} className="spin" /> 초기화 중</> : <>다시 설정하기</>}
+              </button>
+              <button className="paper-start-button" type="submit" disabled={starting || resettingSetup || !initialContextReadyForStart}>
+                {starting
+                  ? <><LoaderCircle size={17} className="spin" /> World Agent 시뮬레이션을 준비하고 있습니다</>
+                  : <><CircleDollarSign size={17} /> 모의 투자 시작하기 <ArrowRight size={16} /></>}
+              </button>
+            </div>
+            {resetSetupError && <p className="paper-inline-error">{resetSetupError}</p>}
+            {starting && (
+              <p className="paper-start-note">
+                초기 상황과 59개 개별 에이전트 프로필을 불러오고 있습니다. 최초 생성은 잠시 걸릴 수 있습니다.
+              </p>
+            )}
+          </section>
+        </section>
       )}
 
       {error && <p className="paper-error"><AlertTriangle size={14} /> {error}</p>}
+      {contextDocumentLoading && <div className="paper-document-loading" role="status"><LoaderCircle size={15} className="spin" /> 문서를 불러오는 중입니다.</div>}
+      {selectedContextDocument && (
+        <div className="paper-document-backdrop" role="presentation" onMouseDown={() => setSelectedContextDocument(null)}>
+          <section className="paper-document-modal" role="dialog" aria-modal="true" aria-labelledby="paper-document-title" onMouseDown={(event) => event.stopPropagation()}>
+            <header>
+              <div><span>EVIDENCE DOCUMENT</span><h3 id="paper-document-title">{picked?.name} · {selectedContextDocument.label}</h3><p>선택 종목의 실제 자료를 정리한 Markdown 문서입니다.</p></div>
+              <button className="scenario-modal-close" type="button" onClick={() => setSelectedContextDocument(null)} aria-label="Evidence 문서 닫기"><X size={18} /></button>
+            </header>
+            <pre>{selectedContextDocument.content}</pre>
+          </section>
+        </div>
+      )}
+      {selectedAgentGroup && (
+        <div className="paper-document-backdrop" role="presentation" onMouseDown={() => setSelectedAgentGroup(null)}>
+          <section className="paper-agent-modal" role="dialog" aria-modal="true" aria-labelledby="paper-agent-modal-title" onMouseDown={(event) => event.stopPropagation()}>
+            <header>
+              <div><span>MARKET AGENT PROFILES</span><h3 id="paper-agent-modal-title">{picked?.name} · {selectedAgentGroup.label}</h3><p>초기 상황과 역할 정책을 바탕으로 각각 생성된 독립 에이전트 프로필입니다.</p></div>
+              <button className="scenario-modal-close" type="button" onClick={() => setSelectedAgentGroup(null)} aria-label="개별 에이전트 프로필 닫기"><X size={18} /></button>
+            </header>
+            {agentProfileDetailsLoading ? <div className="paper-agent-modal-loading"><LoaderCircle size={18} className="spin" /> 개별 프로필을 불러오는 중입니다.</div> : agentProfileDetails?.profiles.length ? (
+              <div className="paper-agent-profile-list">
+                {agentProfileDetails.profiles.map((agent) => <article className="paper-agent-profile-detail" key={agent.persona_id}>
+                  <header><div><small>{agent.persona_id}</small><h4>{agent.profile.display_name}</h4><p>{agent.role_description}</p></div><span className={`paper-agent-stance ${agent.profile.initial_stance}`}>{agent.profile.initial_stance}</span></header>
+                  <p className="paper-agent-thesis">{agent.profile.investment_thesis}</p>
+                  <dl><div><dt>편향</dt><dd>{agent.profile.bias}</dd></div><div><dt>보유 관점</dt><dd>{agent.profile.holding_horizon}</dd></div><div><dt>위험 허용</dt><dd>{agent.risk_tolerance.toFixed(2)}</dd></div></dl>
+                  <div className="paper-agent-profile-signals"><strong>주로 보는 신호</strong><div>{agent.profile.focus_signals.map((signal) => <span key={signal}>{signal}</span>)}</div></div>
+                  <p className="paper-agent-rule"><b>사건 반응</b>{agent.profile.event_response}</p>
+                  <p className="paper-agent-rule"><b>위험 규칙</b>{agent.profile.risk_rule}</p>
+                </article>)}
+              </div>
+            ) : <div className="paper-agent-modal-loading">개별 프로필을 불러오지 못했습니다. 다시 시도해 주세요.</div>}
+          </section>
+        </div>
+      )}
       {activeStep > 1 && <div className="paper-setup-focus-space" aria-hidden="true" />}
     </form>
   );
@@ -1508,62 +2156,88 @@ function OrderDesk({
 
 const COACH_KEY = "finverse.paper-trading.coach";
 
-function CoachOverlay({ onDone }: { onDone: () => void }) {
+function CoachOverlay({ onDone, worldMode = false }: { onDone: () => void; worldMode?: boolean }) {
   return (
     <div className="paper-coach" role="dialog" aria-label="모의 투자 사용 방법">
       <div className="paper-coach-card">
         <span>HOW IT WORKS</span>
-        <h3>한 번의 이벤트를 네 단계로 겪습니다</h3>
+        <h3>{worldMode ? "거래일마다 이렇게 연습하세요" : "한 번의 이벤트를 네 단계로 겪습니다"}</h3>
+        {worldMode ? (
+          <ol>
+            <li><b>오늘의 시장 확인</b><p className="paper-coach-lines"><span>‘하루 진행’을 누르면 오늘의 시황과 새로 공개된 정보를 확인합니다.</span><span>평소 거래일에는 내 포트폴리오 변화와 시장 흐름을 읽는 데 집중하면 됩니다.</span></p></li>
+            <li><b>중요 사건에서 직접 판단</b><p className="paper-coach-lines"><span>가격에 큰 영향을 줄 사건이 오면 게임이 멈추고 판단 화면이 열립니다.</span><span>그때 매수 고려·관찰 계속·매도 고려 중 하나를 선택합니다. 수량이나 주문은 필요하지 않습니다.</span></p></li>
+            <li><b>내 선택은 기록으로 남음</b><p className="paper-coach-lines"><span>내 판단은 학습 기록으로 저장되고 시장 가격이나 수급을 직접 움직이지 않습니다.</span><span>시장 변화는 중요한 사건과 59개 에이전트의 전체 반응으로 만들어집니다.</span></p></li>
+            <li><b>다음 거래일로 이어가기</b><p className="paper-coach-lines"><span>각 거래일에는 개인·외국인·기관·연기금이 각자 다른 방식으로 반응합니다.</span><span>결과를 확인한 뒤 다음 거래일을 열어 변화가 이어지는 모습을 관찰하세요.</span></p></li>
+            <li><b>마지막에 내 판단 돌아보기</b><p className="paper-coach-lines"><span>연습이 끝나면 수익률과 함께 기록한 판단을 분석합니다.</span><span>추격 매수, 손실 회피, 과신, 과도한 매매 같은 패턴을 확인할 수 있습니다.</span></p></li>
+          </ol>
+        ) : (
         <ol>
-          <li><b>관망</b><p>이벤트 직전까지 하루씩 장이 열립니다. 40명의 에이전트가 스스로 거래하고, 뉴스·루머가 순서대로 흘러나옵니다. 주문은 낼 수 없습니다.</p></li>
+          <li><b>관망</b><p>이벤트 직전까지 하루씩 장이 열립니다. 59명의 에이전트가 스스로 거래하고, 공개 정보가 순서대로 흘러나옵니다. 주문은 낼 수 없습니다.</p></li>
           <li><b>사전 판단</b><p>이벤트 내용은 아직 비공개입니다. 신호만 보고 매수·매도를 담습니다. 담지 않으면 관망으로 기록됩니다.</p></li>
           <li><b>공개와 대응</b><p>이벤트가 드러나고 시장이 반응합니다. 과잉 반응인지 추세인지 판단해 다시 주문합니다.</p></li>
           <li><b>회고</b><p>모든 이벤트가 끝나면 매 판단의 근거와 결과를 묶은 리포트를 받습니다.</p></li>
         </ol>
+        )}
         <button type="button" onClick={onDone}>시작하기 <ArrowRight size={15} /></button>
       </div>
     </div>
   );
 }
 
-function PhaseStepper({ phase }: { phase: Phase }) {
-  const active = STEP_ORDER.indexOf(phase);
+function ReportList({ title, items, tone = "" }: { title: string; items?: string[]; tone?: string }) {
+  if (!items?.length) return null;
+  return <div className={`paper-report-list ${tone}`}><b>{title}</b><ul>{items.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul></div>;
+}
+
+function CompletedReports({ reports, portfolio, initialEquity }: { reports?: LlmReports; portfolio: Portfolio; initialEquity?: number }) {
+  const investment = reports?.investment;
+  const scenario = reports?.scenario;
+  if (!investment && !scenario) return null;
+  const end = investment?.portfolio_at_end ?? portfolio;
+  const starting = investment?.initial_equity ?? initialEquity ?? 0;
+  const profit = end.equity - starting;
   return (
-    <ol className="paper-stepper">
-      {STEP_ORDER.map((step, index) => (
-        <li key={step} className={index < active ? "done" : index === active ? "active" : ""}>
-          <i>{index < active ? <CheckCircle2 size={12} /> : index + 1}</i>
-          <span>{STEP_LABEL[step]}</span>
-        </li>
-      ))}
-    </ol>
+    <section className="paper-completed-reports" aria-label="AI 시뮬레이션 보고서">
+      <div className="paper-completed-reports-heading"><span>SIMULATION REPORTS</span><h2>시뮬레이션이 끝났습니다</h2><p>기록된 판단과 변화한 시장 환경을 바탕으로 두 가지 보고서를 만들었습니다.</p></div>
+      {investment && <article className="paper-report-card">
+        <header><div><span>01 · USER REPORT</span><h3>나의 투자보고서</h3></div><b className={toneOf(profit)}>{signedPct(end.total_return_pct ?? 0)}</b></header>
+        <div className="paper-report-metrics"><div><span>최종 투자금액</span><strong>{won(end.equity)}</strong></div><div><span>종료일 평가손익</span><strong className={toneOf(profit)}>{won(profit)}</strong></div><div><span>실현손익</span><strong>{won(end.realized_pnl)}</strong></div><div><span>판단 횟수</span><strong>{investment.verified_metrics?.daily_reflection_count ?? investment.verified_metrics?.trade_count ?? 0}회</strong></div></div>
+        <p className="paper-report-summary">{investment.summary}</p>
+        {investment.behavior_pattern && <p className="paper-report-detail"><b>행동 패턴</b>{investment.behavior_pattern}</p>}
+        {investment.daily_action_review?.length ? <div className="paper-report-daily"><b>일자별 판단과 결과</b>{investment.daily_action_review.map((row, index) => <p key={`${row.date}-${index}`}><strong>{row.date}</strong> <span>{row.action}</span> — {row.result}</p>)}</div> : null}
+        <div className="paper-report-columns"><ReportList title="잘한 점" items={investment.strengths} tone="good" /><ReportList title="다음에 점검할 점" items={investment.risk_patterns} tone="risk" /><ReportList title="다음 연습 원칙" items={investment.next_practice} tone="plan" /></div>
+      </article>}
+      {scenario && <article className="paper-report-card scenario">
+        <header><div><span>02 · WORLD REPORT</span><h3>시나리오 보고서</h3></div><span>환경 변화·에이전트 흐름</span></header>
+        <p className="paper-report-summary">{scenario.summary}</p>
+        {scenario.environment_evolution && <p className="paper-report-detail"><b>World State 변화</b>{scenario.environment_evolution}</p>}
+        {scenario.stock_flow && <p className="paper-report-detail"><b>종목 흐름</b>{scenario.stock_flow}</p>}
+        {scenario.event_reviews?.length ? <div className="paper-report-events"><b>발생 이벤트</b>{scenario.event_reviews.map((row, index) => <p key={`${row.date}-${index}`}><strong>{row.date} · {row.event}</strong>{row.impact}</p>)}</div> : null}
+        {scenario.group_behavior && <div className="paper-report-groups">{Object.entries(scenario.group_behavior).map(([key, value]) => <p key={key}><b>{GROUP_LABEL[key] ?? key}</b>{value}</p>)}</div>}
+        <ReportList title="주요 전환점" items={scenario.key_turning_points} tone="plan" />
+      </article>}
+    </section>
   );
 }
 
 function TradingScreen({
   game,
-  job,
   busy,
   stalled,
   error,
-  assessment,
   orderSubmitting,
   onOrder,
+  onDailyReflection,
   onAdvance,
-  onReset,
-  onClose,
 }: {
   game: ScenarioGame;
-  job: Job | null;
   busy: boolean;
   stalled: boolean;
   error: string | null;
-  assessment: Assessment | null;
   orderSubmitting: boolean;
   onOrder: (input: { side: "BUY" | "SELL"; quantity: number; rationale: string; confidence: number }) => void;
+  onDailyReflection: (stance: DailyReflection["stance"]) => void;
   onAdvance: (days?: number) => void;
-  onReset: () => void;
-  onClose: () => void;
 }) {
   // 모달은 사용자가 열었을 때만 마운트되므로 첫 렌더에서 바로 읽어도 안전하다.
   // 저장소 접근이 막힌 브라우저에서는 안내를 띄우지 않는다.
@@ -1575,124 +2249,82 @@ function TradingScreen({
     try { window.localStorage.setItem(COACH_KEY, "done"); } catch { /* 무시 */ }
   }, []);
 
-  // 사용자가 직접 고르기 전까지는 시나리오가 끝났을 때 회고를 먼저 보여준다.
-  const [tabChoice, setTabChoice] = useState<"feed" | "report" | null>(null);
-  const tab = tabChoice ?? (game.phase === "completed" && assessment ? "report" : "feed");
-
   const meta = PHASE_META[game.phase] ?? PHASE_META.inter_event_market;
-  const portfolio = game.portfolio;
-  const returnTone = toneOf(portfolio.total_return_pct);
-  const priceChangePct = game.initial_reference_price
-    ? ((game.current_price - game.initial_reference_price) / game.initial_reference_price) * 100
-    : 0;
-  const priceTone = toneOf(priceChangePct);
-  const eventProgress = game.total_events
-    ? Math.min(100, ((game.phase === "completed" ? game.total_events : game.current_event_index) / game.total_events) * 100)
-    : 0;
+  const worldMode = game.mode === "world";
+  const totalProgressUnits = worldMode ? (game.simulation_days ?? 0) : game.total_events;
+  const currentProgressUnits = worldMode
+    ? (game.phase === "completed" ? totalProgressUnits : game.current_day_index ?? 0)
+    : (game.phase === "completed" ? game.total_events : game.current_event_index);
+  const eventProgress = totalProgressUnits ? Math.min(100, (currentProgressUnits / totalProgressUnits) * 100) : 0;
   const latestRound = game.agent_rounds?.[game.agent_rounds.length - 1];
-  const event = game.current_event;
+  const reflectionMarketDate = game.phase === "world_decision"
+    ? game.current_event?.event_date
+    : latestRound?.market_date;
+  const latestReflection = useMemo(() => {
+    return (game.daily_reflections ?? []).find((item) => item.market_date === reflectionMarketDate);
+  }, [game.daily_reflections, reflectionMarketDate]);
+  const startFromCoach = useCallback(() => {
+    dismissCoach();
+    if (worldMode && game.phase === "world_market" && (game.current_day_index ?? 0) === 0 && !busy) {
+      onAdvance(1);
+    }
+  }, [busy, dismissCoach, game.current_day_index, game.phase, onAdvance, worldMode]);
 
   return (
     <div className="paper-run">
-      {coach && <CoachOverlay onDone={dismissCoach} />}
+      {coach && <CoachOverlay onDone={startFromCoach} worldMode={worldMode} />}
 
       <header className="paper-run-header">
-        <div>
-          <span>FINVERSE · PAPER TRADING</span>
-          <h2 id="paper-trading-title">{game.name} <em>{game.ticker}</em></h2>
-          <p>{game.scenario_premise || "이벤트 시나리오 모의 투자"}</p>
-        </div>
-        <div className="paper-run-header-actions">
-          <div className="paper-quote">
-            <strong className={priceTone}>{game.current_price.toLocaleString("ko-KR")}</strong>
-            <em className={priceTone}>{signedPct(priceChangePct)}</em>
+        <div className="paper-header-dashboard" aria-label="시나리오 진행 현황">
+          <div className="paper-header-progress">
+            <strong>{worldMode
+              ? `시나리오 ${currentProgressUnits} / ${totalProgressUnits} 거래일`
+              : `${game.phase === "completed" ? game.total_events : game.current_event_index + 1} / ${game.total_events} 이벤트`}</strong>
+            <div className="paper-progress"><i style={{ width: `${eventProgress}%` }} /></div>
           </div>
-          <span className={`paper-phase-pill ${game.phase}`}>{busy && <i />} {meta.label}</span>
-          <button className="paper-reset" type="button" onClick={onReset} disabled={busy}>새 시나리오</button>
-          <button className="scenario-modal-close" type="button" onClick={onClose} aria-label="모의 투자 닫기"><X size={20} /></button>
+          {error && <div className="paper-run-error"><AlertTriangle size={14} /> <span>{error}</span></div>}
+          {stalled && !error && (
+            <div className="paper-run-warning">
+              <AlertTriangle size={14} />
+              <span>응답이 8분 넘게 갱신되지 않았습니다. 백엔드가 재시작되었을 수 있습니다. 창을 닫았다 다시 열면 최신 상태를 불러옵니다.</span>
+            </div>
+          )}
         </div>
       </header>
-
-      <section className="paper-run-overview" aria-label="시나리오 진행 현황">
-        <div className="paper-progress-copy">
-          <PhaseStepper phase={game.phase} />
-          <strong>{game.phase === "completed" ? game.total_events : game.current_event_index + 1} / {game.total_events} 이벤트</strong>
-        </div>
-        <div className="paper-progress"><i style={{ width: `${busy && job ? job.progress : eventProgress}%` }} className={busy ? "busy" : ""} /></div>
-        <div className="paper-metrics">
-          <div>
-            <Wallet size={16} /><span>총자산</span>
-            <strong>{compactWon(portfolio.equity)}</strong>
-          </div>
-          <div>
-            {returnTone === "down" ? <TrendingDown size={16} /> : <TrendingUp size={16} />}<span>수익률</span>
-            <strong className={returnTone}>{signedPct(portfolio.total_return_pct)}</strong>
-          </div>
-          <div>
-            <CircleDollarSign size={16} /><span>현금</span>
-            <strong>{compactWon(portfolio.cash)}</strong>
-          </div>
-          <div>
-            <Flag size={16} /><span>보유</span>
-            <strong>{portfolio.quantity.toLocaleString("ko-KR")} <em>주</em></strong>
-          </div>
-        </div>
-        {error && <div className="paper-run-error"><AlertTriangle size={14} /> <span>{error}</span></div>}
-        {stalled && !error && (
-          <div className="paper-run-warning">
-            <AlertTriangle size={14} />
-            <span>응답이 8분 넘게 갱신되지 않았습니다. 백엔드가 재시작되었을 수 있습니다. 창을 닫았다 다시 열면 최신 상태를 불러옵니다.</span>
-          </div>
-        )}
-      </section>
 
       <div className="paper-run-grid">
         <section className="paper-panel paper-chart-panel" aria-label="가격 차트">
           <div className="paper-panel-heading">
             <div><CandlestickChart size={15} /><span>시나리오 캔들</span></div>
-            <em>{game.last_market_date ? `${game.last_market_date} 기준` : "시작 전"}</em>
+            <em>{(game.last_market_date ?? latestRound?.market_date) ? `${game.last_market_date ?? latestRound?.market_date} 기준` : "시작 전"}</em>
           </div>
           <CandleChart game={game} />
-          <PsychologyStrip round={latestRound} />
         </section>
 
-        <section className="paper-panel paper-desk-panel" aria-label="주문">
+        <section className="paper-panel paper-desk-panel" aria-label="투자 시뮬레이션">
           <div className="paper-panel-heading">
-            <div><CircleDollarSign size={15} /><span>주문 티켓</span></div>
+            <div><CircleDollarSign size={15} /><span>투자 시뮬레이션</span></div>
             <em>{meta.eyebrow}</em>
           </div>
 
-          <div className="paper-now">
-            <div className="paper-now-head">
-              <span>지금 할 일</span>
-              <b>{meta.label}</b>
-            </div>
-            <ol>
-              {meta.todo.map((line) => <li key={line}>{emphasise(line)}</li>)}
-            </ol>
-            {!coach && (
-              <button type="button" className="paper-now-help" onClick={() => setCoach(true)}>
-                전체 흐름 다시 보기
-              </button>
-            )}
-          </div>
-
           <div className="paper-desk-scroll">
-            <div className="paper-holdings">
-              <div><span>평가금액</span><strong>{compactWon(portfolio.market_value)}</strong></div>
-              <div><span>평단가</span><strong>{portfolio.average_price ? portfolio.average_price.toLocaleString("ko-KR") : "—"}</strong></div>
-              <div><span>평가손익</span><strong className={toneOf(portfolio.unrealized_pnl)}>{portfolio.unrealized_pnl ? compactWon(portfolio.unrealized_pnl) : "—"}</strong></div>
-              <div><span>실현손익</span><strong className={toneOf(portfolio.realized_pnl)}>{portfolio.realized_pnl ? compactWon(portfolio.realized_pnl) : "—"}</strong></div>
-            </div>
-
-            {meta.canOrder
+            {worldMode && (
+              <DailyPracticeCard
+                round={latestRound}
+                event={game.phase === "world_decision" ? game.current_event : null}
+                reflection={latestReflection}
+                disabled={busy || !["world_market", "world_decision"].includes(game.phase)}
+                onSelect={onDailyReflection}
+              />
+            )}
+            {meta.canOrder && !worldMode
               ? <OrderDesk game={game} disabled={busy} onSubmit={onOrder} submitting={orderSubmitting} />
-              : (
+              : (!worldMode && (
                 <div className="paper-locked-note">
                   <strong>{meta.label}에는 주문할 수 없습니다</strong>
                   <p>{meta.guide}</p>
                 </div>
-              )}
+              ))}
 
             {Boolean(game.pending_orders?.length) && (
               <div className="paper-pending">
@@ -1723,77 +2355,51 @@ function TradingScreen({
           </div>
 
           <div className="paper-advance-row">
+            {worldMode && meta.action === "advance" && !busy && (
+              <button
+                className="paper-advance-fast"
+                type="button"
+                onClick={() => onAdvance(Math.max(1, (game.simulation_days ?? 1) - (game.current_day_index ?? 0)))}
+              >
+                자동 진행
+              </button>
+            )}
             {meta.action === "advance_days" && !busy && (
               <button className="paper-advance-day" type="button" onClick={() => onAdvance(1)}>
-                <CalendarClock size={15} /> 하루만
+                <CalendarClock size={15} /> 하루 진행
               </button>
             )}
             <button className="paper-advance" type="button" onClick={() => onAdvance()} disabled={busy}>
               {busy
-                ? <><LoaderCircle size={16} className="spin" /> {job?.message ?? "진행 중"}</>
-                : <>{meta.cta} <ChevronRight size={16} /></>}
+                ? <><LoaderCircle size={16} className="spin" /> 오늘의 시장을 준비하는 중</>
+                : <>{worldMode && meta.action === "advance" ? "하루 진행" : meta.cta} <ChevronRight size={16} /></>}
             </button>
           </div>
         </section>
 
-        <section className="paper-panel paper-feed-panel" aria-label="시장 반응">
+        <section className="paper-panel paper-feed-panel" aria-label="시장 기록">
           <div className="paper-panel-heading">
-            <div className="paper-tabs">
-              <button type="button" className={tab === "feed" ? "active" : ""} onClick={() => setTabChoice("feed")}>
-                <Radio size={13} /> 시장 반응
-              </button>
-              <button type="button" className={tab === "report" ? "active" : ""} onClick={() => setTabChoice("report")}>
-                <Sparkles size={13} /> 투자 회고
-              </button>
-            </div>
-            <em>{game.agent_rounds?.length ? `${game.agent_rounds.length}개 거래일` : "대기"}</em>
+            <div><Radio size={13} /><span>시장 기록</span></div>
+            <em>{game.agent_rounds?.length ? game.agent_rounds.length + "개 거래일" : "대기"}</em>
           </div>
 
-          {tab === "feed" && event && (
-            <div className={`paper-event-card ${event.status}`}>
-              <div className="paper-event-top">
-                <span><CalendarClock size={13} /> 이벤트 {event.sequence}</span>
-                <em>{event.event_date} 예정 · {event.trading_days_until}거래일 남음</em>
-              </div>
-              {event.status === "revealed" && event.title
-                ? <strong>{event.title}</strong>
-                : <strong className="masked">아직 공개되지 않은 이벤트</strong>}
-              <p>{event.status === "revealed" && event.description ? event.description : event.pre_brief}</p>
-              {event.status === "revealed" && event.ontology_source
-                ? <EventProvenanceStrip source={event.ontology_source} />
-                : event.ontology_source && (
-                    // 공개 전에는 내용을 숨기되, 지어낸 사건이 아니라는 것은 알린다.
-                    <div className="paper-provenance pending">
-                      <Landmark size={12} />
-                      <span>실제로 일어난 사건입니다. 내용은 공개 시점에 드러납니다.</span>
-                    </div>
-                  )}
-            </div>
-          )}
-
           <div className="paper-feed-scroll">
-            {tab === "feed"
-              ? <ReactionFeed game={game} busy={busy} job={job} />
-              : assessment
-                ? <ReportView
-                    assessment={assessment}
-                    canGenerate={game.phase === "completed"}
-                    generating={busy && job?.kind === "report"}
-                    onGenerate={() => onAdvance()}
-                  />
-                : <div className="paper-feed-empty">
-                    <Sparkles size={22} />
-                    <strong>회고를 준비하는 중입니다</strong>
-                    <p>거래 기록이 쌓이면 판단 성향과 지표가 여기에 정리됩니다.</p>
-                  </div>}
+            <div className="paper-record-layout">
+              <EventTimeline game={game} worldMode={worldMode} />
+              <AgentActivityFeed game={game} busy={busy} />
+            </div>
           </div>
         </section>
       </div>
 
+      {game.phase === "completed" && <CompletedReports reports={game.llm_reports} portfolio={game.portfolio} initialEquity={game.initial_equity} />}
+
       <footer className="paper-run-footer">
         <span>GAME {game.game_id.slice(0, 22)}</span>
         <span>
-          {game.event_provenance?.mode === "ontology_events"
+          {worldMode
+            ? "World Agent의 사건은 시작 전 실제 유사 사례를 검색해 만든 교육용 가상 전개"
+            : game.event_provenance?.mode === "ontology_events"
             ? `실제 시장 사건 기반${game.event_provenance.sector ? ` · ${game.event_provenance.sector}` : ""}` +
               ` · 후보 ${(game.event_provenance.macro_candidates ?? 0) + (game.event_provenance.micro_candidates ?? 0)}건`
             : "AI 생성 가상 이벤트"} · 실제 투자 결과를 보장하지 않는 교육용 시뮬레이션입니다.
@@ -1811,7 +2417,6 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [job, setJob] = useState<Job | null>(null);
   const [orderSubmitting, setOrderSubmitting] = useState(false);
-  const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [stalled, setStalled] = useState(false);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1825,76 +2430,10 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const refreshAssessment = useCallback(async (gameId: string) => {
-    try {
-      const report = await callApi<{ data: Assessment }>(`/scenarios/${gameId}/assessment`);
-      setAssessment(report.data);
-    } catch {
-      // 회고는 부가 정보다. 실패해도 진행을 막지 않는다.
-    }
-  }, []);
-
   const refreshGame = useCallback(async (gameId: string) => {
     const payload = await callApi<{ data: ScenarioGame }>(`/games/${gameId}`);
     setGame(payload.data);
     return payload.data;
-  }, []);
-
-  const resume = useCallback(async (gameId: string) => {
-    setStarting(true);
-    setError(null);
-    try {
-      await refreshGame(gameId);
-      await refreshAssessment(gameId);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "저장된 시나리오를 불러오지 못했습니다.");
-    } finally {
-      setStarting(false);
-    }
-  }, [refreshGame, refreshAssessment]);
-
-  const start = useCallback(async (input: {
-    ticker: string; name: string; initialCash: number;
-    investmentMode: InvestmentMode; initialPosition?: { quantity: number; averagePrice: number };
-    simulationDays: number; practiceMode: PracticeMode;
-  }) => {
-    setStarting(true);
-    setError(null);
-    try {
-      const payload = await callApi<{ data: ScenarioGame }>("/scenarios", {
-        method: "POST",
-        body: JSON.stringify({
-          ticker: input.ticker,
-          initial_cash: input.initialCash,
-          initial_position: input.initialPosition
-            ? { quantity: input.initialPosition.quantity, average_price: input.initialPosition.averagePrice }
-            : undefined,
-          investment_mode: input.investmentMode,
-          simulation_days: input.simulationDays,
-          practice_mode: input.practiceMode,
-          event_source: "ontology",
-          // 캐시 리플레이 이력은 종가만 있어 캔들이 선으로 뭉개진다.
-          // finverse는 실제 OHLC를 쓰고, DB가 죽었을 때만 백엔드가 캐시로 내려간다.
-          prefer_live_finverse: true,
-        }),
-      });
-      setGame(payload.data);
-      await refreshAssessment(payload.data.game_id);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "시나리오를 만들지 못했습니다.");
-    } finally {
-      setStarting(false);
-    }
-  }, [refreshAssessment]);
-
-  // 진행 중인 게임은 서버에 저장되어 있다. 목록에서 언제든 이어서 할 수 있다.
-  const reset = useCallback(() => {
-    if (pollRef.current) clearTimeout(pollRef.current);
-    setGame(null);
-    setAssessment(null);
-    setJob(null);
-    setError(null);
-    setStalled(false);
   }, []);
 
   const pollJob = useCallback((jobId: string, gameId: string) => {
@@ -1926,7 +2465,6 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
           await refreshGame(gameId);
           setJob(null);
           setStalled(false);
-          await refreshAssessment(gameId);
           return;
         }
         if (next.status === "failed") {
@@ -1944,7 +2482,61 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
       }
     };
     pollRef.current = setTimeout(tick, 900);
-  }, [refreshGame, refreshAssessment]);
+  }, [refreshGame]);
+
+  const start = useCallback(async (input: {
+    ticker: string; name: string; initialCash: number;
+    investmentMode: InvestmentMode; initialPosition?: { quantity: number; averagePrice: number };
+    simulationDays: number; initialContextId: string;
+  }) => {
+    setStarting(true);
+    setError(null);
+    try {
+      const payload = await callApi<{ data: ScenarioGame }>("/scenarios", {
+        method: "POST",
+        body: JSON.stringify({
+          ticker: input.ticker,
+          initial_cash: input.initialCash,
+          initial_position: input.initialPosition
+            ? { quantity: input.initialPosition.quantity, average_price: input.initialPosition.averagePrice }
+            : undefined,
+          investment_mode: input.investmentMode,
+          simulation_days: input.simulationDays,
+          context_id: input.initialContextId,
+          // 캐시 리플레이 이력은 종가만 있어 캔들이 선으로 뭉개진다.
+          // finverse는 실제 OHLC를 쓰고, DB가 죽었을 때만 백엔드가 캐시로 내려간다.
+          prefer_live_finverse: true,
+        }),
+      });
+      setGame(payload.data);
+
+      // 시작 화면에서는 0일차를 보여주지 않고 첫 거래일을 한 번 자동 진행한다.
+      // 이후 거래일은 사용자가 `하루 진행` 또는 `자동 진행`으로 선택한다.
+      const firstAction = payload.data.mode === "world"
+        ? "advance"
+        : payload.data.phase === "inter_event_market"
+          ? "advance_days"
+          : null;
+      if (firstAction) {
+        try {
+          const actionPayload = await callApi<{ data: Job }>(`/scenarios/${payload.data.game_id}/actions`, {
+            method: "POST",
+            body: JSON.stringify({ action: firstAction, days: 1 }),
+          });
+          setJob(actionPayload.data);
+          pollJob(actionPayload.data.job_id, payload.data.game_id);
+        } catch (cause) {
+          setError(cause instanceof Error
+            ? `첫 거래일을 자동으로 진행하지 못했습니다: ${cause.message}`
+            : "첫 거래일을 자동으로 진행하지 못했습니다. 하루 진행 버튼으로 다시 시도해주세요.");
+        }
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "시나리오를 만들지 못했습니다.");
+    } finally {
+      setStarting(false);
+    }
+  }, [pollJob]);
 
   const advance = useCallback(async (days?: number) => {
     if (!game || busy) return;
@@ -1980,30 +2572,49 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
     }
   }, [game]);
 
+  const recordDailyReflection = useCallback(async (stance: DailyReflection["stance"]) => {
+    if (!game || busy) return;
+    setError(null);
+    try {
+      const payload = await callApi<{ game: ScenarioGame }>(`/scenarios/${game.game_id}/daily-reflections`, {
+        method: "POST",
+        body: JSON.stringify({ stance }),
+      });
+      setGame(payload.game);
+      if (payload.game.phase === "world_decision") {
+        const actionPayload = await callApi<{ data: Job }>(`/scenarios/${game.game_id}/actions`, {
+          method: "POST",
+          body: JSON.stringify({ action: "resolve" }),
+        });
+        setJob(actionPayload.data);
+        pollJob(actionPayload.data.job_id, game.game_id);
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "오늘의 판단을 기록하지 못했습니다.");
+    }
+  }, [busy, game, pollJob]);
+
   return (
     <div className="modal-backdrop paper-trading-backdrop" onMouseDown={onClose}>
       <section
         className={`scenario-modal paper-trading-modal ${game ? "running" : "setup"}`}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="paper-trading-title"
+        aria-label="모의 투자 시뮬레이션"
         onMouseDown={(event) => event.stopPropagation()}
       >
         {game
           ? <TradingScreen
               game={game}
-              job={job}
               busy={busy}
               stalled={stalled}
               error={error}
-              assessment={assessment}
               orderSubmitting={orderSubmitting}
               onOrder={submitOrder}
+              onDailyReflection={recordDailyReflection}
               onAdvance={advance}
-              onReset={reset}
-              onClose={onClose}
             />
-          : <SetupScreen onStart={start} onResume={resume} starting={starting} error={error} onClose={onClose} />}
+          : <SetupScreen onStart={start} starting={starting} error={error} onClose={onClose} />}
       </section>
     </div>
   );

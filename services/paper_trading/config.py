@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 from dotenv import load_dotenv
 
@@ -17,6 +18,32 @@ from dotenv import load_dotenv
 # 저장소 루트의 .env 하나만 쓴다. 예전에는 FinSimulation 쪽에 같은 키를
 # 한 벌 더 두어야 했다.
 load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=False)
+
+
+def _database_url_for_runtime() -> str:
+    """Use the local PEM SSH tunnel whenever it is explicitly enabled.
+
+    Keeping this here (rather than only in the integrated Node launcher)
+    prevents a manually restarted Flask process from accidentally bypassing
+    the tunnel and attempting a direct connection to the private DB address.
+    """
+    database_url = os.environ.get("FINVERSE_DATABASE_URL", "").strip()
+    if not database_url or os.environ.get("FINVERSE_DATABASE_TUNNEL") != "1":
+        return database_url
+
+    parsed = urlsplit(database_url)
+    if not parsed.hostname:
+        return database_url
+
+    credentials = f"{parsed.netloc.rsplit('@', 1)[0]}@" if "@" in parsed.netloc else ""
+    port = os.environ.get("FINVERSE_DATABASE_TUNNEL_PORT", "15432").strip() or "15432"
+    return urlunsplit((
+        parsed.scheme,
+        f"{credentials}127.0.0.1:{port}",
+        parsed.path,
+        parsed.query,
+        parsed.fragment,
+    ))
 
 
 class Config:
@@ -28,7 +55,7 @@ class Config:
         str(Path(__file__).resolve().parents[2] / "var" / "paper_games"))
     UPLOAD_FOLDER = str(Path(PAPER_TRADING_DATA_DIR).parent)
 
-    FINVERSE_DATABASE_URL = os.environ.get("FINVERSE_DATABASE_URL", "")
+    FINVERSE_DATABASE_URL = _database_url_for_runtime()
 
     # 로컬 추론 서버 경로. OPENROUTER_API_KEY가 있으면 쓰이지 않는다.
     LLM_API_KEY = os.environ.get("LLM_API_KEY")
@@ -60,6 +87,11 @@ class Config:
     OPENROUTER_MAX_RETRIES = int(os.environ.get("OPENROUTER_MAX_RETRIES", 2))
     OPENROUTER_APP_URL = os.environ.get("OPENROUTER_APP_URL", "https://finverse.local").strip()
     OPENROUTER_APP_TITLE = os.environ.get("OPENROUTER_APP_TITLE", "FINVERSE Paper Trading").strip()
+
+    # 독립 에이전트는 각각 LLM 호출을 하지만, 프로필 생성과 거래일 행동의
+    # 동시 실행 수는 제한한다. 한 요청에 여러 에이전트를 합치는 값이 아니다.
+    AGENT_PROFILE_PARALLEL_COUNT = int(os.environ.get("FINVERSE_AGENT_PROFILE_PARALLEL_COUNT", 5))
+    AGENT_ACTION_PARALLEL_COUNT = int(os.environ.get("FINVERSE_AGENT_ACTION_PARALLEL_COUNT", 4))
 
     @classmethod
     def use_openrouter(cls) -> bool:

@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "node scripts/dev_local.mjs",
+    "db:tunnel": "node scripts/db_tunnel.mjs",
     "build": "vinext build",
     "start": "node scripts/with_openrouter_env.mjs start",
     "sync:indices": "node scripts/market_index_sync.mjs",

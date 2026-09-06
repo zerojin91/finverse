@@ -22,6 +22,19 @@ function loadEnv() {
 
 loadEnv();
 
+// The database is reached through the SSH tunnel on developer machines. Keep
+// one process-wide URL so Next.js and the Flask child use the same route.
+if (process.env.FINVERSE_DATABASE_TUNNEL === "1") {
+  const databaseUrl = process.env.FINVERSE_DATABASE_URL?.trim();
+  if (databaseUrl) {
+    const parsed = new URL(databaseUrl);
+    parsed.hostname = "127.0.0.1";
+    parsed.port = process.env.FINVERSE_DATABASE_TUNNEL_PORT?.trim() || "15432";
+    process.env.FINVERSE_DATABASE_URL = parsed.toString();
+    console.log(`PostgreSQL: SSH tunnel 127.0.0.1:${parsed.port} 사용`);
+  }
+}
+
 const children = [];
 const start = (command, args, label) => {
   const child = spawn(command, args, { cwd: root, env: { ...process.env }, stdio: "inherit", shell: process.platform === "win32" });
@@ -39,6 +52,7 @@ if (process.env.FINVERSE_SIMULATION_TUNNEL_ENABLED === "1") {
 // 페이퍼 트레이딩 엔진. 예전에는 FinSimulation을 따로 띄워야 했다.
 const paperPython = process.env.FINVERSE_PYTHON?.trim()
   || (existsSync(resolve(root, ".venv-paper/bin/python")) ? resolve(root, ".venv-paper/bin/python")
+    : existsSync(resolve(root, ".venv/bin/python")) ? resolve(root, ".venv/bin/python")
     : process.platform === "win32" && existsSync(resolve(root, ".venv", "Scripts", "python.exe"))
       ? resolve(root, ".venv", "Scripts", "python.exe")
       : "python3");
