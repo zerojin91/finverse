@@ -2121,7 +2121,7 @@ function SetupScreen({
               <button className="paper-start-button" type="submit" disabled={starting || resettingSetup || !initialContextReadyForStart}>
                 {starting
                   ? <><LoaderCircle size={17} className="spin" /> World Agent 시뮬레이션을 준비하고 있습니다</>
-                  : <><CircleDollarSign size={17} /> 모의 투자 시작하기 <ArrowRight size={16} /></>}
+                  : <>모의 투자 시작하기 <ArrowRight size={16} /></>}
               </button>
             </div>
             {resetSetupError && <p className="paper-inline-error">{resetSetupError}</p>}
