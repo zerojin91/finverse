@@ -1828,40 +1828,45 @@ function TwinReviewMilestoneRail({ detail }: { detail: TwinGameDetail }) {
   const milestones = useMemo(() => {
     const snapshots = [...(detail.daily_performance ?? [])].sort((left, right) => left.market_date.localeCompare(right.market_date));
     if (!snapshots.length) return [];
-    const checkpointIndexes = [...new Set([
+    const uniformIndexes = [
       Math.max(0, Math.ceil(snapshots.length / 3) - 1),
       Math.max(0, Math.ceil((snapshots.length * 2) / 3) - 1),
       snapshots.length - 1,
-    ])];
-    const labels = ["초반 판단", "중반 점검", "마무리 회고"];
-    let previousIndex = -1;
-    return checkpointIndexes.map((snapshotIndex, index) => {
+    ];
+    const eventIndexes = (detail.revealed_events ?? [])
+      .map((event) => snapshots.findIndex((snapshot) => snapshot.market_date === event.event_date))
+      .filter((index) => index >= 0);
+    // 사건이 공개된 날은 반드시 남기고, 남은 칸만 호라이즌을 균등 분할한 시점으로 채운다.
+    const checkpointIndexes = [...new Set([...eventIndexes, ...uniformIndexes])].sort((left, right) => left - right).slice(0, 3);
+    return checkpointIndexes.map((snapshotIndex) => {
       const snapshot = snapshots[snapshotIndex];
-      const rangeStart = snapshots[previousIndex + 1]?.market_date ?? snapshot.market_date;
-      const events = (detail.revealed_events ?? []).filter((event) => event.event_date >= rangeStart && event.event_date <= snapshot.market_date);
-      previousIndex = snapshotIndex;
-      return { label: labels[index] ?? "진행 회고", snapshot, rangeStart, event: events[0], eventCount: events.length };
+      const event = (detail.revealed_events ?? []).find((item) => item.event_date === snapshot.market_date);
+      return { snapshot, event };
     });
   }, [detail.daily_performance, detail.revealed_events]);
   return (
-    <aside className="journal-review-milestones" aria-label="3개 구간 회고">
-      <header><h4>3개 구간 회고</h4><span>실제 기록</span></header>
+    <aside className="journal-review-milestones" aria-label="발생 가능 이벤트">
+      <header><h4>발생 가능 이벤트</h4><span>시뮬레이션 기준</span></header>
       {milestones.length ? <div className="journal-review-milestone-list">
-        {milestones.map(({ label, snapshot, rangeStart, event, eventCount }) => (
+        {milestones.map(({ snapshot, event }) => (
           <article key={snapshot.market_date}>
             <div className={`journal-review-milestone-dot ${twinTone(snapshot.total_return_pct)}`} />
             <div>
-              <div className="journal-review-milestone-meta"><small>{label} · {formatTwinShortDate(snapshot.market_date)}</small><b className={twinTone(snapshot.total_return_pct)}>{twinSignedPct(snapshot.total_return_pct)}</b></div>
-              <h5>{event?.title ?? "공개 이벤트 없이 진행된 구간"}</h5>
+              <div className="journal-review-milestone-meta"><small>D+{snapshotIndexForDate(detail.daily_performance, snapshot.market_date)} · {formatTwinShortDate(snapshot.market_date)}</small><b className={twinTone(snapshot.total_return_pct)}>{twinSignedPct(snapshot.total_return_pct)}</b></div>
+              <h5>{event?.title ?? "시뮬레이션 진행 시점"}</h5>
               <p>{event
-                ? `${eventCount > 1 ? `${eventCount}개 공개 이벤트 중 ` : ""}${event.description ?? "공개된 시장 사건을 반영했습니다."}`
-                : `${formatTwinShortDate(rangeStart)}부터 이 시점까지의 실제 판단·자산 기록을 기준으로 회고합니다.`}</p>
+                ? event.description ?? "공개된 시장 사건을 반영했습니다."
+                : "이 시점까지의 실제 판단과 자산 변화를 기준으로 확인합니다."}</p>
             </div>
           </article>
         ))}
       </div> : <p className="journal-review-milestone-empty">완료된 거래일 기록을 불러오는 중입니다.</p>}
     </aside>
   );
+}
+function snapshotIndexForDate(snapshots: TwinDailyPerformance[] | undefined, marketDate: string) {
+  const index = (snapshots ?? []).findIndex((snapshot) => snapshot.market_date === marketDate);
+  return Math.max(0, index + 1);
 }
 const twinWon = (value: number) => `${Math.round(value).toLocaleString("ko-KR")}원`;
 function formatTwinDate(iso?: string) {
