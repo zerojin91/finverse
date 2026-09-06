@@ -1779,18 +1779,6 @@ function twinCssVar(name: string, fallback: string) {
   if (typeof window === "undefined") return fallback;
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 }
-function twinMetricChips(metrics?: TwinAssessmentMetrics): { label: string; value: string }[] {
-  if (!metrics) return [];
-  const chips = [
-    { label: "회전율", value: `${(metrics.turnover_ratio ?? 0).toFixed(2)}배` },
-    { label: "누적수익률", value: twinSignedPct(metrics.total_return_pct ?? 0) },
-    { label: "거래", value: `${metrics.trade_count ?? 0}회` },
-  ];
-  chips.push(metrics.average_confidence != null
-    ? { label: "평균확신도", value: `${metrics.average_confidence}점` }
-    : { label: "완료 이벤트", value: `${metrics.completed_events ?? 0}개` });
-  return chips;
-}
 function twinStyleNarrative(sessions: TwinSession[]): string {
   if (sessions.length === 0) return "";
   const first = sessions[0];
@@ -2136,7 +2124,6 @@ function TwinPage({ onRequireAuth }: { onRequireAuth?: (action: () => void) => v
   }, [games]);
 
   const currentSession = twinSessions.at(-1);
-  const cappedNotice = games.length > TWIN_ASSESSMENT_CAP;
   const selectedSummary = games.find((game) => game.game_id === selectedGameId);
   const selectedDetail = selectedGameId ? gameDetails[selectedGameId] : undefined;
   const openPaperTrading = () => {
@@ -2175,60 +2162,6 @@ function TwinPage({ onRequireAuth }: { onRequireAuth?: (action: () => void) => v
                 <span className="journal-current-style-date">{formatTwinDate(currentSession.game.created_at ?? currentSession.game.updated_at)} 기준</span>
               </div>
               <p className="journal-current-style-desc">{twinStyleNarrative(twinSessions)}</p>
-            </>
-          )}
-        </div>
-      </section>
-
-      <section className="panel">
-        <div className="panel-title">
-          <div><h2>나의 투자 성향 히스토리</h2></div>
-          <span className="panel-note">모의투자를 마칠 때마다 매매 행동에서 스타일을 다시 판정합니다. 점수가 아니라 스타일 전환과 그 근거로 봅니다.</span>
-        </div>
-        <div className="journal-behavior-body">
-          {gamesState === "loading" || (gamesState === "ready" && games.length > 0 && (assessmentsState === "loading" || assessmentsState === "idle")) ? (
-            <div className="journal-loading"><LoaderCircle size={16} className="spin" /> 불러오는 중…</div>
-          ) : gamesState === "error" ? (
-            <div className="journal-error">히스토리를 불러오지 못했습니다.</div>
-          ) : games.length === 0 ? (
-            <TwinEmptyState onOpen={openPaperTrading} />
-          ) : twinSessions.length === 0 ? (
-            <div className="journal-error">세션별 투자 성향 판정 결과를 불러오지 못했습니다.</div>
-          ) : (
-            <>
-              <div className="journal-timeline">
-                <div className="journal-timeline-row labels">
-                  {twinSessions.map((session) => <span key={session.game.game_id}>{session.assessment.style ?? "판정 전"}</span>)}
-                </div>
-                <div className="journal-timeline-row dots" style={{ "--tl-count": twinSessions.length } as CSSProperties}>
-                  {twinSessions.map((session) => (
-                    <span key={session.game.game_id}><i className="journal-timeline-dot" style={{ background: twinStyleShade(session.assessment.style) }} /></span>
-                  ))}
-                </div>
-                <div className="journal-timeline-row dates">
-                  {twinSessions.map((session) => <span key={session.game.game_id}>{formatTwinShortDate(session.game.created_at ?? session.game.updated_at)}</span>)}
-                </div>
-              </div>
-              <div className="journal-session-list">
-                {twinSessions.slice().reverse().map((session) => (
-                  <article className="journal-session-card" key={session.game.game_id}>
-                    <div className="journal-session-card-top">
-                      <span className="journal-session-date">{formatTwinDate(session.game.created_at ?? session.game.updated_at)}</span>
-                      <span className="journal-session-ticker">{session.game.name}</span>
-                      <span className="journal-style-pill" style={{ background: twinStyleShade(session.assessment.style), color: twinStyleTextColor(session.assessment.style) }}>
-                        {session.assessment.style ?? "판정 전"}
-                      </span>
-                    </div>
-                    <div className="journal-session-card-bottom">
-                      <div className="journal-metric-chips">
-                        {twinMetricChips(session.assessment.metrics).map((chip) => <span className="journal-metric-chip" key={chip.label}>{chip.label} <b>{chip.value}</b></span>)}
-                      </div>
-                      <p className="journal-session-finding">{session.assessment.findings?.[0] ?? "기록된 세부 관찰이 없습니다."}</p>
-                    </div>
-                  </article>
-                ))}
-              </div>
-              {cappedNotice && <p className="journal-history-note">전체 {games.length}건 중 최근 {TWIN_ASSESSMENT_CAP}건의 세션만 표시합니다.</p>}
             </>
           )}
         </div>
