@@ -115,7 +115,7 @@ def _call_structured_report(messages: list[dict[str, str]], required_keys: list[
             retry.append({"role": "user", "content":
                           f"직전 응답에 다음 필수 키가 없었다. 형식을 지켜 모두 포함해 다시 반환하라: {', '.join(missing)}"})
         try:
-            report = _parse_json(chat(retry, temperature=.35, max_tokens=5000,
+            report = _parse_json(chat(retry, temperature=.35, max_tokens=9000,
                                       response_format={"type": "json_object"}))
         except Exception as exc:  # noqa: BLE001 - 제한된 횟수로 재시도
             last_error, missing = exc, []
@@ -149,7 +149,7 @@ def generate_llm_reports(game: dict[str, Any],
               f"[report-agent.md]\n{report_agent}")
     # Keep the legacy JSON contract required so older/mock providers can still
     # complete a run; report_markdown is preferred and the UI has a fallback.
-    investment_keys = ["summary", "daily_action_review", "behavior_pattern", "strengths", "risk_patterns", "next_practice"]
+    investment_keys = ["summary", "daily_action_review", "behavior_pattern", "strengths", "risk_patterns", "next_practice", "report_markdown"]
     scenario_keys = ["summary", "environment_evolution", "event_reviews", "stock_flow", "group_behavior", "key_turning_points"]
     investment_message = {"role": "user", "content": (
         f"다음 기록으로 사용자의 투자보고서를 작성하라.\n{json.dumps(context, ensure_ascii=False)}\n"

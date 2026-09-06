@@ -919,7 +919,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 /* ---------------------------------------------------------- paper trading */
 .paper-trading-modal { width: min(1320px,100%); padding: 0; overflow: hidden; }
 .paper-trading-modal.setup { width: min(720px,100%); max-height: calc(100vh - 40px); overflow-y: auto; }
-.paper-trading-modal.running { height: min(1020px,calc(100vh - 24px)); max-height: calc(100vh - 24px); }
+.paper-trading-modal.running { height: min(1020px,calc(100vh - 24px)); max-height: calc(100vh - 24px); overflow-x: hidden; overflow-y: auto; }
 
 /* setup */
 .paper-setup { display: flex; flex-direction: column; gap: 20px; padding: 26px 28px 28px; }
