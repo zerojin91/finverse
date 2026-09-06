@@ -397,6 +397,15 @@ def clear_initial_context_cache(history: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def clear_initial_context_analysis_cache(history: dict[str, Any]) -> dict[str, Any]:
+    """Remove only the aggregate analysis so the existing Evidence MD can be retried."""
+    _, fingerprint = _context_fingerprint(history)
+    path = _cache_path(fingerprint)
+    analysis_removed = path.exists()
+    path.unlink(missing_ok=True)
+    return {"context_id": f"ctx_{fingerprint}", "analysis_removed": analysis_removed}
+
+
 def get_initial_context_documents(history: dict[str, Any]) -> dict[str, Any]:
     """Return prepared document metadata and content without aggregate analysis.
 
@@ -434,10 +443,13 @@ def get_initial_context(history: dict[str, Any]) -> dict[str, Any]:
         return {**cached, "context_id": context_id, "cached": True}
 
     try:
-        analysis = _complete_context(
-            _normalize(LLMClient().chat_json(_messages(source, evidence_documents), temperature=.25, max_tokens=3800)),
-            source,
-        )
+        raw_analysis = LLMClient().chat_json(_messages(source, evidence_documents), temperature=.25, max_tokens=3800)
+        if not isinstance(raw_analysis, dict) or not (
+            str(raw_analysis.get("summary") or "").strip()
+            or any(str(item).strip() for item in (raw_analysis.get("summary_points") or []) if item is not None)
+        ):
+            raise InitialContextUnavailable("초기 상황 분석 결과가 비어 있습니다.")
+        analysis = _complete_context(_normalize(raw_analysis), source)
         _mark_direct_event_evidence(analysis, source["events"]["recent_events"])
     except Exception as exc:  # noqa: BLE001 - API 계층에서 사용자용 503으로 변환한다.
         raise InitialContextUnavailable("초기 시장 맥락 분석을 생성하지 못했습니다.") from exc

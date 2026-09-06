@@ -1498,6 +1498,7 @@ function SetupScreen({
   const [initialContextLoading, setInitialContextLoading] = useState(false);
   const [initialContextError, setInitialContextError] = useState<string | null>(null);
   const [initialContextRetryToken, setInitialContextRetryToken] = useState(0);
+  const [initialContextRetrying, setInitialContextRetrying] = useState(false);
   const [contextDocuments, setContextDocuments] = useState<ContextDocumentProgress[]>(INITIAL_CONTEXT_DOCUMENTS);
   const [contextDocumentSource, setContextDocumentSource] = useState<InitialContextDocuments | null>(null);
   const [contextDwellComplete, setContextDwellComplete] = useState(false);
@@ -1586,6 +1587,21 @@ function SetupScreen({
     }
   };
 
+  const retryInitialContext = async () => {
+    if (!pickedTicker || initialContextLoading || initialContextRetrying) return;
+    setInitialContextRetrying(true);
+    setInitialContextError(null);
+    setInitialContext(null);
+    try {
+      await callApi(`/securities/${encodeURIComponent(pickedTicker)}/initial-context/retry`, { method: "POST" });
+      setInitialContextRetryToken((token) => token + 1);
+    } catch (cause) {
+      setInitialContextError(cause instanceof Error ? cause.message : "초기 상황 분석을 다시 실행하지 못했습니다.");
+    } finally {
+      setInitialContextRetrying(false);
+    }
+  };
+
   useEffect(() => {
     const keyword = query.trim();
     if (picked?.name === keyword) {
@@ -1671,6 +1687,9 @@ function SetupScreen({
         // 네 Evidence MD가 화면에 모두 준비된 뒤, 그 문서 묶음만 OpenRouter에 전달한다.
         const analysisStartedAt = Date.now();
         const payload = await callApi<{ data: InitialContext }>(`/securities/${encodeURIComponent(pickedTicker)}/initial-context`);
+        if (!payload.data?.analysis?.summary?.trim() || !payload.data.analysis.summary_points?.length) {
+          throw new Error("초기 상황 분석 결과가 비어 있습니다.");
+        }
         const remaining = Math.max(0, CONTEXT_ANALYSIS_MIN_MS - (Date.now() - analysisStartedAt));
         if (remaining) await new Promise((resolve) => window.setTimeout(resolve, remaining));
         if (!cancelled) {
@@ -2073,10 +2092,13 @@ function SetupScreen({
             ))}
           </div>
           {initialContextLoading && contextDocuments.every((document) => document.status === "ready") && <div className="paper-context-loading"><LoaderCircle size={15} className="spin" /> 네 개의 근거 문서를 바탕으로 종목 전체 현황과 최근 이벤트 흐름을 분석하고 있습니다.</div>}
+          {!initialContextLoading && !initialContext && !initialContextError && contextDocuments.every((document) => document.status === "ready") && (
+            <p className="paper-inline-error"><span>초기 상황 분석 결과를 불러오지 못했습니다.</span><button type="button" onClick={retryInitialContext} disabled={initialContextRetrying}>{initialContextRetrying ? "재실행 중…" : "분석 재실행"}</button></p>
+          )}
           {initialContextError && (
             <p className="paper-inline-error">
               <span>{initialContextError}</span>
-              <button type="button" onClick={() => { setInitialContextError(null); setInitialContextRetryToken((token) => token + 1); }}>다시 시도</button>
+              <button type="button" onClick={retryInitialContext} disabled={initialContextRetrying}>{initialContextRetrying ? "재실행 중…" : "분석 재실행"}</button>
             </p>
           )}
           {initialContext && (

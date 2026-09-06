@@ -17,6 +17,7 @@ from .finverse_market_data import FinverseMarketData, FinverseUnavailable
 from .llm_market_simulator import LLMMarketUnavailable
 from .initial_context_analyzer import (
     InitialContextUnavailable,
+    clear_initial_context_analysis_cache,
     clear_initial_context_cache,
     get_initial_context,
     get_initial_context_documents,
@@ -174,6 +175,13 @@ def clear_security_initial_context_cache(ticker: str):
     return jsonify({"success": True, "data": {
         **clear_initial_context_cache(history), "agent_profiles_removed": agent_profiles_removed,
     }})
+
+
+@paper_trading_bp.route("/securities/<ticker>/initial-context/retry", methods=["POST"])
+def retry_security_initial_context(ticker: str):
+    """Clear only the aggregate LLM result and let the setup screen run it again."""
+    history = _market_data().load_game_data(ticker, "", "")
+    return jsonify({"success": True, "data": clear_initial_context_analysis_cache(history)})
 
 
 @paper_trading_bp.route("/securities/<ticker>/agent-profiles", methods=["GET"])
