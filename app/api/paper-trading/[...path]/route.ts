@@ -14,7 +14,10 @@ const UNREACHABLE = "FinSimulation 백엔드에 연결하지 못했습니다. �
 // 종목 조회·초기 상황 같은 로그인 전 탐색 단계는 그대로 공개로 둔다.
 function needsOwner(segments: string[], method: string): boolean {
   if (segments[0] === "games") return true;
-  if (segments[0] === "scenarios" && segments.length === 1 && method === "POST") return true;
+  // 게임 생성과 생성된 게임의 진행·주문·보고서 작업은 모두 소유자별 상태를
+  // 읽거나 바꾼다. 특히 첫 거래일 자동 진행은 /scenarios/:id/actions로
+  // 이어지므로 이 경로에도 같은 세션 식별자를 전달해야 한다.
+  if (segments[0] === "scenarios" && method === "POST") return true;
   return false;
 }
 
