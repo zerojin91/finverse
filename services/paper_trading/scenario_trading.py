@@ -268,7 +268,17 @@ def public_scenario_game(game: dict[str, Any]) -> dict[str, Any]:
         result = {key: value for key, value in game.items() if key not in ("events", "personas")}
         event = current_event(game)
         result["current_event"] = dict(event) if event else None
+        event_dates = {
+            row.get("event_id"): row.get("event_date")
+            for row in ((game.get("world") or {}).get("memory") or {}).get("event_ledger", [])
+            if row.get("event_id") and row.get("event_date")
+        }
         result["total_events"] = len(((game.get("world") or {}).get("memory") or {}).get("event_ledger") or [])
+        result["fills"] = [
+            ({**fill, "market_date": fill.get("market_date") or event_dates.get(fill.get("event_id"))}
+             if not fill.get("market_date") else fill)
+            for fill in game.get("fills", [])
+        ]
         result["portfolio"] = scenario_portfolio(game)
         model = dict(result.get("impact_model") or {})
         model.pop("return_distribution_pct", None)
@@ -293,6 +303,16 @@ def public_scenario_game(game: dict[str, Any]) -> dict[str, Any]:
     else:
         result["current_event"] = None
     result["total_events"] = len(game["events"])
+    event_dates = {
+        row.get("event_id"): row.get("event_date")
+        for row in game.get("events", [])
+        if row.get("event_id") and row.get("event_date")
+    }
+    result["fills"] = [
+        ({**fill, "market_date": fill.get("market_date") or event_dates.get(fill.get("event_id"))}
+         if not fill.get("market_date") else fill)
+        for fill in game.get("fills", [])
+    ]
     result["portfolio"] = scenario_portfolio(game)
     model = dict(result.get("impact_model") or {})
     model.pop("return_distribution_pct", None)
