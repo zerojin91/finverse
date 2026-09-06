@@ -2391,9 +2391,9 @@ function MockNavigation({ activeTab, onActivate, onShowIntro, user, onLogin, onL
         finverse<span>.</span>
       </button>
       <nav className="mock-journal-nav" aria-label="주 메뉴">
+        <button type="button" onClick={onShowIntro}>서비스 소개</button>
         <button type="button" onClick={() => onActivate("market")} aria-current={activeTab === "market" ? "page" : undefined}>시장 시뮬레이션</button>
         <button type="button" onClick={() => onActivate("twin")} aria-current={activeTab === "twin" ? "page" : undefined}>나의 투자 일지</button>
-        <button type="button" onClick={onShowIntro}>서비스 소개</button>
       </nav>
       {user ? (
         <div className="mock-journal-account">
@@ -2409,59 +2409,74 @@ const FINVERSE_INTRO_STORAGE_KEY = "finverse-service-intro-seen-v1";
 
 function ServiceIntro({ onEnter, onOpenJournal }: { onEnter: () => void; onOpenJournal: () => void }) {
   return (
-    <main className="service-intro">
-      <header className="service-intro-header">
-        <button className="service-intro-brand" type="button" onClick={onEnter} aria-label="FINVERSE 서비스 시작">
-          FINVERSE<span>.</span>
-        </button>
-        <span className="service-intro-header-note">MARKET JUDGMENT LAB</span>
-        <button className="service-intro-text-action" type="button" onClick={onEnter}>서비스 들어가기 <ArrowRight size={15} /></button>
+    <main className="intro-smoke">
+      <header className="intro-smoke-topbar">
+        <div className="intro-smoke-wrap intro-smoke-topbar-inner">
+          <button className="intro-smoke-brand" type="button" onClick={onEnter}>finverse<span>.</span></button>
+          <span>MARKET JUDGMENT LAB</span>
+        </div>
       </header>
 
-      <section className="service-intro-hero" aria-labelledby="service-intro-title">
-        <p className="service-intro-eyebrow">FINVERSE · MARKET JUDGMENT LAB</p>
-        <h1 id="service-intro-title">정보가 많을수록,<br />판단의 기준이 필요합니다.</h1>
-        <p className="service-intro-lede">FINVERSE는 실제 시장 근거를 읽고, 결과를 알 수 없는 모의투자에서 나만의 판단을 연습한 뒤 행동 기록으로 돌아보는 금융 판단 학습 서비스입니다.</p>
-        <div className="service-intro-cta-row">
-          <button className="service-intro-primary" type="button" onClick={onEnter}>시장 인사이트 시작하기 <ArrowRight size={19} /></button>
-          <button className="service-intro-secondary" type="button" onClick={onOpenJournal}>나의 투자 일지 보기</button>
-        </div>
-        <p className="service-intro-disclaimer">실제 계좌와 연결하지 않는 모의투자 학습 서비스입니다.</p>
-      </section>
-
-      <section className="service-intro-flow" aria-label="FINVERSE 서비스 흐름">
-        <div className="service-intro-flow-card">
-          <span>01</span>
-          <Database size={21} />
-          <h2>실제 근거를 읽습니다</h2>
-          <p>시장·경제·사건·커뮤니티 데이터를 분리해 지금 확인할 수 있는 사실과 관찰 포인트를 정리합니다.</p>
-        </div>
-        <div className="service-intro-flow-card">
-          <span>02</span>
-          <UsersRound size={21} />
-          <h2>결과를 모른 채 연습합니다</h2>
-          <p>월드와 시장 참여 에이전트의 반응 속에서 매수·관찰·매도 판단을 남기며 흐름을 경험합니다.</p>
-        </div>
-        <div className="service-intro-flow-card">
-          <span>03</span>
-          <FileUp size={21} />
-          <h2>행동을 기록으로 돌아봅니다</h2>
-          <p>완료된 모의투자의 나의 투자 일지와 시나리오 보고서로 판단 과정과 결과를 함께 비교합니다.</p>
+      <section className="intro-smoke-hero" aria-labelledby="service-intro-title">
+        <div className="intro-smoke-wrap intro-smoke-hero-inner">
+          <div>
+            <h1 id="service-intro-title">투자 공부는 했는데,<br />막상 그 순간엔<br />다르게 행동합니다.</h1>
+            <div className="intro-smoke-rule" />
+            <p className="intro-smoke-hero-close">FINVERSE는 그 간격을 좁힙니다.</p>
+            <p className="intro-smoke-hero-lede">실제 시장 근거를 읽고, 결과를 알 수 없는 모의투자에서 판단을 남긴 뒤 그 행동을 보고서로 돌아보세요.</p>
+            <button className="intro-smoke-cta" type="button" onClick={onEnter}>시장 인사이트 시작하기 <ArrowRight size={17} /></button>
+            <p className="intro-smoke-note">실제 계좌와 연결하지 않는 모의투자 학습 서비스입니다.</p>
+          </div>
+          <figure className="intro-smoke-hidden-chart">
+            <div><span>삼성전자 · 005930</span><span>모의투자</span></div>
+            <svg viewBox="0 0 420 192" role="img" aria-label="실제 캔들과 미공개 미래 구간을 구분한 예시 차트">
+              <defs><pattern id="introVoidHatch" width="7" height="7" patternTransform="rotate(45)" patternUnits="userSpaceOnUse"><line x1="0" y1="0" x2="0" y2="7" /></pattern></defs>
+              {[42, 94, 146].map((y) => <line className="intro-smoke-grid" key={y} x1="0" y1={y} x2="420" y2={y} />)}
+              <g className="intro-smoke-candles">
+                {[[18, 96, 132, 104, 20, "down"], [42, 86, 126, 94, 24, "up"], [66, 74, 116, 82, 26, "up"], [90, 70, 112, 78, 22, "down"], [114, 78, 122, 86, 28, "down"], [138, 66, 110, 74, 28, "up"], [162, 56, 98, 64, 26, "up"], [186, 62, 106, 70, 24, "down"]].map(([x, high, low, body, height, tone]) => (
+                  <g className={tone === "up" ? "up" : "down"} key={String(x)}><line x1={Number(x)} y1={Number(high)} x2={Number(x)} y2={Number(low)} /><rect x={Number(x) - 6} y={Number(body)} width="12" height={Number(height)} /></g>
+                ))}
+              </g>
+              <rect className="intro-smoke-void" x="214" y="10" width="200" height="154" />
+              <rect className="intro-smoke-void-box" x="214" y="10" width="200" height="154" />
+              <line className="intro-smoke-divide" x1="206" y1="10" x2="206" y2="164" />
+              <circle cx="206" cy="88" r="4.5" /><text x="314" y="84" textAnchor="middle">아직 공개되지 않았습니다</text><text className="intro-smoke-subtext" x="314" y="104" textAnchor="middle">검색해도 나오지 않습니다</text><text className="intro-smoke-subtext" x="200" y="182" textAnchor="end">여기서 판단합니다</text>
+            </svg>
+            <figcaption><span><i className="up" />상승</span><span><i className="down" />하락</span><span><i className="void" />미공개 구간</span></figcaption>
+          </figure>
         </div>
       </section>
 
-      <section className="service-intro-principle" aria-label="FINVERSE 학습 원칙">
-        <p>FINVERSE PRINCIPLES</p>
-        <div>
-          <strong>예측을 정답처럼 말하지 않습니다.</strong>
-          <span>실제 과거 근거와 시뮬레이션의 가상 사건을 구분하고, 수익률만이 아니라 판단의 일관성과 변화도 함께 살펴봅니다.</span>
+      <section className="intro-smoke-gap intro-smoke-wrap">
+        <span>계획과 실제</span>
+        <div><p>손절선을 정해두고,</p><strong>막상 그 가격이 오면 물타기를 합니다.</strong></div>
+        <div><p>뉴스 보고는 안 산다면서,</p><strong>뉴스가 뜨면 이미 판단을 바꿉니다.</strong></div>
+        <h2>몰라서가 아닙니다. 알면서 못 한 겁니다.</h2>
+      </section>
+
+      <section className="intro-smoke-feature">
+        <div className="intro-smoke-wrap intro-smoke-feature-grid">
+          <div><span className="intro-smoke-tag">아는 것</span><h2>가격이 아니라<br />조건을 봅니다</h2><p>종목을 고르면 시장·경제·사건·커뮤니티에서 모은 근거로 지금 그 종목이 <b>어떤 조건 위에 서 있는지</b> 정리합니다.</p><p>숫자를 정답처럼 던지지 않고, 조건이 깨지는 신호까지 함께 보여줍니다.</p></div>
+          <div className="intro-smoke-mock"><header><span>시장 인사이트 · 초기 상황</span><span>실제 근거</span></header><strong>삼성전자 <small>005930</small></strong><ul><li><b>A</b> 외국인 수급이 순매수로 전환하는지</li><li><b>B</b> 실적과 가이던스가 기대를 충족하는지</li><li><b>C</b> 가격이 관찰 구간을 지키는지</li></ul><footer>시장 · 경제 · 사건 · 커뮤니티 근거를 구분해 확인합니다.</footer></div>
         </div>
       </section>
 
-      <section className="service-intro-footer-cta">
-        <p>오늘의 시장을 읽고, 나의 기준을 만들어 보세요.</p>
-        <button className="service-intro-primary" type="button" onClick={onEnter}>FINVERSE 시작하기 <ArrowRight size={19} /></button>
+      <section className="intro-smoke-feature intro-smoke-primary">
+        <div className="intro-smoke-wrap intro-smoke-feature-grid">
+          <div><span className="intro-smoke-tag">하는 것</span><h2>결과를 모른 채,<br />판단을 남깁니다</h2><p>실제 근거를 바탕으로 만들어진 World Agent 시뮬레이션이 하루씩 진행됩니다. 중요한 사건은 공개되기 전 사용자의 판단을 먼저 남깁니다.</p><p>개인·외국인·기관·연기금의 반응은 다음 거래일 환경에 반영되고, 사용자의 판단은 학습 기록으로만 보존됩니다.</p></div>
+          <div className="intro-smoke-mock"><header><span>투자 시뮬레이션 · 오늘의 판단</span><span>D-1</span></header><strong>중요한 사건이 다가오고 있습니다.</strong><p>내용은 아직 공개되지 않았습니다.</p><div className="intro-smoke-choice"><span>내일 매수 고려</span><b>관찰 계속</b><span>내일 매도 고려</span></div><footer>사용자 판단은 시장 가격이나 수급에 영향을 주지 않는 학습 기록입니다.</footer></div>
+        </div>
       </section>
+
+      <section className="intro-smoke-feature">
+        <div className="intro-smoke-wrap intro-smoke-feature-grid intro-smoke-reverse">
+          <div><span className="intro-smoke-tag">그 사이</span><h2>당신은 어떤<br />투자자인가요?</h2><p><b>수익률만 보지 않습니다.</b> 사건 전후에 어떻게 판단했는지, 어느 시점에 기준이 바뀌었는지를 함께 돌아봅니다.</p><p>완료된 모의투자의 나의 투자 일지와 시나리오 보고서에서 행동과 결과를 나란히 확인할 수 있습니다.</p><button className="intro-smoke-link" type="button" onClick={onOpenJournal}>나의 투자 일지 보기 <ArrowRight size={16} /></button></div>
+          <div className="intro-smoke-mock"><header><span>나의 투자 일지</span><span>완료 보고서</span></header><p>현재 나의 투자 성향</p><strong className="intro-smoke-type">판단 패턴을 돌아볼 차례입니다.</strong><div className="intro-smoke-report-lines"><i /><i /><i /></div><footer>가상 시나리오의 행동을 바탕으로 한 교육용 분석입니다.</footer></div>
+        </div>
+      </section>
+
+      <section className="intro-smoke-closing"><h2>지금, 당신의 판단을 실험해보세요.</h2><button className="intro-smoke-cta" type="button" onClick={onEnter}>모의투자 시작하기 <ArrowRight size={17} /></button></section>
+      <footer className="intro-smoke-footer">AI 분석 기반 참고 자료이며 투자 판단의 최종 책임은 본인에게 있습니다. FINVERSE는 실제 계좌와 연동하지 않습니다.</footer>
     </main>
   );
 }
