@@ -2188,6 +2188,21 @@ function TwinPage() {
   );
 }
 
+function MockNavigation({ activeTab, onActivate }: { activeTab: MainTab; onActivate: (tab: MainTab) => void }) {
+  return (
+    <header className="mock-journal-header">
+      <button className="mock-journal-brand" type="button" onClick={() => onActivate("market")} aria-label="FINVERSE 홈">
+        finverse<span>.</span>
+      </button>
+      <nav className="mock-journal-nav" aria-label="주 메뉴">
+        <button type="button" onClick={() => onActivate("market")} aria-current={activeTab === "market" ? "page" : undefined}>시장 시뮬레이션</button>
+        <button type="button" onClick={() => onActivate("twin")} aria-current={activeTab === "twin" ? "page" : undefined}>나의 투자 일지</button>
+      </nav>
+      <button className="mock-journal-login" type="button" aria-label="로그인">로그인</button>
+    </header>
+  );
+}
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState<MainTab>("market");
   const [paperTradingOpen, setPaperTradingOpen] = useState(false);
@@ -2750,30 +2765,23 @@ export default function Home() {
 
   if (activeTab === "market") {
     return (
-      <>
+      <div className="mock-journal-app">
+        <MockNavigation activeTab={activeTab} onActivate={activateTab} />
         <MockMarketSimulation
           onOpenJournal={() => activateTab("twin")}
           onOpenJudgement={() => setPaperTradingOpen(true)}
           onOpenLogin={() => undefined}
+          hideHeader
         />
         {paperTradingOpen && <PaperTradingModal onClose={() => setPaperTradingOpen(false)} />}
-      </>
+      </div>
     );
   }
 
   if (activeTab === "twin") {
     return (
       <div className="mock-journal-app">
-        <header className="mock-journal-header">
-          <button className="mock-journal-brand" type="button" onClick={() => activateTab("market")} aria-label="FINVERSE 홈">
-            finverse<span>.</span>
-          </button>
-          <nav className="mock-journal-nav" aria-label="주 메뉴">
-            <button type="button" onClick={() => activateTab("market")}>시장 시뮬레이션</button>
-            <button type="button" aria-current="page">나의 투자 일지</button>
-          </nav>
-          <button className="mock-journal-login" type="button" aria-label="로그인">로그인</button>
-        </header>
+        <MockNavigation activeTab={activeTab} onActivate={activateTab} />
         <main className="mock-journal-main">
           <TwinPage />
         </main>

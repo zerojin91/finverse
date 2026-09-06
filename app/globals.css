@@ -2183,6 +2183,8 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
   background: #fff;
   color: var(--ink);
   font-family: "Pretendard Variable", Pretendard, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
   letter-spacing: -.025em;
 }
 .mock-journal-app * { box-sizing: border-box; }
@@ -2258,6 +2260,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .mock-journal-main .journal-lab-sidebar { border-color: #e9edf5; }
 .mock-journal-main .journal-lab-run-btn.active { border-color: #cfe5ff; background: #f2f8ff; box-shadow: none; }
 .mock-journal-main .journal-lab-run-btn:hover,.mock-journal-main .journal-session-card:hover { background: var(--brand-bluewash); }
+.mock-market-simulation-frame { display: block; width: 100%; min-height: calc(100vh - 76px); border: 0; }
 
 @media (max-width: 640px) {
   .mock-journal-header { min-height: 60px; grid-template-columns: 1fr auto; gap: 12px; padding: 0 16px; }
@@ -2268,6 +2271,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
   .mock-journal-main { padding: 0 12px 28px; }
   .mock-journal-main .journal-page { padding-top: 24px; gap: 18px; }
   .mock-journal-main .page-heading h1 { font-size: 24px; }
+  .mock-market-simulation-frame { min-height: calc(100vh - 60px); }
 }
 
 @keyframes finverse-event-enter { to { opacity: 1; transform: translateY(0); } }
