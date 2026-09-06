@@ -1879,11 +1879,6 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 /* entry card */
 
 @media (max-width: 1100px) {
-  .journal-lab-chart-layout { grid-template-columns: minmax(0,1fr); }
-  .journal-potential-events { padding: 16px 0 0; border-top: 1px solid var(--line); border-left: 0; }
-  .journal-potential-event-list { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
-  .journal-potential-event-list article { min-height: 0; }
-  .journal-potential-event-list article::after { display: none; }
   .paper-trading-modal.running { height: calc(100vh - 24px); }
   .paper-run-grid { grid-template-columns: minmax(0,1fr); grid-template-rows: none; overflow-y: auto; }
   .paper-chart-panel,.paper-desk-panel,.paper-feed-panel { grid-column: 1; grid-row: auto; }
@@ -1898,6 +1893,11 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 }
 
 @media (max-width: 820px) {
+  .journal-lab-chart-layout { grid-template-columns: minmax(0,1fr); }
+  .journal-potential-events { padding: 16px 0 0; border-top: 1px solid var(--line); border-left: 0; }
+  .journal-potential-event-list { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+  .journal-potential-event-list article { min-height: 0; }
+  .journal-potential-event-list article::after { display: none; }
   .paper-report-heading-row { align-items: stretch; flex-direction: column; }
   .paper-report-back { align-self: flex-start; }
   .paper-header-progress { grid-template-columns: minmax(0,1fr); gap: 6px; }
