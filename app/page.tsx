@@ -2193,8 +2193,19 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<MainTab>("market");
   const [paperTradingOpen, setPaperTradingOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
-  const [authIntentTab, setAuthIntentTab] = useState<MainTab | null>(null);
+  const [authIntent, setAuthIntent] = useState<(() => void) | null>(null);
   const { user: authUser, refresh: refreshAuthUser, logout: logoutAuthUser } = useAuthUser();
+
+  // 로그인 필요한 진입점(나의 투자 일지 탭, 모의 투자 시작)이 공통으로 쓴다:
+  // 로그인돼 있으면 바로 실행하고, 아니면 로그인 모달을 띄운 뒤 성공 시 이어서 실행한다.
+  const requireAuth = (action: () => void) => {
+    if (!authUser) {
+      setAuthIntent(() => action);
+      setAuthOpen(true);
+      return;
+    }
+    action();
+  };
   const [kospiData, setKospiData] = useState<KospiMarketData | null>(null);
   const [intradayIndices, setIntradayIndices] = useState<IntradayIndex[]>([]);
   const [dashboardSignals, setDashboardSignals] = useState<DashboardSignal[]>(marketSignals);
@@ -2384,13 +2395,12 @@ export default function Home() {
   }, [selectedScenario]);
 
   const activateTab = (tab: MainTab) => {
-    if (tab === "twin" && !authUser) {
-      setAuthIntentTab(tab);
-      setAuthOpen(true);
-      return;
-    }
-    setActiveTab(tab);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    const go = () => {
+      setActiveTab(tab);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+    if (tab === "twin") { requireAuth(go); return; }
+    go();
   };
 
   const selectSymbol = (item: WatchSymbol) => {
@@ -2766,7 +2776,7 @@ export default function Home() {
         <nav className="top-nav" aria-label="FINVERSE 탐색">
           <button className={activeTab === "market" ? "active" : ""} onClick={() => activateTab("market")} aria-current={activeTab === "market" ? "page" : undefined}>시장 인사이트</button>
           <button className={activeTab === "twin" ? "active" : ""} onClick={() => activateTab("twin")} aria-current={activeTab === "twin" ? "page" : undefined}>나의 투자 일지</button>
-          <button onClick={() => setPaperTradingOpen(true)}>모의 투자</button>
+          <button onClick={() => requireAuth(() => setPaperTradingOpen(true))}>모의 투자</button>
         </nav>
         <div className="top-header-actions">
           {authUser ? (
@@ -2891,7 +2901,7 @@ export default function Home() {
                     </article>
                   ))}
                   <article className="custom-scenario-card">
-                    <button type="button" onClick={() => setPaperTradingOpen(true)}>
+                    <button type="button" onClick={() => requireAuth(() => setPaperTradingOpen(true))}>
                       <Plus size={26} />
                       <span>내가 생각한<br />시나리오로 보기</span>
                     </button>
@@ -3101,14 +3111,13 @@ export default function Home() {
       {paperTradingOpen && <PaperTradingModal onClose={() => setPaperTradingOpen(false)} />}
       {authOpen && (
         <AuthModal
-          onClose={() => { setAuthOpen(false); setAuthIntentTab(null); }}
+          onClose={() => { setAuthOpen(false); setAuthIntent(null); }}
           onAuthenticated={() => {
             refreshAuthUser();
             setAuthOpen(false);
-            if (authIntentTab) {
-              setActiveTab(authIntentTab);
-              setAuthIntentTab(null);
-              window.scrollTo({ top: 0, behavior: "smooth" });
+            if (authIntent) {
+              authIntent();
+              setAuthIntent(null);
             }
           }}
         />
