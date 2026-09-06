@@ -2107,13 +2107,6 @@ function SetupScreen({
                 ))}
               </div>
             </div>
-            <div className="paper-ready-hint">
-              <CalendarClock size={13} />
-              <div>
-                <span>World Agent가 실제 과거 근거를 바탕으로 매 거래일 외부 환경을 갱신합니다.</span>
-                <span>중요한 사건은 사용자 판단을 받은 뒤 59개 에이전트의 반응과 함께 체결됩니다.</span>
-              </div>
-            </div>
             <div className="paper-ready-actions">
               <button className="paper-reset-button" type="button" onClick={() => void restartSetup()} disabled={starting || resettingSetup}>
                 {resettingSetup ? <><LoaderCircle size={15} className="spin" /> 초기화 중</> : <>다시 설정하기</>}
