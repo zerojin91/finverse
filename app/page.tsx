@@ -10,7 +10,6 @@ import {
   CandlestickChart,
   ChevronRight,
   CircleDollarSign,
-  CircleHelp,
   CheckCircle2,
   Clock3,
   Database,
@@ -2787,7 +2786,6 @@ export default function Home() {
           ) : (
             <button className="header-login-button" type="button" onClick={() => setAuthOpen(true)}>로그인</button>
           )}
-          <button className="header-help" type="button" aria-label="도움말"><CircleHelp size={18} /></button>
         </div>
       </header>
 

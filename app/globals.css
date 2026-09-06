@@ -67,8 +67,6 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .top-nav button.active { color: var(--ink); }
 .top-nav button.active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--down); }
 .top-header-actions { justify-self: end; display: flex; align-items: center; gap: 8px; }
-.header-help { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; color: var(--muted); background: var(--soft); cursor: pointer; }
-.header-help:hover { color: var(--ink); }
 .main-content { min-width: 0; }
 
 .market-page { width: min(calc(100% - 72px), 1480px); margin: 0 auto; padding: 33px 0 48px; }
