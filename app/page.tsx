@@ -2504,7 +2504,7 @@ function ServiceIntro({ onEnter, onOpenJournal }: { onEnter: () => void; onOpenJ
         </div>
       </section>
 
-      <section className="intro-smoke-closing"><h2>불확실한 시장에서도,<br />나의 기준으로 판단해 보세요.</h2><button className="intro-smoke-cta" type="button" onClick={onEnter}>시장 시뮬레이션 시작하기 <ArrowRight size={17} /></button></section>
+      <section className="intro-smoke-closing"><h2>멀티 AI 에이전트가 만드는 가상 미래에서,<br />나의 기준으로 판단해 보세요.</h2><button className="intro-smoke-cta" type="button" onClick={onEnter}>시장 시뮬레이션 시작하기 <ArrowRight size={17} /></button></section>
       <footer className="intro-smoke-footer">AI 분석 기반 참고 자료이며 투자 판단의 최종 책임은 본인에게 있습니다. FINVERSE는 실제 계좌와 연동하지 않습니다.</footer>
     </main>
   );
