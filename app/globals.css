@@ -1059,6 +1059,18 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-profile-gate { position: relative; display: grid; justify-items: start; gap: 14px; min-height: 360px; padding: 42px 38px; background: linear-gradient(135deg,#fff 0%,#f3f7ff 100%); }
 .paper-profile-gate > svg { color: var(--brand); }.paper-profile-gate > span { color: var(--brand); font-size: 10px; font-weight: 900; letter-spacing: .1em; }
 .paper-profile-gate strong { color: var(--ink); font-size: 15px; }.paper-profile-gate h2 { margin: 4px 0 0; color: var(--ink); font-size: 29px; line-height: 1.16; letter-spacing: -.045em; }.paper-profile-gate p { max-width: 500px; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.7; }.paper-profile-gate button:not(.scenario-modal-close) { display: inline-flex; align-items: center; gap: 8px; min-height: 45px; margin-top: 4px; padding: 0 17px; border: 0; border-radius: 9px; color: #fff; background: var(--ink); font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }.paper-profile-gate small { color: var(--light); font-size: 10px; line-height: 1.55; }
+.paper-profile-gate-copy { max-width: none !important; white-space: nowrap; }
+.paper-profile-survey { width: 100%; max-width: 570px; }
+.paper-profile-survey-head { display: flex; align-items: center; justify-content: space-between; color: var(--brand); font-size: 11px; font-weight: 850; letter-spacing: .07em; }
+.paper-profile-survey-head b { color: var(--muted); font-size: 11px; letter-spacing: 0; }
+.paper-profile-survey-progress { height: 4px; margin-top: 12px; overflow: hidden; border-radius: 999px; background: #dbe7fa; }
+.paper-profile-survey-progress i { display: block; height: 100%; border-radius: inherit; background: var(--brand); transition: width .18s ease; }
+.paper-profile-gate .paper-profile-survey h2 { margin: 20px 0 14px; font-size: 21px; letter-spacing: -.03em; }
+.paper-profile-survey-choices { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; }
+.paper-profile-gate .paper-profile-survey-choices button { display: flex; align-items: center; justify-content: space-between; min-height: 50px; margin: 0; padding: 10px 12px; border: 1px solid #dbe2ec; border-radius: 8px; background: #fff; color: var(--ink); font-size: 12px; font-weight: 650; line-height: 1.45; text-align: left; }
+.paper-profile-gate .paper-profile-survey-choices button:hover { border-color: var(--brand); color: var(--brand); box-shadow: 0 3px 10px rgba(7,105,255,.08); }
+.paper-profile-gate .paper-profile-survey-back { min-height: auto; margin: 14px 0 0; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 11px; font-weight: 600; text-decoration: underline; }
+.paper-profile-survey-error { margin-top: 12px !important; color: #d64c53 !important; }
 .paper-trading-modal.running { height: min(1020px,calc(100vh - 24px)); max-height: calc(100vh - 24px); overflow-x: hidden; overflow-y: auto; }
 
 /* setup */

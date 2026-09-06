@@ -94,6 +94,55 @@ type EventProvenance = {
   event_source_window?: [string, string];
 };
 
+type ProfileSurveyChoice = { label: string; score: number };
+type ProfileSurveyQuestion = { prompt: string; choices: ProfileSurveyChoice[] };
+
+const PROFILE_SURVEY_QUESTIONS: ProfileSurveyQuestion[] = [
+  { prompt: "투자에서 가장 피하고 싶은 상황은 무엇인가요?", choices: [{ label: "원금이 조금이라도 줄어드는 상황", score: 1 }, { label: "예상보다 큰 손실이 나는 상황", score: 2 }, { label: "회복을 기다려야 하는 단기 손실", score: 3 }, { label: "높은 수익 기회를 놓치는 상황", score: 4 }] },
+  { prompt: "보유 종목이 단기간에 10% 하락했다면 어떻게 하시겠어요?", choices: [{ label: "바로 매도해 손실을 제한한다", score: 1 }, { label: "추가 하락 여부를 확인한 뒤 일부 줄인다", score: 2 }, { label: "근거를 다시 확인하고 그대로 보유한다", score: 3 }, { label: "회복을 기대해 추가 매수를 고려한다", score: 4 }] },
+  { prompt: "투자 자금을 얼마나 오래 묶어둘 수 있나요?", choices: [{ label: "몇 주 안에 쓸 가능성이 있다", score: 1 }, { label: "3개월 안에는 필요할 수 있다", score: 2 }, { label: "6개월 이상 기다릴 수 있다", score: 3 }, { label: "1년 이상 장기 투자할 수 있다", score: 4 }] },
+  { prompt: "변동성이 큰 투자 기회에 대해 어떻게 생각하나요?", choices: [{ label: "가능하면 피하고 싶다", score: 1 }, { label: "손실 가능성이 작을 때만 고려한다", score: 2 }, { label: "근거가 충분하면 감수할 수 있다", score: 3 }, { label: "높은 수익을 위해 적극 감수할 수 있다", score: 4 }] },
+  { prompt: "두 투자안 중 더 마음이 가는 쪽은 무엇인가요?", choices: [{ label: "수익은 낮아도 결과가 안정적인 투자", score: 1 }, { label: "안정성과 수익을 균형 있게 고려한 투자", score: 2 }, { label: "손실 가능성은 있지만 성장 여지가 큰 투자", score: 3 }, { label: "손실 가능성이 커도 기대수익이 높은 투자", score: 4 }] },
+];
+
+function ProfileGateSurvey({ onComplete }: { onComplete: () => void }) {
+  const [answers, setAnswers] = useState<number[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const questionIndex = answers.length;
+  const question = PROFILE_SURVEY_QUESTIONS[questionIndex];
+
+  const selectAnswer = async (score: number) => {
+    const next = [...answers, score];
+    setAnswers(next);
+    if (next.length !== PROFILE_SURVEY_QUESTIONS.length) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/investor-profile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ score: next.reduce((sum, value) => sum + value, 0) }) });
+      const payload = await response.json().catch(() => null) as { profile?: unknown; error?: string } | null;
+      if (!response.ok || !payload?.profile) throw new Error(payload?.error ?? "투자 성향 기록을 저장하지 못했습니다.");
+      onComplete();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "투자 성향 기록을 저장하지 못했습니다.");
+      setAnswers((current) => current.slice(0, -1));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return <div className="paper-profile-survey" aria-live="polite">
+    <div className="paper-profile-survey-head"><span>투자 성향 진단</span><b>{questionIndex + 1} / {PROFILE_SURVEY_QUESTIONS.length}</b></div>
+    <div className="paper-profile-survey-progress"><i style={{ width: `${((questionIndex + 1) / PROFILE_SURVEY_QUESTIONS.length) * 100}%` }} /></div>
+    <h2>{question.prompt}</h2>
+    <div className="paper-profile-survey-choices">
+      {question.choices.map((choice) => <button key={choice.label} type="button" disabled={saving} onClick={() => { void selectAnswer(choice.score); }}>{choice.label}<ChevronRight size={16} /></button>)}
+    </div>
+    {questionIndex > 0 && <button type="button" className="paper-profile-survey-back" disabled={saving} onClick={() => setAnswers((current) => current.slice(0, -1))}>이전 질문</button>}
+    {error && <p className="paper-profile-survey-error">{error}</p>}
+  </div>;
+}
+
 type PricePoint = {
   step: number;
   label: string;
@@ -2759,10 +2808,11 @@ function TradingScreen({
 
 /* ----------------------------------------------------------------- main */
 
-export function PaperTradingModal({ onClose, onProfileRequired }: { onClose: () => void; onProfileRequired?: () => void }) {
+export function PaperTradingModal({ onClose }: { onClose: () => void }) {
   const [game, setGame] = useState<ScenarioGame | null>(null);
   const [profileState, setProfileState] = useState<"loading" | "ready" | "missing" | "error">("loading");
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [showProfileSurvey, setShowProfileSurvey] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [job, setJob] = useState<Job | null>(null);
@@ -2974,8 +3024,8 @@ export function PaperTradingModal({ onClose, onProfileRequired }: { onClose: () 
       >
         {profileGate ? <div className="paper-profile-gate">
           <button className="scenario-modal-close" type="button" onClick={onClose} aria-label="닫기"><X size={18} /></button>
-          {profileState === "loading" ? <><LoaderCircle size={22} className="spin" /><strong>투자 성향 기록을 확인하고 있습니다.</strong></> : profileState === "missing" ? <>
-            <span>FIRST STEP · 투자 성향 진단</span><h2>첫 판단 전에,<br />현재 나의 투자 성향을 확인하세요.</h2><p>5개 질문으로 현재의 위험 감수 성향을 기록하면, 이후 모의투자 판단과 실제 행동을 비교해 볼 수 있습니다.</p><button type="button" onClick={onProfileRequired ?? onClose}>투자 성향 진단 시작하기 <ArrowRight size={16} /></button><small>최초 1회 진단 결과는 로그인한 계정에 저장되며, 완료 후 시뮬레이션을 시작할 수 있습니다.</small>
+          {profileState === "loading" ? <><LoaderCircle size={22} className="spin" /><strong>투자 성향 기록을 확인하고 있습니다.</strong></> : profileState === "missing" && showProfileSurvey ? <ProfileGateSurvey onComplete={() => { setProfileState("ready"); setShowProfileSurvey(false); }} /> : profileState === "missing" ? <>
+            <span>FIRST STEP · 투자 성향 진단</span><h2>첫 판단 전에,<br />현재 나의 투자 성향을 확인하세요.</h2><p className="paper-profile-gate-copy">5개 질문으로 현재의 위험 감수 성향을 기록하면, 이후 모의투자 판단과 실제 행동을 비교해 볼 수 있습니다.</p><button type="button" onClick={() => setShowProfileSurvey(true)}>투자 성향 진단 시작하기 <ArrowRight size={16} /></button><small>최초 1회 진단 결과는 로그인한 계정에 저장되며, 완료 후 시뮬레이션을 시작할 수 있습니다.</small>
           </> : <><AlertTriangle size={22} /><strong>{profileError ?? "투자 성향 기록을 확인하지 못했습니다."}</strong><button type="button" onClick={() => window.location.reload()}>다시 확인하기</button></>}
         </div> : game
           ? <TradingScreen

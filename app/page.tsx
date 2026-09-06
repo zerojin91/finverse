@@ -2487,7 +2487,7 @@ function TwinPage({ onRequireAuth }: { onRequireAuth?: (action: () => void) => v
         )}
       </section>
 
-      {journalPaperTradingOpen && <PaperTradingModal onClose={() => setJournalPaperTradingOpen(false)} onProfileRequired={() => setJournalPaperTradingOpen(false)} />}
+      {journalPaperTradingOpen && <PaperTradingModal onClose={() => setJournalPaperTradingOpen(false)} />}
     </div>
   );
 }
@@ -3227,7 +3227,7 @@ export default function Home() {
           onOpenLogin={() => setAuthOpen(true)}
           hideHeader
         />
-        {paperTradingOpen && <PaperTradingModal onClose={() => setPaperTradingOpen(false)} onProfileRequired={() => { setPaperTradingOpen(false); setIntroVisible(false); activateTab("twin"); }} />}
+        {paperTradingOpen && <PaperTradingModal onClose={() => setPaperTradingOpen(false)} />}
         {authModal}
       </div>
     );
@@ -3579,7 +3579,7 @@ export default function Home() {
         </div>
       )}
 
-      {paperTradingOpen && <PaperTradingModal onClose={() => setPaperTradingOpen(false)} onProfileRequired={() => { setPaperTradingOpen(false); activateTab("twin"); }} />}
+      {paperTradingOpen && <PaperTradingModal onClose={() => setPaperTradingOpen(false)} />}
 
       {selectedMarketSignal && (
         <div className="modal-backdrop market-signal-backdrop" onMouseDown={() => setSelectedMarketSignal(null)}>
