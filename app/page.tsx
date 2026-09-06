@@ -2420,16 +2420,16 @@ function ServiceIntro({ onEnter, onOpenJournal }: { onEnter: () => void; onOpenJ
             <h1 id="service-intro-title">아는 것과,<br />행동하는 것은 다릅니다.</h1>
             <div className="intro-smoke-rule" />
             <p className="intro-smoke-hero-close">FINVERSE는 판단과 행동의 간격을 훈련합니다.</p>
-            <p className="intro-smoke-hero-lede">사람은 불안, 손실 회피, 군집 심리와 정보 과부하 속에서 세워 둔 원칙을 지키기 어렵습니다. FINVERSE는 그 판단 오류를 안전하게 발견하고 다음 행동 기준으로 바꾸도록 돕습니다.</p>
+            <p className="intro-smoke-hero-lede">사람은 불안, 손실 회피, 군집 심리와 정보 과부하 속에서 세워 둔 원칙을 지키기 어렵습니다.<br /><b>FINVERSE</b>는 그 판단 오류를 안전하게 발견하고 다음 행동 기준으로 바꾸도록 돕습니다.</p>
+            <div className="intro-smoke-hero-actions">
+              <button className="intro-smoke-cta" type="button" onClick={onEnter}>시장 시뮬레이션 시작하기 <ArrowRight size={17} /></button>
+              <p className="intro-smoke-note">실제 계좌와 연결하지 않는 모의투자 학습 서비스입니다.</p>
+            </div>
           </div>
           <div className="intro-smoke-hero-preview-wrap">
             <figure className="intro-smoke-hidden-chart intro-smoke-real-preview">
               <img src="/intro/conditional-simulation.png" alt="삼성전자 조건부 반등 시뮬레이션과 발생 가능 이벤트 예시" />
             </figure>
-            <div className="intro-smoke-hero-actions">
-              <button className="intro-smoke-cta" type="button" onClick={onEnter}>시장 시뮬레이션 시작하기 <ArrowRight size={17} /></button>
-              <p className="intro-smoke-note">실제 계좌와 연결하지 않는 모의투자 학습 서비스입니다.</p>
-            </div>
           </div>
         </div>
       </section>
