@@ -77,6 +77,23 @@ def test_daily_buy_reflection_is_filled_when_next_day_advances(monkeypatch):
     assert game["fills"][-1]["quantity"] == 30
 
 
+def test_default_daily_reflection_does_not_queue_or_fill_an_order(monkeypatch):
+    monkeypatch.setattr(world_simulation, "run_individual_agent_round", _hold_round)
+    monkeypatch.setattr(world_agent, "_event_type", lambda *_args: None)
+    game = _game()
+
+    world_simulation.advance_world_market(game)
+
+    assert game["daily_reflections"][-1]["stance"] == "HOLD_WATCH"
+    assert game["daily_reflections"][-1].get("order_id") is None
+    assert game["pending_orders"] == []
+
+    world_simulation.advance_world_market(game)
+
+    assert game["position"]["quantity"] == 0
+    assert game["fills"] == []
+
+
 def test_material_world_event_waits_for_user_before_agent_market_round(monkeypatch):
     monkeypatch.setattr(world_simulation, "run_individual_agent_round", _hold_round)
     monkeypatch.setattr(world_agent, "_event_type", lambda *_args: "surprise")

@@ -966,8 +966,18 @@ function DailyPracticeCard({
   disabled: boolean;
   onSelect: (stance: DailyReflection["stance"], quantity?: number) => Promise<void>;
 }) {
+  const marketDate = event?.event_date ?? round?.market_date ?? "";
   const [draftStance, setDraftStance] = useState<DailyReflection["stance"]>(reflection?.stance ?? "HOLD_WATCH");
   const [draftQuantity, setDraftQuantity] = useState(reflection?.quantity ? String(reflection.quantity) : "");
+  const hasSubmittedOrder = Boolean(reflection?.order_id);
+
+  // 거래일이 바뀔 때만 서버에 저장된 판단으로 초안을 다시 맞춘다.
+  // 입력 중인 수량을 prop 갱신으로 덮어쓰지 않으면서 이전 거래일의 수량이
+  // 다음 거래일에 남아 의도치 않은 주문으로 기록되는 일을 막는다.
+  useEffect(() => {
+    setDraftStance(reflection?.stance ?? "HOLD_WATCH");
+    setDraftQuantity(reflection?.quantity ? String(reflection.quantity) : "");
+  }, [marketDate]);
 
   if (!round && !event) {
     return (
@@ -1032,7 +1042,7 @@ function DailyPracticeCard({
             type="button"
             className={`${item.key.toLowerCase()} ${draftStance === item.key ? "active" : ""}`}
             onClick={() => chooseStance(item.key)}
-            disabled={disabled}
+            disabled={disabled || hasSubmittedOrder}
           >
             <b>{item.label}</b><span>{item.description}</span>
           </button>
@@ -1049,7 +1059,6 @@ function DailyPracticeCard({
               step="1"
               value={draftQuantity}
               onChange={(input) => setDraftQuantity(input.target.value)}
-              onBlur={() => { void submitDecision(); }}
               onKeyDown={(input) => {
                 if (input.key === "Enter") {
                   input.preventDefault();
@@ -1057,16 +1066,25 @@ function DailyPracticeCard({
                 }
               }}
               placeholder="수량 입력"
-              disabled={disabled}
+              disabled={disabled || hasSubmittedOrder}
             />
             <span>주</span>
+            <button
+              type="button"
+              onClick={() => { void submitDecision(); }}
+              disabled={disabled || hasSubmittedOrder || !/^[1-9]\d*$/.test(draftQuantity)}
+            >
+              판단 기록
+            </button>
           </div>
           <small>{draftStance === "BUY_WATCH"
             ? `현재 현금 기준 약 ${Math.floor(portfolio.cash / Math.max(portfolio.mark_price, 1)).toLocaleString("ko-KR")}주까지 가능`
             : `현재 보유 ${portfolio.quantity.toLocaleString("ko-KR")}주까지 가능`}</small>
         </div>
       )}
-      <small>관찰·매수·매도 판단은 시장 가격을 움직이지 않고 내 개인 포트폴리오에만 반영됩니다. 관찰을 유지하면 매매 없이 기록됩니다.</small>
+      <small>{hasSubmittedOrder
+        ? "오늘의 매수·매도 판단이 기록되었습니다. 다음 거래일에 내 개인 포트폴리오에만 반영됩니다."
+        : "매수·매도는 수량을 입력한 뒤 ‘판단 기록’을 눌러야 저장됩니다. 관찰을 유지하면 매매 없이 기록됩니다."}</small>
     </div>
   );
 }
