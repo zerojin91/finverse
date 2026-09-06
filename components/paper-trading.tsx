@@ -2068,9 +2068,6 @@ function SetupScreen({
                       <b>{agent.count}명</b>
                     </header>
                     <p>{agent.description}</p>
-                    <div className="paper-agent-tags">
-                      {agent.strategies.slice(0, 4).map((strategy) => <span key={strategy}>{agentStrategyLabel(strategy)}</span>)}
-                    </div>
                     <div className="paper-agent-actions" aria-label={`${agent.label} 가능한 행동`}>
                       <span className="paper-agent-actions-label">가능한 행동</span>
                       <div>{GROUP_ACTION_LABELS[agent.key].map((action) => <span className="paper-agent-action-chip" key={action}>{action}</span>)}</div>
