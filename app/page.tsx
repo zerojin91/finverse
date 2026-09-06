@@ -2041,12 +2041,12 @@ function TwinPage() {
   return (
     <div className="journal-page">
       <header className="page-heading journal-heading">
-        <div><span>MY INVESTMENT JOURNAL</span><h1>모의투자로 알게 된 내 투자 성향과, 종목별 실험 결과를 한눈에 확인하세요.</h1></div>
+        <div><h1>모의투자로 알게 된 내 투자 성향과, 종목별 실험 결과를 한눈에 확인하세요.</h1></div>
       </header>
 
       <section className="panel">
         <div className="panel-title">
-          <div><span>CURRENT STYLE SUMMARY</span><h2>현재 나의 투자 성향</h2></div>
+          <div><h2>현재 나의 투자 성향</h2></div>
           <span className="panel-note">가장 최근 이벤트 시나리오 모의투자에서 판정된 스타일과, 히스토리 전체의 변화 흐름을 함께 보여줍니다.</span>
         </div>
         <div className="journal-summary-body">
@@ -2075,7 +2075,7 @@ function TwinPage() {
 
       <section className="panel">
         <div className="panel-title">
-          <div><span>INVESTOR STYLE TIMELINE</span><h2>나의 투자 성향 히스토리</h2></div>
+          <div><h2>나의 투자 성향 히스토리</h2></div>
           <span className="panel-note">모의투자를 마칠 때마다 매매 행동에서 스타일을 다시 판정합니다. 점수가 아니라 스타일 전환과 그 근거로 봅니다.</span>
         </div>
         <div className="journal-behavior-body">
@@ -2129,7 +2129,7 @@ function TwinPage() {
 
       <section className="panel">
         <div className="panel-title">
-          <div><span>SCENARIO EXPERIMENT LAB</span><h2>종목별 이벤트 시나리오 실험</h2></div>
+          <div><h2>종목별 이벤트 시나리오 실험</h2></div>
           <span className="panel-note">종목과 실행을 고르면 그 실험의 캔들 경로가 아래에 나타납니다. 이벤트를 가리키면 그 시점의 내용만 보여줍니다.</span>
         </div>
         {gamesState === "loading" ? (
