@@ -198,6 +198,15 @@ function PaperEvidenceMarkdown({ content }: { content: string }) {
       continue;
     }
     if (/^(-{3,}|\*{3,}|_{3,})$/.test(line)) { blocks.push(<hr key={`rule-${index}`} />); index += 1; continue; }
+    if (line.startsWith(">")) {
+      const quote: string[] = [];
+      while (index < lines.length && lines[index].trim().startsWith(">")) {
+        quote.push(lines[index].trim().replace(/^>\s?/, ""));
+        index += 1;
+      }
+      blocks.push(<blockquote key={`quote-${index}`}>{inline(quote.join(" "))}</blockquote>);
+      continue;
+    }
     if (line.includes("|") && index + 1 < lines.length && isTableDivider(lines[index + 1])) {
       const headers = tableCells(line);
       index += 2;
@@ -2396,8 +2405,7 @@ function CompletedReports({ reports, portfolio, initialEquity, onBack }: { repor
           <img src={INVESTOR_TYPE_META[investorType].image} alt={INVESTOR_TYPE_META[investorType].label} />
         </figure>}
         <header><div><span>01 · USER REPORT</span><h3>나의 투자보고서</h3></div><b className={toneOf(profit)}>{signedPct(end.total_return_pct ?? 0)}</b></header>
-        {investment.report_markdown ? <PaperEvidenceMarkdown content={investment.report_markdown} /> : null}
-        <div className="paper-report-metrics"><div><span>최종 투자금액</span><strong>{won(end.equity)}</strong></div><div><span>종료일 평가손익</span><strong className={toneOf(profit)}>{won(profit)}</strong></div><div><span>실현손익</span><strong>{won(end.realized_pnl)}</strong></div><div><span>판단 횟수</span><strong>{investment.verified_metrics?.daily_reflection_count ?? investment.verified_metrics?.trade_count ?? 0}회</strong></div></div>
+        {investment.report_markdown ? <PaperEvidenceMarkdown content={investment.report_markdown} /> : <div className="paper-report-metrics"><div><span>최종 투자금액</span><strong>{won(end.equity)}</strong></div><div><span>종료일 평가손익</span><strong className={toneOf(profit)}>{won(profit)}</strong></div><div><span>실현손익</span><strong>{won(end.realized_pnl)}</strong></div><div><span>판단 횟수</span><strong>{investment.verified_metrics?.daily_reflection_count ?? investment.verified_metrics?.trade_count ?? 0}회</strong></div></div>}
         {!investment.report_markdown && <>
           <p className="paper-report-summary">{investment.summary}</p>
           {investment.behavior_pattern && <p className="paper-report-detail"><b>행동 패턴</b>{investment.behavior_pattern}</p>}
@@ -2446,7 +2454,9 @@ function TradingScreen({
   });
   const [showReports, setShowReports] = useState(true);
   useEffect(() => {
-    if (game.phase === "completed" && game.llm_reports) setShowReports(true);
+    if (game.phase !== "completed" || !game.llm_reports) return;
+    const reopenReports = window.setTimeout(() => setShowReports(true), 0);
+    return () => window.clearTimeout(reopenReports);
   }, [game.phase, game.llm_reports]);
   const dismissCoach = useCallback(() => {
     setCoach(false);

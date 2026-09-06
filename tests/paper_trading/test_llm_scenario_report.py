@@ -69,6 +69,9 @@ def test_reports_split_user_review_from_world_review_and_include_action_log():
 
     reports = generate_llm_reports(game, chat)
     assert reports["investment"]["summary"] == "사용자 요약"
+    assert "# 1. 한눈에 보는 나의 투자 성향" in reports["investment"]["report_markdown"]
+    assert "# Appendix B. 분석 신뢰도" in reports["investment"]["report_markdown"]
+    assert "{{" not in reports["investment"]["report_markdown"]
     assert reports["scenario"]["summary"] == "환경 요약"
     assert '"group_behavior":{"retail":"개인"' in prompts[1]
     assert "retail_001" in prompts[0]

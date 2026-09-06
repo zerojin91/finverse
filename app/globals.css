@@ -766,6 +766,8 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .evidence-markdown ul,.evidence-markdown ol { display: grid; gap: 5px; margin: 10px 0 16px; padding-left: 20px; }
 .evidence-markdown li::marker { color: #2563eb; font-weight: 800; }
 .evidence-markdown strong { color: #18181b; font-weight: 800; }
+.evidence-markdown blockquote { margin: 14px 0; padding: 13px 15px; border-left: 3px solid #93c5fd; border-radius: 0 8px 8px 0; color: #334155; background: #f8fbff; }
+.evidence-markdown blockquote p { margin: 0; }
 .evidence-markdown code { padding: 2px 5px; border-radius: 4px; color: #334155; background: #e2e8f0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
 .evidence-markdown a { color: #2563eb; text-decoration: underline; text-underline-offset: 2px; }
 .evidence-markdown hr { margin: 22px 0; border: 0; border-top: 1px solid var(--line); }
