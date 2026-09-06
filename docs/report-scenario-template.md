@@ -16,7 +16,7 @@
 
 {{market_state_path}}
 
-## 4. 수급 주체와 개별 에이전트 행동
+## 4. 수급 주체별 행동 흐름과 이벤트 반응
 
 {{actor_action_path}}
 
