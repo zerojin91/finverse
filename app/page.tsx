@@ -34,6 +34,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { ChangeEvent, CSSProperties, FormEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation";
 import { PaperTradingModal, type Security } from "@/components/paper-trading";
+import { AuthModal, useAuthUser } from "@/components/auth";
 
 const SimulationMessageResponse = dynamic(
   () => import("@/components/ai-elements/message").then((module) => module.MessageResponse),
@@ -2191,6 +2192,8 @@ function TwinPage() {
 export default function Home() {
   const [activeTab, setActiveTab] = useState<MainTab>("market");
   const [paperTradingOpen, setPaperTradingOpen] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
+  const { user: authUser, refresh: refreshAuthUser, logout: logoutAuthUser } = useAuthUser();
   const [kospiData, setKospiData] = useState<KospiMarketData | null>(null);
   const [intradayIndices, setIntradayIndices] = useState<IntradayIndex[]>([]);
   const [dashboardSignals, setDashboardSignals] = useState<DashboardSignal[]>(marketSignals);
@@ -2760,6 +2763,14 @@ export default function Home() {
           <button onClick={() => setPaperTradingOpen(true)}>모의 투자</button>
         </nav>
         <div className="top-header-actions">
+          {authUser ? (
+            <div className="header-user">
+              <span>{authUser.email}</span>
+              <button type="button" onClick={() => logoutAuthUser()}>로그아웃</button>
+            </div>
+          ) : (
+            <button className="header-login-button" type="button" onClick={() => setAuthOpen(true)}>로그인</button>
+          )}
           <button className="header-help" type="button" aria-label="도움말"><CircleHelp size={18} /></button>
         </div>
       </header>
@@ -3082,6 +3093,12 @@ export default function Home() {
       )}
 
       {paperTradingOpen && <PaperTradingModal onClose={() => setPaperTradingOpen(false)} />}
+      {authOpen && (
+        <AuthModal
+          onClose={() => setAuthOpen(false)}
+          onAuthenticated={() => { refreshAuthUser(); setAuthOpen(false); }}
+        />
+      )}
 
       {selectedMarketSignal && (
         <div className="modal-backdrop market-signal-backdrop" onMouseDown={() => setSelectedMarketSignal(null)}>

@@ -1,3 +1,5 @@
+import { getSessionUser } from "@/lib/auth-db";
+
 export const dynamic = "force-dynamic";
 
 // 같은 저장소의 페이퍼 트레이딩 엔진(services/paper_trading)으로 중계합니다.
@@ -8,15 +10,37 @@ const finsimUrl = () =>
 
 const UNREACHABLE = "FinSimulation 백엔드에 연결하지 못했습니다. 로컬 서비스를 다시 실행해주세요.";
 
+// 게임 소유자 구분이 걸리는 경로만 로그인을 요구한다 (docs/PRD.md §13 이슈 5).
+// 종목 조회·초기 상황 같은 로그인 전 탐색 단계는 그대로 공개로 둔다.
+function needsOwner(segments: string[], method: string): boolean {
+  if (segments[0] === "games") return true;
+  if (segments[0] === "scenarios" && segments.length === 1 && method === "POST") return true;
+  return false;
+}
+
 async function proxy(request: Request, segments: string[], method: string) {
   const search = new URL(request.url).search;
   const target = `${finsimUrl()}/api/paper-trading/${segments.map(encodeURIComponent).join("/")}${search}`;
   const hasBody = method !== "GET" && method !== "DELETE";
+  const headers: Record<string, string> = {};
+  if (hasBody) headers["content-type"] = "application/json";
+
+  if (needsOwner(segments, method)) {
+    let user;
+    try {
+      user = await getSessionUser(request);
+    } catch (error) {
+      console.error("FINVERSE auth lookup failed", error);
+      return Response.json({ success: false, error: "인증 서비스에 연결하지 못했습니다." }, { status: 503 });
+    }
+    if (!user) return Response.json({ success: false, error: "로그인이 필요합니다." }, { status: 401 });
+    headers["X-Finverse-User-Id"] = String(user.id);
+  }
 
   try {
     const response = await fetch(target, {
       method,
-      headers: hasBody ? { "content-type": "application/json" } : undefined,
+      headers,
       body: hasBody ? await request.text() : undefined,
       cache: "no-store",
     });
