@@ -2265,7 +2265,6 @@ function TwinPage({ onRequireAuth }: { onRequireAuth?: (action: () => void) => v
       <section className="panel">
         <div className="panel-title">
           <div><h2>현재 나의 투자 성향</h2></div>
-          <span className="panel-note">완료된 모의투자의 나의 투자 일지와 해당 시나리오 보고서를 계정별로 함께 보관합니다.</span>
         </div>
         <div className="journal-summary-body">
           <TwinRiskProfileSurvey />
@@ -2275,9 +2274,7 @@ function TwinPage({ onRequireAuth }: { onRequireAuth?: (action: () => void) => v
             <div className="journal-investment-style-status journal-error">모의투자 기록 기반 성향을 불러오지 못했습니다.</div>
           ) : games.length === 0 ? (
             <p className="journal-investment-style-status">모의투자를 완료하면 실제 선택과 거래 기록을 바탕으로 한 성향 분석도 함께 표시됩니다.</p>
-          ) : !currentSession ? (
-            <div className="journal-investment-style-status journal-error">최근 모의투자 기록 기반 성향 판정 결과를 불러오지 못했습니다.</div>
-          ) : (
+          ) : currentSession ? (
             <div className="journal-investment-style-status">
               <div className="journal-current-style-row">
                 <span className="journal-current-style-label">모의투자 기반 관찰</span>
@@ -2288,7 +2285,7 @@ function TwinPage({ onRequireAuth }: { onRequireAuth?: (action: () => void) => v
               </div>
               <p className="journal-current-style-desc">{twinStyleNarrative(twinSessions)}</p>
             </div>
-          )}
+          ) : null}
         </div>
       </section>
 
