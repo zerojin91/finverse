@@ -2761,6 +2761,26 @@ export default function Home() {
     );
   }
 
+  if (activeTab === "twin") {
+    return (
+      <div className="mock-journal-app">
+        <header className="mock-journal-header">
+          <button className="mock-journal-brand" type="button" onClick={() => activateTab("market")} aria-label="FINVERSE 홈">
+            finverse<span>.</span>
+          </button>
+          <nav className="mock-journal-nav" aria-label="주 메뉴">
+            <button type="button" onClick={() => activateTab("market")}>시장 시뮬레이션</button>
+            <button type="button" aria-current="page">나의 투자 일지</button>
+          </nav>
+          <button className="mock-journal-login" type="button" aria-label="로그인">로그인</button>
+        </header>
+        <main className="mock-journal-main">
+          <TwinPage />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="finverse-app">
       <header className="top-header">
