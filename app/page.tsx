@@ -2411,7 +2411,6 @@ function ServiceIntro({ onEnter, onOpenJournal }: { onEnter: () => void; onOpenJ
       <header className="intro-smoke-topbar">
         <div className="intro-smoke-wrap intro-smoke-topbar-inner">
           <button className="intro-smoke-brand" type="button" onClick={onEnter}>finverse<span>.</span></button>
-          <span>MARKET JUDGMENT LAB</span>
         </div>
       </header>
 
