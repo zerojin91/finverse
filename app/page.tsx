@@ -10,7 +10,6 @@ import {
   CandlestickChart,
   ChevronRight,
   CircleDollarSign,
-  CircleHelp,
   CheckCircle2,
   Clock3,
   Database,
@@ -34,6 +33,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { ChangeEvent, CSSProperties, FormEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation";
 import { PaperTradingModal, type Security } from "@/components/paper-trading";
+import { AuthModal, useAuthUser } from "@/components/auth";
 
 const SimulationMessageResponse = dynamic(
   () => import("@/components/ai-elements/message").then((module) => module.MessageResponse),
@@ -2191,6 +2191,20 @@ function TwinPage() {
 export default function Home() {
   const [activeTab, setActiveTab] = useState<MainTab>("market");
   const [paperTradingOpen, setPaperTradingOpen] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authIntent, setAuthIntent] = useState<(() => void) | null>(null);
+  const { user: authUser, refresh: refreshAuthUser, logout: logoutAuthUser } = useAuthUser();
+
+  // 로그인 필요한 진입점(나의 투자 일지 탭, 모의 투자 시작)이 공통으로 쓴다:
+  // 로그인돼 있으면 바로 실행하고, 아니면 로그인 모달을 띄운 뒤 성공 시 이어서 실행한다.
+  const requireAuth = (action: () => void) => {
+    if (!authUser) {
+      setAuthIntent(() => action);
+      setAuthOpen(true);
+      return;
+    }
+    action();
+  };
   const [kospiData, setKospiData] = useState<KospiMarketData | null>(null);
   const [intradayIndices, setIntradayIndices] = useState<IntradayIndex[]>([]);
   const [dashboardSignals, setDashboardSignals] = useState<DashboardSignal[]>(marketSignals);
@@ -2380,8 +2394,12 @@ export default function Home() {
   }, [selectedScenario]);
 
   const activateTab = (tab: MainTab) => {
-    setActiveTab(tab);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    const go = () => {
+      setActiveTab(tab);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+    if (tab === "twin") { requireAuth(go); return; }
+    go();
   };
 
   const selectSymbol = (item: WatchSymbol) => {
@@ -2757,10 +2775,17 @@ export default function Home() {
         <nav className="top-nav" aria-label="FINVERSE 탐색">
           <button className={activeTab === "market" ? "active" : ""} onClick={() => activateTab("market")} aria-current={activeTab === "market" ? "page" : undefined}>시장 인사이트</button>
           <button className={activeTab === "twin" ? "active" : ""} onClick={() => activateTab("twin")} aria-current={activeTab === "twin" ? "page" : undefined}>나의 투자 일지</button>
-          <button onClick={() => setPaperTradingOpen(true)}>모의 투자</button>
+          <button onClick={() => requireAuth(() => setPaperTradingOpen(true))}>모의 투자</button>
         </nav>
         <div className="top-header-actions">
-          <button className="header-help" type="button" aria-label="도움말"><CircleHelp size={18} /></button>
+          {authUser ? (
+            <div className="header-user">
+              <span>{authUser.email}</span>
+              <button type="button" onClick={() => logoutAuthUser()}>로그아웃</button>
+            </div>
+          ) : (
+            <button className="header-login-button" type="button" onClick={() => setAuthOpen(true)}>로그인</button>
+          )}
         </div>
       </header>
 
@@ -2874,7 +2899,7 @@ export default function Home() {
                     </article>
                   ))}
                   <article className="custom-scenario-card">
-                    <button type="button" onClick={() => setPaperTradingOpen(true)}>
+                    <button type="button" onClick={() => requireAuth(() => setPaperTradingOpen(true))}>
                       <Plus size={26} />
                       <span>내가 생각한<br />시나리오로 보기</span>
                     </button>
@@ -3082,6 +3107,19 @@ export default function Home() {
       )}
 
       {paperTradingOpen && <PaperTradingModal onClose={() => setPaperTradingOpen(false)} />}
+      {authOpen && (
+        <AuthModal
+          onClose={() => { setAuthOpen(false); setAuthIntent(null); }}
+          onAuthenticated={() => {
+            refreshAuthUser();
+            setAuthOpen(false);
+            if (authIntent) {
+              authIntent();
+              setAuthIntent(null);
+            }
+          }}
+        />
+      )}
 
       {selectedMarketSignal && (
         <div className="modal-backdrop market-signal-backdrop" onMouseDown={() => setSelectedMarketSignal(null)}>

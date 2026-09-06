@@ -94,6 +94,23 @@ def _public(game):
     return public_scenario_game(game)
 
 
+class AuthRequiredError(Exception):
+    """The Next.js proxy resolves the session cookie and forwards this header;
+    a missing header means the request bypassed login (docs/PRD.md §13 이슈 5)."""
+
+
+def _owner_id() -> str:
+    owner_id = request.headers.get("X-Finverse-User-Id", "").strip()
+    if not owner_id:
+        raise AuthRequiredError()
+    return owner_id
+
+
+@paper_trading_bp.errorhandler(AuthRequiredError)
+def handle_auth_required(error):
+    return jsonify({"success": False, "error": "로그인이 필요합니다."}), 401
+
+
 @paper_trading_bp.errorhandler(TradingError)
 @paper_trading_bp.errorhandler(ValueError)
 def handle_trading_error(error):
@@ -250,7 +267,12 @@ def _summary(game):
 
 @paper_trading_bp.route("/games", methods=["GET"])
 def list_games():
-    games = _store().list(request.args.get("limit", 50, type=int))
+    owner_id = _owner_id()
+    limit = max(1, min(request.args.get("limit", 50, type=int), 100))
+    # 저장소는 전체 게임 중 최신 100개까지만 주므로, 그 안에서 소유자로
+    # 거른 뒤 사용자가 요청한 limit으로 자른다. 데모 규모를 넘어서면
+    # PaperGameStore 자체를 소유자별로 인덱싱해야 한다.
+    games = [game for game in _store().list(100) if game.get("owner_id") == owner_id][:limit]
     if request.args.get("summary") in ("1", "true", "yes"):
         return jsonify({"success": True, "data": [_summary(game) for game in games]})
     return jsonify({"success": True, "data": [_public(game) for game in games]})
@@ -258,8 +280,9 @@ def list_games():
 
 @paper_trading_bp.route("/games/<game_id>", methods=["GET"])
 def get_game(game_id: str):
+    owner_id = _owner_id()
     game = _store().get(game_id)
-    if not game:
+    if not game or game.get("owner_id") != owner_id:
         return _not_found(game_id)
     return jsonify({"success": True, "data": _public(game)})
 
@@ -272,6 +295,7 @@ def create_event_scenario():
     duration now controls only the number of business days; external events are
     created by the stateful World Agent as that time moves.
     """
+    owner_id = _owner_id()
     data = request.get_json(silent=True) or {}
     ticker = str(data.get("ticker", "")).zfill(6)
     simulation_days = int(data.get("simulation_days", 20))
@@ -297,6 +321,7 @@ def create_event_scenario():
         sell_tax_rate=float(data.get("sell_tax_rate", .0018)),
         slippage_bps=float(data.get("slippage_bps", 5.0)),
     )
+    game["owner_id"] = owner_id
     game["data_source"] = "finverse_postgresql_history_only"
     game["event_provenance"] = {"mode": "world_agent_retrieval_grounded"}
     game["ontology_snapshot"] = history.get("ontology_snapshot", {})
