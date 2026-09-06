@@ -2452,7 +2452,7 @@ function ServiceIntro({ onEnter, onOpenJournal }: { onEnter: () => void; onOpenJ
       </section>
 
       <section className="intro-smoke-gap intro-smoke-wrap">
-        <div className="intro-smoke-gap-heading"><div><span>계획과 실제</span><h2>알고 있는 것과<br />행동하는 것 사이</h2><p>FINVERSE가 다루는 것은 지식의 부족이 아닙니다. 시장이 급등락하는 순간에는 불안과 손실 회피 때문에 알고 있던 원칙을 지키기 어렵습니다. 그래서 알면서도 지키기 어려웠던 그 순간을 안전한 가상 환경에서 다시 연습합니다.</p></div><b>BEHAVIOR GAP</b></div>
+        <div className="intro-smoke-gap-heading"><div><span>계획과 실제</span><h2>알고 있는 것과<br />행동하는 것 사이</h2><p>FINVERSE가 다루는 것은 지식의 부족이 아닙니다.<br />시장이 급등락하는 순간에는 불안과 손실 회피 때문에 알고 있던 원칙을 지키기 어렵습니다.</p></div></div>
         <div className="intro-smoke-gap-row"><em>01</em><div><p>세운 원칙</p><strong>손절선을 정해두고,</strong></div><i>→</i><div><p>실제 순간</p><strong>막상 그 가격이 오면 물타기를 합니다.</strong></div></div>
         <div className="intro-smoke-gap-row"><em>02</em><div><p>세운 원칙</p><strong>뉴스 보고는 안 산다면서,</strong></div><i>→</i><div><p>실제 순간</p><strong>뉴스가 뜨면 이미 판단을 바꿉니다.</strong></div></div>
       </section>
