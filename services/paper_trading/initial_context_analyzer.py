@@ -19,7 +19,7 @@ from .kospi_paper_trading import TradingError
 from .llm_client import LLMClient
 
 
-CONTEXT_SCHEMA_VERSION = "initial-context-v12-complete-context"
+CONTEXT_SCHEMA_VERSION = "initial-context-v13-korean-response"
 CONTEXT_CACHE_TTL_SECONDS = 12 * 60 * 60
 
 
@@ -152,7 +152,10 @@ def _messages(source: dict[str, Any], evidence_documents: dict[str, str]) -> lis
 제공된 시장·경제·사건·커뮤니티 관측값만 근거로 선택 종목의 현재 상황을 분석한다.
 실제 관측값과 LLM의 해석을 구분하고, 미래 사건이나 가격을 사실처럼 예측하지 않는다.
 앞으로의 내용은 반드시 불확실성·가능성·시뮬레이션 전제로 표현한다.
-반드시 한국어 JSON 객체 하나만 반환한다.""",
+반드시 자연스러운 한국어로만 답변하는 JSON 객체 하나를 반환한다.
+입력 근거에 영어 기사 제목·요약이 있어도 사용자에게 표시하는 모든 문장, 특히
+`event_sequence`의 title·description·market_reaction은 원문 의미를 벗어나지 않는
+자연스러운 한국어로 작성한다. 영어 원문을 그대로 복사하거나 병기하지 않는다.""",
         },
         {
             "role": "user",
