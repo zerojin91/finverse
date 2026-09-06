@@ -2414,13 +2414,6 @@ function ServiceIntro({ onEnter, onOpenJournal }: { onEnter: () => void; onOpenJ
         </div>
       </header>
 
-      <section className="intro-smoke-product-preview" aria-label="조건부 시뮬레이션 화면 예시">
-        <div className="intro-smoke-wrap">
-          <img src="/intro/conditional-simulation.png" alt="삼성전자 조건부 반등 시뮬레이션과 발생 가능 이벤트 예시" />
-          <p>실제 서비스 화면 예시 · 결과를 예측하는 화면이 아니라 판단을 연습하는 가상 경로입니다.</p>
-        </div>
-      </section>
-
       <section className="intro-smoke-hero" aria-labelledby="service-intro-title">
         <div className="intro-smoke-wrap intro-smoke-hero-inner">
           <div>
@@ -2431,22 +2424,8 @@ function ServiceIntro({ onEnter, onOpenJournal }: { onEnter: () => void; onOpenJ
             <button className="intro-smoke-cta" type="button" onClick={onEnter}>시장 시뮬레이션 시작하기 <ArrowRight size={17} /></button>
             <p className="intro-smoke-note">실제 계좌와 연결하지 않는 모의투자 학습 서비스입니다.</p>
           </div>
-          <figure className="intro-smoke-hidden-chart">
-            <div><span>삼성전자 · 005930</span><span>모의투자</span></div>
-            <svg viewBox="0 0 420 192" role="img" aria-label="실제 캔들과 미공개 미래 구간을 구분한 예시 차트">
-              <defs><pattern id="introVoidHatch" width="7" height="7" patternTransform="rotate(45)" patternUnits="userSpaceOnUse"><line x1="0" y1="0" x2="0" y2="7" /></pattern></defs>
-              {[42, 94, 146].map((y) => <line className="intro-smoke-grid" key={y} x1="0" y1={y} x2="420" y2={y} />)}
-              <g className="intro-smoke-candles">
-                {[[18, 96, 132, 104, 20, "down"], [42, 86, 126, 94, 24, "up"], [66, 74, 116, 82, 26, "up"], [90, 70, 112, 78, 22, "down"], [114, 78, 122, 86, 28, "down"], [138, 66, 110, 74, 28, "up"], [162, 56, 98, 64, 26, "up"], [186, 62, 106, 70, 24, "down"]].map(([x, high, low, body, height, tone]) => (
-                  <g className={tone === "up" ? "up" : "down"} key={String(x)}><line x1={Number(x)} y1={Number(high)} x2={Number(x)} y2={Number(low)} /><rect x={Number(x) - 6} y={Number(body)} width="12" height={Number(height)} /></g>
-                ))}
-              </g>
-              <rect className="intro-smoke-void" x="214" y="10" width="200" height="154" />
-              <rect className="intro-smoke-void-box" x="214" y="10" width="200" height="154" />
-              <line className="intro-smoke-divide" x1="206" y1="10" x2="206" y2="164" />
-              <circle cx="206" cy="88" r="4.5" /><text x="314" y="84" textAnchor="middle">아직 공개되지 않았습니다</text><text className="intro-smoke-subtext" x="314" y="104" textAnchor="middle">검색해도 나오지 않습니다</text><text className="intro-smoke-subtext" x="200" y="182" textAnchor="end">여기서 판단합니다</text>
-            </svg>
-            <figcaption><span><i className="up" />상승</span><span><i className="down" />하락</span><span><i className="void" />미공개 구간</span></figcaption>
+          <figure className="intro-smoke-hidden-chart intro-smoke-real-preview">
+            <img src="/intro/conditional-simulation.png" alt="삼성전자 조건부 반등 시뮬레이션과 발생 가능 이벤트 예시" />
           </figure>
         </div>
       </section>
