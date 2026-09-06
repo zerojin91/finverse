@@ -2337,7 +2337,9 @@ function TwinPage({ onRequireAuth }: { onRequireAuth?: (action: () => void) => v
                     </div>
                   </div>
                   <div className="journal-lab-chart-layout">
-                    <TwinCandleChart detail={selectedDetail} />
+                    <div className="journal-lab-chart-column">
+                      <TwinCandleChart detail={selectedDetail} />
+                    </div>
                     <TwinPotentialEventRail detail={selectedDetail} />
                   </div>
                   <TwinStoredReports reports={selectedDetail.llm_reports} regenerating={regeneratingReportId === selectedDetail.game_id} onRegenerate={() => { void regenerateReports(selectedDetail.game_id); }} />

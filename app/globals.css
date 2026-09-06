@@ -563,6 +563,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .journal-lab-run-return span { display: block; color: var(--light); font-size: 9.5px; }
 .journal-lab-run-return b { display: block; margin-top: 3px; font-size: 19px; font-weight: 800; }
 .journal-lab-chart-layout { display: grid; grid-template-columns: minmax(0,1fr) minmax(260px,300px); gap: 18px; align-items: stretch; }
+.journal-lab-chart-column { min-width: 0; }
 .journal-potential-events { min-width: 0; padding: 6px 0 0 18px; border-left: 1px solid var(--line); }
 .journal-potential-events > header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding-right: 2px; }
 .journal-potential-events h4 { margin: 0; color: var(--ink); font-size: 13px; }
