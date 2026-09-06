@@ -2470,7 +2470,7 @@ function ServiceIntro({ onEnter, onOpenJournal }: { onEnter: () => void; onOpenJ
       <section className="intro-smoke-feature">
         <div className="intro-smoke-wrap intro-smoke-feature-grid">
           <div><span className="intro-smoke-tag">아는 것</span><h2>가격이 아니라<br />조건을 봅니다</h2><p>종목을 고르면 시장·경제·사건·커뮤니티에서 모은 근거로 지금 그 종목이 <b>어떤 조건 위에 서 있는지</b> 정리합니다.</p><p>숫자를 정답처럼 던지지 않고, 조건이 깨지는 신호까지 함께 보여줍니다.</p></div>
-          <div className="intro-smoke-mock"><header><span>시장 시뮬레이션 · 초기 상황</span><span>최근 한 달 · 실제 근거 기반</span></header><strong>삼성전자 <small>005930</small></strong><ul><li><b>A</b> 주주환원 확대 기대가 실제 자금 흐름으로 이어지는지</li><li><b>B</b> 외국인·기관 동반 순매도가 이어지며 주가를 누르는지</li><li><b>C</b> 기준금리 인상과 반도체 실적이 가격에 미치는 영향은 무엇인지</li></ul><footer>주주환원·수급·금리·실적 관련 실제 사건을 시간순으로 확인합니다.</footer></div>
+          <div className="intro-smoke-mock"><header><span>시장 시뮬레이션 · 초기 상황</span><span>최근 한 달 · 실제 근거 기반</span></header><strong>삼성전자 <small>005930</small></strong><ul className="intro-smoke-ontology"><li><b>시장</b><span>삼성전자 주가·거래량과 외국인·기관 수급의 최근 흐름을 요약합니다.</span></li><li><b>경제</b><span>한국은행 기준금리 인상과 환율·거시지표가 업종에 미치는 영향을 정리합니다.</span></li><li><b>사건</b><span>주주환원 확대, 반도체 실적 등 종목과 직접 연결된 주요 사건을 묶습니다.</span></li><li><b>커뮤니티</b><span>온라인 투자 반응과 참여 추이를 통해 시장 심리의 변화를 살펴봅니다.</span></li></ul><footer>4개 온톨로지 정보의 Evidence 문서를 바탕으로 초기 상황을 요약합니다.</footer></div>
         </div>
       </section>
 
