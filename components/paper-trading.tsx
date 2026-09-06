@@ -1794,7 +1794,13 @@ function SetupScreen({
           setAgentProfileJob(next);
           setAgentProfileError(next.error ?? "시장 참여 에이전트 프로필 생성에 실패했습니다.");
         } else {
-          setAgentProfileJob(next);
+          const updatedAt = next.updated_at ? Date.parse(next.updated_at) : 0;
+          if (updatedAt && Date.now() - updatedAt > STALL_NOTICE_MS) {
+            setAgentProfileJob({ ...next, status: "failed", message: "작업이 응답하지 않아 재실행이 필요합니다.", error: "프로필 생성 작업이 제한 시간 동안 진행되지 않았습니다." });
+            setAgentProfileError("시장 참여 에이전트 프로필 생성이 오래 진행되지 않았습니다. 다시 실행해주세요.");
+          } else {
+            setAgentProfileJob(next);
+          }
         }
       } catch (cause) {
         if (!cancelled) setAgentProfileError(cause instanceof Error ? cause.message : "프로필 생성 진행 상태를 확인하지 못했습니다.");
