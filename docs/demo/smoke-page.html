@@ -1,0 +1,743 @@
+<!-- FINVERSE-DOC · AI 어시스트 작성 · 원본 소스(README · app/ · services/ · agents/ · collectors/)와 구분되는 산출물 -->
+<!--
+  FINVERSE 서비스 소개 스모크 페이지.
+
+  세 꼭지의 화면은 아직 손으로 그린 목업이라 블록마다 "화면은 예시입니다"를 달아 뒀다.
+  실제 화면 캡처가 들어오면 그 자리를 바꾸고 문구를 뗀다.
+
+  CTA는 데모 서버(https://finverse-collector.taila68873.ts.net/)를 가리킨다.
+  Tailscale 네트워크라 외부에서 열리는지 확인이 필요하다 → docs/PRD.md §12.2.
+
+  브라우저로 이 파일을 그대로 열면 된다. 별도 빌드가 없다.
+-->
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>:root{color-scheme:light}body{margin:0;font:14px system-ui,sans-serif;background:#fafafa}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>FINVERSE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@700;800;900&family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+</head>
+<body>
+<style>
+/* ── 토큰 ─────────────────────────────────────────────────────────────
+   중립 라이트 단일 테마. 제품(app/globals.css)이 라이트 전용이라 이 페이지도
+   뷰어 테마를 따라가지 않는다. --up(#d64c53)=상승 / --down(#0769ff)=하락은
+   제품 토큰 그대로이고, 시장 데이터가 있는 자리에만 쓴다. */
+:root {
+  --ground:      #F6F6F7;
+  --surface:     #FFFFFF;
+  --surface-alt: #FAFAFA;
+  --ink:         #0B0D14;
+  --text:        #3F4149;
+  --muted:       #6E7076;
+  --faint:       #9B9DA3;
+  --line:        #E9E9EC;
+  --line-strong: #D8D8DC;
+  --up:          #D64C53;
+  --down:        #0769FF;
+  --brand:       #0769FF;
+  --brand-wash:  #F0F6FF;
+  --up-wash:     #FDF0F1;
+  --focus:       #0769FF;
+
+  /* 그라데이션은 하나만 쓰고 세기만 바꾼다.
+     제공하는 것 다섯 지점: 코어밸류 · 꼭지 1·2·3 표식 · CTA */
+  --grad:      linear-gradient(112deg, #0050D8 0%, #0769FF 52%, #3D8BFF 100%);
+  --grad-hero: linear-gradient(180deg, #FFFFFF 0%, #FBFCFE 100%);
+  --grad-peak: linear-gradient(180deg, #FFFFFF 0%, #F1F7FF 100%);
+  --grad-cta:  linear-gradient(180deg, #F6F6F7 0%, #EAF2FF 100%);
+
+  --display: "Gothic A1", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --radius: 12px;
+  --maxw: 1120px;
+  --readw: 34rem;
+}
+
+/* ── 기본 ───────────────────────────────────────────────────────────── */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  /* 한국어는 단어 중간에서 끊으면 안 된다. 어절 단위로만 넘긴다.
+     break-word 는 끊을 곳이 없는 긴 토큰(URL·숫자)의 안전장치다. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+
+h1, h2, h3 {
+  font-family: var(--display);
+  color: var(--ink);
+  margin: 0;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+  line-height: 1.18;
+}
+
+p { margin: 0; }
+figure { margin: 0; }
+a { color: inherit; }
+
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 4px; }
+
+.eyebrow {
+  font-family: var(--body);
+  font-size: 12px; font-weight: 500;
+  letter-spacing: 0.02em; text-transform: uppercase;
+  color: var(--muted);
+}
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* ── 상단 바 ─────────────────────────────────────────────────────────── */
+.topbar { border-bottom: 1px solid var(--line); background: var(--surface); }
+.topbar-inner {
+  max-width: var(--maxw); margin: 0 auto; padding: 16px 24px;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+}
+.brand {
+  font-family: var(--display); font-weight: 900; font-size: 19px;
+  letter-spacing: -0.02em; color: var(--ink);
+}
+.brand .dot { color: var(--brand); }
+.brand-note {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.02em;
+  color: var(--faint); text-transform: uppercase;
+}
+
+/* ── 히어로 ─────────────────────────────────────────────────────────── */
+.hero { background: var(--grad-hero); border-bottom: 1px solid var(--line); }
+.hero-inner {
+  max-width: var(--maxw); margin: 0 auto; padding: 76px 24px 68px;
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr);
+  gap: 56px; align-items: center;
+}
+.hero-thesis { font-size: clamp(29px, 3.9vw, 45px); font-weight: 900; }
+.hero-lede { margin-top: 22px; max-width: var(--readw); font-size: 17px; color: var(--text); }
+.hero-lede strong { color: var(--ink); font-weight: 600; }
+.hero-rule { margin: 30px 0 24px; width: 56px; height: 3px; border-radius: 999px; background: var(--grad); }
+.hero-close {
+  font-family: var(--display); font-weight: 800;
+  font-size: clamp(19px, 1.9vw, 23px); letter-spacing: -0.025em;
+  color: var(--brand);
+}
+/* background-clip을 지원할 때만 그라데이션으로 덮는다. 아니면 위의 단색이 남는다. */
+@supports (-webkit-background-clip: text) or (background-clip: text) {
+  .hero-close {
+    background-image: var(--grad);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+  }
+}
+
+.cta {
+  display: inline-flex; align-items: center; gap: 10px;
+  margin-top: 30px; padding: 15px 26px;
+  border: 0; border-radius: 10px;
+  background: var(--grad); color: #FFFFFF;
+  font-family: var(--body); font-size: 15.5px; font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 6px 18px -7px rgba(7, 105, 255, .55);
+  transition: transform .16s ease, box-shadow .16s ease;
+}
+.cta:hover { transform: translateY(-1px); box-shadow: 0 11px 26px -9px rgba(7, 105, 255, .6); }
+.cta .arrow { font-family: var(--mono); font-size: 14px; }
+.cta-note { margin-top: 12px; font-size: 13px; color: var(--muted); }
+
+/* ── 히어로 그림 ─────────────────────────────────────────────────────── */
+.hidden-chart {
+  background: var(--surface-alt); border: 1px solid var(--line);
+  border-radius: 14px; padding: 20px 20px 16px;
+}
+.hidden-chart-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px; margin-bottom: 14px;
+}
+.hidden-chart-head .t {
+  font-family: var(--body); font-size: 12px; letter-spacing: 0.02em;
+  color: var(--muted); text-transform: uppercase;
+}
+.hidden-chart svg { display: block; width: 100%; height: auto; }
+
+/* SVG는 클래스로 칠한다. 프레젠테이션 속성 안의 var()는 브라우저별 편차가 있다. */
+.hidden-chart .grid   { stroke: var(--line); stroke-width: 1; fill: none; }
+.hidden-chart .c-up   { fill: var(--up); stroke: var(--up); }
+.hidden-chart .c-down { fill: var(--down); stroke: var(--down); }
+.hidden-chart .hatch-line { stroke: var(--line); stroke-width: 1.4; }
+.hidden-chart .divide { stroke: var(--ink); stroke-width: 1.5; fill: none; }
+.hidden-chart .pin    { fill: var(--ink); }
+.hidden-chart .voidbox  { fill: none; stroke: var(--line-strong); stroke-width: 1; }
+.hidden-chart .voidfill { stroke: none; }
+.hidden-chart .t-mono { font-family: var(--body); font-size: 11.5px; fill: var(--muted); }
+.hidden-chart .t-lead { font-family: var(--body); font-size: 13px; font-weight: 600; fill: var(--muted); }
+.hidden-chart .t-sub  { font-family: var(--body); font-size: 11.5px; fill: var(--faint); }
+
+.hidden-chart-foot {
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line);
+  display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted);
+}
+.hidden-chart-foot span { display: inline-flex; align-items: center; gap: 7px; }
+.swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.swatch.up { background: var(--up); }
+.swatch.down { background: var(--down); }
+.swatch.void { background: transparent; border: 1px dashed var(--line-strong); }
+
+/* ── 공감 ───────────────────────────────────────────────────────────── */
+.gap-section { padding: 72px 0 8px; }
+.gap-list {
+  margin: 26px 0 0; padding: 0; list-style: none;
+  max-width: 46rem; border-top: 1px solid var(--line);
+}
+.gap-list li {
+  padding: 18px 0; border-bottom: 1px solid var(--line);
+  display: grid; grid-template-columns: minmax(0, 0.82fr) minmax(0, 1fr);
+  gap: 30px; align-items: baseline;
+}
+/* 왼쪽은 정해둔 것, 오른쪽은 실제로 한 것. 둘 사이의 빈 칸이 이 섹션의 논지다. */
+.gap-list .plan { font-size: 16.5px; color: var(--muted); }
+.gap-list .act  { font-size: 17px; color: var(--ink); font-weight: 500; }
+.gap-punch {
+  margin-top: 30px; font-family: var(--display); font-weight: 900;
+  font-size: clamp(24px, 3vw, 34px); color: var(--ink); letter-spacing: -0.035em;
+}
+
+/* ── 꼭지 공통 ───────────────────────────────────────────────────────── */
+.feature { padding: 64px 0; border-top: 1px solid var(--line); }
+
+.feature-grid {
+  display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 52px; align-items: center;
+}
+.feature-grid.reverse .feature-copy { order: 2; }
+
+.feature-tag {
+  display: inline-block; padding: 5px 11px;
+  border: 1px solid rgba(7, 105, 255, .18); border-radius: 999px;
+  background: var(--brand-wash);
+  font-family: var(--body); font-size: 11.5px; font-weight: 600;
+  letter-spacing: 0.02em; color: var(--brand);
+}
+.feature h2 { margin-top: 18px; font-size: clamp(25px, 2.8vw, 33px); font-weight: 800; }
+.feature-body { margin-top: 16px; max-width: var(--readw); font-size: 16.5px; }
+.feature-body + .feature-body { margin-top: 12px; }
+.feature-body strong { color: var(--ink); font-weight: 600; }
+
+.feature.primary {
+  background: var(--grad-peak);
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  padding: 76px 0;
+}
+.feature.primary .feature-grid {
+  grid-template-columns: minmax(0, 1fr); gap: 40px;
+  justify-items: center; text-align: center;
+}
+.feature.primary .feature-body { margin-left: auto; margin-right: auto; }
+.feature.primary h2 { font-size: clamp(28px, 3.6vw, 42px); font-weight: 900; }
+.feature.primary .mock { width: 100%; max-width: 880px; }
+
+/* ── 목업 공통 ───────────────────────────────────────────────────────── */
+.mock {
+  background: var(--surface); border: 1px solid var(--line);
+  box-shadow: 0 1px 2px rgba(11, 13, 20, .04);
+  border-radius: var(--radius); overflow: hidden;
+}
+
+.mock-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 11px 15px; border-bottom: 1px solid var(--line); background: var(--surface-alt);
+}
+.mock-bar .label {
+  font-family: var(--body); font-size: 11.5px; letter-spacing: 0.02em;
+  text-transform: uppercase; color: var(--muted);
+}
+.mock-body { padding: 18px 18px 20px; text-align: left; }
+.mock-caption { margin-top: 12px; font-size: 12.5px; color: var(--faint); text-align: left; }
+
+/* 시세 헤더 */
+.quote { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.quote .name { font-family: var(--display); font-weight: 800; font-size: 17px; color: var(--ink); }
+.quote .ticker { font-family: var(--mono); font-size: 12px; color: var(--faint); }
+/* 가격은 등폭으로 쓰면 콤마 앞뒤가 벌어져 보인다. 본문 서체 + 표 정렬 숫자로. */
+.quote .price {
+  font-family: var(--body); font-size: 25px; font-weight: 600;
+  letter-spacing: -0.015em; font-variant-numeric: tabular-nums;
+}
+.quote .delta { font-family: var(--body); font-size: 13.5px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.quote .price.down, .quote .delta.down { color: var(--down); }
+.quote .price.up, .quote .delta.up { color: var(--up); }
+
+/* 조건 목록 */
+.cond { margin: 16px 0 0; padding: 0; list-style: none; display: grid; gap: 9px; }
+.cond li {
+  display: grid; grid-template-columns: 1.1rem minmax(0, 1fr); gap: 10px;
+  align-items: start; font-size: 13.5px; color: var(--text); line-height: 1.55;
+}
+.cond .mark { font-family: var(--mono); font-size: 12px; color: var(--faint); padding-top: 1px; }
+.cond li.refute { color: var(--muted); }
+.cond li.refute .mark { color: var(--down); }
+
+/* 예정 이벤트 */
+.timeline {
+  margin-top: 16px; padding-top: 15px; border-top: 1px solid var(--line);
+  display: grid; gap: 8px;
+}
+.tl-row {
+  display: grid; grid-template-columns: 3.4rem minmax(0, 1fr) auto;
+  gap: 12px; align-items: baseline; font-size: 12.5px;
+}
+.tl-row .w { font-family: var(--body); font-size: 11.5px; color: var(--faint); }
+.tl-row .e { color: var(--text); }
+.tl-row .i { font-family: var(--body); font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.tl-row .i.up { color: var(--up); }
+.tl-row .i.down { color: var(--down); }
+
+/* 사건 비공개 배지 */
+.sealed {
+  margin-top: 16px; display: flex; align-items: center; gap: 10px;
+  padding: 11px 13px; border: 1px dashed var(--line-strong);
+  border-radius: 9px; background: var(--surface-alt);
+}
+.sealed .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); flex: none; }
+.sealed .txt { font-size: 13px; color: var(--text); }
+.sealed .txt b { color: var(--ink); font-weight: 600; }
+.sealed .when {
+  margin-left: auto; font-family: var(--mono); font-size: 11.5px;
+  color: var(--muted); white-space: nowrap;
+}
+
+.signal-line {
+  margin-top: 12px; font-size: 13px; color: var(--text);
+  display: flex; gap: 9px; align-items: baseline; flex-wrap: wrap;
+}
+.signal-line .tag {
+  font-family: var(--body); font-size: 11px; letter-spacing: 0.02em;
+  text-transform: uppercase; color: var(--faint);
+}
+.signal-line .rel { font-family: var(--body); font-size: 11.5px; color: var(--muted); }
+
+/* 일일 판단 3지선다 */
+.judge-label {
+  margin-top: 16px; font-family: var(--body); font-size: 11px;
+  letter-spacing: 0.02em; text-transform: uppercase; color: var(--faint);
+}
+.judge-row { margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+.judge-btn {
+  padding: 9px 15px; border-radius: 8px; font-size: 13px; font-weight: 600;
+  border: 1px solid var(--line-strong); background: transparent;
+  color: var(--muted); font-family: var(--body);
+}
+.judge-btn.picked { border-color: var(--brand); color: var(--brand); background: var(--brand-wash); }
+.judge-note { margin-top: 9px; font-size: 12.5px; color: var(--muted); }
+
+/* 에이전트 */
+.persona-row {
+  margin-top: 17px; padding-top: 15px; border-top: 1px solid var(--line);
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;
+}
+.persona .p-top { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
+.persona .p-name { font-size: 12.5px; font-weight: 600; color: var(--ink); }
+.persona .p-n { font-family: var(--mono); font-size: 11px; color: var(--faint); }
+.persona .p-track {
+  margin-top: 7px; height: 5px; border-radius: 999px;
+  background: var(--line); overflow: hidden;
+}
+.persona .p-fill { display: block; height: 100%; border-radius: 999px; }
+.persona .p-fill.up { background: var(--up); }
+.persona .p-fill.down { background: var(--down); }
+.persona .p-act {
+  margin-top: 6px; font-family: var(--body); font-size: 11px;
+  letter-spacing: 0.02em; text-transform: uppercase; color: var(--muted);
+}
+
+/* 성향 진단 */
+.verdict { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.verdict .v-label {
+  font-family: var(--body); font-size: 11.5px; letter-spacing: 0.02em;
+  text-transform: uppercase; color: var(--muted);
+}
+.verdict .v-type {
+  font-family: var(--display); font-weight: 900; font-size: 25px;
+  color: var(--ink); letter-spacing: -0.03em;
+}
+
+.metric-row {
+  margin-top: 16px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px; background: var(--line); border: 1px solid var(--line);
+  border-radius: 10px; overflow: hidden;
+}
+.metric { background: var(--surface); padding: 12px 13px; }
+.metric .m-k { font-size: 11.5px; color: var(--muted); line-height: 1.4; }
+.metric .m-v {
+  margin-top: 5px; font-family: var(--mono); font-size: 21px; font-weight: 500;
+  color: var(--ink); letter-spacing: -0.02em;
+}
+.metric .m-v em { font-style: normal; font-size: 13px; color: var(--muted); margin-left: 2px; }
+
+.finding {
+  margin-top: 16px; padding: 14px 15px;
+  border-left: 2px solid var(--brand); background: var(--surface-alt);
+  border-radius: 0 8px 8px 0;
+}
+.finding .f-said { font-size: 13.5px; color: var(--ink); font-weight: 600; line-height: 1.6; }
+.finding .f-next { margin-top: 8px; font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+/* 성향 히스토리 */
+.history {
+  margin-top: 16px; padding-top: 15px; border-top: 1px solid var(--line);
+  display: grid; gap: 7px;
+}
+.h-row {
+  display: grid; grid-template-columns: 4.6rem minmax(0, 1fr) auto;
+  gap: 12px; align-items: baseline; font-size: 12.5px;
+}
+.h-row .d { font-family: var(--mono); font-size: 11px; color: var(--faint); }
+.h-row .s { color: var(--text); }
+.h-row .r { font-family: var(--body); font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.h-row .r.up { color: var(--up); }
+.h-row .r.down { color: var(--down); }
+
+/* ── 마무리 ─────────────────────────────────────────────────────────── */
+.closing {
+  border-top: 1px solid var(--line); padding: 78px 0 82px; text-align: center;
+  background: var(--grad-cta);
+}
+.closing h2 { font-size: clamp(27px, 3.4vw, 38px); font-weight: 900; }
+.closing .closing-cta { margin-top: 34px; }
+
+/* ── 푸터 ───────────────────────────────────────────────────────────── */
+.foot { border-top: 1px solid var(--line); background: var(--surface); padding: 26px 0 34px; }
+.foot-inner {
+  max-width: var(--maxw); margin: 0 auto; padding: 0 24px;
+  display: flex; gap: 18px; justify-content: space-between; flex-wrap: wrap;
+  font-size: 12.5px; color: var(--muted); line-height: 1.65;
+}
+.foot p { max-width: 46rem; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* ── 반응형 ─────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .hero-inner { grid-template-columns: minmax(0, 1fr); gap: 40px; padding: 56px 24px 52px; }
+  .feature-grid { grid-template-columns: minmax(0, 1fr); gap: 32px; }
+  .feature-grid.reverse .feature-copy { order: 0; }
+  .persona-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .gap-list li { grid-template-columns: minmax(0, 1fr); gap: 3px; }
+  .metric-row { grid-template-columns: minmax(0, 1fr); }
+  .tl-row, .h-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .tl-row .w, .h-row .d { grid-column: 1 / -1; }
+}
+</style>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <span class="brand">finverse<span class="dot">.</span></span>
+    <span class="brand-note">2026 금융 AI Challenge</span>
+  </div>
+</header>
+
+<!-- ══ 히어로 ══════════════════════════════════════════════════════════ -->
+<section class="hero">
+  <div class="hero-inner">
+    <div>
+      <h1 class="hero-thesis">투자 공부는 했는데,<br>막상 그 순간엔<br>다르게 행동합니다.</h1>
+      <div class="hero-rule"></div>
+      <p class="hero-close">FINVERSE는 그 간격을 좁힙니다.</p>
+
+      <!-- 데모 서버. Tailscale 네트워크라 외부에서 열리는지 확인이 필요하다. -->
+      <a class="cta" href="https://finverse-collector.taila68873.ts.net/">
+        모의 투자 시작하기 <span class="arrow" aria-hidden="true">→</span>
+      </a>
+      <p class="cta-note">가입 없이 바로 시작합니다. 실제 계좌와 연결되지 않습니다.</p>
+    </div>
+
+    <figure class="hidden-chart">
+      <div class="hidden-chart-head">
+        <span class="t">삼성전자 · 005930</span>
+        <span class="t">20거래일 연습</span>
+      </div>
+
+      <svg viewBox="0 0 420 192" role="img"
+           aria-label="왼쪽 절반에는 실제 캔들이 그려져 있고, 오른쪽 절반은 빗금으로 비어 있는 차트. 그 경계에 '여기서 판단합니다'라고 표시되어 있다.">
+        <defs>
+          <pattern id="voidHatch" width="7" height="7" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+            <line class="hatch-line" x1="0" y1="0" x2="0" y2="7"/>
+          </pattern>
+        </defs>
+
+        <line class="grid" x1="0" y1="42"  x2="420" y2="42"/>
+        <line class="grid" x1="0" y1="94"  x2="420" y2="94"/>
+        <line class="grid" x1="0" y1="146" x2="420" y2="146"/>
+
+        <!-- 실제 캔들: 빨강=상승 / 파랑=하락 (한국 시장 관례) -->
+        <g stroke-width="1.5">
+          <line class="c-down" x1="18"  y1="96"  x2="18"  y2="132"/>
+          <rect class="c-down" x="12"  y="104" width="12" height="20"/>
+          <line class="c-up"   x1="42"  y1="86"  x2="42"  y2="126"/>
+          <rect class="c-up"   x="36"  y="94"  width="12" height="24"/>
+          <line class="c-up"   x1="66"  y1="74"  x2="66"  y2="116"/>
+          <rect class="c-up"   x="60"  y="82"  width="12" height="26"/>
+          <line class="c-down" x1="90"  y1="70"  x2="90"  y2="112"/>
+          <rect class="c-down" x="84"  y="78"  width="12" height="22"/>
+          <line class="c-down" x1="114" y1="78"  x2="114" y2="122"/>
+          <rect class="c-down" x="108" y="86"  width="12" height="28"/>
+          <line class="c-up"   x1="138" y1="66"  x2="138" y2="110"/>
+          <rect class="c-up"   x="132" y="74"  width="12" height="28"/>
+          <line class="c-up"   x1="162" y1="56"  x2="162" y2="98"/>
+          <rect class="c-up"   x="156" y="64"  width="12" height="26"/>
+          <line class="c-down" x1="186" y1="62"  x2="186" y2="106"/>
+          <rect class="c-down" x="180" y="70"  width="12" height="24"/>
+        </g>
+
+        <!-- 아직 없는 미래 -->
+        <rect class="voidfill" x="214" y="10" width="200" height="154" fill="url(#voidHatch)" opacity="0.5"/>
+        <rect class="voidbox"  x="214" y="10" width="200" height="154" stroke-dasharray="3 4"/>
+        <text class="t-lead" x="314" y="84"  text-anchor="middle">아직 공개되지 않았습니다</text>
+        <text class="t-sub"  x="314" y="104" text-anchor="middle">검색해도 나오지 않습니다</text>
+
+        <!-- 판단 경계 -->
+        <line class="divide" x1="206" y1="10" x2="206" y2="164" stroke-dasharray="4 4"/>
+        <circle class="pin" cx="206" cy="88" r="4.5"/>
+        <text class="t-mono" x="200" y="182" text-anchor="end">여기서 판단합니다</text>
+      </svg>
+
+      <figcaption class="hidden-chart-foot">
+        <span><i class="swatch up"></i> 상승</span>
+        <span><i class="swatch down"></i> 하락</span>
+        <span><i class="swatch void"></i> 미공개 구간</span>
+      </figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ══ 공감 ════════════════════════════════════════════════════════════ -->
+<section class="gap-section">
+  <div class="wrap">
+    <span class="eyebrow">계획과 실제</span>
+    <ul class="gap-list">
+      <li><span class="plan">손절선을 정해두고,</span><span class="act">막상 그 가격이 오면 물타기를 합니다.</span></li>
+      <li><span class="plan">분산하겠다고 해놓고,</span><span class="act">확신이 들면 한 종목에 몰아넣습니다.</span></li>
+      <li><span class="plan">뉴스 보고는 안 산다면서,</span><span class="act">뉴스가 뜨면 이미 주문을 넣고 있습니다.</span></li>
+    </ul>
+    <p class="gap-punch">몰라서가 아닙니다. 알면서 못 한 겁니다.</p>
+  </div>
+</section>
+
+<!-- ══ 꼭지 1 — 아는 것 ═══════════════════════════════════════════════ -->
+<section class="feature">
+  <div class="wrap">
+    <div class="feature-grid">
+      <div class="feature-copy">
+        <span class="feature-tag">아는 것</span>
+        <h2>가격이 아니라<br>조건을 봅니다</h2>
+        <p class="feature-body">
+          종목을 고르면 시장·경제·사건·커뮤니티에서 모은 근거로 지금 그 종목이
+          <strong>어떤 조건 위에 서 있는지</strong> 보여드립니다.
+        </p>
+        <p class="feature-body">
+          숫자 하나를 정답처럼 던지지 않습니다. 그 숫자가 성립하는 조건과,
+          <strong>그 조건이 깨지는 신호</strong>를 함께 놓습니다. 지킬 수 있는 기준의 형태로요.
+        </p>
+      </div>
+
+      <figure class="mock">
+        <div class="mock-bar">
+          <span class="label">시장 인사이트 · 시나리오</span>
+          <span class="label">1개월</span>
+        </div>
+        <div class="mock-body">
+          <div class="quote">
+            <span class="name">SK하이닉스</span>
+            <span class="ticker num">000660</span>
+            <span class="price down num">248,500</span>
+            <span class="delta down num">−2.4%</span>
+          </div>
+
+          <ul class="cond">
+            <li><span class="mark">A</span><span>외국인이 현물·선물에서 <strong>3거래일 이상</strong> 순매수로 전환</span></li>
+            <li><span class="mark">B</span><span>영업이익이 컨센서스를 <strong>10% 이상</strong> 상회</span></li>
+            <li><span class="mark">C</span><span>글로벌 빅테크의 AI 인프라 투자 가이던스 유지</span></li>
+            <li class="refute"><span class="mark">※</span><span>반증 신호 — 외국인 순매수가 3~5거래일 안에 꺾이면 이 경로는 닫힙니다</span></li>
+          </ul>
+
+          <div class="timeline">
+            <div class="tl-row"><span class="w">1주차</span><span class="e">실적 발표 · 가이던스 공개</span><span class="i up num">+4.2%p</span></div>
+            <div class="tl-row"><span class="w">2주차</span><span class="e">메모리 고정거래가 발표</span><span class="i up num">+1.8%p</span></div>
+            <div class="tl-row"><span class="w">3주차</span><span class="e">중국 공급 확대 보도</span><span class="i down num">−3.1%p</span></div>
+          </div>
+        </div>
+      </figure>
+    </div>
+    <p class="mock-caption">화면은 예시입니다. 표시된 수치는 실제 수집 데이터의 형태를 보여주기 위한 것입니다.</p>
+  </div>
+</section>
+
+<!-- ══ 꼭지 2 — 하는 것 (메인) ════════════════════════════════════════ -->
+<section class="feature primary">
+  <div class="wrap">
+    <div class="feature-grid">
+      <div class="feature-copy">
+        <span class="feature-tag">하는 것</span>
+        <h2>결과를 모른 채, 판단을 남깁니다</h2>
+        <p class="feature-body">
+          실제 데이터로 만든 시장이 <strong>아직 공개되지 않은 사건</strong>을 향해 하루씩 움직입니다.
+          검색해도 안 나옵니다. 가격은 그때 그대로가 아니라 매번 새로 만들어지거든요.
+        </p>
+        <p class="feature-body">
+          <strong>주문은 내지 않습니다.</strong> 내일 살지, 지켜볼지, 팔지 — 생각만 기록합니다.
+          그 사이 <strong>개인·외국인·기관·연기금의 판단과 행동 시뮬레이션이</strong> 다음 날
+          가격을 만들고, 당신의 기록은 그 결과와 나란히 놓입니다.
+        </p>
+      </div>
+
+      <figure class="mock">
+        <div class="mock-bar">
+          <span class="label">모의 투자 · 12일차 / 20일</span>
+          <span class="label">실제 시세 기반</span>
+        </div>
+        <div class="mock-body">
+          <div class="quote">
+            <span class="name">삼성전자</span>
+            <span class="ticker num">005930</span>
+            <span class="price up num">71,400</span>
+            <span class="delta up num">+1.9%</span>
+          </div>
+
+          <div class="sealed">
+            <span class="dot" aria-hidden="true"></span>
+            <span class="txt"><b>중요한 사건이 다가오고 있습니다.</b> 내용은 아직 공개되지 않습니다.</span>
+            <span class="when num">D-1</span>
+          </div>
+
+          <p class="signal-line">
+            <span class="tag">선행 신호</span>
+            <span>외국인 순매도가 2거래일 연속 이어지고 있습니다.</span>
+            <span class="rel">신뢰도 보통</span>
+          </p>
+
+          <p class="judge-label">오늘의 판단</p>
+          <div class="judge-row">
+            <button class="judge-btn" type="button">내일 매수 고려</button>
+            <button class="judge-btn picked" type="button">관찰 계속</button>
+            <button class="judge-btn" type="button">내일 매도 고려</button>
+          </div>
+          <p class="judge-note">수량도 주문도 입력하지 않습니다. 이 기록은 가격에 영향을 주지 않습니다.</p>
+
+          <div class="persona-row">
+            <div class="persona">
+              <div class="p-top"><span class="p-name">개인</span></div>
+              <div class="p-track"><i class="p-fill up" style="width:74%"></i></div>
+              <div class="p-act">순매수</div>
+            </div>
+            <div class="persona">
+              <div class="p-top"><span class="p-name">외국인</span></div>
+              <div class="p-track"><i class="p-fill down" style="width:62%"></i></div>
+              <div class="p-act">순매도</div>
+            </div>
+            <div class="persona">
+              <div class="p-top"><span class="p-name">기관</span></div>
+              <div class="p-track"><i class="p-fill down" style="width:28%"></i></div>
+              <div class="p-act">관망</div>
+            </div>
+            <div class="persona">
+              <div class="p-top"><span class="p-name">연기금</span></div>
+              <div class="p-track"><i class="p-fill up" style="width:14%"></i></div>
+              <div class="p-act">변화 없음</div>
+            </div>
+          </div>
+        </div>
+      </figure>
+    </div>
+    <p class="mock-caption" style="text-align:center">화면은 예시입니다. 모의 투자의 금액·수량은 해당 연습 안에서만 쓰이는 가상값입니다.</p>
+  </div>
+</section>
+
+<!-- ══ 꼭지 3 — 그 사이 ═══════════════════════════════════════════════ -->
+<section class="feature">
+  <div class="wrap">
+    <div class="feature-grid reverse">
+      <div class="feature-copy">
+        <span class="feature-tag">그 사이</span>
+        <h2>당신은 어떤<br>투자자인가요?</h2>
+        <p class="feature-body">
+          <strong>얼마 벌었는지는 보지 않습니다.</strong> 사건 전에 움직였는지,
+          보고 나서 따라갔는지, 얼마나 자주 마음을 바꿨는지를 봅니다.
+        </p>
+        <p class="feature-body">
+          하루하루의 판단과 그다음 날의 결과를 나란히 놓고
+          <strong>어디서 무너지는지</strong> 정리해드립니다. 연습이 쌓이면
+          <strong>나의 투자 일지</strong>에 성향이 어떻게 변해왔는지도 남습니다.
+        </p>
+      </div>
+
+      <figure class="mock">
+        <div class="mock-bar">
+          <span class="label">나의 투자 일지</span>
+          <span class="label">연습 3회</span>
+        </div>
+        <div class="mock-body">
+          <div class="verdict">
+            <span class="v-label">현재 성향</span>
+            <span class="v-type">이벤트 추종형</span>
+          </div>
+
+          <div class="metric-row">
+            <div class="metric"><div class="m-k">사건 공개 전 판단</div><div class="m-v">1<em>회</em></div></div>
+            <div class="metric"><div class="m-k">공개 후 매수 고려</div><div class="m-v">3<em>회</em></div></div>
+            <div class="metric"><div class="m-k">판단 번복</div><div class="m-v">4<em>회</em></div></div>
+          </div>
+
+          <div class="finding">
+            <p class="f-said">사건이 공개되기 전에는 거의 움직이지 않다가, 공개 직후에 3번 매수를 고려하셨습니다.</p>
+            <p class="f-next">다음엔 — 공개 직후에는 사건의 사실과, 이미 가격에 반영된 기대를 분리해 확인해 보세요.</p>
+          </div>
+
+          <div class="history">
+            <div class="h-row"><span class="d num">09.05</span><span class="s">삼성전자 · 20일 · 이벤트 추종형</span><span class="r up num">+4.2%</span></div>
+            <div class="h-row"><span class="d num">08.28</span><span class="s">삼성전자 · 10일 · 사전 포지셔닝형</span><span class="r down num">−1.8%</span></div>
+            <div class="h-row"><span class="d num">08.21</span><span class="s">SK하이닉스 · 10일 · 이벤트 반응 관찰형</span><span class="r up num">+0.6%</span></div>
+          </div>
+        </div>
+      </figure>
+    </div>
+    <p class="mock-caption">화면은 예시입니다. 가상 시나리오에서의 행동을 바탕으로 한 교육용 분석이며 투자 권유가 아닙니다.</p>
+  </div>
+</section>
+
+<!-- ══ 마무리 ══════════════════════════════════════════════════════════ -->
+<section class="closing">
+  <div class="wrap">
+    <h2>지금, 당신의 판단을 실험해보세요.</h2>
+    <a class="cta closing-cta" href="https://finverse-collector.taila68873.ts.net/">
+      모의 투자 시작하기 <span class="arrow" aria-hidden="true">→</span>
+    </a>
+  </div>
+</section>
+
+<footer class="foot">
+  <div class="foot-inner">
+    <p>
+      AI 분석 기반 참고 자료이며, 투자 판단의 최종 책임은 본인에게 있습니다.
+      FINVERSE는 실제 계좌와 연동하지 않고, 보유종목·자산·신용정보를 수집하지 않습니다.
+      특정 금융상품을 추천하지 않습니다.
+    </p>
+    <p class="num">FINVERSE · 2026 금융 AI Challenge</p>
+  </div>
+</footer>
+
+</body>
+</html>
