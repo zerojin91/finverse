@@ -209,7 +209,9 @@ def public_world_information(game: dict[str, Any], market_date: str) -> dict[str
     }
 
 
-def record_market_feedback(game: dict[str, Any], round_result: dict[str, Any], market_date: str) -> None:
+def record_market_feedback(
+    game: dict[str, Any], round_result: dict[str, Any], market_date: str, *, keep_active_event: bool = False,
+) -> None:
     world = game["world"]
     state = world["state"]
     return_pct = float(round_result.get("return_pct") or 0)
@@ -224,13 +226,14 @@ def record_market_feedback(game: dict[str, Any], round_result: dict[str, Any], m
     })
     if world.get("active_event"):
         active = world["active_event"]
-        active["stage"] = "absorbed"
+        active["stage"] = "market_reacted" if keep_active_event else "absorbed"
         for item in reversed(world["memory"]["event_ledger"]):
             if item["event_id"] == active["event_id"]:
-                item.setdefault("lifecycle", []).append("absorbed")
+                item.setdefault("lifecycle", []).append(active["stage"])
                 item["market_reaction"] = {"return_pct": return_pct, "order_imbalance": imbalance}
                 break
         game.setdefault("revealed_events", []).append(dict(active))
-        world["active_event"] = None
+        if not keep_active_event:
+            world["active_event"] = None
     current = _as_date(market_date)
     world["next_market_date"] = _next_business_day(current).isoformat()

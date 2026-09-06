@@ -94,7 +94,7 @@ def test_default_daily_reflection_does_not_queue_or_fill_an_order(monkeypatch):
     assert game["fills"] == []
 
 
-def test_material_world_event_waits_for_user_before_agent_market_round(monkeypatch):
+def test_material_world_event_shows_market_round_before_user_decision(monkeypatch):
     monkeypatch.setattr(world_simulation, "run_individual_agent_round", _hold_round)
     monkeypatch.setattr(world_agent, "_event_type", lambda *_args: "surprise")
     monkeypatch.setattr(
@@ -111,11 +111,18 @@ def test_material_world_event_waits_for_user_before_agent_market_round(monkeypat
     assert game["phase"] == world_simulation.PHASE_WORLD_DECISION
     assert game["world"]["active_event"]["is_simulated"] is True
     assert game["world"]["active_event"]["analogue_event_ids"]
+    assert len(game["agent_rounds"]) == 1
+    assert len(game["price_history"]) == 2
+    assert game["agent_rounds"][-1]["market_date"] == game["world"]["active_event"]["event_date"]
+    assert game["revealed_events"][-1]["event_id"] == game["world"]["active_event"]["event_id"]
 
-    world_simulation.submit_world_order(game, "BUY", 1, "실제 유사 사례와 변동성을 보고 소액 대응", 60)
+    world_simulation.record_world_daily_reflection(game, "BUY_WATCH", 1)
     resolved = world_simulation.resolve_world_decision(game)
     assert resolved["completed"] is False
     assert game["phase"] == world_simulation.PHASE_WORLD_MARKET
     assert game["world"]["active_event"] is None
     assert len(game["revealed_events"]) == 1
     assert len(game["user_decision_memory"]) == 1
+    assert len(game["agent_rounds"]) == 1
+    assert game["fills"] == []
+    assert game["pending_orders"][0]["event_id"]

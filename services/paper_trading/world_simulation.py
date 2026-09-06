@@ -249,12 +249,7 @@ def _advance_world_market_day(game: dict[str, Any], *, progress: Callable[[int, 
     market_date = step["market_date"]
     information = public_world_information(game, market_date)
     event = step.get("event")
-    # 중요한 사건은 같은 공개 정보로 사용자와 에이전트가 판단하도록 우선 멈춘다.
-    if event and float(event.get("impact_score") or 0) >= .55:
-        game["phase"] = PHASE_WORLD_DECISION
-        game["status"] = "awaiting_user"
-        game["updated_at"] = datetime.now().isoformat()
-        return {"completed": False, "awaiting_user": True, "market_date": market_date, "event": event}
+    important_event = bool(event and float(event.get("impact_score") or 0) >= .55)
     if progress:
         progress(8, f"{market_date} World Agent 환경을 공개했습니다.")
     def agent_progress(done: int, total: int, agent_id: str) -> None:
@@ -265,12 +260,19 @@ def _advance_world_market_day(game: dict[str, Any], *, progress: Callable[[int, 
     result = apply_agent_round(game, round_data, phase=phase, label=f"{market_date} · World Agent 시장 진행", market_date=market_date)
     # 사용자의 판단은 시장 형성 이후 개인 계좌에만 다음 거래일 가격으로 체결한다.
     result["user_fills"] = _execute_user_orders(game, market_date)
-    record_market_feedback(game, result, market_date)
+    # 중요 이벤트도 그날의 시장 반응·캔들·요약을 먼저 완성한다. 이벤트는
+    # 사용자가 같은 화면에서 판단할 수 있도록 판단 기록 전까지 유지한다.
+    record_market_feedback(game, result, market_date, keep_active_event=important_event)
     result["market_summary_detail"] = generate_daily_market_summary(game, result, information, event)
     result["market_summary"] = result["market_summary_detail"]["summary"]
     _ensure_world_daily_reflection(game, result)
     _record_daily_performance(game, market_date)
     game["current_day_index"] = int(game["world"]["current_day"])
+    if important_event:
+        game["phase"] = PHASE_WORLD_DECISION
+        game["status"] = "awaiting_user"
+        game["updated_at"] = datetime.now().isoformat()
+        return {"completed": False, "awaiting_user": True, "market_date": market_date, "event": event, "round": result}
     game["phase"] = PHASE_COMPLETED if game["current_day_index"] >= game["simulation_days"] else PHASE_WORLD_MARKET
     game["status"] = "completed" if game["phase"] == PHASE_COMPLETED else "ready"
     game["updated_at"] = datetime.now().isoformat()
@@ -304,36 +306,32 @@ def resolve_world_decision(game: dict[str, Any], *, progress: Callable[[int, str
     if not event:
         raise TradingError("공개된 World Agent 사건을 찾을 수 없습니다.")
     market_date = str(event["event_date"])
-    information = public_world_information(game, market_date)
-    user_fills = _execute_user_orders(game, market_date)
-    if progress:
-        progress(8, "사용자 판단을 저장하고 개별 에이전트 반응을 생성합니다.")
-    def agent_progress(done: int, total: int, agent_id: str) -> None:
-        if progress:
-            progress(10 + round(78 * done / max(total, 1)), f"{market_date} 개별 에이전트 판단 {done}/{total} · {agent_id}")
-    round_data = _run_market_agents(game, market_date, information, "event_reaction", agent_progress)
-    result = apply_agent_round(game, round_data, phase="event_reaction", label=f"{market_date} · WORLD EVENT {event['sequence']} · {event['title']}", market_date=market_date)
+    latest_round = next(
+        (row for row in reversed(game.get("agent_rounds") or []) if row.get("market_date") == market_date),
+        None,
+    )
+    if not latest_round:
+        raise TradingError("이벤트 발생일의 시장 반응을 확인하지 못했습니다.")
     daily_reflection = next(
         (row for row in game.get("daily_reflections", []) if row.get("market_date") == market_date),
         None,
     )
-    game["decision_log"].append({"event_id": event["event_id"], "phase": PHASE_WORLD_DECISION, "user_fills": user_fills, "user_stance": (daily_reflection or {}).get("stance"), "price_before": result["previous_price"], "price_after": result["price"]})
+    if progress:
+        progress(40, "오늘의 시장 요약과 이벤트를 바탕으로 남긴 판단을 기록했습니다.")
+    game["decision_log"].append({"event_id": event["event_id"], "phase": PHASE_WORLD_DECISION, "user_fills": [], "user_stance": (daily_reflection or {}).get("stance"), "price_before": latest_round["previous_price"], "price_after": latest_round["price"]})
     game["user_decision_memory"].append({
         "event_id": event["event_id"], "event_title": event["title"], "market_date": market_date,
-        "public_signal": event.get("public_signal"), "user_stance": (daily_reflection or {}).get("stance"), "user_fills": user_fills,
-        "orders": [dict(row) for row in game.get("fills", [])[-len(user_fills):]] if user_fills else [],
-        "world_state": information.get("world_state"),
+        "public_signal": event.get("public_signal"), "user_stance": (daily_reflection or {}).get("stance"), "user_fills": [],
+        "orders": [dict(row) for row in game.get("pending_orders", []) if row.get("event_id") == event.get("event_id")],
+        "world_state": dict(world.get("state") or {}),
     })
-    record_market_feedback(game, result, market_date)
-    result["market_summary_detail"] = generate_daily_market_summary(game, result, information, event)
-    result["market_summary"] = result["market_summary_detail"]["summary"]
-    _ensure_world_daily_reflection(game, result)
-    _record_daily_performance(game, market_date)
-    game["current_day_index"] = int(world["current_day"])
+    world["active_event"] = None
     game["phase"] = PHASE_COMPLETED if game["current_day_index"] >= game["simulation_days"] else PHASE_WORLD_MARKET
     game["status"] = "completed" if game["phase"] == PHASE_COMPLETED else "ready"
     game["updated_at"] = datetime.now().isoformat()
-    return {"completed": game["phase"] == PHASE_COMPLETED, "user_fills": user_fills, "round": result}
+    if progress:
+        progress(100, "이벤트 판단을 기록했습니다. 다음 거래일을 준비합니다.")
+    return {"completed": game["phase"] == PHASE_COMPLETED, "user_fills": [], "round": latest_round}
 
 
 def world_portfolio(game: dict[str, Any]) -> dict[str, Any]:

@@ -570,11 +570,11 @@ const PHASE_META: Record<Phase, {
     eyebrow: "WORLD AGENT MARKET",
     action: "advance",
     cta: "다음 거래일 진행",
-    guide: "World Agent가 초기 맥락과 직전 시장 반응을 기억해 다음 거래일의 공개 환경을 엽니다. 중대 사건이 나오면 사용자 판단을 먼저 기다립니다.",
+    guide: "World Agent가 초기 맥락과 직전 시장 반응을 기억해 다음 거래일의 공개 환경을 엽니다. 중대 사건이 나오면 그날 시장 요약과 함께 표시됩니다.",
     todo: [
       "다음 거래일을 열면 World Agent가 외부 환경을 갱신합니다.",
       "59명의 개별 에이전트는 같은 공개 정보와 각자의 기억으로 독립 판단합니다.",
-      "중요 사건이 발생하면 시장 반응 전에 내 판단을 기록하는 화면이 열립니다.",
+      "중요 사건이 발생하면 그날 시장 반응·요약과 함께 내용을 확인하고 판단합니다.",
     ],
     canOrder: false,
   },
@@ -582,12 +582,12 @@ const PHASE_META: Record<Phase, {
     label: "중요 사건 판단",
     eyebrow: "WORLD EVENT DECISION",
     action: "resolve",
-    cta: "판단 반영하고 시장 진행",
-    guide: "중요 사건이 공개됐습니다. 같은 공개 정보를 확인하고 세 가지 방향성 중 하나를 선택하면 시장이 진행됩니다.",
+    cta: "관찰로 기록하고 다음 거래일 준비",
+    guide: "중요 사건과 그날 시장 반응이 함께 공개됐습니다. 세 가지 방향성 중 하나를 선택해 다음 거래일의 내 판단을 남기세요.",
     todo: [
-      "공개된 사건과 과거 유사 사례의 관계를 확인합니다.",
+      "공개된 사건과 오늘의 시장 요약·수급 주체별 반응을 함께 확인합니다.",
       "매수 고려·관찰 계속·매도 고려 중 하나를 선택합니다. 매수·매도 시 개인 계좌에 반영할 수량을 입력합니다.",
-      "선택한 판단은 학습 기록으로 남고, 59개 에이전트의 반응과 시장 결과가 이어집니다.",
+      "선택한 판단은 학습 기록으로 남고, 매수·매도 고려는 다음 거래일 내 개인 계좌에 반영됩니다.",
     ],
     canOrder: false,
   },
@@ -1020,15 +1020,14 @@ function DailyPracticeCard({
         <span>{event ? "중요 사건 판단" : "오늘의 시장 요약"}</span>
         <em>{event?.event_date ?? round?.market_date}</em>
       </div>
-      {event ? (
+      {event && (
         <div className="paper-daily-event">
           <b>{event.title || "공개된 중요 사건"}</b>
           <span>{event.description || event.public_signal || "공개된 사건의 내용을 확인하고 다음 방향을 선택하세요."}</span>
         </div>
-      ) : (
-        <p>{round?.market_summary_detail?.summary || round?.market_summary || "오늘의 공개 정보와 시장 참여자 반응을 확인하세요."}</p>
       )}
-      {!event && round?.market_summary_detail?.group_actions && (
+      <p>{round?.market_summary_detail?.summary || round?.market_summary || "오늘의 공개 정보와 시장 참여자 반응을 확인하세요."}</p>
+      {round?.market_summary_detail?.group_actions && (
         <div className="paper-daily-summary-groups" aria-label="수급 주체별 오늘의 행동 요약">
           {DAILY_SUMMARY_GROUPS.map(([key, label]) => (
             <div className="paper-daily-summary-group" key={key}>
@@ -1038,7 +1037,7 @@ function DailyPracticeCard({
           ))}
         </div>
       )}
-      {!event && round?.market_summary_detail?.price_reason && (
+      {round?.market_summary_detail?.price_reason && (
         <div className="paper-daily-reason">
           <b>주가 변동 이유 추론</b>
           <span>{round?.market_summary_detail?.price_reason}</span>
