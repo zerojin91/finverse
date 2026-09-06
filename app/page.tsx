@@ -2476,7 +2476,7 @@ function ServiceIntro({ onEnter, onOpenJournal }: { onEnter: () => void; onOpenJ
 
       <section className="intro-smoke-feature intro-smoke-primary">
         <div className="intro-smoke-wrap intro-smoke-feature-grid">
-          <div><span className="intro-smoke-tag">하는 것</span><h2>결과를 모른 채,<br />판단을 남깁니다</h2><p>실제 근거를 바탕으로 만들어진 World Agent 시뮬레이션이 하루씩 진행됩니다. 중요한 사건은 공개되기 전 사용자의 판단을 먼저 남깁니다.</p><p>개인·외국인·기관·연기금의 반응은 다음 거래일 환경에 반영되고, 사용자의 판단은 학습 기록으로만 보존됩니다.</p></div>
+          <div><span className="intro-smoke-tag">하는 것</span><h2>결과를 모른 채,<br />판단을 남깁니다</h2><p>실제 근거를 바탕으로 World Agent가 시장 환경과 사건의 흐름을 하루씩 진행합니다. 중요한 사건은 공개되기 전 사용자의 판단을 먼저 남깁니다.</p><p><b>개인·외국인·기관·연기금으로 나뉜 59개 멀티 에이전트</b>가 서로 다른 투자 기준과 위험 감내 수준으로 반응하며, 그 행동이 다음 거래일의 가상 가격과 수급을 만듭니다. 사용자의 판단은 시장을 바꾸지 않는 학습 기록으로만 보존됩니다.</p></div>
           <div className="intro-smoke-mock"><header><span>투자 시뮬레이션 · 오늘의 판단</span><span>D-1</span></header><strong>중요한 사건이 다가오고 있습니다.</strong><p>내용은 아직 공개되지 않았습니다.</p><div className="intro-smoke-choice"><span>내일 매수 고려</span><b>관찰 계속</b><span>내일 매도 고려</span></div><footer>사용자 판단은 시장 가격이나 수급에 영향을 주지 않는 학습 기록입니다.</footer></div>
         </div>
       </section>
