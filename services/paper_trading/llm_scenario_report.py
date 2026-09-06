@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any, Callable
 
 from .llm_market_simulator import LLMMarketUnavailable, _parse_json
@@ -40,6 +41,14 @@ def enforce_verified_report_metrics(report: dict[str, Any],
 REQUIRED_REPORT_KEYS = ("executive_summary", "investor_profile", "event_reviews",
                         "strengths", "risk_patterns", "action_plan")
 REPORT_ATTEMPTS = 3
+
+
+def _load_report_documents() -> tuple[str, str]:
+    """Load the user-owned report contract and analysis instructions."""
+    docs_dir = Path(__file__).resolve().parents[2] / "docs"
+    template = (docs_dir / "report-template.md").read_text(encoding="utf-8")
+    agent = (docs_dir / "report-agent.md").read_text(encoding="utf-8")
+    return template, agent
 
 
 def _compact_agent_rounds(game: dict[str, Any]) -> list[dict[str, Any]]:
@@ -132,18 +141,25 @@ def generate_llm_reports(game: dict[str, Any],
         from .llm_client import LLMClient
         chat = LLMClient().chat
     context = _report_context(game)
+    report_template, report_agent = _load_report_documents()
     common = ("한국 주식 교육용 가상 시뮬레이션이다. 실제 투자 권유나 미래 예측을 하지 않는다. "
               "입력의 금액과 퍼센트는 엔진이 계산한 검증값이므로 임의로 바꾸지 않는다. "
               "근거가 없는 심리 특성은 단정하지 말고 기록에서 확인되는 행동 패턴으로만 설명한다. "
-              "반드시 JSON 객체만 반환한다.")
+              "반드시 JSON 객체만 반환한다. 아래 분석 에이전트 지침을 따른다.\n\n"
+              f"[report-agent.md]\n{report_agent}")
+    # Keep the legacy JSON contract required so older/mock providers can still
+    # complete a run; report_markdown is preferred and the UI has a fallback.
     investment_keys = ["summary", "daily_action_review", "behavior_pattern", "strengths", "risk_patterns", "next_practice"]
     scenario_keys = ["summary", "environment_evolution", "event_reviews", "stock_flow", "group_behavior", "key_turning_points"]
     investment_message = {"role": "user", "content": (
         f"다음 기록으로 사용자의 투자보고서를 작성하라.\n{json.dumps(context, ensure_ascii=False)}\n"
+        f"다음 report-template.md의 목차·순서·표 구조를 지켜 report_markdown으로 완성된 한국어 Markdown 보고서를 반환하라. "
+        f"템플릿의 {{...}} 변수는 실제 입력 기록으로 모두 치환하고 남겨두지 마라.\n\n[report-template.md]\n{report_template}\n\n"
         "사용자가 날짜별로 매수·매도·관찰을 어떻게 선택했는지, 최종 투자금액과 종료일 가격 기준 손익을 설명하라. "
+        "investor_type은 행동 기록과 템플릿 기준을 종합해 anchor, adapter, defender, chaser 중 정확히 하나를 선택하라. "
         "daily_action_review는 날짜별 1~2문장 배열로 작성하라. 반환 형식: "
-        '{"summary":"3~5문장", "daily_action_review":[{"date":"날짜","action":"행동","result":"다음 결과"}], '
-        '"behavior_pattern":"종합 행동 패턴", "strengths":["잘한 점"], "risk_patterns":["주의할 점"], "next_practice":["다음 연습 원칙"]}'
+        '{"investor_type":"anchor|adapter|defender|chaser", "summary":"3~5문장", "daily_action_review":[{"date":"날짜","action":"행동","result":"다음 결과"}], '
+        '"behavior_pattern":"종합 행동 패턴", "strengths":["잘한 점"], "risk_patterns":["주의할 점"], "next_practice":["다음 연습 원칙"], "report_markdown":"완성된 template.md 전체"}'
     )}
     scenario_message = {"role": "user", "content": (
         f"다음 기록으로 시나리오 보고서를 작성하라.\n{json.dumps(context, ensure_ascii=False)}\n"

@@ -370,6 +370,8 @@ type PendingOrder = {
 };
 
 type LlmReport = {
+  report_markdown?: string;
+  investor_type?: "anchor" | "adapter" | "defender" | "chaser";
   summary?: string;
   daily_action_review?: { date?: string; action?: string; result?: string }[];
   behavior_pattern?: string;
@@ -387,6 +389,23 @@ type LlmReport = {
 };
 
 type LlmReports = { investment?: LlmReport; scenario?: LlmReport };
+
+const INVESTOR_TYPE_META: Record<NonNullable<LlmReport["investor_type"]>, { label: string; image: string }> = {
+  anchor: { label: "원칙형 · The Anchor", image: "/investor-types/anchor.png" },
+  adapter: { label: "전략형 · The Adapter", image: "/investor-types/adapter.png" },
+  defender: { label: "고집 반응형 · The Defender", image: "/investor-types/defender.png" },
+  chaser: { label: "추격형 · The Chaser", image: "/investor-types/chaser.png" },
+};
+
+function inferInvestorType(report?: LlmReport): NonNullable<LlmReport["investor_type"]> | null {
+  if (report?.investor_type && INVESTOR_TYPE_META[report.investor_type]) return report.investor_type;
+  const text = `${report?.report_markdown ?? ""} ${report?.behavior_pattern ?? ""} ${report?.summary ?? ""}`;
+  if (/The Anchor|원칙형/i.test(text)) return "anchor";
+  if (/The Adapter|전략형|적응형/i.test(text)) return "adapter";
+  if (/The Defender|고집 반응형/i.test(text)) return "defender";
+  if (/The Chaser|추격형/i.test(text)) return "chaser";
+  return null;
+}
 
 type Phase = "inter_event_market" | "pre_event_decision" | "post_event_decision" | "world_market" | "world_decision" | "completed";
 
@@ -2347,25 +2366,38 @@ function ReportList({ title, items, tone = "" }: { title: string; items?: string
   return <div className={`paper-report-list ${tone}`}><b>{title}</b><ul>{items.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul></div>;
 }
 
-function CompletedReports({ reports, portfolio, initialEquity }: { reports?: LlmReports; portfolio: Portfolio; initialEquity?: number }) {
+function CompletedReports({ reports, portfolio, initialEquity, onBack }: { reports?: LlmReports; portfolio: Portfolio; initialEquity?: number; onBack: () => void }) {
   const investment = reports?.investment;
   const scenario = reports?.scenario;
+  const investorType = inferInvestorType(investment);
+  const [tab, setTab] = useState<"investment" | "scenario">("investment");
   if (!investment && !scenario) return null;
   const end = investment?.portfolio_at_end ?? portfolio;
   const starting = investment?.initial_equity ?? initialEquity ?? 0;
   const profit = end.equity - starting;
   return (
     <section className="paper-completed-reports" aria-label="AI 시뮬레이션 보고서">
-      <div className="paper-completed-reports-heading"><span>SIMULATION REPORTS</span><h2>시뮬레이션이 끝났습니다</h2><p>기록된 판단과 변화한 시장 환경을 바탕으로 두 가지 보고서를 만들었습니다.</p></div>
-      {investment && <article className="paper-report-card">
+      <div className="paper-completed-reports-heading"><div className="paper-report-heading-row"><div><span>SIMULATION REPORTS</span><h2>시뮬레이션이 끝났습니다</h2><p>기록된 판단과 변화한 시장 환경을 바탕으로 두 가지 보고서를 만들었습니다.</p></div><button type="button" className="paper-report-back" onClick={onBack}>시뮬레이션으로 돌아가기</button></div></div>
+      <nav className="paper-report-tabs" aria-label="보고서 종류">
+        <button type="button" className={tab === "investment" ? "active" : ""} onClick={() => setTab("investment")} disabled={!investment}>나의 투자 일지</button>
+        <button type="button" className={tab === "scenario" ? "active" : ""} onClick={() => setTab("scenario")} disabled={!scenario}>해당 시나리오</button>
+      </nav>
+      {investment && tab === "investment" && <article className="paper-report-card">
+        {investorType && <figure className="paper-investor-type-card">
+          <figcaption><span>나의 투자 유형</span><strong>{INVESTOR_TYPE_META[investorType].label}</strong></figcaption>
+          <img src={INVESTOR_TYPE_META[investorType].image} alt={INVESTOR_TYPE_META[investorType].label} />
+        </figure>}
         <header><div><span>01 · USER REPORT</span><h3>나의 투자보고서</h3></div><b className={toneOf(profit)}>{signedPct(end.total_return_pct ?? 0)}</b></header>
+        {investment.report_markdown ? <PaperEvidenceMarkdown content={investment.report_markdown} /> : null}
         <div className="paper-report-metrics"><div><span>최종 투자금액</span><strong>{won(end.equity)}</strong></div><div><span>종료일 평가손익</span><strong className={toneOf(profit)}>{won(profit)}</strong></div><div><span>실현손익</span><strong>{won(end.realized_pnl)}</strong></div><div><span>판단 횟수</span><strong>{investment.verified_metrics?.daily_reflection_count ?? investment.verified_metrics?.trade_count ?? 0}회</strong></div></div>
-        <p className="paper-report-summary">{investment.summary}</p>
-        {investment.behavior_pattern && <p className="paper-report-detail"><b>행동 패턴</b>{investment.behavior_pattern}</p>}
-        {investment.daily_action_review?.length ? <div className="paper-report-daily"><b>일자별 판단과 결과</b>{investment.daily_action_review.map((row, index) => <p key={`${row.date}-${index}`}><strong>{row.date}</strong> <span>{row.action}</span> — {row.result}</p>)}</div> : null}
-        <div className="paper-report-columns"><ReportList title="잘한 점" items={investment.strengths} tone="good" /><ReportList title="다음에 점검할 점" items={investment.risk_patterns} tone="risk" /><ReportList title="다음 연습 원칙" items={investment.next_practice} tone="plan" /></div>
+        {!investment.report_markdown && <>
+          <p className="paper-report-summary">{investment.summary}</p>
+          {investment.behavior_pattern && <p className="paper-report-detail"><b>행동 패턴</b>{investment.behavior_pattern}</p>}
+          {investment.daily_action_review?.length ? <div className="paper-report-daily"><b>일자별 판단과 결과</b>{investment.daily_action_review.map((row, index) => <p key={`${row.date}-${index}`}><strong>{row.date}</strong> <span>{row.action}</span> — {row.result}</p>)}</div> : null}
+          <div className="paper-report-columns"><ReportList title="잘한 점" items={investment.strengths} tone="good" /><ReportList title="다음에 점검할 점" items={investment.risk_patterns} tone="risk" /><ReportList title="다음 연습 원칙" items={investment.next_practice} tone="plan" /></div>
+        </>}
       </article>}
-      {scenario && <article className="paper-report-card scenario">
+      {scenario && tab === "scenario" && <article className="paper-report-card scenario">
         <header><div><span>02 · WORLD REPORT</span><h3>시나리오 보고서</h3></div><span>환경 변화·에이전트 흐름</span></header>
         <p className="paper-report-summary">{scenario.summary}</p>
         {scenario.environment_evolution && <p className="paper-report-detail"><b>World State 변화</b>{scenario.environment_evolution}</p>}
@@ -2404,6 +2436,10 @@ function TradingScreen({
   const [coach, setCoach] = useState(() => {
     try { return window.localStorage.getItem(COACH_KEY) !== "done"; } catch { return false; }
   });
+  const [showReports, setShowReports] = useState(true);
+  useEffect(() => {
+    if (game.phase === "completed" && game.llm_reports) setShowReports(true);
+  }, [game.phase, game.llm_reports]);
   const dismissCoach = useCallback(() => {
     setCoach(false);
     try { window.localStorage.setItem(COACH_KEY, "done"); } catch { /* 무시 */ }
@@ -2576,6 +2612,11 @@ function TradingScreen({
           </div>
 
           <div className="paper-advance-row">
+            {game.phase === "completed" && game.llm_reports && !showReports && (
+              <button className="paper-advance-fast" type="button" onClick={() => setShowReports(true)}>
+                보고서 다시 보기
+              </button>
+            )}
             {worldMode && meta.action === "advance" && !busy && (
               <button
                 className="paper-advance-fast"
@@ -2613,7 +2654,17 @@ function TradingScreen({
         </section>
       </div>
 
-      {game.phase === "completed" && <CompletedReports reports={game.llm_reports} portfolio={game.portfolio} initialEquity={game.initial_equity} />}
+      {game.phase === "completed" && game.llm_reports && showReports && (
+        <CompletedReports
+          reports={game.llm_reports}
+          portfolio={game.portfolio}
+          initialEquity={game.initial_equity}
+          onBack={() => {
+            setShowReports(false);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+        />
+      )}
 
       <footer className="paper-run-footer">
         <span>GAME {game.game_id.slice(0, 22)}</span>

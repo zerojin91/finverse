@@ -72,6 +72,8 @@
 - 시장·경제·뉴스·커뮤니티 수집기는 `collectors/`에 있다. `scripts/run_ingest.sh`가 수집과 PostgreSQL 적재를 묶는다.
 - 모의투자는 `GET /api/paper-trading/securities/:ticker/scenario-context`로 선택 종목의 시장·경제·사건·커뮤니티 준비 상태를 먼저 확인한다. World Agent와 에이전트 프로필 생성은 같은 PostgreSQL 이력과 초기 Evidence Markdown만 사용하며, 시작 시점 이후의 실제 데이터는 시뮬레이션 입력으로 읽지 않는다.
 - World 모드가 종료되면 `AI 투자 리포트 생성` 작업이 OpenRouter를 두 번 호출해 `llm_reports.investment`(사용자의 일자별 매수·매도·관찰 판단과 최종 자산·손익·행동 패턴)와 `llm_reports.scenario`(World State 일별 변화·발생 이벤트·종목 흐름·4개 주체 및 개별 에이전트 행동)를 별도로 생성한다. 최종 자산·손익·수익률은 엔진 검증값을 함께 저장하고 화면에서도 LLM 서술보다 우선 표시한다. 원본 게임의 `agent_rounds`, `daily_reflections`, `fills`, `world.memory`는 두 보고서의 입력과 최종 회고 근거로 보존한다.
+- 최종 투자 보고서의 계약 문서는 `docs/report-template.md`, 행동 분석 지침은 `docs/report-agent.md`다. 보고서 생성 시 두 파일을 런타임에 읽어 OpenRouter에 전달하며, `llm_reports.investment.report_markdown`에는 템플릿의 목차·표·플레이스홀더를 채운 완성 Markdown을 저장한다. 완료 화면은 검증 지표와 함께 이 Markdown을 구조화 렌더링하고, `나의 투자 일지`·`해당 시나리오` 탭과 시뮬레이션 복귀 동작을 제공한다. 문서 파일을 수정할 때는 Downloads 원본과의 의도적인 변경 여부를 확인한다.
+- 최종 `나의 투자 유형`은 `investor_type`(anchor·adapter·defender·chaser)로 저장하며, 완료 보고서 상단에서 `public/investor-types/`의 대응 이미지를 함께 보여준다. 기존 보고서에 유형 키가 없으면 Markdown·행동 패턴의 유형명을 이용해 화면에서 보완하되, 근거가 없을 때 이미지를 임의로 선택하지 않는다.
 - 대시보드는 `app/api/dashboard/route.ts`에서 KOSPI·거시지표·뉴스·수급을 읽고, 최신 `market_signal_analysis` 레코드의 OpenRouter 분석을 사용한다.
 - AI 요약 레코드가 없으면 UI는 “요약을 불러오고 있다” 기본 문구를 표시한다. 레코드 형식은 `record_type='market_signal_analysis'`, `source='openrouter'`이다.
 - `scripts/bedrock_signal_update.py`라는 파일명은 과거 호환 이름일 뿐, 현재 구현은 AWS Bedrock이 아니라 OpenRouter Chat Completions API를 사용한다.
