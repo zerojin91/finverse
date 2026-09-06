@@ -1617,6 +1617,7 @@ type TwinPricePoint = {
 };
 
 type TwinHistoryCandle = { market_date: string; open: number; high: number; low: number; close: number; volume: number };
+type TwinDailyPerformance = { market_date: string; equity: number; daily_pnl: number; total_return_pct: number };
 
 type TwinGameDetail = {
   game_id: string;
@@ -1638,6 +1639,7 @@ type TwinGameDetail = {
   };
   world?: { memory?: { active_momenta?: string[] } };
   portfolio?: { total_return_pct: number };
+  daily_performance?: TwinDailyPerformance[];
   llm_reports?: {
     investment?: { report_markdown?: string; summary?: string; behavior_pattern?: string; investor_type?: "anchor" | "adapter" | "defender" | "chaser" };
     scenario?: {
@@ -1822,34 +1824,42 @@ function twinCategoryLabel(source?: TwinOntologySource | null) {
 const twinTone = (value: number) => (value > 0 ? "up" : value < 0 ? "down" : "");
 const twinSignedPct = (value: number) => `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
 
-function twinPotentialEventCategory(text: string) {
-  if (/외국인|기관|수급|거래량/.test(text)) return "수급";
-  if (/금리|환율|FOMC|국고채|거시/.test(text)) return "거시";
-  if (/실적|반도체|주주환원|배당|기업/.test(text)) return "종목";
-  return "시장";
-}
-
-function TwinPotentialEventRail({ detail }: { detail: TwinGameDetail }) {
-  const candidates = useMemo(() => {
-    const watchPoints = detail.initial_context?.watch_points ?? [];
-    const momentum = detail.world?.memory?.active_momenta ?? [];
-    return [...watchPoints, ...momentum].filter((item, index, all) => item && all.indexOf(item) === index).slice(0, 3);
-  }, [detail.initial_context?.watch_points, detail.world?.memory?.active_momenta]);
+function TwinReviewMilestoneRail({ detail }: { detail: TwinGameDetail }) {
+  const milestones = useMemo(() => {
+    const snapshots = [...(detail.daily_performance ?? [])].sort((left, right) => left.market_date.localeCompare(right.market_date));
+    if (!snapshots.length) return [];
+    const checkpointIndexes = [...new Set([
+      Math.max(0, Math.ceil(snapshots.length / 3) - 1),
+      Math.max(0, Math.ceil((snapshots.length * 2) / 3) - 1),
+      snapshots.length - 1,
+    ])];
+    const labels = ["초반 판단", "중반 점검", "마무리 회고"];
+    let previousIndex = -1;
+    return checkpointIndexes.map((snapshotIndex, index) => {
+      const snapshot = snapshots[snapshotIndex];
+      const rangeStart = snapshots[previousIndex + 1]?.market_date ?? snapshot.market_date;
+      const events = (detail.revealed_events ?? []).filter((event) => event.event_date >= rangeStart && event.event_date <= snapshot.market_date);
+      previousIndex = snapshotIndex;
+      return { label: labels[index] ?? "진행 회고", snapshot, rangeStart, event: events[0], eventCount: events.length };
+    });
+  }, [detail.daily_performance, detail.revealed_events]);
   return (
-    <aside className="journal-potential-events" aria-label="발생 가능 이벤트">
-      <header><h4>발생 가능 이벤트</h4><span>조건 관찰</span></header>
-      {candidates.length ? <div className="journal-potential-event-list">
-        {candidates.map((candidate, index) => (
-          <article key={candidate}>
-            <div className="journal-potential-event-dot" />
+    <aside className="journal-review-milestones" aria-label="3개 구간 회고">
+      <header><h4>3개 구간 회고</h4><span>실제 기록</span></header>
+      {milestones.length ? <div className="journal-review-milestone-list">
+        {milestones.map(({ label, snapshot, rangeStart, event, eventCount }) => (
+          <article key={snapshot.market_date}>
+            <div className={`journal-review-milestone-dot ${twinTone(snapshot.total_return_pct)}`} />
             <div>
-              <small>관찰 조건 {index + 1} · {twinPotentialEventCategory(candidate)}</small>
-              <h5>{candidate}</h5>
-              <p>조건이 강화되면 실제 유사 사례를 확인한 뒤 시나리오 사건으로 공개됩니다.</p>
+              <div className="journal-review-milestone-meta"><small>{label} · {formatTwinShortDate(snapshot.market_date)}</small><b className={twinTone(snapshot.total_return_pct)}>{twinSignedPct(snapshot.total_return_pct)}</b></div>
+              <h5>{event?.title ?? "공개 이벤트 없이 진행된 구간"}</h5>
+              <p>{event
+                ? `${eventCount > 1 ? `${eventCount}개 공개 이벤트 중 ` : ""}${event.description ?? "공개된 시장 사건을 반영했습니다."}`
+                : `${formatTwinShortDate(rangeStart)}부터 이 시점까지의 실제 판단·자산 기록을 기준으로 회고합니다.`}</p>
             </div>
           </article>
         ))}
-      </div> : <p className="journal-potential-event-empty">초기 상황의 관찰 조건을 불러오는 중입니다.</p>}
+      </div> : <p className="journal-review-milestone-empty">완료된 거래일 기록을 불러오는 중입니다.</p>}
     </aside>
   );
 }
@@ -2427,7 +2437,7 @@ function TwinPage({ onRequireAuth }: { onRequireAuth?: (action: () => void) => v
                     <div className="journal-lab-chart-column">
                       <TwinCandleChart detail={selectedDetail} />
                     </div>
-                    <TwinPotentialEventRail detail={selectedDetail} />
+                    <TwinReviewMilestoneRail detail={selectedDetail} />
                   </div>
                   <TwinStoredReports detail={selectedDetail} regenerating={regeneratingReportId === selectedDetail.game_id} onRegenerate={() => { void regenerateReports(selectedDetail.game_id); }} />
                 </>
