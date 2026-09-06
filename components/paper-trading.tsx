@@ -346,6 +346,7 @@ type Fill = {
   confidence?: number | null;
   realized_pnl?: number;
   market_date?: string;
+  gross_amount?: number;
 };
 
 type DailyPerformance = {
@@ -2412,6 +2413,23 @@ function TradingScreen({
   const latestReflection = useMemo(() => {
     return (game.daily_reflections ?? []).find((item) => item.market_date === reflectionMarketDate);
   }, [game.daily_reflections, reflectionMarketDate]);
+  const dailyFillSummaries = useMemo(() => {
+    const grouped = new Map<string, { market_date: string; buy_quantity: number; buy_amount: number; sell_quantity: number; sell_amount: number }>();
+    for (const fill of game.fills ?? []) {
+      const marketDate = fill.market_date ?? "거래일 미상";
+      const current = grouped.get(marketDate) ?? { market_date: marketDate, buy_quantity: 0, buy_amount: 0, sell_quantity: 0, sell_amount: 0 };
+      const amount = fill.gross_amount ?? fill.price * fill.quantity;
+      if (fill.side === "BUY") {
+        current.buy_quantity += fill.quantity;
+        current.buy_amount += amount;
+      } else {
+        current.sell_quantity += fill.quantity;
+        current.sell_amount += amount;
+      }
+      grouped.set(marketDate, current);
+    }
+    return [...grouped.values()].sort((left, right) => right.market_date.localeCompare(left.market_date));
+  }, [game.fills]);
   const reflectionSaveRef = useRef<Promise<void>>(Promise.resolve());
   const saveDailyReflection = useCallback((stance: DailyReflection["stance"], quantity?: number) => {
     const request = onDailyReflection(stance, quantity);
@@ -2508,16 +2526,27 @@ function TradingScreen({
             )}
 
             {Boolean(game.fills?.length) && (
-              <div className="paper-fills">
-                <span>체결 내역 {game.fills?.length}건</span>
-                {[...(game.fills ?? [])].reverse().slice(0, 6).map((fill, index) => (
-                  <div key={fill.order_id ?? index}>
-                    <b className={fill.side === "BUY" ? "up" : "down"}>{fill.side === "BUY" ? "매수" : "매도"}</b>
-                    <strong>{fill.quantity.toLocaleString("ko-KR")}주</strong>
-                    <span>{fill.market_date ? `${fill.market_date} 체결` : "체결일 미상"}</span>
-                    <em>{fill.price.toLocaleString("ko-KR")}원</em>
+              <div className="paper-trade-records">
+                <section className="paper-holding-record" aria-label="현재 보유 현황">
+                  <div className="paper-record-title">현재 보유 현황</div>
+                  <div className="paper-holding-record-grid">
+                    <div><span>보유 수량</span><strong>{game.portfolio.quantity.toLocaleString("ko-KR")}주</strong></div>
+                    <div><span>평균 매입단가</span><strong>{game.portfolio.quantity ? won(game.portfolio.average_price) : "-"}</strong></div>
+                    <div><span>현재 평가액</span><strong>{won(game.portfolio.market_value)}</strong></div>
+                    <div><span>평가손익</span><strong className={toneOf(game.portfolio.unrealized_pnl)}>{won(game.portfolio.unrealized_pnl)}</strong></div>
                   </div>
-                ))}
+                </section>
+                <section className="paper-fills" aria-label="일자별 체결 기록">
+                  <div className="paper-record-title">일자별 거래 기록 <small>{game.fills?.length}건</small></div>
+                  <div className="paper-fill-table-head"><span>거래일</span><span>매수</span><span>매도</span></div>
+                  {dailyFillSummaries.map((day) => (
+                    <div className="paper-fill-day-row" key={day.market_date}>
+                      <strong>{day.market_date}</strong>
+                      <span className={day.buy_quantity ? "up" : "muted"}>{day.buy_quantity ? `${day.buy_quantity.toLocaleString("ko-KR")}주 · ${won(day.buy_amount)}` : "-"}</span>
+                      <span className={day.sell_quantity ? "down" : "muted"}>{day.sell_quantity ? `${day.sell_quantity.toLocaleString("ko-KR")}주 · ${won(day.sell_amount)}` : "-"}</span>
+                    </div>
+                  ))}
+                </section>
               </div>
             )}
 
