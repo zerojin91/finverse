@@ -970,6 +970,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-security-preview > header strong { font-size: 11px; }
 .paper-security-preview > header > span { color: var(--light); font-size: 9px; }
 .paper-security-preview .paper-chart { padding: 9px 13px 8px; }
+.paper-security-preview .paper-chart-scroll { flex: 0 0 160px; height: 160px; }
 .paper-security-preview .paper-chart-svg { min-height: 160px; flex: 0 0 160px; }
 .paper-security-preview-loading, .paper-security-preview-empty { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 160px; color: var(--light); font-size: 10px; }
 .paper-security-preview .paper-inline-error { padding: 14px; }
