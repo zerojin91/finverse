@@ -2709,7 +2709,7 @@ function TradingScreen({
               disabled={busy || (game.phase === "completed" && Boolean(game.llm_reports))}
             >
               {busy
-                ? <><LoaderCircle size={16} className="spin" /> 오늘의 시장을 준비하는 중</>
+                ? <><LoaderCircle size={16} className="spin" /> {game.phase === "completed" ? "AI 투자 리포트를 생성하는 중입니다" : "오늘의 시장을 준비하는 중"}</>
                 : <>{game.phase === "completed" && game.llm_reports ? "AI 투자 리포트 생성 완료" : worldMode && meta.action === "advance" ? "다음 거래일 진행" : meta.cta} {!game.llm_reports && <ChevronRight size={16} />}</>}
             </button>
           </div>
