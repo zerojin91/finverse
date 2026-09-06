@@ -1618,6 +1618,12 @@ type TwinPricePoint = {
 
 type TwinHistoryCandle = { market_date: string; open: number; high: number; low: number; close: number; volume: number };
 type TwinDailyPerformance = { market_date: string; equity: number; daily_pnl: number; total_return_pct: number };
+type TwinDailyReflection = { market_date: string; market_summary?: string };
+type TwinAgentRound = {
+  market_date?: string;
+  market_summary?: string;
+  market_summary_detail?: { summary?: string };
+};
 
 type TwinGameDetail = {
   game_id: string;
@@ -1640,6 +1646,8 @@ type TwinGameDetail = {
   world?: { memory?: { active_momenta?: string[] } };
   portfolio?: { total_return_pct: number };
   daily_performance?: TwinDailyPerformance[];
+  daily_reflections?: TwinDailyReflection[];
+  agent_rounds?: TwinAgentRound[];
   llm_reports?: {
     investment?: { report_markdown?: string; summary?: string; behavior_pattern?: string; investor_type?: "anchor" | "adapter" | "defender" | "chaser" };
     scenario?: {
@@ -1828,6 +1836,16 @@ function TwinReviewMilestoneRail({ detail }: { detail: TwinGameDetail }) {
   const milestones = useMemo(() => {
     const snapshots = [...(detail.daily_performance ?? [])].sort((left, right) => left.market_date.localeCompare(right.market_date));
     if (!snapshots.length) return [];
+    const dailySummaries = new Map<string, string>();
+    for (const round of detail.agent_rounds ?? []) {
+      const summary = round.market_summary_detail?.summary ?? round.market_summary;
+      if (round.market_date && summary && !dailySummaries.has(round.market_date)) dailySummaries.set(round.market_date, summary);
+    }
+    for (const reflection of detail.daily_reflections ?? []) {
+      if (reflection.market_date && reflection.market_summary && !dailySummaries.has(reflection.market_date)) {
+        dailySummaries.set(reflection.market_date, reflection.market_summary);
+      }
+    }
     const uniformIndexes = [
       Math.max(0, Math.ceil(snapshots.length / 3) - 1),
       Math.max(0, Math.ceil((snapshots.length * 2) / 3) - 1),
@@ -1841,22 +1859,22 @@ function TwinReviewMilestoneRail({ detail }: { detail: TwinGameDetail }) {
     return checkpointIndexes.map((snapshotIndex) => {
       const snapshot = snapshots[snapshotIndex];
       const event = (detail.revealed_events ?? []).find((item) => item.event_date === snapshot.market_date);
-      return { snapshot, event };
+      return { snapshot, event, dailySummary: dailySummaries.get(snapshot.market_date) };
     });
-  }, [detail.daily_performance, detail.revealed_events]);
+  }, [detail.agent_rounds, detail.daily_performance, detail.daily_reflections, detail.revealed_events]);
   return (
     <aside className="journal-review-milestones" aria-label="발생 가능 이벤트">
       <header><h4>발생 가능 이벤트</h4><span>시뮬레이션 기준</span></header>
       {milestones.length ? <div className="journal-review-milestone-list">
-        {milestones.map(({ snapshot, event }) => (
+        {milestones.map(({ snapshot, event, dailySummary }) => (
           <article key={snapshot.market_date}>
             <div className={`journal-review-milestone-dot ${twinTone(snapshot.total_return_pct)}`} />
             <div>
               <div className="journal-review-milestone-meta"><small>D+{snapshotIndexForDate(detail.daily_performance, snapshot.market_date)} · {formatTwinShortDate(snapshot.market_date)}</small><b className={twinTone(snapshot.total_return_pct)}>{twinSignedPct(snapshot.total_return_pct)}</b></div>
-              <h5>{event?.title ?? "시뮬레이션 진행 시점"}</h5>
+              <h5>{event?.title ?? "오늘의 시장 요약"}</h5>
               <p>{event
                 ? event.description ?? "공개된 시장 사건을 반영했습니다."
-                : "이 시점까지의 실제 판단과 자산 변화를 기준으로 확인합니다."}</p>
+                : dailySummary ?? `이 거래일 기준 누적 수익률은 ${twinSignedPct(snapshot.total_return_pct)}입니다.`}</p>
             </div>
           </article>
         ))}
