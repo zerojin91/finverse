@@ -2193,6 +2193,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<MainTab>("market");
   const [paperTradingOpen, setPaperTradingOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
+  const [authIntentTab, setAuthIntentTab] = useState<MainTab | null>(null);
   const { user: authUser, refresh: refreshAuthUser, logout: logoutAuthUser } = useAuthUser();
   const [kospiData, setKospiData] = useState<KospiMarketData | null>(null);
   const [intradayIndices, setIntradayIndices] = useState<IntradayIndex[]>([]);
@@ -2383,6 +2384,11 @@ export default function Home() {
   }, [selectedScenario]);
 
   const activateTab = (tab: MainTab) => {
+    if (tab === "twin" && !authUser) {
+      setAuthIntentTab(tab);
+      setAuthOpen(true);
+      return;
+    }
     setActiveTab(tab);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -3095,8 +3101,16 @@ export default function Home() {
       {paperTradingOpen && <PaperTradingModal onClose={() => setPaperTradingOpen(false)} />}
       {authOpen && (
         <AuthModal
-          onClose={() => setAuthOpen(false)}
-          onAuthenticated={() => { refreshAuthUser(); setAuthOpen(false); }}
+          onClose={() => { setAuthOpen(false); setAuthIntentTab(null); }}
+          onAuthenticated={() => {
+            refreshAuthUser();
+            setAuthOpen(false);
+            if (authIntentTab) {
+              setActiveTab(authIntentTab);
+              setAuthIntentTab(null);
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }
+          }}
         />
       )}
 
