@@ -1630,6 +1630,12 @@ type TwinGameDetail = {
   history_candles?: TwinHistoryCandle[];
   price_history?: TwinPricePoint[];
   revealed_events?: TwinRevealedEvent[];
+  initial_context?: {
+    watch_points?: string[];
+    positive_factors?: string[];
+    risk_factors?: string[];
+  };
+  world?: { memory?: { active_momenta?: string[] } };
   portfolio?: { total_return_pct: number };
   llm_reports?: {
     investment?: { report_markdown?: string; summary?: string };
@@ -1677,15 +1683,14 @@ function TwinStoredReports({ reports, regenerating, onRegenerate }: {
       <div className="journal-stored-report-tabs">
         <button type="button" disabled={!investment} onClick={() => setOpenReport("investment")}>나의 투자 일지 열기</button>
         <button type="button" disabled={!scenario} onClick={() => setOpenReport("scenario")}>해당 시나리오 열기</button>
+        {onRegenerate && <button className="journal-report-regenerate" type="button" onClick={onRegenerate} disabled={regenerating}>{regenerating ? "새 형식 보고서 생성 중…" : "새 형식으로 두 보고서 다시 생성"}</button>}
       </div>
-      <p className="journal-history-note">두 보고서는 각각 새 창에서 표·강조·목록 형식을 유지해 볼 수 있습니다.</p>
       {openReport && <div className="journal-report-dialog-backdrop" role="presentation" onMouseDown={() => setOpenReport(null)}>
         <section className="journal-report-dialog" role="dialog" aria-modal="true" aria-labelledby="journal-report-title" onMouseDown={(event) => event.stopPropagation()}>
           <header><div><span>COMPLETED REPORT</span><h5 id="journal-report-title">{reportTitle}</h5></div><button type="button" aria-label="보고서 닫기" onClick={() => setOpenReport(null)}>×</button></header>
           {active?.report_markdown ? <PaperEvidenceMarkdown content={active.report_markdown} /> : <p className="journal-history-note">저장된 요약: {active?.summary ?? "보고서 내용을 불러오지 못했습니다."}</p>}
         </section>
       </div>}
-      {onRegenerate && <button className="journal-report-regenerate" type="button" onClick={onRegenerate} disabled={regenerating}>{regenerating ? "새 형식 보고서를 생성 중…" : "새 형식으로 두 보고서 다시 생성"}</button>}
     </section>
   );
 }
@@ -1729,6 +1734,38 @@ function twinCategoryLabel(source?: TwinOntologySource | null) {
 }
 const twinTone = (value: number) => (value > 0 ? "up" : value < 0 ? "down" : "");
 const twinSignedPct = (value: number) => `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
+
+function twinPotentialEventCategory(text: string) {
+  if (/외국인|기관|수급|거래량/.test(text)) return "수급";
+  if (/금리|환율|FOMC|국고채|거시/.test(text)) return "거시";
+  if (/실적|반도체|주주환원|배당|기업/.test(text)) return "종목";
+  return "시장";
+}
+
+function TwinPotentialEventRail({ detail }: { detail: TwinGameDetail }) {
+  const candidates = useMemo(() => {
+    const watchPoints = detail.initial_context?.watch_points ?? [];
+    const momentum = detail.world?.memory?.active_momenta ?? [];
+    return [...watchPoints, ...momentum].filter((item, index, all) => item && all.indexOf(item) === index).slice(0, 3);
+  }, [detail.initial_context?.watch_points, detail.world?.memory?.active_momenta]);
+  return (
+    <aside className="journal-potential-events" aria-label="발생 가능 이벤트">
+      <header><h4>발생 가능 이벤트</h4><span>조건 관찰</span></header>
+      {candidates.length ? <div className="journal-potential-event-list">
+        {candidates.map((candidate, index) => (
+          <article key={candidate}>
+            <div className="journal-potential-event-dot" />
+            <div>
+              <small>관찰 조건 {index + 1} · {twinPotentialEventCategory(candidate)}</small>
+              <h5>{candidate}</h5>
+              <p>조건이 강화되면 실제 유사 사례를 확인한 뒤 시나리오 사건으로 공개됩니다.</p>
+            </div>
+          </article>
+        ))}
+      </div> : <p className="journal-potential-event-empty">초기 상황의 관찰 조건을 불러오는 중입니다.</p>}
+    </aside>
+  );
+}
 const twinWon = (value: number) => `${Math.round(value).toLocaleString("ko-KR")}원`;
 function formatTwinDate(iso?: string) {
   if (!iso || iso.length < 10) return iso ?? "";
@@ -2245,7 +2282,10 @@ function TwinPage({ onRequireAuth }: { onRequireAuth?: (action: () => void) => v
                       <b className={twinTone(selectedDetail.portfolio?.total_return_pct ?? 0)}>{twinSignedPct(selectedDetail.portfolio?.total_return_pct ?? 0)}</b>
                     </div>
                   </div>
-                  <TwinCandleChart detail={selectedDetail} />
+                  <div className="journal-lab-chart-layout">
+                    <TwinCandleChart detail={selectedDetail} />
+                    <TwinPotentialEventRail detail={selectedDetail} />
+                  </div>
                   <TwinStoredReports reports={selectedDetail.llm_reports} regenerating={regeneratingReportId === selectedDetail.game_id} onRegenerate={() => { void regenerateReports(selectedDetail.game_id); }} />
                 </>
               )}
