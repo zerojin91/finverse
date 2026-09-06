@@ -2776,6 +2776,19 @@ export default function Home() {
           onOpenLogin={() => setAuthOpen(true)}
         />
         {paperTradingOpen && <PaperTradingModal onClose={() => setPaperTradingOpen(false)} />}
+        {authOpen && (
+          <AuthModal
+            onClose={() => { setAuthOpen(false); setAuthIntent(null); }}
+            onAuthenticated={() => {
+              refreshAuthUser();
+              setAuthOpen(false);
+              if (authIntent) {
+                authIntent();
+                setAuthIntent(null);
+              }
+            }}
+          />
+        )}
       </>
     );
   }
