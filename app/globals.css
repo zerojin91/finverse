@@ -1345,6 +1345,8 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-chart-legend .down::before { background: var(--down); }
 .paper-chart-legend .future::before { border: 1px dashed #9aa0ab; background: #fafafa; }
 .paper-chart-legend .event::before { background: #f97316; }
+.paper-event-marker line { stroke: #f97316; stroke-width: 1; stroke-dasharray: 3 3; opacity: .85; }
+.paper-event-marker circle { fill: #fff; stroke: #f97316; stroke-width: 2; }
 .paper-chart-legend .buy::before { border-radius: 50%; background: #7c3aed; }
 .paper-chart-legend .sell::before { border-radius: 50%; background: #f59e0b; }
 .paper-chart-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 190px; padding: 26px; color: var(--light); text-align: center; }

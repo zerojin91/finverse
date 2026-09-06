@@ -19,7 +19,7 @@ from .participant_sizing import scale_personas_to_representative_capacity
 from .daily_market_summary import generate_daily_market_summary
 from .scenario_trading import (
     GROUP_PSYCHOLOGY, _execute_user_orders, _real_candles, apply_agent_round,
-    scenario_portfolio,
+    _record_daily_performance, scenario_portfolio,
 )
 from .world_agent import advance_environment, build_world_state, public_world_information, record_market_feedback
 
@@ -264,11 +264,12 @@ def _advance_world_market_day(game: dict[str, Any], *, progress: Callable[[int, 
     round_data = _run_market_agents(game, market_date, information, phase, agent_progress)
     result = apply_agent_round(game, round_data, phase=phase, label=f"{market_date} · World Agent 시장 진행", market_date=market_date)
     # 사용자의 판단은 시장 형성 이후 개인 계좌에만 다음 거래일 가격으로 체결한다.
-    result["user_fills"] = _execute_user_orders(game)
+    result["user_fills"] = _execute_user_orders(game, market_date)
     record_market_feedback(game, result, market_date)
     result["market_summary_detail"] = generate_daily_market_summary(game, result, information, event)
     result["market_summary"] = result["market_summary_detail"]["summary"]
     _ensure_world_daily_reflection(game, result)
+    _record_daily_performance(game, market_date)
     game["current_day_index"] = int(game["world"]["current_day"])
     game["phase"] = PHASE_COMPLETED if game["current_day_index"] >= game["simulation_days"] else PHASE_WORLD_MARKET
     game["status"] = "completed" if game["phase"] == PHASE_COMPLETED else "ready"
@@ -304,7 +305,7 @@ def resolve_world_decision(game: dict[str, Any], *, progress: Callable[[int, str
         raise TradingError("공개된 World Agent 사건을 찾을 수 없습니다.")
     market_date = str(event["event_date"])
     information = public_world_information(game, market_date)
-    user_fills = _execute_user_orders(game)
+    user_fills = _execute_user_orders(game, market_date)
     if progress:
         progress(8, "사용자 판단을 저장하고 개별 에이전트 반응을 생성합니다.")
     def agent_progress(done: int, total: int, agent_id: str) -> None:
@@ -327,6 +328,7 @@ def resolve_world_decision(game: dict[str, Any], *, progress: Callable[[int, str
     result["market_summary_detail"] = generate_daily_market_summary(game, result, information, event)
     result["market_summary"] = result["market_summary_detail"]["summary"]
     _ensure_world_daily_reflection(game, result)
+    _record_daily_performance(game, market_date)
     game["current_day_index"] = int(world["current_day"])
     game["phase"] = PHASE_COMPLETED if game["current_day_index"] >= game["simulation_days"] else PHASE_WORLD_MARKET
     game["status"] = "completed" if game["phase"] == PHASE_COMPLETED else "ready"

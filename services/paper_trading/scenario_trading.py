@@ -288,6 +288,29 @@ def _record_daily_performance(game: dict[str, Any], market_date: str | None) -> 
         history[existing] = snapshot
 
 
+def repair_missing_fill_dates(game: dict[str, Any]) -> int:
+    """Restore only provable legacy fill dates from the linked daily decision.
+
+    Older World-mode saves omitted ``market_date`` while preserving the same
+    order id in ``daily_reflections``.  Do not infer dates from timestamps or
+    prices: a date is repaired only when that explicit order-id link exists.
+    """
+    dates_by_order = {
+        str(row.get("order_id")): str(row.get("market_date"))
+        for row in game.get("daily_reflections") or []
+        if row.get("order_id") and row.get("market_date")
+    }
+    repaired = 0
+    for fill in game.get("fills") or []:
+        if fill.get("market_date") or not fill.get("order_id"):
+            continue
+        market_date = dates_by_order.get(str(fill["order_id"]))
+        if market_date:
+            fill["market_date"] = market_date
+            repaired += 1
+    return repaired
+
+
 def public_scenario_game(game: dict[str, Any]) -> dict[str, Any]:
     if game.get("mode") == "world":
         # World Agent 사건은 사용자와 모든 에이전트에게 동시에 공개되는 정보다.

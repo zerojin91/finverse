@@ -636,6 +636,7 @@ function buildBars(game: CandleChartData, preview = false): Bar[] {
   const history: Bar[] = [];
   const simulation: Bar[] = [];
   const seen = new Set<string>();
+  const eventDates = new Set((game.revealed_events ?? []).map((event) => event.event_date).filter(Boolean));
 
   for (const row of game.history_candles ?? []) {
     if (!row.close || seen.has(row.market_date)) continue;
@@ -664,7 +665,9 @@ function buildBars(game: CandleChartData, preview = false): Bar[] {
       close,
       volume: point.volume ?? 0,
       real: point.step === 0,
-      event: point.phase === "event_reaction",
+      // World 모드에서는 공개된 사건 원장과 반응 라운드가 분리될 수 있다.
+      // 어느 한쪽만 있어도 같은 거래일 캔들에 공개일 마커를 남긴다.
+      event: point.phase === "event_reaction" || eventDates.has(point.market_date ?? ""),
       returnPct: point.return_pct ?? 0,
     });
   }
@@ -737,15 +740,11 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
   const { top, span, slot, chartWidth, bodyW, simStart, futureSlots, remainingSimulationDays, leadingSlots, y, cx } = layout;
   const gridValues = [0, 0.25, 0.5, 0.75, 1].map((ratio) => top - span * ratio);
 
-  // 사용자 체결은 해당 이벤트가 반응한 봉 위에 표시한다. 사전 판단은 왼쪽,
-  // 사후 대응은 오른쪽으로 살짝 밀어 두 주문이 겹치지 않게 한다.
-  const eventBars = bars.reduce<number[]>(
-    (acc, bar, index) => (bar.event ? [...acc, index] : acc), []);
-  const eventOrder = (game.revealed_events ?? []).map((item) => item.event_id);
+  // 주문·체결 기록의 시장일을 기준으로 표시한다. 이벤트 순서로 역추적하면
+  // 일반 거래일 주문이 마지막 이벤트 봉에 붙는 문제가 생긴다.
   const fillMarkers = (game.fills ?? []).flatMap((fill, index) => {
-    const position = eventOrder.indexOf(fill.event_id ?? "");
-    const barIndex = eventBars[position >= 0 ? position : eventBars.length - 1];
-    if (barIndex === undefined) return [];
+    const barIndex = bars.findIndex((bar) => !bar.real && bar.date === fill.market_date);
+    if (barIndex < 0) return [];
     return [{
       key: fill.order_id ?? `fill-${index}`,
       side: fill.side,
@@ -865,6 +864,14 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
             </g>
           );
         })}
+
+        {!preview && bars.map((bar, index) => bar.event ? (
+          <g key={`event-${bar.key}`} className="paper-event-marker">
+            <title>{`${bar.date} · 이벤트 공개일`}</title>
+            <line x1={cx(index)} x2={cx(index)} y1={8} y2={PRICE_H - 2} />
+            <circle cx={cx(index)} cy={12} r={4} />
+          </g>
+        ) : null)}
 
         {markers.map((marker) => (
           <g key={marker.key} className={`paper-fill-marker ${marker.side === "BUY" ? "buy" : "sell"}`}>

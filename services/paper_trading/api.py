@@ -29,7 +29,7 @@ from .evidence_documents import DOCUMENT_FILES
 from .llm_scenario_simulator import run_scenario_agent_round
 from .scenario_trading import (
     advance_inter_event_market, finish_event, new_scenario_game, public_scenario_game,
-    reveal_and_react, scenario_portfolio, submit_scenario_order,
+    repair_missing_fill_dates, reveal_and_react, scenario_portfolio, submit_scenario_order,
 )
 from .world_simulation import (
     PHASE_COMPLETED as WORLD_PHASE_COMPLETED, PHASE_WORLD_DECISION, PHASE_WORLD_MARKET,
@@ -282,9 +282,16 @@ def list_games():
 @paper_trading_bp.route("/games/<game_id>", methods=["GET"])
 def get_game(game_id: str):
     owner_id = _owner_id()
-    game = _store().get(game_id)
+    store = _store()
+    game = store.get(game_id)
     if not game or game.get("owner_id") != owner_id:
         return _not_found(game_id)
+    if repair_missing_fill_dates(game):
+        # The migration uses an explicit order-id link and is therefore safe to
+        # persist immediately. Future fills receive the date at fill time.
+        saved = store.update(game_id, repair_missing_fill_dates)
+        if saved:
+            game = saved[0]
     return jsonify({"success": True, "data": _public(game)})
 
 
