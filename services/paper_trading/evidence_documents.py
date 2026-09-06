@@ -145,7 +145,8 @@ def _messages(domain: str, payload: dict[str, Any]) -> list[dict[str, str]]:
 당신의 결과는 World Agent, 시장 참여 에이전트, 학습자 판단의 초기 조건으로 사용된다.
 입력에 있는 관측값과 evidence_id만 근거로 한국어 JSON 객체 하나를 반환한다.
 미래 가격·미래 사건·보이지 않는 원인·투자 권유를 만들지 않는다. 인과는 '가능성', '점검 필요'처럼 표현한다.
-관측 사실과 해석을 섞지 말고, 모든 관측 주장에는 입력의 evidence_id를 연결한다.""",
+관측 사실과 해석을 섞지 말고, 모든 관측 주장에는 입력의 evidence_id를 연결한다.
+입력 근거로 작성할 수 없는 항목은 빈 배열로 두며, 분석 실패·재시도·추가 근거 요구를 알리는 문구는 절대 출력하지 않는다.""",
         },
         {
             "role": "user",
@@ -167,8 +168,10 @@ def _messages(domain: str, payload: dict[str, Any]) -> list[dict[str, str]]:
   "data_gaps": ["자료 품질 또는 범위의 제한"]
 }}
 
-key_findings는 정확히 3개, 나머지 배열은 1~3개로 작성하라. evidence_ids에는 실제 존재하는 ID만 넣어라.
-관측값이 부족해도 그 부족 자체를 명확히 적고, 빈 수치를 채우지 마라.""",
+key_findings는 근거가 있는 항목만 최대 3개, 나머지 배열도 근거가 있는 항목만 최대 3개로 작성하라. evidence_ids에는 실제 존재하는 ID만 넣어라.
+관측 근거가 충분하지 않은 항목은 억지로 채우지 말고 해당 배열을 빈 배열로 반환하라.
+`근거가 필요합니다`, `AI 해석을 준비하지 못했습니다`, `다시 생성하면`, `관측값 부족`처럼 분석 실패나 추가 작업을 알리는 문구는 어느 필드에도 쓰지 마라.
+빈 수치를 채우거나, 입력 밖 사실·원인·전망을 만들지 마라.""",
         },
     ]
 
@@ -180,12 +183,12 @@ def _list(value: Any, limit: int = 3) -> list[str]:
 def _analysis(domain: str, payload: dict[str, Any], row_count: int) -> dict[str, Any]:
     if not row_count:
         return {
-            "headline": "이 도메인에서 확인된 관측값이 없어 원시 자료 부족 상태입니다.",
+            "headline": "",
             "key_findings": [],
             "transmission_paths": [],
             "agent_focus": [],
-            "uncertainties": ["확인된 관측값이 없어 종목 맥락으로 해석하지 않습니다."],
-            "data_gaps": ["해당 기간의 실제 적재 데이터가 없습니다."],
+            "uncertainties": [],
+            "data_gaps": [],
             "mode": "raw_fallback",
         }
     try:
@@ -214,29 +217,37 @@ def _analysis(domain: str, payload: dict[str, Any], row_count: int) -> dict[str,
     except Exception:
         # 초기 설정 화면이 OpenRouter 일시 장애로 막히지 않게 관측 원문은 계속 제공한다.
         return {
-            "headline": "AI 해석을 불러오지 못해 관측 원자료를 표시합니다.",
+            "headline": "",
             "key_findings": [],
             "transmission_paths": [],
             "agent_focus": [],
-            "uncertainties": ["AI 해석을 다시 생성하면 종합 맥락에 반영됩니다."],
+            "uncertainties": [],
             "data_gaps": [],
             "mode": "raw_fallback",
         }
 
 
 def _analysis_lines(analysis: dict[str, Any]) -> list[str]:
-    lines = ["## AI Interpretation", f"- 상태: {analysis['headline']}", "## Key Findings"]
-    for item in analysis["key_findings"]:
+    # LLM이 실패하거나 실제 관측값이 없을 때에는 실패 안내 문구를 문서에
+    # 남기지 않는다. 이 문서는 원시 관측 근거만으로도 감사 가능해야 한다.
+    if analysis.get("mode") != "llm_grounded":
+        return []
+
+    lines = ["## AI Interpretation"]
+    if analysis.get("headline"):
+        lines.append(f"- 상태: {analysis['headline']}")
+    findings = analysis.get("key_findings") or []
+    if findings:
+        lines.append("## Key Findings")
+    for item in findings:
         ids = ", ".join(item["evidence_ids"]) or "근거 ID 미연결"
         suffix = f" — {item['interpretation']}" if item["interpretation"] else ""
         lines.append(f"- {item['fact']}{suffix} (근거: {ids})")
-    if not analysis["key_findings"]:
-        lines.append("- AI 해석을 준비하지 못했습니다. 아래 원시 관측값을 확인하세요.")
     for heading, key in (("Transmission Paths", "transmission_paths"), ("Agent Focus", "agent_focus"), ("Uncertainty", "uncertainties"), ("Data Gaps", "data_gaps")):
-        lines.append(f"## {heading}")
-        lines.extend(f"- {item}" for item in analysis[key])
-        if not analysis[key]:
-            lines.append("- 직접 확인할 추가 근거가 필요합니다.")
+        items = analysis.get(key) or []
+        if items:
+            lines.append(f"## {heading}")
+            lines.extend(f"- {item}" for item in items)
     return lines
 
 
