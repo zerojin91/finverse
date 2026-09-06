@@ -269,7 +269,7 @@ def _render(domain: str, history: dict[str, Any], rows: list[dict[str, Any]], an
     else:
         aggregate_rows = [row for row in rows if row.get("evidence_kind") == "daily_aggregate"]
         comment_rows = [row for row in rows if row.get("evidence_kind") == "target_top_comment"]
-        lines += ["## Raw Community Signals", "| trade_date | sentiment | post_count | engagement |", "|---|---:|---:|---:|"]
+        lines += ["## Raw Community Signals", "| trade_date | sentiment | comment_count | engagement |", "|---|---:|---:|---:|"]
         lines += ["| " + " | ".join(_line(row.get(key)) for key in ("trade_date", "sentiment", "post_count", "engagement")) + " |" for row in aggregate_rows]
         if not aggregate_rows:
             lines += ["| 관측값 없음 | - | - | - |"]
@@ -283,7 +283,7 @@ def _render(domain: str, history: dict[str, Any], rows: list[dict[str, Any]], an
                 title = _line(row.get("video_title") or "종목 검색 영상")
                 claims.append(f"{title}의 고반응 댓글(좋아요 {_line(row.get('like_count'))}): {_line(row.get('text'))}")
             else:
-                claims.append(f"일별 커뮤니티 감성 {_line(row.get('sentiment'))}, 게시물 {_line(row.get('post_count'))}개")
+                claims.append(f"일별 커뮤니티 감성 {_line(row.get('sentiment'))}, 댓글 {_line(row.get('post_count'))}개")
     references = [row.get("source_url") or row.get("url") for row in rows]
     lines += ["## Evidence Register", "| evidence_id | claim | observed_at | source | record_id_or_url |", "|---|---|---|---|---|"]
     lines += [

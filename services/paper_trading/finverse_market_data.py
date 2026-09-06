@@ -48,7 +48,7 @@ DEFAULT_HISTORY_DAYS = 240
 # 같은 종목·기간을 다시 부를 때 그 값을 다시 치르지 않도록 디스크에 남긴다.
 HISTORY_CACHE_TTL_SECONDS = 12 * 60 * 60
 # 뉴스 분류 규칙이 바뀌면 이전의 전체-뉴스 캐시를 재사용하면 안 된다.
-HISTORY_CACHE_SCHEMA_VERSION = "targeted-news-community-v4"
+HISTORY_CACHE_SCHEMA_VERSION = "targeted-news-community-v5"
 
 # ``events.news``에는 종목 ticker 태그가 비어 있는 경우가 많다. 따라서 선택
 # 종목명으로 직접 확인되는 기사와 명백한 시장 전체 기사만 시나리오에 넣는다.
@@ -247,6 +247,17 @@ class FinverseMarketData:
             values = [str(row[field]) for row in rows if row.get(field)]
             return max(values) if values else None
 
+        community_comments = history.get("community_comments") or []
+        # psychology.sentiment_daily의 post_count는 이름과 달리 YouTube 일별
+        # 댓글 수 집계다. 원문 댓글이 아직 없을 때도 기간(행) 수를 노출하지
+        # 않고, 실제 수집된 댓글 합계를 보여준다.
+        aggregated_comment_count = sum(
+            max(0, int(row.get("post_count") or 0))
+            for row in history["social_signals"]
+        )
+        community_count = len(community_comments) or aggregated_comment_count
+        community_rows = community_comments or history["social_signals"]
+
         sources = [
             {
                 "key": "market", "label": "시장", "status": "ready" if market_days else "missing",
@@ -265,11 +276,11 @@ class FinverseMarketData:
             },
             {
                 "key": "community", "label": "커뮤니티",
-                "status": "ready" if (history["social_signals"] or history.get("community_comments")) else "missing",
-                "count": len(history.get("community_comments") or history["social_signals"]),
-                "unit": "댓글" if history.get("community_comments") else "일",
-                "updated_at": latest(history.get("community_comments") or history["social_signals"], "published_at" if history.get("community_comments") else "trade_date"),
-                "detail": "종목 영상의 고반응 댓글과 온라인 언급 추이",
+                "status": "ready" if community_rows else "missing",
+                "count": community_count,
+                "unit": "댓글",
+                "updated_at": latest(community_rows, "published_at" if community_comments else "trade_date"),
+                "detail": "종목 영상 댓글과 온라인 언급 추이",
             },
         ]
         return {"ticker": history["ticker"], "name": history["name"], "sources": sources}
