@@ -1638,7 +1638,7 @@ type TwinGameDetail = {
   world?: { memory?: { active_momenta?: string[] } };
   portfolio?: { total_return_pct: number };
   llm_reports?: {
-    investment?: { report_markdown?: string; summary?: string };
+    investment?: { report_markdown?: string; summary?: string; behavior_pattern?: string; investor_type?: "anchor" | "adapter" | "defender" | "chaser" };
     scenario?: { report_markdown?: string; summary?: string };
   };
 };
@@ -1666,6 +1666,23 @@ type TwinAssessment = {
 type TwinSession = { game: TwinGameSummary; assessment: TwinAssessment };
 type TwinBar = { key: string; date: string; open: number; high: number; low: number; close: number; real: boolean };
 
+const TWIN_INVESTOR_TYPE_META = {
+  anchor: { label: "원칙형 · The Anchor", image: "/investor-types/anchor.png" },
+  adapter: { label: "전략형 · The Adapter", image: "/investor-types/adapter.png" },
+  defender: { label: "고집 반응형 · The Defender", image: "/investor-types/defender.png" },
+  chaser: { label: "추격형 · The Chaser", image: "/investor-types/chaser.png" },
+} as const;
+
+function inferTwinInvestorType(report?: NonNullable<TwinGameDetail["llm_reports"]>["investment"]): keyof typeof TWIN_INVESTOR_TYPE_META | null {
+  if (report?.investor_type && report.investor_type in TWIN_INVESTOR_TYPE_META) return report.investor_type;
+  const text = `${report?.report_markdown ?? ""} ${report?.behavior_pattern ?? ""} ${report?.summary ?? ""}`;
+  if (/The Anchor|원칙형/i.test(text)) return "anchor";
+  if (/The Adapter|전략형|적응형/i.test(text)) return "adapter";
+  if (/The Defender|고집 반응형/i.test(text)) return "defender";
+  if (/The Chaser|추격형/i.test(text)) return "chaser";
+  return null;
+}
+
 function TwinStoredReports({ reports, regenerating, onRegenerate }: {
   reports?: TwinGameDetail["llm_reports"];
   regenerating?: boolean;
@@ -1676,6 +1693,7 @@ function TwinStoredReports({ reports, regenerating, onRegenerate }: {
   const scenario = reports?.scenario;
   const active = openReport === "scenario" ? scenario : investment;
   const reportTitle = openReport === "scenario" ? "해당 시나리오" : "나의 투자 일지";
+  const investorType = inferTwinInvestorType(investment);
   if (!investment && !scenario) return <p className="journal-history-note">이 실행은 아직 완료된 보고서를 생성하지 않았습니다.</p>;
   return (
     <section className="journal-stored-reports" aria-label="저장된 완료 보고서">
@@ -1688,6 +1706,10 @@ function TwinStoredReports({ reports, regenerating, onRegenerate }: {
       {openReport && <div className="journal-report-dialog-backdrop" role="presentation" onMouseDown={() => setOpenReport(null)}>
         <section className="journal-report-dialog" role="dialog" aria-modal="true" aria-labelledby="journal-report-title" onMouseDown={(event) => event.stopPropagation()}>
           <header><div><span>COMPLETED REPORT</span><h5 id="journal-report-title">{reportTitle}</h5></div><button type="button" aria-label="보고서 닫기" onClick={() => setOpenReport(null)}>×</button></header>
+          {openReport === "investment" && investorType && <figure className="journal-report-investor-type">
+            <figcaption><span>나의 투자 유형</span><strong>{TWIN_INVESTOR_TYPE_META[investorType].label}</strong></figcaption>
+            <img src={TWIN_INVESTOR_TYPE_META[investorType].image} alt={TWIN_INVESTOR_TYPE_META[investorType].label} />
+          </figure>}
           {active?.report_markdown ? <PaperEvidenceMarkdown content={active.report_markdown} /> : <p className="journal-history-note">저장된 요약: {active?.summary ?? "보고서 내용을 불러오지 못했습니다."}</p>}
         </section>
       </div>}
