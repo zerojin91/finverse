@@ -467,6 +467,9 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .journal-page { width: min(calc(100% - 72px), 1480px); margin: 0 auto; padding: 33px 0 48px; display: grid; gap: 16px; }
 .journal-page .page-heading { margin-bottom: 0; }
 .journal-heading h1 { font-size: clamp(29px,2.4vw,38px); }
+/* these panels are glance cards/lists sized by their own content, not the
+   market dashboard's chart panels — drop the shared 590px min-height. */
+.journal-page .panel { min-height: 0; }
 
 .journal-loading,.journal-error { display: flex; align-items: center; gap: 8px; padding: 22px 22px; color: var(--muted); font-size: 12.5px; }
 .journal-error { color: var(--down); }
@@ -986,7 +989,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 /* ---------------------------------------------------------- paper trading */
 .paper-trading-modal { width: min(1320px,100%); padding: 0; overflow: hidden; }
 .paper-trading-modal.setup { width: min(720px,100%); max-height: calc(100vh - 40px); overflow-y: auto; }
-.paper-trading-modal.running { height: min(1020px,calc(100vh - 24px)); max-height: calc(100vh - 24px); }
+.paper-trading-modal.running { height: min(1020px,calc(100vh - 24px)); max-height: calc(100vh - 24px); overflow-y: auto; }
 
 /* setup */
 .paper-setup { display: flex; flex-direction: column; gap: 20px; padding: 26px 28px 28px; }
@@ -1210,7 +1213,9 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-reset-button:hover:not(:disabled) { border-color: #9aa0ab; background: #e8eaf0; }
 .paper-reset-button:disabled { cursor: wait; opacity: .55; }
 .paper-error { display: flex; align-items: center; gap: 7px; margin: 0; padding: 10px 12px; border: 1px solid #fecaca; border-radius: 8px; color: #b91c1c; background: #fef2f2; font-size: 10px; }
-.paper-inline-error { margin: 0; color: #b91c1c; font-size: 10px; }
+.paper-inline-error { margin: 0; display: flex; align-items: center; gap: 8px; color: #b91c1c; font-size: 10px; }
+.paper-inline-error button { padding: 4px 9px; border: 1px solid #b91c1c; border-radius: 6px; background: #fff; color: #b91c1c; font-size: 10px; font-weight: 700; cursor: pointer; }
+.paper-inline-error button:hover { background: #fef2f2; }
 
 /* run */
 .paper-run { position: relative; height: 100%; min-height: 0; display: flex; flex-direction: column; background: #f8f8f9; }
@@ -1849,6 +1854,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
   .knowledge-graph-footer span + span { display: block; margin-top: 5px; }
   .config-metric-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .config-row-list > div { grid-template-columns: 85px minmax(0,1fr) auto; }
+  .simulation-ready-summary { grid-template-columns: 1fr; }
   .scenario-detail-body { grid-template-columns: 1fr; }
   .scenario-story { padding-right: 0; padding-bottom: 17px; border-right: 0; border-bottom: 1px solid var(--line); }
   .scenario-narrative-list,.scenario-decision-grid { grid-template-columns: 1fr; }
