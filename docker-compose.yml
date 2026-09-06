@@ -39,7 +39,11 @@ services:
       timeout: 5s
       retries: 10
       start_period: 20s
-    shm_size: 256mb
+    # Parallel workers build their hash tables in /dev/shm. One segment asks
+    # for about 48 MB, and on a cold cache several heavy queries overlap --
+    # 256 MB ran out and the API answered 503 with "could not resize shared
+    # memory segment". Raised on 2026-09-06 after 15 such failures.
+    shm_size: 1gb
     # The collector server has 4GB total and runs the collectors alongside the
     # database, so these are sized to leave room rather than to maximise
     # throughput. Raise them if the database moves to its own host.
