@@ -2245,7 +2245,8 @@ export default function Home() {
   const kospiRate = liveKospiLatest?.changePct ?? kospiData?.rate ?? -10.84;
   const kospiTone = kospiChange >= 0 ? "up" : "down";
   const kospiAsOf = liveKospiLatest?.date.slice(0, 10) ?? kospiData?.latestDate ?? "2026-07-28";
-  const kospiAsOfLabel = `${kospiAsOf.slice(0, 4)}.${Number(kospiAsOf.slice(5, 7))}.${Number(kospiAsOf.slice(8, 10))}`;
+  const kospiAsOfDigits = kospiAsOf.replace(/-/g, "");
+  const kospiAsOfLabel = `${kospiAsOfDigits.slice(0, 4)}.${Number(kospiAsOfDigits.slice(4, 6))}.${Number(kospiAsOfDigits.slice(6, 8))}`;
 
   useEffect(() => {
     let active = true;
@@ -2873,7 +2874,7 @@ export default function Home() {
                     </article>
                   ))}
                   <article className="custom-scenario-card">
-                    <button type="button" onClick={() => setPaperTradingOpen(true)}>
+                    <button type="button" onClick={openBuilder}>
                       <Plus size={26} />
                       <span>내가 생각한<br />시나리오로 보기</span>
                     </button>
