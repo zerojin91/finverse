@@ -32,7 +32,7 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, CSSProperties, FormEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation";
-import { PaperTradingModal, type Security } from "@/components/paper-trading";
+import { PaperEvidenceMarkdown, PaperTradingModal, type Security } from "@/components/paper-trading";
 import { AuthModal, type AuthUser, useAuthUser } from "@/components/auth";
 import { MockMarketSimulation } from "@/components/mock-market-simulation";
 
@@ -1665,19 +1665,26 @@ function TwinStoredReports({ reports, regenerating, onRegenerate }: {
   regenerating?: boolean;
   onRegenerate?: () => void;
 }) {
-  const [tab, setTab] = useState<"investment" | "scenario">("investment");
+  const [openReport, setOpenReport] = useState<"investment" | "scenario" | null>(null);
   const investment = reports?.investment;
   const scenario = reports?.scenario;
-  const active = tab === "investment" ? investment : scenario;
+  const active = openReport === "scenario" ? scenario : investment;
+  const reportTitle = openReport === "scenario" ? "해당 시나리오" : "나의 투자 일지";
   if (!investment && !scenario) return <p className="journal-history-note">이 실행은 아직 완료된 보고서를 생성하지 않았습니다.</p>;
   return (
     <section className="journal-stored-reports" aria-label="저장된 완료 보고서">
       <div className="journal-stored-reports-head"><h4>저장된 완료 보고서</h4><span>이 계정의 투자 성향 히스토리에 저장됨</span></div>
       <div className="journal-stored-report-tabs">
-        <button type="button" className={tab === "investment" ? "active" : ""} disabled={!investment} onClick={() => setTab("investment")}>나의 투자 일지</button>
-        <button type="button" className={tab === "scenario" ? "active" : ""} disabled={!scenario} onClick={() => setTab("scenario")}>해당 시나리오</button>
+        <button type="button" disabled={!investment} onClick={() => setOpenReport("investment")}>나의 투자 일지 열기</button>
+        <button type="button" disabled={!scenario} onClick={() => setOpenReport("scenario")}>해당 시나리오 열기</button>
       </div>
-      {active?.report_markdown ? <article className="journal-stored-report-markdown">{active.report_markdown}</article> : <p className="journal-history-note">저장된 요약: {active?.summary ?? "보고서 내용을 불러오지 못했습니다."}</p>}
+      <p className="journal-history-note">두 보고서는 각각 새 창에서 표·강조·목록 형식을 유지해 볼 수 있습니다.</p>
+      {openReport && <div className="journal-report-dialog-backdrop" role="presentation" onMouseDown={() => setOpenReport(null)}>
+        <section className="journal-report-dialog" role="dialog" aria-modal="true" aria-labelledby="journal-report-title" onMouseDown={(event) => event.stopPropagation()}>
+          <header><div><span>COMPLETED REPORT</span><h5 id="journal-report-title">{reportTitle}</h5></div><button type="button" aria-label="보고서 닫기" onClick={() => setOpenReport(null)}>×</button></header>
+          {active?.report_markdown ? <PaperEvidenceMarkdown content={active.report_markdown} /> : <p className="journal-history-note">저장된 요약: {active?.summary ?? "보고서 내용을 불러오지 못했습니다."}</p>}
+        </section>
+      </div>}
       {onRegenerate && <button className="journal-report-regenerate" type="button" onClick={onRegenerate} disabled={regenerating}>{regenerating ? "새 형식 보고서를 생성 중…" : "새 형식으로 두 보고서 다시 생성"}</button>}
     </section>
   );

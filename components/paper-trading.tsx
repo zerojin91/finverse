@@ -175,7 +175,7 @@ type InitialContextDocuments = {
   document_contents?: Record<string, string>;
 };
 
-function PaperEvidenceMarkdown({ content }: { content: string }) {
+export function PaperEvidenceMarkdown({ content }: { content: string }) {
   const inline = (value: string): ReactNode => value.split(/(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g).filter(Boolean).map((part, index) => {
     if (part.startsWith("**") && part.endsWith("**")) return <strong key={index}>{part.slice(2, -2)}</strong>;
     if (part.startsWith("`") && part.endsWith("`")) return <code key={index}>{part.slice(1, -1)}</code>;
@@ -199,6 +199,15 @@ function PaperEvidenceMarkdown({ content }: { content: string }) {
       continue;
     }
     if (/^(-{3,}|\*{3,}|_{3,})$/.test(line)) { blocks.push(<hr key={`rule-${index}`} />); index += 1; continue; }
+    if (line.startsWith(">")) {
+      const quote: string[] = [];
+      while (index < lines.length && lines[index].trim().startsWith(">")) {
+        quote.push(lines[index].trim().replace(/^>\s?/, ""));
+        index += 1;
+      }
+      blocks.push(<blockquote key={`quote-${index}`}>{quote.map((item, quoteIndex) => <p key={quoteIndex}>{inline(item)}</p>)}</blockquote>);
+      continue;
+    }
     if (line.includes("|") && index + 1 < lines.length && isTableDivider(lines[index + 1])) {
       const headers = tableCells(line);
       index += 2;

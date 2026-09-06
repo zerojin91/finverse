@@ -846,6 +846,8 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .evidence-markdown h2 { margin: 27px 0 10px; font-size: 16px; }
 .evidence-markdown h3 { margin: 20px 0 7px; font-size: 13px; }
 .evidence-markdown p { margin: 8px 0; }
+.evidence-markdown blockquote { margin: 13px 0; padding: 8px 13px; border-left: 3px solid #76a9ff; color: #475569; background: #f5f9ff; }
+.evidence-markdown blockquote p { margin: 3px 0; }
 .evidence-markdown ul,.evidence-markdown ol { display: grid; gap: 5px; margin: 10px 0 16px; padding-left: 20px; }
 .evidence-markdown li::marker { color: #0769ff; font-weight: 800; }
 .evidence-markdown strong { color: #18181b; font-weight: 800; }
@@ -1805,9 +1807,14 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .journal-stored-reports-head span { color: var(--light); font-size: 10px; }
 .journal-stored-report-tabs { display: flex; gap: 6px; }
 .journal-stored-report-tabs button { min-height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 7px; color: var(--muted); background: #fff; font: inherit; font-size: 11px; font-weight: 750; cursor: pointer; }
-.journal-stored-report-tabs button.active { border-color: var(--ink); color: var(--ink); }
 .journal-stored-report-tabs button:disabled { cursor: not-allowed; opacity: .45; }
-.journal-stored-report-markdown { max-height: 620px; overflow: auto; margin: 0; padding: 14px; border-radius: 8px; color: var(--ink); background: #fafafa; white-space: pre-wrap; font-size: 12px; line-height: 1.8; }
+.journal-report-dialog-backdrop { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; padding: 28px; background: rgb(15 23 42 / .42); }
+.journal-report-dialog { display: grid; grid-template-rows: auto minmax(0,1fr); width: min(960px,100%); max-height: min(820px,calc(100vh - 56px)); overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: #fff; box-shadow: 0 24px 60px rgb(15 23 42 / .26); }
+.journal-report-dialog > header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.journal-report-dialog header span { color: #0769ff; font-size: 9px; font-weight: 850; letter-spacing: .1em; }
+.journal-report-dialog h5 { margin: 3px 0 0; color: var(--ink); font-size: 17px; }
+.journal-report-dialog header button { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid var(--line); border-radius: 7px; color: var(--muted); background: #fff; font: 24px/1 Arial,sans-serif; cursor: pointer; }
+.journal-report-dialog .evidence-markdown { min-height: 0; padding: 22px 28px 34px; background: #fff; font-size: 13px; }
 .journal-report-regenerate { justify-self: start; min-height: 32px; padding: 0 12px; border: 1px solid var(--ink); border-radius: 7px; color: var(--ink); background: #fff; font: inherit; font-size: 11px; font-weight: 750; cursor: pointer; }
 .journal-report-regenerate:disabled { cursor: wait; opacity: .55; }
 .paper-completed-reports-heading span,.paper-report-card header span { color: #ef4444; font-size: 8px; font-weight: 900; letter-spacing: .1em; }
