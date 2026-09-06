@@ -4,7 +4,7 @@ help:
 	@echo "make install  - Node + Python(uv) dependencies"
 	@echo "make dev      - full local stack (Next.js:3000, MiroFish:5440, paper trading:5055), direct DB connection"
 	@echo "make local    - same as dev, but opens the PEM SSH tunnel to the DB first (FINVERSE_DATABASE_TUNNEL=1 in .env)"
-	@echo "make prod     - build once, then run the full stack with the Next app in production mode"
+	@echo "make prod     - same as dev for now (see comment in scripts/dev_local.mjs: vinext start 503s on DB routes)"
 	@echo "make stop     - kill anything still listening on 3000/5440/5055"
 	@echo "make health   - curl the three local services"
 
@@ -24,9 +24,7 @@ local:
 		npm run dev \
 	'
 
-prod:
-	npm run build
-	FINVERSE_RUN_MODE=prod npm run dev
+prod: dev
 
 stop:
 	-lsof -ti tcp:3000 -ti tcp:5440 -ti tcp:5055 | xargs kill -9 2>/dev/null || true

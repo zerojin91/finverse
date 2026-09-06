@@ -61,11 +61,13 @@ start(paperPython, ["-m", "services.paper_trading_api"], "paper trading engine")
 // vinext dev currently fails while scanning the lazily loaded AI chat bundle,
 // while the same Next application builds and runs normally.  Use Next's own
 // development server so `npm run dev` remains the single reliable local entry.
-if (process.env.FINVERSE_RUN_MODE === "prod") {
-  start(process.platform === "win32" ? "node" : process.execPath, [resolve(root, "node_modules/.bin/vinext"), "start"], "web app");
-} else {
-  start(process.platform === "win32" ? "node" : process.execPath, [resolve(root, "node_modules/next/dist/bin/next"), "dev", "-p", "3000"], "web app");
-}
+//
+// `vinext start` (the built production server) was tried here too, but its
+// static route classification puts app/api/dashboard, /api/kospi and
+// /api/market-indices on a Workers-style runtime that imports `cloudflare:sockets`;
+// under plain Node that throws ERR_UNSUPPORTED_ESM_URL_SCHEME and those routes
+// 503. Until that's fixed, always use `next dev` here regardless of run mode.
+start(process.platform === "win32" ? "node" : process.execPath, [resolve(root, "node_modules/next/dist/bin/next"), "dev", "-p", "3000"], "web app");
 
 function shutdown() {
   for (const child of children) if (!child.killed) child.kill("SIGTERM");
