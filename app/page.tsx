@@ -1988,7 +1988,6 @@ const TWIN_RISK_SURVEY_QUESTIONS: TwinRiskSurveyQuestion[] = [
 ];
 
 type TwinRiskSurveyResult = { score: number; completedAt: string };
-const LEGACY_TWIN_RISK_SURVEY_STORAGE_KEY = "finverse-twin-risk-survey-v1";
 
 function twinRiskProfile(score: number) {
   if (score <= 8) return { label: "안정형", description: "손실 회피와 자금 안정성을 우선하는 편입니다. 변동성이 큰 상황에서는 투자 근거와 손실 한도를 먼저 점검해 보세요.", tone: "steady" };
@@ -2014,23 +2013,7 @@ function TwinRiskProfileSurvey() {
         if (payload?.profile) {
           setResult(payload.profile);
           setPhase("result");
-        } else {
-          // 이전 버전은 브라우저에만 결과를 보관했다. 기존 사용자가 첫 화면에서
-          // 다시 답하지 않도록 유효한 점수만 계정 기록으로 한 번 옮긴다.
-          let legacy: TwinRiskSurveyResult | null = null;
-          try {
-            const saved = window.localStorage.getItem(LEGACY_TWIN_RISK_SURVEY_STORAGE_KEY);
-            const parsed = saved ? JSON.parse(saved) as TwinRiskSurveyResult : null;
-            if (parsed && Number.isInteger(parsed.score) && parsed.score >= 5 && parsed.score <= 20) legacy = parsed;
-          } catch { /* 이전 브라우저 기록이 없으면 새 진단으로 진행한다. */ }
-          if (!legacy) { setPhase("intro"); return; }
-          const migration = await fetch("/api/investor-profile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ score: legacy.score }) });
-          const migrated = await migration.json().catch(() => null) as { profile?: TwinRiskSurveyResult } | null;
-          if (!migration.ok || !migrated?.profile) throw new Error("기존 투자 성향 기록을 이전하지 못했습니다.");
-          if (!active) return;
-          setResult(migrated.profile);
-          setPhase("result");
-        }
+        } else setPhase("intro");
       })
       .catch((cause) => { if (active) { setError(cause instanceof Error ? cause.message : "투자 성향 기록을 불러오지 못했습니다."); setPhase("intro"); } });
     return () => { active = false; };
