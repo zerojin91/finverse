@@ -2638,10 +2638,15 @@ function TradingScreen({
                 <CalendarClock size={15} /> 하루 진행
               </button>
             )}
-            <button className="paper-advance" type="button" onClick={() => { void advanceAfterReflection(); }} disabled={busy}>
+            <button
+              className={`paper-advance${game.phase === "completed" && game.llm_reports ? " report-generated" : ""}`}
+              type="button"
+              onClick={() => { void advanceAfterReflection(); }}
+              disabled={busy || (game.phase === "completed" && Boolean(game.llm_reports))}
+            >
               {busy
                 ? <><LoaderCircle size={16} className="spin" /> 오늘의 시장을 준비하는 중</>
-                : <>{worldMode && meta.action === "advance" ? "하루 진행" : meta.cta} <ChevronRight size={16} /></>}
+                : <>{game.phase === "completed" && game.llm_reports ? "AI 투자 리포트 생성 완료" : worldMode && meta.action === "advance" ? "하루 진행" : meta.cta} {!game.llm_reports && <ChevronRight size={16} />}</>}
             </button>
           </div>
         </section>

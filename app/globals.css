@@ -1462,6 +1462,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-advance-day:hover { border-color: #a1a1aa; background: #fafafa; }
 .paper-advance { min-height: 50px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; margin: 0 14px 14px; border: 0; border-radius: 10px; color: #fff; background: var(--ink); font-family: inherit; font-size: 13px; font-weight: 750; cursor: pointer; }
 .paper-advance:disabled { cursor: wait; opacity: .55; }
+.paper-advance.report-generated:disabled { cursor: default; }
 .paper-run-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 11px 24px; border-top: 1px solid var(--line); background: #fff; color: var(--light); font-size: 9px; }
 .paper-run-footer span:first-child { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .paper-run.report-view .paper-run-grid { display: none; }
