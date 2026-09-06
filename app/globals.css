@@ -467,6 +467,9 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .journal-page { width: min(calc(100% - 72px), 1480px); margin: 0 auto; padding: 33px 0 48px; display: grid; gap: 16px; }
 .journal-page .page-heading { margin-bottom: 0; }
 .journal-heading h1 { font-size: clamp(29px,2.4vw,38px); }
+/* these panels are glance cards/lists sized by their own content, not the
+   market dashboard's chart panels — drop the shared 590px min-height. */
+.journal-page .panel { min-height: 0; }
 
 .journal-loading,.journal-error { display: flex; align-items: center; gap: 8px; padding: 22px 22px; color: var(--muted); font-size: 12.5px; }
 .journal-error { color: var(--down); }
