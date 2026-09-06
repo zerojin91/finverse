@@ -2469,7 +2469,7 @@ function ServiceIntro({ onEnter, onOpenJournal }: { onEnter: () => void; onOpenJ
 
       <section className="intro-smoke-feature">
         <div className="intro-smoke-wrap intro-smoke-feature-grid">
-          <div><span className="intro-smoke-tag">아는 것</span><h2>가격이 아니라<br />조건을 봅니다</h2><p>종목을 고르면 시장·경제·사건·커뮤니티에서 모은 근거로 지금 그 종목이 <b>어떤 조건 위에 서 있는지</b> 정리합니다.</p><p>숫자를 정답처럼 던지지 않고, 조건이 깨지는 신호까지 함께 보여줍니다.</p></div>
+          <div><span className="intro-smoke-tag">아는 것</span><h2>가격이 아니라<br />조건을 봅니다</h2><p>종목을 고르면 시장·경제·사건·커뮤니티의 정보를 <b>온톨로지</b>로 연결합니다. 같은 원인에서 나온 뉴스와 지표를 하나의 흐름으로 묶어, 가격 뒤에 있는 사건·주체·영향을 함께 볼 수 있게 합니다.</p><p>이렇게 나누는 이유는 한 영역의 숫자만으로는 시장을 설명할 수 없기 때문입니다. 시장 수급이 바뀌었는지, 금리·환율 같은 경제 조건이 움직였는지, 종목 사건이 실제로 확인됐는지, 커뮤니티 심리가 과열됐는지를 서로 대조해야 합니다.</p><p>숫자를 정답처럼 던지지 않고, <b>어떤 조건이 유지되어야 하는지</b>와 그 조건이 깨지는 신호까지 함께 보여줍니다.</p></div>
           <div className="intro-smoke-mock"><header><span>시장 시뮬레이션 · 초기 상황</span><span>최근 한 달 · 실제 근거 기반</span></header><strong>삼성전자 <small>005930</small></strong><ul className="intro-smoke-ontology"><li><b>시장</b><span>삼성전자 주가·거래량과 외국인·기관 수급의 최근 흐름을 요약합니다.</span></li><li><b>경제</b><span>한국은행 기준금리 인상과 환율·거시지표가 업종에 미치는 영향을 정리합니다.</span></li><li><b>사건</b><span>주주환원 확대, 반도체 실적 등 종목과 직접 연결된 주요 사건을 묶습니다.</span></li><li><b>커뮤니티</b><span>온라인 투자 반응과 참여 추이를 통해 시장 심리의 변화를 살펴봅니다.</span></li></ul><footer>4개 온톨로지 정보의 Evidence 문서를 바탕으로 초기 상황을 요약합니다.</footer></div>
         </div>
       </section>
