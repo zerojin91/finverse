@@ -107,6 +107,7 @@ def test_user_fill_records_execution_market_date_and_net_return():
         persona_counts={"retail": 1, "foreign": 1, "institution": 1, "pension": 1},
     )
     _advance(game)
+    assert public_scenario_game(game)["daily_performance"][0]["market_date"] == game["last_market_date"]
     submit_scenario_order(game, "BUY", 10)
     revealed = reveal_and_react(game, _round(game, "HOLD"))
 
@@ -115,6 +116,7 @@ def test_user_fill_records_execution_market_date_and_net_return():
     assert portfolio["equity"] == portfolio["cash"] + portfolio["market_value"]
     assert portfolio["total_return_pct"] == round(
         (portfolio["equity"] / game["initial_equity"] - 1) * 100, 4)
+    assert public_scenario_game(game)["daily_performance"][-1]["equity"] == portfolio["equity"]
 
 
 def test_inter_event_days_release_signals_without_allowing_user_orders():

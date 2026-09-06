@@ -348,6 +348,17 @@ type Fill = {
   market_date?: string;
 };
 
+type DailyPerformance = {
+  market_date: string;
+  mark_price: number;
+  cash: number;
+  quantity: number;
+  market_value: number;
+  equity: number;
+  daily_pnl: number;
+  total_return_pct: number;
+};
+
 type PendingOrder = {
   order_id: string;
   side: "BUY" | "SELL";
@@ -412,6 +423,7 @@ type ScenarioGame = {
   daily_reflections?: DailyReflection[];
   world?: { memory?: { event_ledger?: ScenarioEvent[] } };
   llm_reports?: LlmReports;
+  daily_performance?: DailyPerformance[];
 };
 
 type DailyReflection = {
@@ -2498,6 +2510,19 @@ function TradingScreen({
                     <strong>{fill.quantity.toLocaleString("ko-KR")}주</strong>
                     <span>{fill.market_date ? `${fill.market_date} 체결` : "체결일 미상"}</span>
                     <em>{fill.price.toLocaleString("ko-KR")}원</em>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {Boolean(game.daily_performance?.length) && (
+              <div className="paper-daily-performance">
+                <span>일별 투자 성과</span>
+                {[...(game.daily_performance ?? [])].reverse().slice(0, 10).map((day) => (
+                  <div key={day.market_date}>
+                    <strong>{day.market_date}</strong>
+                    <span>{day.quantity.toLocaleString("ko-KR")}주 · 평가액 {day.market_value.toLocaleString("ko-KR")}원</span>
+                    <b className={toneOf(day.daily_pnl)}>{day.daily_pnl >= 0 ? "+" : ""}{day.daily_pnl.toLocaleString("ko-KR")}원</b>
                   </div>
                 ))}
               </div>

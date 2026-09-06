@@ -222,6 +222,8 @@ def new_scenario_game(
         "initial_equity": initial_equity,
         "position": {"quantity": initial_quantity,
                      "average_price": initial_average_price},
+        "initial_position": {"quantity": initial_quantity,
+                              "average_price": initial_average_price},
         "realized_pnl": 0,
         "current_price": int(previous_close), "initial_reference_price": int(previous_close),
         "events": normalized_events, "revealed_events": [],
@@ -250,7 +252,7 @@ def new_scenario_game(
         "volatility_state": {"level": 1.0},
         "settings": {"fee_rate": fee_rate, "sell_tax_rate": sell_tax_rate,
                      "slippage_bps": slippage_bps, "context_mode": CONTEXT_MODE},
-        "decision_log": [],
+        "decision_log": [], "daily_performance": [],
     }
 
 
@@ -259,6 +261,31 @@ def current_event(game: dict[str, Any]) -> dict[str, Any] | None:
         return (game.get("world") or {}).get("active_event")
     index = game["current_event_index"]
     return game["events"][index] if index < len(game["events"]) else None
+
+
+def _record_daily_performance(game: dict[str, Any], market_date: str | None) -> None:
+    """Persist one final personal-account snapshot per simulated trading day."""
+    if not market_date:
+        return
+    portfolio = scenario_portfolio(game)
+    history = game.setdefault("daily_performance", [])
+    previous_equity = history[-1]["equity"] if history else game["initial_equity"]
+    snapshot = {
+        "market_date": market_date,
+        "mark_price": portfolio["mark_price"],
+        "cash": portfolio["cash"],
+        "quantity": portfolio["quantity"],
+        "market_value": portfolio["market_value"],
+        "equity": portfolio["equity"],
+        "daily_pnl": portfolio["equity"] - previous_equity,
+        "total_return_pct": portfolio["total_return_pct"],
+    }
+    existing = next((index for index, row in enumerate(history)
+                     if row.get("market_date") == market_date), None)
+    if existing is None:
+        history.append(snapshot)
+    else:
+        history[existing] = snapshot
 
 
 def public_scenario_game(game: dict[str, Any]) -> dict[str, Any]:
@@ -822,6 +849,7 @@ def advance_inter_event_market(game: dict[str, Any], round_provider: Any,
         result["newly_released_signals"] = newly_released
         rounds.append(result)
         game["last_market_date"] = market_date
+        _record_daily_performance(game, market_date)
     # 남은 날이 있으면 아직 이벤트 전 구간이다. 다음 호출에서 이어서 진행한다.
     if max_days is None or len(dates) >= remaining:
         game["phase"] = PHASE_PRE_EVENT
@@ -841,6 +869,7 @@ def reveal_and_react(game: dict[str, Any], round_data: dict[str, Any]) -> dict[s
                                  label=f"{event['event_date']} · EVENT {event['sequence']} · {event['title']}",
                                  market_date=event["event_date"])
     game["last_market_date"] = event["event_date"]
+    _record_daily_performance(game, event["event_date"])
     game["decision_log"].append({"event_id": event["event_id"], "phase": PHASE_PRE_EVENT,
                                  "user_fills": user_fills, "price_before": reaction["previous_price"],
                                  "price_after": reaction["price"]})
@@ -854,6 +883,7 @@ def finish_event(game: dict[str, Any], autonomous_rounds: Any = None) -> dict[st
         raise TradingError("현재는 이벤트 사후 판단 단계가 아닙니다.")
     event = current_event(game)
     user_fills = _execute_user_orders(game, event["event_date"])
+    _record_daily_performance(game, event["event_date"])
     game["decision_log"].append({"event_id": event["event_id"], "phase": PHASE_POST_EVENT,
                                  "user_fills": user_fills,
                                  "price_after_autonomous": game["current_price"]})
