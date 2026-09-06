@@ -2107,6 +2107,10 @@ function SetupScreen({
                 ))}
               </div>
             </div>
+            <div className="paper-ready-copy">
+              <span>선택한 종목의 실제 흐름과 시장 정보를 바탕으로, 앞으로의 거래일을 가상으로 경험합니다.</span>
+              <span>매일 매수·매도·관망을 선택하며 나만의 투자 판단을 기록하고 돌아볼 수 있습니다.</span>
+            </div>
             <div className="paper-ready-actions">
               <button className="paper-reset-button" type="button" onClick={() => void restartSetup()} disabled={starting || resettingSetup}>
                 {resettingSetup ? <><LoaderCircle size={15} className="spin" /> 초기화 중</> : <>다시 설정하기</>}
