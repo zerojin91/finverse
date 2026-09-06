@@ -2369,8 +2369,8 @@ function CoachOverlay({ onDone, worldMode = false }: { onDone: () => void; world
         {worldMode ? (
           <ol>
             <li><b>오늘의 시장 확인</b><p className="paper-coach-lines"><span>‘하루 진행’을 누르면 오늘의 시황과 새로 공개된 정보를 확인합니다.</span><span>평소 거래일에는 내 포트폴리오 변화와 시장 흐름을 읽는 데 집중하면 됩니다.</span></p></li>
-            <li><b>중요 사건에서 직접 판단</b><p className="paper-coach-lines"><span>가격에 큰 영향을 줄 사건이 오면 게임이 멈추고 판단 화면이 열립니다.</span><span>그때 매수 고려·관찰 계속·매도 고려 중 하나를 선택합니다. 수량이나 주문은 필요하지 않습니다.</span></p></li>
-            <li><b>내 선택은 기록으로 남음</b><p className="paper-coach-lines"><span>내 판단은 학습 기록으로 저장되고 시장 가격이나 수급을 직접 움직이지 않습니다.</span><span>시장 변화는 중요한 사건과 59개 에이전트의 전체 반응으로 만들어집니다.</span></p></li>
+            <li><b>중요 사건에서 직접 판단</b><p className="paper-coach-lines"><span>가격에 큰 영향을 줄 사건이 오면 게임이 멈추고 판단 화면이 열립니다.</span><span>매수 고려·관찰 계속·매도 고려 중 하나를 선택합니다. 매수·매도 고려를 고르면 다음 거래일 개인 계좌에 반영할 수량도 입력합니다.</span></p></li>
+            <li><b>내 선택은 기록으로 남음</b><p className="paper-coach-lines"><span>내 판단과 개인 계좌 주문은 학습 기록으로 저장되며 시장 가격이나 수급을 직접 움직이지 않습니다.</span><span>시장 변화는 World Agent가 갱신한 환경·공개 사건과 59개 에이전트의 전체 반응으로 만들어집니다.</span></p></li>
             <li><b>다음 거래일로 이어가기</b><p className="paper-coach-lines"><span>각 거래일에는 개인·외국인·기관·연기금이 각자 다른 방식으로 반응합니다.</span><span>결과를 확인한 뒤 다음 거래일을 열어 변화가 이어지는 모습을 관찰하세요.</span></p></li>
             <li><b>마지막에 내 판단 돌아보기</b><p className="paper-coach-lines"><span>연습이 끝나면 수익률과 함께 기록한 판단을 분석합니다.</span><span>추격 매수, 손실 회피, 과신, 과도한 매매 같은 패턴을 확인할 수 있습니다.</span></p></li>
           </ol>
