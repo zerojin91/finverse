@@ -2237,7 +2237,6 @@ function TwinPage({ onRequireAuth }: { onRequireAuth?: (action: () => void) => v
       <section className="panel">
         <div className="panel-title">
           <div><h2>종목별 이벤트 시나리오 실험</h2></div>
-          <span className="panel-note">종목과 실행을 고르면 그 실험의 캔들 경로가 아래에 나타납니다. 이벤트를 가리키면 그 시점의 내용만 보여줍니다.</span>
         </div>
         {gamesState === "loading" ? (
           <div className="journal-loading"><LoaderCircle size={16} className="spin" /> 불러오는 중…</div>
