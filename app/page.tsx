@@ -1690,12 +1690,20 @@ const TWIN_GROUP_LABEL: Record<string, string> = {
 };
 
 function inferTwinInvestorType(report?: NonNullable<TwinGameDetail["llm_reports"]>["investment"]): keyof typeof TWIN_INVESTOR_TYPE_META | null {
-  if (report?.investor_type && report.investor_type in TWIN_INVESTOR_TYPE_META) return report.investor_type;
+  const declaredType = String(report?.investor_type ?? "").trim().toLowerCase();
+  const aliases: Record<string, keyof typeof TWIN_INVESTOR_TYPE_META> = {
+    anchor: "anchor", "원칙형": "anchor",
+    adapter: "adapter", "전략형": "adapter", "적응형": "adapter",
+    defender: "defender", "고집 반응형": "defender",
+    chaser: "chaser", "추격형": "chaser",
+  };
+  if (aliases[declaredType]) return aliases[declaredType];
   const text = `${report?.report_markdown ?? ""} ${report?.behavior_pattern ?? ""} ${report?.summary ?? ""}`;
   if (/The Anchor|원칙형/i.test(text)) return "anchor";
   if (/The Adapter|전략형|적응형/i.test(text)) return "adapter";
   if (/The Defender|고집 반응형/i.test(text)) return "defender";
   if (/The Chaser|추격형/i.test(text)) return "chaser";
+  if (/추격 매수|FOMO|고점.*매수/i.test(text)) return "chaser";
   return null;
 }
 
@@ -1758,15 +1766,17 @@ function TwinStoredReports({ detail, regenerating, onRegenerate }: {
       {openReport && <div className="journal-report-dialog-backdrop" role="presentation" onMouseDown={() => setOpenReport(null)}>
         <section className="journal-report-dialog" role="dialog" aria-modal="true" aria-labelledby="journal-report-title" onMouseDown={(event) => event.stopPropagation()}>
           <header><div><span>COMPLETED REPORT</span><h5 id="journal-report-title">{reportTitle}</h5></div><button type="button" aria-label="보고서 닫기" onClick={() => setOpenReport(null)}>×</button></header>
-          {openReport === "investment" && investorType && <figure className="journal-report-investor-type">
-            <figcaption><span>나의 투자 유형</span><strong>{TWIN_INVESTOR_TYPE_META[investorType].label}</strong></figcaption>
-            <img src={TWIN_INVESTOR_TYPE_META[investorType].image} alt={TWIN_INVESTOR_TYPE_META[investorType].label} />
-          </figure>}
-          {openReport === "scenario"
-            ? <TwinScenarioReport detail={detail} scenario={scenario} />
-            : active?.report_markdown
-              ? <PaperEvidenceMarkdown content={active.report_markdown} />
-              : <p className="journal-history-note">저장된 요약: {active?.summary ?? "보고서 내용을 불러오지 못했습니다."}</p>}
+          <div className="journal-report-dialog-body">
+            {openReport === "investment" && investorType && <figure className="journal-report-investor-type">
+              <figcaption><span>나의 투자 유형</span><strong>{TWIN_INVESTOR_TYPE_META[investorType].label}</strong></figcaption>
+              <img src={TWIN_INVESTOR_TYPE_META[investorType].image} alt={TWIN_INVESTOR_TYPE_META[investorType].label} />
+            </figure>}
+            {openReport === "scenario"
+              ? <TwinScenarioReport detail={detail} scenario={scenario} />
+              : active?.report_markdown
+                ? <PaperEvidenceMarkdown content={active.report_markdown} />
+                : <p className="journal-history-note">저장된 요약: {active?.summary ?? "보고서 내용을 불러오지 못했습니다."}</p>}
+          </div>
         </section>
       </div>}
     </section>
