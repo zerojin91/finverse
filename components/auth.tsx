@@ -19,8 +19,14 @@ export function useAuthUser() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const refresh = useCallback(async () => {
-    setUser(await fetchMe());
+  const refresh = useCallback(async (knownUser?: AuthUser) => {
+    if (knownUser) {
+      setUser(knownUser);
+      return knownUser;
+    }
+    const nextUser = await fetchMe();
+    setUser(nextUser);
+    return nextUser;
   }, []);
 
   useEffect(() => {

@@ -2247,6 +2247,9 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
   font-weight: 600;
   cursor: default;
 }
+.mock-journal-account { justify-self: end; display: flex; align-items: center; gap: 9px; min-width: 0; }
+.mock-journal-account > span { max-width: 180px; overflow: hidden; color: var(--muted); font-size: 11px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.mock-journal-account > button { padding: 0; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 11px; font-weight: 650; white-space: nowrap; cursor: pointer; }
 .mock-journal-main { width: min(100%, 1280px); margin: 0 auto; padding: 0 36px 40px; }
 .mock-journal-main .journal-page { width: 100%; margin: 0; padding: 38px 0 0; gap: 32px; }
 .mock-journal-main .page-heading { display: flex; margin: 0 0 -6px; }
@@ -2268,6 +2271,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
   .mock-journal-nav { gap: 16px; }
   .mock-journal-nav button { height: 60px; font-size: 13px; }
   .mock-journal-login { display: none; }
+  .mock-journal-account > span { display: none; }
   .mock-journal-main { padding: 0 12px 28px; }
   .mock-journal-main .journal-page { padding-top: 24px; gap: 18px; }
   .mock-journal-main .page-heading h1 { font-size: 24px; }
