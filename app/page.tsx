@@ -2405,8 +2405,6 @@ function MockNavigation({ activeTab, onActivate, onShowIntro, user, onLogin, onL
   );
 }
 
-const FINVERSE_INTRO_STORAGE_KEY = "finverse-service-intro-seen-v1";
-
 function ServiceIntro({ onEnter, onOpenJournal }: { onEnter: () => void; onOpenJournal: () => void }) {
   return (
     <main className="intro-smoke">
@@ -2420,7 +2418,7 @@ function ServiceIntro({ onEnter, onOpenJournal }: { onEnter: () => void; onOpenJ
       <section className="intro-smoke-hero" aria-labelledby="service-intro-title">
         <div className="intro-smoke-wrap intro-smoke-hero-inner">
           <div>
-            <h1 id="service-intro-title">아는 것과,<br />행동하는 것은<br />다릅니다.</h1>
+            <h1 id="service-intro-title">아는 것과,<br />행동하는 것은 다릅니다.</h1>
             <div className="intro-smoke-rule" />
             <p className="intro-smoke-hero-close">FINVERSE는 판단과 행동의 간격을 훈련합니다.</p>
             <p className="intro-smoke-hero-lede">사람은 불안, 손실 회피, 군집 심리와 정보 과부하 속에서 세워 둔 원칙을 지키기 어렵습니다. FINVERSE는 그 판단 오류를 안전하게 발견하고 다음 행동 기준으로 바꾸도록 돕습니다.</p>
@@ -2456,7 +2454,7 @@ function ServiceIntro({ onEnter, onOpenJournal }: { onEnter: () => void; onOpenJ
 
       <section className="intro-smoke-errors">
         <div className="intro-smoke-wrap">
-          <span className="intro-smoke-tag">금융 현안</span>
+          <span className="intro-smoke-tag">풀고자 하는 금융 현안</span>
           <h2>불확실한 순간에는,<br />판단 오류가 반복됩니다.</h2>
           <p className="intro-smoke-errors-lede">시장 급등락과 금리·환율 변화처럼 불확실성이 큰 순간에는 장기 목표와 위험 감내 수준보다 감정과 주변 정보가 먼저 판단을 이끌기 쉽습니다. FINVERSE는 아래와 같은 순간을 안전한 가상 환경에서 먼저 마주하게 합니다.</p>
           <div className="intro-smoke-error-grid">
@@ -2585,16 +2583,7 @@ export default function Home() {
   const kospiAsOfDigits = kospiAsOf.replace(/-/g, "");
   const kospiAsOfLabel = `${kospiAsOfDigits.slice(0, 4)}.${Number(kospiAsOfDigits.slice(4, 6))}.${Number(kospiAsOfDigits.slice(6, 8))}`;
 
-  useEffect(() => {
-    try {
-      setIntroVisible(window.localStorage.getItem(FINVERSE_INTRO_STORAGE_KEY) !== "seen");
-    } catch {
-      // 저장소를 사용할 수 없는 환경에서는 방문마다 소개를 보여준다.
-    }
-  }, []);
-
   const enterService = useCallback((tab: MainTab = "market") => {
-    try { window.localStorage.setItem(FINVERSE_INTRO_STORAGE_KEY, "seen"); } catch { /* 저장 실패는 서비스 진입을 막지 않는다. */ }
     setActiveTab(tab);
     setIntroVisible(false);
   }, []);
