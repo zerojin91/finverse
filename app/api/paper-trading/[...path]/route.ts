@@ -1,4 +1,4 @@
-import { getSessionUser } from "@/lib/auth-db";
+import { getInvestorProfile, getSessionUser } from "@/lib/auth-db";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +37,9 @@ async function proxy(request: Request, segments: string[], method: string) {
       return Response.json({ success: false, error: "인증 서비스에 연결하지 못했습니다." }, { status: 503 });
     }
     if (!user) return Response.json({ success: false, error: "로그인이 필요합니다." }, { status: 401 });
+    if (segments[0] === "scenarios" && segments.length === 1 && method === "POST" && !getInvestorProfile(user.id)) {
+      return Response.json({ success: false, error: "모의투자를 시작하기 전에 현재 나의 투자 성향 진단을 먼저 완료해주세요." }, { status: 403 });
+    }
     headers["X-Finverse-User-Id"] = String(user.id);
   }
 

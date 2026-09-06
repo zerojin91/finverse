@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import { hashToken, readSessionToken } from "@/lib/auth";
 
 export type AuthUser = { id: number; email: string };
+export type InvestorProfile = { score: number; completedAt: string };
 
 // 데모용 최소 인증이라 공유 Postgres에 쓰기 권한 계정을 새로 발급받는 대신,
 // 다른 로컬 상태(var/paper_games/*.json)와 같은 위치에 파일 하나로 둔다.
@@ -30,6 +31,11 @@ function database(): DatabaseSync {
       expires_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS sessions_user_id_idx ON sessions(user_id);
+    CREATE TABLE IF NOT EXISTS investor_profiles (
+      user_id       INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      score         INTEGER NOT NULL CHECK (score BETWEEN 5 AND 20),
+      completed_at  TEXT NOT NULL
+    );
   `);
   return db;
 }
@@ -51,6 +57,20 @@ export function createSession(userId: number, tokenHash: string, expiresAt: Date
 
 export function deleteSessionByTokenHash(tokenHash: string): void {
   database().prepare("delete from sessions where token_hash = ?").run(tokenHash);
+}
+
+export function getInvestorProfile(userId: number): InvestorProfile | null {
+  const row = database().prepare("select score, completed_at from investor_profiles where user_id = ?").get(userId) as { score: number; completed_at: string } | undefined;
+  return row ? { score: row.score, completedAt: row.completed_at } : null;
+}
+
+export function saveInvestorProfile(userId: number, score: number): InvestorProfile {
+  const completedAt = new Date().toISOString();
+  database().prepare(`
+    insert into investor_profiles (user_id, score, completed_at) values (?, ?, ?)
+    on conflict(user_id) do update set score = excluded.score, completed_at = excluded.completed_at
+  `).run(userId, score, completedAt);
+  return { score, completedAt };
 }
 
 /** Resolves the session cookie on `request` to its owning user, or null if absent/expired. */

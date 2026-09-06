@@ -1983,7 +1983,7 @@ const TWIN_RISK_SURVEY_QUESTIONS: TwinRiskSurveyQuestion[] = [
 ];
 
 type TwinRiskSurveyResult = { score: number; completedAt: string };
-const TWIN_RISK_SURVEY_STORAGE_KEY = "finverse-twin-risk-survey-v1";
+const LEGACY_TWIN_RISK_SURVEY_STORAGE_KEY = "finverse-twin-risk-survey-v1";
 
 function twinRiskProfile(score: number) {
   if (score <= 8) return { label: "안정형", description: "손실 회피와 자금 안정성을 우선하는 편입니다. 변동성이 큰 상황에서는 투자 근거와 손실 한도를 먼저 점검해 보세요.", tone: "steady" };
@@ -1993,20 +1993,42 @@ function twinRiskProfile(score: number) {
 }
 
 function TwinRiskProfileSurvey() {
-  const [phase, setPhase] = useState<"intro" | "questions" | "result">("intro");
+  const [phase, setPhase] = useState<"loading" | "intro" | "questions" | "result">("loading");
   const [answers, setAnswers] = useState<number[]>([]);
   const [result, setResult] = useState<TwinRiskSurveyResult | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(TWIN_RISK_SURVEY_STORAGE_KEY);
-      if (!saved) return;
-      const parsed = JSON.parse(saved) as TwinRiskSurveyResult;
-      if (typeof parsed.score === "number") {
-        setResult(parsed);
-        setPhase("result");
-      }
-    } catch { /* 브라우저 저장소를 사용할 수 없으면 이번 화면에서만 결과를 표시한다. */ }
+    let active = true;
+    fetch("/api/investor-profile", { cache: "no-store" })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => null) as { profile?: TwinRiskSurveyResult | null; error?: string } | null;
+        if (!response.ok) throw new Error(payload?.error ?? "투자 성향 기록을 불러오지 못했습니다.");
+        if (!active) return;
+        if (payload?.profile) {
+          setResult(payload.profile);
+          setPhase("result");
+        } else {
+          // 이전 버전은 브라우저에만 결과를 보관했다. 기존 사용자가 첫 화면에서
+          // 다시 답하지 않도록 유효한 점수만 계정 기록으로 한 번 옮긴다.
+          let legacy: TwinRiskSurveyResult | null = null;
+          try {
+            const saved = window.localStorage.getItem(LEGACY_TWIN_RISK_SURVEY_STORAGE_KEY);
+            const parsed = saved ? JSON.parse(saved) as TwinRiskSurveyResult : null;
+            if (parsed && Number.isInteger(parsed.score) && parsed.score >= 5 && parsed.score <= 20) legacy = parsed;
+          } catch { /* 이전 브라우저 기록이 없으면 새 진단으로 진행한다. */ }
+          if (!legacy) { setPhase("intro"); return; }
+          const migration = await fetch("/api/investor-profile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ score: legacy.score }) });
+          const migrated = await migration.json().catch(() => null) as { profile?: TwinRiskSurveyResult } | null;
+          if (!migration.ok || !migrated?.profile) throw new Error("기존 투자 성향 기록을 이전하지 못했습니다.");
+          if (!active) return;
+          setResult(migrated.profile);
+          setPhase("result");
+        }
+      })
+      .catch((cause) => { if (active) { setError(cause instanceof Error ? cause.message : "투자 성향 기록을 불러오지 못했습니다."); setPhase("intro"); } });
+    return () => { active = false; };
   }, []);
 
   const start = () => {
@@ -2014,15 +2036,26 @@ function TwinRiskProfileSurvey() {
     setResult(null);
     setPhase("questions");
   };
-  const selectAnswer = (score: number) => {
+  const selectAnswer = async (score: number) => {
     const next = [...answers, score];
     setAnswers(next);
     if (next.length !== TWIN_RISK_SURVEY_QUESTIONS.length) return;
     const completed = { score: next.reduce((sum, value) => sum + value, 0), completedAt: new Date().toISOString() };
-    setResult(completed);
-    setPhase("result");
-    try { window.localStorage.setItem(TWIN_RISK_SURVEY_STORAGE_KEY, JSON.stringify(completed)); } catch { /* 저장 실패는 진단 진행을 막지 않는다. */ }
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/investor-profile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ score: completed.score }) });
+      const payload = await response.json().catch(() => null) as { profile?: TwinRiskSurveyResult; error?: string } | null;
+      if (!response.ok || !payload?.profile) throw new Error(payload?.error ?? "투자 성향 기록을 저장하지 못했습니다.");
+      setResult(payload.profile);
+      setPhase("result");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "투자 성향 기록을 저장하지 못했습니다.");
+      setAnswers((current) => current.slice(0, -1));
+    } finally { setSaving(false); }
   };
+
+  if (phase === "loading") return <div className="journal-risk-survey-intro"><div><span>현재 나의 투자 성향</span><strong>진단 기록을 확인하고 있습니다.</strong><p>첫 시뮬레이션 전 5개 질문을 한 번 완료해야 합니다.</p></div><LoaderCircle size={18} className="spin" /></div>;
 
   if (phase === "intro") {
     return <div className="journal-risk-survey-intro">
@@ -2039,9 +2072,10 @@ function TwinRiskProfileSurvey() {
       <div className="journal-risk-survey-progress"><i style={{ width: `${((questionIndex + 1) / TWIN_RISK_SURVEY_QUESTIONS.length) * 100}%` }} /></div>
       <h3>{question.prompt}</h3>
       <div className="journal-risk-survey-choices">
-        {question.choices.map((choice) => <button key={choice.label} type="button" onClick={() => selectAnswer(choice.score)}>{choice.label}<ChevronRight size={15} /></button>)}
+        {question.choices.map((choice) => <button key={choice.label} type="button" disabled={saving} onClick={() => { void selectAnswer(choice.score); }}>{choice.label}<ChevronRight size={15} /></button>)}
       </div>
       {questionIndex > 0 && <button type="button" className="journal-risk-survey-back" onClick={() => setAnswers((current) => current.slice(0, -1))}>이전 질문</button>}
+      {error && <p className="journal-risk-survey-error">{error}</p>}
     </div>;
   }
 
@@ -2447,7 +2481,7 @@ function TwinPage({ onRequireAuth }: { onRequireAuth?: (action: () => void) => v
         )}
       </section>
 
-      {journalPaperTradingOpen && <PaperTradingModal onClose={() => setJournalPaperTradingOpen(false)} />}
+      {journalPaperTradingOpen && <PaperTradingModal onClose={() => setJournalPaperTradingOpen(false)} onProfileRequired={() => setJournalPaperTradingOpen(false)} />}
     </div>
   );
 }
@@ -3187,7 +3221,7 @@ export default function Home() {
           onOpenLogin={() => setAuthOpen(true)}
           hideHeader
         />
-        {paperTradingOpen && <PaperTradingModal onClose={() => setPaperTradingOpen(false)} />}
+        {paperTradingOpen && <PaperTradingModal onClose={() => setPaperTradingOpen(false)} onProfileRequired={() => { setPaperTradingOpen(false); setIntroVisible(false); activateTab("twin"); }} />}
         {authModal}
       </div>
     );
@@ -3539,7 +3573,7 @@ export default function Home() {
         </div>
       )}
 
-      {paperTradingOpen && <PaperTradingModal onClose={() => setPaperTradingOpen(false)} />}
+      {paperTradingOpen && <PaperTradingModal onClose={() => setPaperTradingOpen(false)} onProfileRequired={() => { setPaperTradingOpen(false); activateTab("twin"); }} />}
 
       {selectedMarketSignal && (
         <div className="modal-backdrop market-signal-backdrop" onMouseDown={() => setSelectedMarketSignal(null)}>

@@ -2759,8 +2759,10 @@ function TradingScreen({
 
 /* ----------------------------------------------------------------- main */
 
-export function PaperTradingModal({ onClose }: { onClose: () => void }) {
+export function PaperTradingModal({ onClose, onProfileRequired }: { onClose: () => void; onProfileRequired?: () => void }) {
   const [game, setGame] = useState<ScenarioGame | null>(null);
+  const [profileState, setProfileState] = useState<"loading" | "ready" | "missing" | "error">("loading");
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [job, setJob] = useState<Job | null>(null);
@@ -2771,6 +2773,18 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
   const busy = job?.status === "queued" || job?.status === "running";
 
   useEffect(() => () => { if (pollRef.current) clearTimeout(pollRef.current); }, []);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/investor-profile", { cache: "no-store" })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => null) as { profile?: unknown; error?: string } | null;
+        if (!response.ok) throw new Error(payload?.error ?? "투자 성향 기록을 확인하지 못했습니다.");
+        if (active) setProfileState(payload?.profile ? "ready" : "missing");
+      })
+      .catch((cause) => { if (active) { setProfileError(cause instanceof Error ? cause.message : "투자 성향 기록을 확인하지 못했습니다."); setProfileState("error"); } });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
@@ -2948,6 +2962,7 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
     }
   }, [busy, game, pollJob]);
 
+  const profileGate = profileState !== "ready";
   return (
     <div className="modal-backdrop paper-trading-backdrop" onMouseDown={onClose}>
       <section
@@ -2957,7 +2972,12 @@ export function PaperTradingModal({ onClose }: { onClose: () => void }) {
         aria-label="모의 투자 시뮬레이션"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        {game
+        {profileGate ? <div className="paper-profile-gate">
+          <button className="scenario-modal-close" type="button" onClick={onClose} aria-label="닫기"><X size={18} /></button>
+          {profileState === "loading" ? <><LoaderCircle size={22} className="spin" /><strong>투자 성향 기록을 확인하고 있습니다.</strong></> : profileState === "missing" ? <>
+            <span>FIRST STEP · 투자 성향 진단</span><h2>첫 판단 전에,<br />현재 나의 투자 성향을 확인하세요.</h2><p>5개 질문으로 현재의 위험 감수 성향을 기록하면, 이후 모의투자 판단과 실제 행동을 비교해 볼 수 있습니다.</p><button type="button" onClick={onProfileRequired ?? onClose}>투자 성향 진단 시작하기 <ArrowRight size={16} /></button><small>최초 1회 진단 결과는 로그인한 계정에 저장되며, 완료 후 시뮬레이션을 시작할 수 있습니다.</small>
+          </> : <><AlertTriangle size={22} /><strong>{profileError ?? "투자 성향 기록을 확인하지 못했습니다."}</strong><button type="button" onClick={() => window.location.reload()}>다시 확인하기</button></>}
+        </div> : game
           ? <TradingScreen
               game={game}
               busy={busy}

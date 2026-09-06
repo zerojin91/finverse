@@ -1056,6 +1056,9 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 /* ---------------------------------------------------------- paper trading */
 .paper-trading-modal { width: min(1320px,100%); padding: 0; overflow: hidden; }
 .paper-trading-modal.setup { width: min(720px,100%); max-height: calc(100vh - 40px); overflow-y: auto; }
+.paper-profile-gate { position: relative; display: grid; justify-items: start; gap: 14px; min-height: 360px; padding: 42px 38px; background: linear-gradient(135deg,#fff 0%,#f3f7ff 100%); }
+.paper-profile-gate > svg { color: var(--brand); }.paper-profile-gate > span { color: var(--brand); font-size: 10px; font-weight: 900; letter-spacing: .1em; }
+.paper-profile-gate strong { color: var(--ink); font-size: 15px; }.paper-profile-gate h2 { margin: 4px 0 0; color: var(--ink); font-size: 29px; line-height: 1.16; letter-spacing: -.045em; }.paper-profile-gate p { max-width: 500px; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.7; }.paper-profile-gate button:not(.scenario-modal-close) { display: inline-flex; align-items: center; gap: 8px; min-height: 45px; margin-top: 4px; padding: 0 17px; border: 0; border-radius: 9px; color: #fff; background: var(--ink); font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }.paper-profile-gate small { color: var(--light); font-size: 10px; line-height: 1.55; }
 .paper-trading-modal.running { height: min(1020px,calc(100vh - 24px)); max-height: calc(100vh - 24px); overflow-x: hidden; overflow-y: auto; }
 
 /* setup */
