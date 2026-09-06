@@ -710,10 +710,16 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
   }, [bars, game.initial_reference_price, game.simulation_days, preview]);
 
   useEffect(() => {
-    if (!preview && scrollRef.current) {
-      scrollRef.current.scrollLeft = scrollRef.current.scrollWidth - scrollRef.current.clientWidth;
-    }
-  }, [bars.length, preview]);
+    if (preview || !scrollRef.current || !layout) return;
+    // 한 화면에는 항상 20칸만 보여준다. 실제 캔들이 20칸을 넘은 뒤에는
+    // 새 캔들이 추가될 때마다 한 칸만 이동해 최신 거래일을 따라간다.
+    // 남은 미래 칸의 길이에 맞춰 끝까지 점프하면 흐름을 읽기 어렵다.
+    const visibleSlots = 20;
+    const target = Math.max(0, bars.length - visibleSlots) * layout.slot;
+    if (Math.abs(scrollRef.current.scrollLeft - target) < 1) return;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    scrollRef.current.scrollTo({ left: target, behavior: reduceMotion ? "auto" : "smooth" });
+  }, [bars.length, layout, preview]);
 
   if (!layout) {
     return (
