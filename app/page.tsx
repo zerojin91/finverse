@@ -33,7 +33,6 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { ChangeEvent, CSSProperties, FormEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation";
 import { PaperTradingModal, type Security } from "@/components/paper-trading";
-import { AuthModal, useAuthUser } from "@/components/auth";
 import { MockMarketSimulation } from "@/components/mock-market-simulation";
 
 const SimulationMessageResponse = dynamic(
@@ -2192,20 +2191,6 @@ function TwinPage() {
 export default function Home() {
   const [activeTab, setActiveTab] = useState<MainTab>("market");
   const [paperTradingOpen, setPaperTradingOpen] = useState(false);
-  const [authOpen, setAuthOpen] = useState(false);
-  const [authIntent, setAuthIntent] = useState<(() => void) | null>(null);
-  const { user: authUser, refresh: refreshAuthUser, logout: logoutAuthUser } = useAuthUser();
-
-  // 로그인 필요한 진입점(나의 투자 일지 탭, 모의 투자 시작)이 공통으로 쓴다:
-  // 로그인돼 있으면 바로 실행하고, 아니면 로그인 모달을 띄운 뒤 성공 시 이어서 실행한다.
-  const requireAuth = (action: () => void) => {
-    if (!authUser) {
-      setAuthIntent(() => action);
-      setAuthOpen(true);
-      return;
-    }
-    action();
-  };
   const [kospiData, setKospiData] = useState<KospiMarketData | null>(null);
   const [intradayIndices, setIntradayIndices] = useState<IntradayIndex[]>([]);
   const [dashboardSignals, setDashboardSignals] = useState<DashboardSignal[]>(marketSignals);
@@ -2395,12 +2380,8 @@ export default function Home() {
   }, [selectedScenario]);
 
   const activateTab = (tab: MainTab) => {
-    const go = () => {
-      setActiveTab(tab);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    };
-    if (tab === "twin") { requireAuth(go); return; }
-    go();
+    setActiveTab(tab);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const selectSymbol = (item: WatchSymbol) => {
@@ -2772,23 +2753,10 @@ export default function Home() {
       <>
         <MockMarketSimulation
           onOpenJournal={() => activateTab("twin")}
-          onOpenJudgement={() => requireAuth(() => setPaperTradingOpen(true))}
-          onOpenLogin={() => setAuthOpen(true)}
+          onOpenJudgement={() => setPaperTradingOpen(true)}
+          onOpenLogin={() => undefined}
         />
         {paperTradingOpen && <PaperTradingModal onClose={() => setPaperTradingOpen(false)} />}
-        {authOpen && (
-          <AuthModal
-            onClose={() => { setAuthOpen(false); setAuthIntent(null); }}
-            onAuthenticated={() => {
-              refreshAuthUser();
-              setAuthOpen(false);
-              if (authIntent) {
-                authIntent();
-                setAuthIntent(null);
-              }
-            }}
-          />
-        )}
       </>
     );
   }
@@ -2802,17 +2770,10 @@ export default function Home() {
         <nav className="top-nav" aria-label="FINVERSE 탐색">
           <button className={activeTab === "market" ? "active" : ""} onClick={() => activateTab("market")} aria-current={activeTab === "market" ? "page" : undefined}>시장 인사이트</button>
           <button className={activeTab === "twin" ? "active" : ""} onClick={() => activateTab("twin")} aria-current={activeTab === "twin" ? "page" : undefined}>나의 투자 일지</button>
-          <button onClick={() => requireAuth(() => setPaperTradingOpen(true))}>모의 투자</button>
+          <button onClick={() => setPaperTradingOpen(true)}>모의 투자</button>
         </nav>
         <div className="top-header-actions">
-          {authUser ? (
-            <div className="header-user">
-              <span>{authUser.email}</span>
-              <button type="button" onClick={() => logoutAuthUser()}>로그아웃</button>
-            </div>
-          ) : (
-            <button className="header-login-button" type="button" onClick={() => setAuthOpen(true)}>로그인</button>
-          )}
+          <button className="header-help" type="button" onClick={() => setPaperTradingOpen(true)} aria-label="모의 투자 열기"><UserRound size={16} /></button>
         </div>
       </header>
 
@@ -2926,7 +2887,7 @@ export default function Home() {
                     </article>
                   ))}
                   <article className="custom-scenario-card">
-                    <button type="button" onClick={() => requireAuth(() => setPaperTradingOpen(true))}>
+                    <button type="button" onClick={() => setPaperTradingOpen(true)}>
                       <Plus size={26} />
                       <span>내가 생각한<br />시나리오로 보기</span>
                     </button>
@@ -3134,19 +3095,6 @@ export default function Home() {
       )}
 
       {paperTradingOpen && <PaperTradingModal onClose={() => setPaperTradingOpen(false)} />}
-      {authOpen && (
-        <AuthModal
-          onClose={() => { setAuthOpen(false); setAuthIntent(null); }}
-          onAuthenticated={() => {
-            refreshAuthUser();
-            setAuthOpen(false);
-            if (authIntent) {
-              authIntent();
-              setAuthIntent(null);
-            }
-          }}
-        />
-      )}
 
       {selectedMarketSignal && (
         <div className="modal-backdrop market-signal-backdrop" onMouseDown={() => setSelectedMarketSignal(null)}>
