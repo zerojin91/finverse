@@ -693,7 +693,6 @@ function buildBars(game: CandleChartData, preview = false): Bar[] {
 function CandleChart({ game, preview = false }: { game: CandleChartData; preview?: boolean }) {
   const bars = useMemo(() => buildBars(game, preview), [game, preview]);
   const [hovered, setHovered] = useState<number | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
 
   const layout = useMemo(() => {
     if (bars.length < 2) return null;
@@ -708,11 +707,13 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
     const historicalCount = simStart < 0 ? bars.length : simStart;
     const simulatedCount = bars.length - historicalCount;
     const futureSlots = preview ? 0 : Math.max(0, (game.simulation_days ?? 20) - simulatedCount);
-    const contentSlots = preview ? bars.length : bars.length + futureSlots;
-    const totalSlots = Math.max(20, contentSlots);
-    const leadingSlots = preview ? 0 : Math.max(0, totalSlots - contentSlots);
-    const slot = (CHART_W - AXIS_W) / 20;
-    const chartWidth = preview ? CHART_W : Math.max(CHART_W, totalSlots * slot + AXIS_W);
+    // 실행 차트는 실제 이력 10거래일과 선택한 전체 연습 기간을 하나의 폭에
+    // 나눠 그린다. 예를 들어 10일 연습은 과거 10일 : 미래 10일이 1:1이며,
+    // 20일 연습도 미래 슬롯 20개가 스크롤 없이 항상 모두 보인다.
+    const totalSlots = preview ? Math.max(1, bars.length) : Math.max(1, historicalCount + (game.simulation_days ?? 20));
+    const leadingSlots = 0;
+    const slot = (CHART_W - AXIS_W) / totalSlots;
+    const chartWidth = CHART_W;
     return {
       top, bottom, span, slot, chartWidth, leadingSlots,
       bodyW: Math.max(2, Math.min(13, slot * 0.6)),
@@ -723,18 +724,6 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
       cx: (index: number) => (leadingSlots + index) * slot + slot / 2,
     };
   }, [bars, game.initial_reference_price, game.simulation_days, preview]);
-
-  useEffect(() => {
-    if (preview || !scrollRef.current || !layout) return;
-    // 한 화면에는 항상 20칸만 보여준다. 실제 캔들이 20칸을 넘은 뒤에는
-    // 새 캔들이 추가될 때마다 한 칸만 이동해 최신 거래일을 따라간다.
-    // 남은 미래 칸의 길이에 맞춰 끝까지 점프하면 흐름을 읽기 어렵다.
-    const visibleSlots = 20;
-    const target = Math.max(0, bars.length - visibleSlots) * layout.slot;
-    if (Math.abs(scrollRef.current.scrollLeft - target) < 1) return;
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    scrollRef.current.scrollTo({ left: target, behavior: reduceMotion ? "auto" : "smooth" });
-  }, [bars.length, layout, preview]);
 
   if (!layout) {
     return (
@@ -796,7 +785,7 @@ function CandleChart({ game, preview = false }: { game: CandleChartData; preview
         {!active.real && <em className={toneOf(active.returnPct)}>{signedPct(active.returnPct)}</em>}
       </div>
 
-      <div className="paper-chart-scroll" ref={scrollRef}>
+      <div className="paper-chart-scroll">
         <svg
           className="paper-chart-svg"
           style={{ width: `${chartWidth}px` }}
