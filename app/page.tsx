@@ -1832,6 +1832,130 @@ function TwinEmptyState({ onOpen }: { onOpen: () => void }) {
   );
 }
 
+type TwinRiskSurveyChoice = { label: string; score: number };
+type TwinRiskSurveyQuestion = { prompt: string; choices: TwinRiskSurveyChoice[] };
+
+// Grable & Lytton의 다차원 위험감수 성향 척도에서 다루는 손실 반응·기간·변동성
+// 수용·수익 추구 요소를 학습용 5문항으로 간소화했다. 금융상품 적합성 평가는 아니다.
+const TWIN_RISK_SURVEY_QUESTIONS: TwinRiskSurveyQuestion[] = [
+  {
+    prompt: "투자에서 가장 피하고 싶은 상황은 무엇인가요?",
+    choices: [
+      { label: "원금이 조금이라도 줄어드는 상황", score: 1 },
+      { label: "예상보다 큰 손실이 나는 상황", score: 2 },
+      { label: "회복을 기다려야 하는 단기 손실", score: 3 },
+      { label: "높은 수익 기회를 놓치는 상황", score: 4 },
+    ],
+  },
+  {
+    prompt: "한 달 만에 투자금이 10% 하락했다면 어떻게 하겠어요?",
+    choices: [
+      { label: "바로 정리하고 손실을 멈춘다", score: 1 },
+      { label: "일부를 줄이고 상황을 지켜본다", score: 2 },
+      { label: "처음 계획을 유지하며 기다린다", score: 3 },
+      { label: "분석 근거가 있으면 추가 매수를 검토한다", score: 4 },
+    ],
+  },
+  {
+    prompt: "이 투자 자금을 묶어둘 수 있는 기간은 어느 정도인가요?",
+    choices: [
+      { label: "1년 이내", score: 1 },
+      { label: "1~3년", score: 2 },
+      { label: "3~5년", score: 3 },
+      { label: "5년 이상", score: 4 },
+    ],
+  },
+  {
+    prompt: "수익을 위해 감수할 수 있는 가격 변동 폭에 가까운 것은 무엇인가요?",
+    choices: [
+      { label: "거의 없는 변동", score: 1 },
+      { label: "작고 예측 가능한 변동", score: 2 },
+      { label: "중간 수준의 등락", score: 3 },
+      { label: "큰 등락도 장기 수익을 위해 감수", score: 4 },
+    ],
+  },
+  {
+    prompt: "두 투자안 중 더 마음이 가는 쪽은 무엇인가요?",
+    choices: [
+      { label: "수익은 낮아도 결과가 안정적인 투자", score: 1 },
+      { label: "안정성과 수익을 균형 있게 고려한 투자", score: 2 },
+      { label: "손실 가능성은 있지만 성장 여지가 큰 투자", score: 3 },
+      { label: "손실 가능성이 커도 기대수익이 높은 투자", score: 4 },
+    ],
+  },
+];
+
+type TwinRiskSurveyResult = { score: number; completedAt: string };
+const TWIN_RISK_SURVEY_STORAGE_KEY = "finverse-twin-risk-survey-v1";
+
+function twinRiskProfile(score: number) {
+  if (score <= 8) return { label: "안정형", description: "손실 회피와 자금 안정성을 우선하는 편입니다. 변동성이 큰 상황에서는 투자 근거와 손실 한도를 먼저 점검해 보세요.", tone: "steady" };
+  if (score <= 12) return { label: "안정추구형", description: "안정성을 우선하되, 충분한 근거가 있으면 제한적인 변동은 감수하는 편입니다. 목표와 투자 기간을 분리해 판단해 보세요.", tone: "balanced" };
+  if (score <= 16) return { label: "위험중립형", description: "성장 기회와 손실 가능성을 함께 비교하는 편입니다. 시장 변동 때도 처음 세운 기준을 유지하는지 모의투자로 확인해 보세요.", tone: "growth" };
+  return { label: "적극투자형", description: "장기 성장 기회와 높은 기대수익을 더 중시하는 편입니다. 큰 변동을 감수할 때는 자금 배분과 손실 관리 기준을 분명히 해 보세요.", tone: "active" };
+}
+
+function TwinRiskProfileSurvey() {
+  const [phase, setPhase] = useState<"intro" | "questions" | "result">("intro");
+  const [answers, setAnswers] = useState<number[]>([]);
+  const [result, setResult] = useState<TwinRiskSurveyResult | null>(null);
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(TWIN_RISK_SURVEY_STORAGE_KEY);
+      if (!saved) return;
+      const parsed = JSON.parse(saved) as TwinRiskSurveyResult;
+      if (typeof parsed.score === "number") {
+        setResult(parsed);
+        setPhase("result");
+      }
+    } catch { /* 브라우저 저장소를 사용할 수 없으면 이번 화면에서만 결과를 표시한다. */ }
+  }, []);
+
+  const start = () => {
+    setAnswers([]);
+    setResult(null);
+    setPhase("questions");
+  };
+  const selectAnswer = (score: number) => {
+    const next = [...answers, score];
+    setAnswers(next);
+    if (next.length !== TWIN_RISK_SURVEY_QUESTIONS.length) return;
+    const completed = { score: next.reduce((sum, value) => sum + value, 0), completedAt: new Date().toISOString() };
+    setResult(completed);
+    setPhase("result");
+    try { window.localStorage.setItem(TWIN_RISK_SURVEY_STORAGE_KEY, JSON.stringify(completed)); } catch { /* 저장 실패는 진단 진행을 막지 않는다. */ }
+  };
+
+  if (phase === "intro") {
+    return <div className="journal-risk-survey-intro">
+      <div><span>간편 투자 성향 진단</span><strong>5개 선택으로 내 위험감수 성향을 알아보세요.</strong><p>약 1분 소요 · 모의투자 학습용 참고 진단</p></div>
+      <button type="button" onClick={start}>진단 시작하기 <ArrowRight size={15} /></button>
+    </div>;
+  }
+
+  if (phase === "questions") {
+    const questionIndex = answers.length;
+    const question = TWIN_RISK_SURVEY_QUESTIONS[questionIndex];
+    return <div className="journal-risk-survey" aria-live="polite">
+      <div className="journal-risk-survey-head"><span>간편 투자 성향 진단</span><b>{questionIndex + 1} / {TWIN_RISK_SURVEY_QUESTIONS.length}</b></div>
+      <div className="journal-risk-survey-progress"><i style={{ width: `${((questionIndex + 1) / TWIN_RISK_SURVEY_QUESTIONS.length) * 100}%` }} /></div>
+      <h3>{question.prompt}</h3>
+      <div className="journal-risk-survey-choices">
+        {question.choices.map((choice) => <button key={choice.label} type="button" onClick={() => selectAnswer(choice.score)}>{choice.label}<ChevronRight size={15} /></button>)}
+      </div>
+      {questionIndex > 0 && <button type="button" className="journal-risk-survey-back" onClick={() => setAnswers((current) => current.slice(0, -1))}>이전 질문</button>}
+    </div>;
+  }
+
+  const profile = twinRiskProfile(result?.score ?? 0);
+  return <div className={`journal-risk-survey-result ${profile.tone}`}>
+    <div><span>진단 결과 · {result?.score ?? 0} / 20점</span><h3>나의 투자 성향은 <b>{profile.label}</b>입니다.</h3><p>{profile.description}</p></div>
+    <button type="button" onClick={start}>다시 진단하기</button>
+    <small>이 결과는 금융상품 권유나 법정 적합성 평가가 아닌 모의투자 학습용 참고 정보입니다.</small>
+  </div>;
+}
+
 type TwinPinDatum = { event: TwinRevealedEvent; index: number; barIndex: number; bar: TwinBar; cumulativePct: number; isUp: boolean; category: string };
 
 /** ForecastChart와 같은 캔버스 패턴(그리드, 심지+몸통 캔들, 실제/시뮬레이션 분할선)으로
@@ -2144,25 +2268,26 @@ function TwinPage({ onRequireAuth }: { onRequireAuth?: (action: () => void) => v
           <span className="panel-note">완료된 모의투자의 나의 투자 일지와 해당 시나리오 보고서를 계정별로 함께 보관합니다.</span>
         </div>
         <div className="journal-summary-body">
+          <TwinRiskProfileSurvey />
           {gamesState === "loading" || (gamesState === "ready" && games.length > 0 && (assessmentsState === "loading" || assessmentsState === "idle")) ? (
-            <div className="journal-loading"><LoaderCircle size={16} className="spin" /> 불러오는 중…</div>
+            <div className="journal-investment-style-status journal-loading"><LoaderCircle size={16} className="spin" /> 모의투자 기록 기반 성향을 불러오는 중…</div>
           ) : gamesState === "error" ? (
-            <div className="journal-error">투자 성향 데이터를 불러오지 못했습니다.</div>
+            <div className="journal-investment-style-status journal-error">모의투자 기록 기반 성향을 불러오지 못했습니다.</div>
           ) : games.length === 0 ? (
-            <TwinEmptyState onOpen={openPaperTrading} />
+            <p className="journal-investment-style-status">모의투자를 완료하면 실제 선택과 거래 기록을 바탕으로 한 성향 분석도 함께 표시됩니다.</p>
           ) : !currentSession ? (
-            <div className="journal-error">최근 세션의 투자 성향 판정 결과를 불러오지 못했습니다.</div>
+            <div className="journal-investment-style-status journal-error">최근 모의투자 기록 기반 성향 판정 결과를 불러오지 못했습니다.</div>
           ) : (
-            <>
+            <div className="journal-investment-style-status">
               <div className="journal-current-style-row">
-                <span className="journal-current-style-label">현재 스타일</span>
+                <span className="journal-current-style-label">모의투자 기반 관찰</span>
                 <span className="journal-style-pill journal-style-pill-lg" style={{ background: twinStyleShade(currentSession.assessment.style), color: twinStyleTextColor(currentSession.assessment.style) }}>
                   {currentSession.assessment.style ?? "판정 전"}
                 </span>
                 <span className="journal-current-style-date">{formatTwinDate(currentSession.game.created_at ?? currentSession.game.updated_at)} 기준</span>
               </div>
               <p className="journal-current-style-desc">{twinStyleNarrative(twinSessions)}</p>
-            </>
+            </div>
           )}
         </div>
       </section>
