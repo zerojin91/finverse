@@ -1856,6 +1856,7 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
   .knowledge-graph-footer span + span { display: block; margin-top: 5px; }
   .config-metric-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .config-row-list > div { grid-template-columns: 85px minmax(0,1fr) auto; }
+  .simulation-ready-summary { grid-template-columns: 1fr; }
   .scenario-detail-body { grid-template-columns: 1fr; }
   .scenario-story { padding-right: 0; padding-bottom: 17px; border-right: 0; border-bottom: 1px solid var(--line); }
   .scenario-narrative-list,.scenario-decision-grid { grid-template-columns: 1fr; }
