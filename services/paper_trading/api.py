@@ -298,7 +298,7 @@ def create_event_scenario():
     owner_id = _owner_id()
     data = request.get_json(silent=True) or {}
     ticker = str(data.get("ticker", "")).zfill(6)
-    simulation_days = int(data.get("simulation_days", 20))
+    simulation_days = int(data.get("simulation_days", 10))
     if simulation_days not in SIMULATION_DURATION_CONFIG:
         raise TradingError("시뮬레이션 기간은 10일, 20일, 60일 중에서 선택해주세요.")
     investment_mode = str(data.get("investment_mode") or "new").lower()

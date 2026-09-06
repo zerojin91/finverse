@@ -1487,7 +1487,7 @@ function SetupScreen({
   const [initialCash, setInitialCash] = useState(50_000_000);
   const [averagePrice, setAveragePrice] = useState(0);
   const [holdingQuantity, setHoldingQuantity] = useState(0);
-  const [simulationDays, setSimulationDays] = useState(20);
+  const [simulationDays, setSimulationDays] = useState(10);
   const [initialContext, setInitialContext] = useState<InitialContext | null>(null);
   const [initialContextLoading, setInitialContextLoading] = useState(false);
   const [initialContextError, setInitialContextError] = useState<string | null>(null);
