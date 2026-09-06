@@ -13,12 +13,13 @@ import time
 from typing import Any
 
 from .config import Config
+from .community_selection import select_representative_comments
 from .evidence_documents import build_target_documents
 from .kospi_paper_trading import TradingError
 from .llm_client import LLMClient
 
 
-CONTEXT_SCHEMA_VERSION = "initial-context-v9"
+CONTEXT_SCHEMA_VERSION = "initial-context-v11-community-comments"
 CONTEXT_CACHE_TTL_SECONDS = 12 * 60 * 60
 
 
@@ -98,6 +99,7 @@ def _compact_input(history: dict[str, Any]) -> dict[str, Any]:
     social = history.get("social_signals") or []
     social_recent = social[-30:]
     sentiment_values = [float(row["sentiment"]) for row in social_recent if row.get("sentiment") is not None]
+    target_comments = select_representative_comments(history.get("community_comments") or [])
 
     return {
         "ticker": history.get("ticker"),
@@ -127,6 +129,11 @@ def _compact_input(history: dict[str, Any]) -> dict[str, Any]:
             "average_sentiment": round(sum(sentiment_values) / len(sentiment_values), 4) if sentiment_values else None,
             "total_comments": sum(int(row.get("post_count") or 0) for row in social_recent),
             "total_engagement": sum(int(row.get("engagement") or 0) for row in social_recent),
+            "target_video_comment_count": len(history.get("community_comments") or []),
+            "top_target_comments": [{
+                key: row.get(key)
+                for key in ("published_at", "video_title", "text", "like_count", "reply_count", "video_like_rank")
+            } for row in target_comments],
         },
         "provenance": {
             "history_start": history.get("start_date"),
@@ -303,6 +310,7 @@ def prepare_initial_context_documents(history: dict[str, Any]) -> dict[str, Any]
             "macro_observations": source["economy"]["observation_count"],
             "events": source["events"]["event_count"],
             "community_days": source["community"]["observed_days"],
+            "target_video_comments": source["community"]["target_video_comment_count"],
             "as_of": source["provenance"],
             "documents": list(document_files.values()),
             "document_previews": {
@@ -331,12 +339,21 @@ def clear_initial_context_cache(history: dict[str, Any]) -> dict[str, Any]:
 
 
 def get_initial_context_documents(history: dict[str, Any]) -> dict[str, Any]:
-    """Return document metadata without starting the aggregate LLM analysis."""
+    """Return prepared document metadata and content without aggregate analysis.
+
+    The setup page already waits for all four Evidence MDs to be written.  Put
+    their bounded local text in that response so opening a ready card is
+    instant, instead of making the learner wait for a second file request.
+    """
     prepared = prepare_initial_context_documents(history)
     return {
         "context_id": prepared["context_id"],
         "schema_version": prepared["schema_version"],
         "source_summary": prepared["source_summary"],
+        "document_contents": {
+            key: (prepared["document_dir"] / filename).read_text(encoding="utf-8")
+            for key, filename in prepared["document_files"].items()
+        },
     }
 
 

@@ -158,8 +158,8 @@ def _ensure_world_daily_reflection(game: dict[str, Any], latest: dict[str, Any])
     })
 
 
-def record_world_daily_reflection(game: dict[str, Any], stance: str) -> dict[str, Any]:
-    """Save a daily learning note without placing or simulating a user order."""
+def record_world_daily_reflection(game: dict[str, Any], stance: str, quantity: int | None = None) -> dict[str, Any]:
+    """Save a daily stance and optionally queue a personal paper-trading order."""
     if game.get("mode") != "world":
         raise TradingError("일일 판단 기록은 World Agent 모의투자에서만 지원합니다.")
     if game.get("phase") not in (PHASE_WORLD_MARKET, PHASE_WORLD_DECISION, PHASE_COMPLETED):
@@ -175,17 +175,52 @@ def record_world_daily_reflection(game: dict[str, Any], stance: str) -> dict[str
     market_date = str((event or {}).get("event_date") or latest.get("market_date") or "")
     if not market_date:
         raise TradingError("오늘의 시장 날짜를 확인하지 못했습니다.")
+    requested_quantity = int(quantity or 0)
+    if stance == "HOLD_WATCH":
+        requested_quantity = 0
+    elif requested_quantity < 1:
+        raise TradingError("매수·매도 고려를 선택하면 1주 이상의 수량을 입력해주세요.")
+    reflections = game.setdefault("daily_reflections", [])
+    existing = next((row for row in reflections if row.get("market_date") == market_date), None)
+    if existing and existing.get("order_id"):
+        raise TradingError("오늘 판단 주문은 이미 기록되었습니다.")
+    order = None
+    if requested_quantity:
+        side = "BUY" if stance == "BUY_WATCH" else "SELL"
+        pending_orders = game.setdefault("pending_orders", [])
+        pending_sell = sum(int(row.get("quantity") or 0) for row in pending_orders if row.get("side") == "SELL")
+        position_quantity = int((game.get("position") or {}).get("quantity") or 0)
+        if side == "SELL" and pending_sell + requested_quantity > position_quantity:
+            raise TradingError("보유 수량을 초과하여 매도할 수 없습니다.")
+        if side == "BUY":
+            settings = game.get("settings") or {}
+            fee_rate = float(settings.get("fee_rate") or 0)
+            estimated_cost = requested_quantity * int(game.get("current_price") or 0)
+            estimated_fee = round(estimated_cost * fee_rate)
+            if estimated_cost + estimated_fee > int(game.get("cash") or 0):
+                raise TradingError("현재 현금으로 입력한 매수 수량을 체결할 수 없습니다.")
+        order = {
+            "order_id": f"ord_{uuid.uuid4().hex[:10]}", "side": side,
+            "quantity": requested_quantity, "status": "pending",
+            "phase": "daily_reflection", "market_date": market_date,
+            "event_id": (event or {}).get("event_id"),
+            "rationale": DAILY_REFLECTION_LABELS[stance], "confidence": None,
+            "submitted_at": datetime.now().isoformat(),
+        }
+        pending_orders.append(order)
     reflection = {
         "market_date": market_date,
         "stance": stance,
         "label": DAILY_REFLECTION_LABELS[stance],
+        "quantity": requested_quantity or None,
+        "order_side": order["side"] if order else None,
+        "order_id": order["order_id"] if order else None,
         "market_return_pct": latest.get("return_pct") if latest.get("market_date") == market_date else None,
         "market_summary": latest.get("market_summary") if latest.get("market_date") == market_date else None,
         "event_id": (event or {}).get("event_id"),
         "recorded_at": datetime.now().isoformat(),
         "source": "user",
     }
-    reflections = game.setdefault("daily_reflections", [])
     for index, existing in enumerate(reflections):
         if existing.get("market_date") == market_date:
             reflections[index] = reflection
@@ -228,6 +263,8 @@ def _advance_world_market_day(game: dict[str, Any], *, progress: Callable[[int, 
     phase = "event_reaction" if event else "inter_event"
     round_data = _run_market_agents(game, market_date, information, phase, agent_progress)
     result = apply_agent_round(game, round_data, phase=phase, label=f"{market_date} · World Agent 시장 진행", market_date=market_date)
+    # 사용자의 판단은 시장 형성 이후 개인 계좌에만 다음 거래일 가격으로 체결한다.
+    result["user_fills"] = _execute_user_orders(game)
     record_market_feedback(game, result, market_date)
     result["market_summary_detail"] = generate_daily_market_summary(game, result, information, event)
     result["market_summary"] = result["market_summary_detail"]["summary"]

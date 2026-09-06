@@ -353,7 +353,7 @@ def create_world_daily_reflection(game_id: str):
     data, store = request.get_json(silent=True) or {}, _store()
 
     def record(game):
-        return record_world_daily_reflection(game, data.get("stance", ""))
+        return record_world_daily_reflection(game, data.get("stance", ""), data.get("quantity"))
 
     updated = store.update(game_id, record)
     if not updated:

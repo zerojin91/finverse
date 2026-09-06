@@ -60,6 +60,23 @@ def test_world_day_updates_only_after_independent_agent_round(monkeypatch):
     assert all(len(person["memory"]) == 2 for person in game["personas"])
 
 
+def test_daily_buy_reflection_is_filled_when_next_day_advances(monkeypatch):
+    monkeypatch.setattr(world_simulation, "run_individual_agent_round", _hold_round)
+    monkeypatch.setattr(world_agent, "_event_type", lambda *_args: None)
+    game = _game()
+
+    world_simulation.advance_world_market(game)
+    world_simulation.record_world_daily_reflection(game, "BUY_WATCH", 30)
+    starting_cash = game["cash"]
+
+    world_simulation.advance_world_market(game)
+
+    assert game["position"]["quantity"] == 30
+    assert game["cash"] < starting_cash
+    assert game["fills"][-1]["side"] == "BUY"
+    assert game["fills"][-1]["quantity"] == 30
+
+
 def test_material_world_event_waits_for_user_before_agent_market_round(monkeypatch):
     monkeypatch.setattr(world_simulation, "run_individual_agent_round", _hold_round)
     monkeypatch.setattr(world_agent, "_event_type", lambda *_args: "surprise")

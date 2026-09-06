@@ -222,6 +222,8 @@ def new_scenario_game(
         "initial_equity": initial_equity,
         "position": {"quantity": initial_quantity,
                      "average_price": initial_average_price},
+        "initial_position": {"quantity": initial_quantity,
+                              "average_price": initial_average_price},
         "realized_pnl": 0,
         "current_price": int(previous_close), "initial_reference_price": int(previous_close),
         "events": normalized_events, "revealed_events": [],
@@ -250,7 +252,7 @@ def new_scenario_game(
         "volatility_state": {"level": 1.0},
         "settings": {"fee_rate": fee_rate, "sell_tax_rate": sell_tax_rate,
                      "slippage_bps": slippage_bps, "context_mode": CONTEXT_MODE},
-        "decision_log": [],
+        "decision_log": [], "daily_performance": [],
     }
 
 
@@ -261,6 +263,31 @@ def current_event(game: dict[str, Any]) -> dict[str, Any] | None:
     return game["events"][index] if index < len(game["events"]) else None
 
 
+def _record_daily_performance(game: dict[str, Any], market_date: str | None) -> None:
+    """Persist one final personal-account snapshot per simulated trading day."""
+    if not market_date:
+        return
+    portfolio = scenario_portfolio(game)
+    history = game.setdefault("daily_performance", [])
+    previous_equity = history[-1]["equity"] if history else game["initial_equity"]
+    snapshot = {
+        "market_date": market_date,
+        "mark_price": portfolio["mark_price"],
+        "cash": portfolio["cash"],
+        "quantity": portfolio["quantity"],
+        "market_value": portfolio["market_value"],
+        "equity": portfolio["equity"],
+        "daily_pnl": portfolio["equity"] - previous_equity,
+        "total_return_pct": portfolio["total_return_pct"],
+    }
+    existing = next((index for index, row in enumerate(history)
+                     if row.get("market_date") == market_date), None)
+    if existing is None:
+        history.append(snapshot)
+    else:
+        history[existing] = snapshot
+
+
 def public_scenario_game(game: dict[str, Any]) -> dict[str, Any]:
     if game.get("mode") == "world":
         # World Agent 사건은 사용자와 모든 에이전트에게 동시에 공개되는 정보다.
@@ -268,7 +295,17 @@ def public_scenario_game(game: dict[str, Any]) -> dict[str, Any]:
         result = {key: value for key, value in game.items() if key not in ("events", "personas")}
         event = current_event(game)
         result["current_event"] = dict(event) if event else None
+        event_dates = {
+            row.get("event_id"): row.get("event_date")
+            for row in ((game.get("world") or {}).get("memory") or {}).get("event_ledger", [])
+            if row.get("event_id") and row.get("event_date")
+        }
         result["total_events"] = len(((game.get("world") or {}).get("memory") or {}).get("event_ledger") or [])
+        result["fills"] = [
+            ({**fill, "market_date": fill.get("market_date") or event_dates.get(fill.get("event_id"))}
+             if not fill.get("market_date") else fill)
+            for fill in game.get("fills", [])
+        ]
         result["portfolio"] = scenario_portfolio(game)
         model = dict(result.get("impact_model") or {})
         model.pop("return_distribution_pct", None)
@@ -293,6 +330,16 @@ def public_scenario_game(game: dict[str, Any]) -> dict[str, Any]:
     else:
         result["current_event"] = None
     result["total_events"] = len(game["events"])
+    event_dates = {
+        row.get("event_id"): row.get("event_date")
+        for row in game.get("events", [])
+        if row.get("event_id") and row.get("event_date")
+    }
+    result["fills"] = [
+        ({**fill, "market_date": fill.get("market_date") or event_dates.get(fill.get("event_id"))}
+         if not fill.get("market_date") else fill)
+        for fill in game.get("fills", [])
+    ]
     result["portfolio"] = scenario_portfolio(game)
     model = dict(result.get("impact_model") or {})
     model.pop("return_distribution_pct", None)
@@ -320,8 +367,12 @@ def submit_scenario_order(game: dict[str, Any], side: str, quantity: int,
     return order
 
 
-def _execute_user_orders(game: dict[str, Any]) -> list[dict[str, Any]]:
+def _execute_user_orders(game: dict[str, Any], market_date: str | None = None) -> list[dict[str, Any]]:
     fills, price = [], game["current_price"]
+    # 주문 제출 시각은 사용자가 버튼을 누른 시각일 뿐이다. 체결은 다음
+    # 시장 단계에서 이뤄지므로, 보고서와 UI가 같은 거래일을 쓰도록 체결일을
+    # 명시적으로 원장에 남긴다.
+    fill_date = str(market_date or game.get("last_market_date") or "")
     settings = game["settings"]
     for order in game["pending_orders"]:
         direction = 1 if order["side"] == "BUY" else -1
@@ -354,7 +405,8 @@ def _execute_user_orders(game: dict[str, Any]) -> list[dict[str, Any]]:
                                 "average_price": average if remaining else 0}
         order["status"] = "filled"
         fill = {**order, "price": fill_price, "gross_amount": gross,
-                "fee": fee, "tax": tax, "realized_pnl": realized}
+                "fee": fee, "tax": tax, "realized_pnl": realized,
+                "market_date": fill_date}
         game["fills"].append(fill)
         fills.append(fill)
     game["pending_orders"] = []
@@ -629,6 +681,31 @@ def apply_agent_round(game: dict[str, Any], round_data: dict[str, Any], *,
             "note": str(order.get("memory_note") or "")[:300],
         })
         persona["memory"] = persona["memory"][-12:]
+    # 요약·화면에 표시하는 체결 금액은 주문 의도 금액이 아니라 실제 체결
+    # 수량과 체결 가격으로 다시 계산한다. 현금/보유수량 제한으로 수량이
+    # 줄어든 경우에도 제한 전 금액이 남으면 가격 설명과 포트폴리오 기록이
+    # 서로 어긋난다.
+    settled_buy = sum(
+        int(order.get("filled_quantity") or 0) * float(order.get("fill_price") or 0)
+        for order in orders if order["side"] == "BUY"
+    )
+    settled_sell = sum(
+        int(order.get("filled_quantity") or 0) * float(order.get("fill_price") or 0)
+        for order in orders if order["side"] == "SELL"
+    )
+    settled_group_actuals = {
+        group: {
+            "buy": round(sum(
+                int(order.get("filled_quantity") or 0) * float(order.get("fill_price") or 0)
+                for order in orders if order["group"] == group and order["side"] == "BUY"
+            )),
+            "sell": round(sum(
+                int(order.get("filled_quantity") or 0) * float(order.get("fill_price") or 0)
+                for order in orders if order["group"] == group and order["side"] == "SELL"
+            )),
+        }
+        for group in INVESTOR_GROUPS
+    }
     game["current_price"] = next_price
     result = {"round_id": f"rnd_{uuid.uuid4().hex[:10]}", "phase": phase,
               "label": label, "market_date": market_date,
@@ -650,15 +727,10 @@ def apply_agent_round(game: dict[str, Any], round_data: dict[str, Any], *,
               "psychology": psychology,
               "max_round_capacity": round(max_round_capacity),
               "context_mode": game.get("settings", {}).get("context_mode", CONTEXT_MODE),
-              "buy_notional": buy, "sell_notional": sell, "persona_orders": orders,
+              "buy_notional": round(settled_buy), "sell_notional": round(settled_sell),
+              "persona_orders": orders,
               "group_notional_targets": representative_targets,
-              "group_notional_actuals": {
-                  group: {"buy": sum(order["notional"] for order in orders
-                                     if order["group"] == group and order["side"] == "BUY"),
-                          "sell": sum(order["notional"] for order in orders
-                                      if order["group"] == group and order["side"] == "SELL")}
-                  for group in INVESTOR_GROUPS
-              },
+              "group_notional_actuals": settled_group_actuals,
               "market_summary": round_data.get("market_summary", ""),
               "observations": round_data.get("observations", []),
               "risk_flags": round_data.get("risk_flags", [])}
@@ -797,6 +869,7 @@ def advance_inter_event_market(game: dict[str, Any], round_provider: Any,
         result["newly_released_signals"] = newly_released
         rounds.append(result)
         game["last_market_date"] = market_date
+        _record_daily_performance(game, market_date)
     # 남은 날이 있으면 아직 이벤트 전 구간이다. 다음 호출에서 이어서 진행한다.
     if max_days is None or len(dates) >= remaining:
         game["phase"] = PHASE_PRE_EVENT
@@ -809,13 +882,14 @@ def reveal_and_react(game: dict[str, Any], round_data: dict[str, Any]) -> dict[s
     if game["phase"] != PHASE_PRE_EVENT:
         raise TradingError("현재는 이벤트 공개 단계가 아닙니다.")
     event = current_event(game)
-    user_fills = _execute_user_orders(game)
+    user_fills = _execute_user_orders(game, event["event_date"])
     event["status"] = "revealed"
     game["revealed_events"].append({**event})
     reaction = apply_agent_round(game, round_data, phase="event_reaction",
                                  label=f"{event['event_date']} · EVENT {event['sequence']} · {event['title']}",
                                  market_date=event["event_date"])
     game["last_market_date"] = event["event_date"]
+    _record_daily_performance(game, event["event_date"])
     game["decision_log"].append({"event_id": event["event_id"], "phase": PHASE_PRE_EVENT,
                                  "user_fills": user_fills, "price_before": reaction["previous_price"],
                                  "price_after": reaction["price"]})
@@ -828,7 +902,8 @@ def finish_event(game: dict[str, Any], autonomous_rounds: Any = None) -> dict[st
     if game["phase"] != PHASE_POST_EVENT:
         raise TradingError("현재는 이벤트 사후 판단 단계가 아닙니다.")
     event = current_event(game)
-    user_fills = _execute_user_orders(game)
+    user_fills = _execute_user_orders(game, event["event_date"])
+    _record_daily_performance(game, event["event_date"])
     game["decision_log"].append({"event_id": event["event_id"], "phase": PHASE_POST_EVENT,
                                  "user_fills": user_fills,
                                  "price_after_autonomous": game["current_price"]})

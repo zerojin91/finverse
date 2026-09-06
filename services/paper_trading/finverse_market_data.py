@@ -48,7 +48,7 @@ DEFAULT_HISTORY_DAYS = 240
 # 같은 종목·기간을 다시 부를 때 그 값을 다시 치르지 않도록 디스크에 남긴다.
 HISTORY_CACHE_TTL_SECONDS = 12 * 60 * 60
 # 뉴스 분류 규칙이 바뀌면 이전의 전체-뉴스 캐시를 재사용하면 안 된다.
-HISTORY_CACHE_SCHEMA_VERSION = "targeted-news-v2"
+HISTORY_CACHE_SCHEMA_VERSION = "targeted-news-community-v4"
 
 # ``events.news``에는 종목 ticker 태그가 비어 있는 경우가 많다. 따라서 선택
 # 종목명으로 직접 확인되는 기사와 명백한 시장 전체 기사만 시나리오에 넣는다.
@@ -264,9 +264,12 @@ class FinverseMarketData:
                 "detail": "종목·시장 관련 뉴스와 이벤트",
             },
             {
-                "key": "community", "label": "커뮤니티", "status": "ready" if history["social_signals"] else "missing",
-                "count": len(history["social_signals"]), "unit": "일", "updated_at": latest(history["social_signals"]),
-                "detail": "투자 심리와 온라인 언급 추이",
+                "key": "community", "label": "커뮤니티",
+                "status": "ready" if (history["social_signals"] or history.get("community_comments")) else "missing",
+                "count": len(history.get("community_comments") or history["social_signals"]),
+                "unit": "댓글" if history.get("community_comments") else "일",
+                "updated_at": latest(history.get("community_comments") or history["social_signals"], "published_at" if history.get("community_comments") else "trade_date"),
+                "detail": "종목 영상의 고반응 댓글과 온라인 언급 추이",
             },
         ]
         return {"ticker": history["ticker"], "name": history["name"], "sources": sources}
@@ -473,6 +476,37 @@ class FinverseMarketData:
             WHERE sentiment_date BETWEEN %s AND %s
             ORDER BY sentiment_date
         """
+        # 종목 태그가 일치하는 YouTube 댓글을 전체 보존한다.
+        # 일별 감성 집계만으로는 어떤 논점이 실제로 고반응을 얻었는지 알 수
+        # 없으므로, 종목 태그가 일치하는 원문을 초기 맥락 문서에도 함께 준다.
+        # youtube_video는 댓글 payload에 없는 제목을 보완하기 위한 선택적 조인이다.
+        community_comments_sql = """
+            SELECT c.payload->>'published_at' AS published_at,
+                   c.payload->>'text' AS text,
+                   COALESCE(NULLIF(c.payload->>'like_count', '')::int, 0) AS like_count,
+                   COALESCE(NULLIF(c.payload->>'reply_count', '')::int, 0) AS reply_count,
+                   NULLIF(c.payload->>'video_like_rank', '')::int AS video_like_rank,
+                   c.payload->>'video_id' AS video_id,
+                   c.payload->>'source_url' AS source_url,
+                   v.payload->>'title' AS video_title,
+                   c.payload->'search_tags' AS search_tags
+            FROM lake.records c
+            LEFT JOIN lake.records v
+              ON v.record_type = 'youtube_video'
+             AND v.payload->>'video_id' = c.payload->>'video_id'
+             AND COALESCE(NULLIF(v.payload->>'is_deleted', '')::boolean, false) = false
+            WHERE c.record_type = 'youtube_comment'
+              AND c.payload->>'category' = 'community_v2'
+              AND c.payload->'tags'->>'source' = 'youtube'
+              AND COALESCE(NULLIF(c.payload->>'is_deleted', '')::boolean, false) = false
+              AND c.payload->'search_matches' @> jsonb_build_array(jsonb_build_object('stock_code', %s::text))
+              AND (c.payload->>'published_at')::timestamptz >= %s::timestamptz
+              AND (c.payload->>'published_at')::timestamptz < %s::timestamptz
+            ORDER BY COALESCE(NULLIF(c.payload->>'video_like_rank', '')::int, 999),
+                     COALESCE(NULLIF(c.payload->>'like_count', '')::int, 0) DESC,
+                     COALESCE(NULLIF(c.payload->>'reply_count', '')::int, 0) DESC,
+                     (c.payload->>'published_at')::timestamptz DESC
+        """
         # 기사 ticker 태그는 비어 있는 경우가 많아 SQL에서 종목으로 거르지 않는다.
         # 대신 아래에서 선택 종목명 또는 명백한 거시·시장 키워드로 좁힌다.
         news_sql = """
@@ -501,6 +535,10 @@ class FinverseMarketData:
             "macro": (macro_sql, (start, end)),
             "sector": (sector_sql, (ticker,)),
             "sentiment": (sentiment_sql, (start, end)),
+            "community_comments": (
+                community_comments_sql,
+                (ticker, start.isoformat(), (end + timedelta(days=1)).isoformat()),
+            ),
             "news": (news_sql, (start - timedelta(days=7), end, MIN_NEWS_SCORE)),
         }
         fetched = self._fetch_parallel(queries)
@@ -533,6 +571,7 @@ class FinverseMarketData:
         indices = optional("indices")
         macro_observations = optional("macro")
         social_signals = optional("sentiment")
+        community_comments = optional("community_comments")
         sector_rows = optional("sector")
         news = optional("news")
 
@@ -654,6 +693,23 @@ class FinverseMarketData:
              "sentiment": float(row["sentiment_score"]) if row.get("sentiment_score") is not None else None,
              "engagement": int(row["engagement_count"] or 0), "quality_status": "provisional"}
             for row in social_signals
+        ]
+        result["community_comments"] = [
+            {
+                "published_at": str(row.get("published_at") or ""),
+                "trade_date": str(row.get("published_at") or "")[:10],
+                "text": plain_text(row.get("text"), 500),
+                "like_count": int(row.get("like_count") or 0),
+                "reply_count": int(row.get("reply_count") or 0),
+                "video_like_rank": int(row["video_like_rank"]) if row.get("video_like_rank") is not None else None,
+                "video_id": row.get("video_id"),
+                "video_title": plain_text(row.get("video_title"), 180),
+                "source_url": row.get("source_url"),
+                "search_tags": row.get("search_tags") or [],
+                "quality_status": "target_tagged_top_liked",
+            }
+            for row in community_comments
+            if plain_text(row.get("text"), 500)
         ]
         result["ontology_snapshot"] = build_market_snapshot(result)
         result["ontology_coverage"] = build_coverage_report(result["ontology_snapshot"])
