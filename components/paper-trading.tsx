@@ -1395,6 +1395,12 @@ const DURATION_OPTIONS = [
 ];
 const AGENT_GROUP_ICON = { retail: Users, foreign: TrendingUp, institution: Landmark, pension: Wallet };
 const agentStrategyLabel = (value: string) => value.replaceAll("_", " ");
+const GROUP_ACTION_LABELS: Record<AgentProfileGroup["key"], string[]> = {
+  retail: ["관망", "진입 매수", "추세 추격", "물타기", "비중 축소", "손절"],
+  foreign: ["관망", "비중 확대", "매크로 로테이션", "환헤지", "위험 축소", "청산"],
+  institution: ["관망", "비중 확대·축소", "리밸런싱", "섹터 로테이션", "ETF 추종", "헤지"],
+  pension: ["관망", "장기 비중 조정", "전략 리밸런싱", "변동성 축소", "헤지"],
+};
 
 const parsePositiveInteger = (value: string) => Number(value.replace(/[^0-9]/g, "")) || 0;
 
@@ -2064,6 +2070,10 @@ function SetupScreen({
                     <p>{agent.description}</p>
                     <div className="paper-agent-tags">
                       {agent.strategies.slice(0, 4).map((strategy) => <span key={strategy}>{agentStrategyLabel(strategy)}</span>)}
+                    </div>
+                    <div className="paper-agent-actions" aria-label={`${agent.label} 가능한 행동`}>
+                      <strong>가능한 행동</strong>
+                      <div>{GROUP_ACTION_LABELS[agent.key].map((action) => <span key={action}>{action}</span>)}</div>
                     </div>
                     <dl className="paper-agent-metrics">
                       <div><dt>위험 허용</dt><dd>{agent.average_risk_tolerance.toFixed(2)}</dd></div>
