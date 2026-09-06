@@ -5,9 +5,9 @@ import {
   ArrowRight,
   BarChart3,
   Bookmark,
-  BrainCircuit,
   CalendarDays,
   CalendarClock,
+  CandlestickChart,
   ChevronRight,
   CircleDollarSign,
   CircleHelp,
@@ -30,10 +30,10 @@ import {
   X,
 } from "lucide-react";
 import dynamic from "next/dynamic";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { ChangeEvent, FormEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { ChangeEvent, CSSProperties, FormEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation";
-import { PaperTradingModal } from "@/components/paper-trading";
+import { PaperTradingModal, type Security } from "@/components/paper-trading";
 
 const SimulationMessageResponse = dynamic(
   () => import("@/components/ai-elements/message").then((module) => module.MessageResponse),
@@ -108,6 +108,19 @@ const marketSignals: DashboardSignal[] = [
 
 const marketSignalIcons = { economy: Activity, country: Globe2, event: CalendarClock, community: UsersRound };
 const importanceScore = (value?: number) => Math.max(1, Math.min(3, Math.round(value ?? 2)));
+
+type WatchSymbol = { ticker: string; name: string };
+type TickerSource = { key: "market" | "economy" | "events" | "community"; label: string; status: "ready" | "missing"; count: number; unit: string; updated_at: string | null; detail: string };
+const tickerSourceIcons = { market: BarChart3, economy: Activity, events: CalendarClock, community: UsersRound };
+const followedSymbols: WatchSymbol[] = [
+  { ticker: "005930", name: "삼성전자" },
+  { ticker: "000660", name: "SK하이닉스" },
+  { ticker: "005380", name: "현대차" },
+  { ticker: "009150", name: "삼성전기" },
+  { ticker: "373220", name: "LG에너지솔루션" },
+  { ticker: "207940", name: "삼성바이오로직스" },
+  { ticker: "105560", name: "KB금융" },
+];
 const marketOverview = [
   { key: "KOSPI", name: "코스피", value: "6,023.66", change: "-732.09", rate: "-10.84%", tone: "down", badge: "시장 하락", points: [6244, 6312, 6388, 6460, 6380, 6428, 6375, 6160, 6128, 6038, 6048, 6024, 6085, 6032, 5920, 5980, 6002, 6024] },
   { key: "KOSDAQ", name: "코스닥", value: "834.20", change: "-30.45", rate: "-3.52%", tone: "down", badge: "유가 금리 부담", points: [862, 856, 849, 852, 844, 840, 836, 834] },
@@ -746,13 +759,13 @@ type GraphPreviewNode = {
 };
 
 const graphPreviewNodes: GraphPreviewNode[] = [
-  { id: "kospi", label: "KOSPI", type: "지수", x: 320, y: 250, color: "#18181b" },
-  { id: "semiconductor", label: "반도체", type: "섹터", x: 162, y: 130, color: "#2563eb" },
+  { id: "kospi", label: "KOSPI", type: "지수", x: 320, y: 250, color: "#0b0d14" },
+  { id: "semiconductor", label: "반도체", type: "섹터", x: 162, y: 130, color: "#0769ff" },
   { id: "samsung", label: "삼성전자", type: "종목", x: 78, y: 268, color: "#0f766e" },
   { id: "hynix", label: "SK하이닉스", type: "종목", x: 135, y: 400, color: "#0f766e" },
-  { id: "auto", label: "자동차", type: "섹터", x: 460, y: 90, color: "#2563eb" },
-  { id: "internet", label: "인터넷", type: "섹터", x: 560, y: 180, color: "#2563eb" },
-  { id: "finance", label: "금융", type: "섹터", x: 525, y: 340, color: "#2563eb" },
+  { id: "auto", label: "자동차", type: "섹터", x: 460, y: 90, color: "#0769ff" },
+  { id: "internet", label: "인터넷", type: "섹터", x: 560, y: 180, color: "#0769ff" },
+  { id: "finance", label: "금융", type: "섹터", x: 525, y: 340, color: "#0769ff" },
   { id: "hyundai", label: "현대차", type: "종목", x: 490, y: 30, color: "#0f766e" },
   { id: "naver", label: "NAVER", type: "종목", x: 615, y: 165, color: "#0f766e" },
   { id: "kb", label: "KB금융", type: "종목", x: 615, y: 355, color: "#0f766e" },
@@ -812,7 +825,7 @@ function KnowledgeGraphPreview({ seeds, prompt, stage, progress, graphSnapshot }
     ...node,
     x: 50 + ((index * 137) % 545),
     y: 55 + ((Math.floor(index * 137 / 545) * 93 + index * 41) % 465),
-    color: ["#2563eb", "#0f766e", "#7c3aed", "#dc2626", "#d97706", "#0891b2"][index % 6],
+    color: ["#0769ff", "#0f766e", "#7c3aed", "#dc2626", "#d97706", "#0891b2"][index % 6],
   })) : [];
   const graphEdges = hasGraphSnapshot ? graphSnapshot!.edges.map((edge) => [edge.source, edge.target, edge.label] as const) : [];
   const visibleNodeCount = graphNodes.length;
@@ -1409,16 +1422,20 @@ function ForecastChart({ scenario, marketData, liveSeries }: { scenario: Scenari
         else candles.push(liveCandle);
       }
       const closes = candles.map((candle) => candle.close);
-      const forecastOffset = closes[closes.length - 1] - scenario.path[0];
-      const forecastPath = scenario.path.map((value) => value + forecastOffset);
-      const outerUpper = forecastPath.map((value, index) => value + 80 + index * 60);
-      const outerLower = forecastPath.map((value, index) => value - 80 - index * 60);
-      const innerUpper = forecastPath.map((value, index) => value + 45 + index * 32);
-      const innerLower = forecastPath.map((value, index) => value - 45 - index * 32);
+      const scaleRatio = closes[closes.length - 1] / scenario.path[0];
+      const forecastPath = scenario.path.map((value) => value * scaleRatio);
+      const outerUpper = forecastPath.map((value, index) => value * (1 + .015 + index * .011));
+      const outerLower = forecastPath.map((value, index) => value * (1 - .015 - index * .011));
+      const innerUpper = forecastPath.map((value, index) => value * (1 + .008 + index * .006));
+      const innerLower = forecastPath.map((value, index) => value * (1 - .008 - index * .006));
       const all = [...closes, ...outerUpper, ...outerLower];
-      const axisStep = 500;
-      const min = Math.floor((Math.min(...all) - 40) / axisStep) * axisStep;
-      const max = Math.ceil((Math.max(...all) + 40) / axisStep) * axisStep;
+      const rawSpan = Math.max(...all) - Math.min(...all);
+      const rawStep = rawSpan / 6;
+      const magnitude = Math.pow(10, Math.floor(Math.log10(Math.max(rawStep, 1))));
+      const niceStep = [1, 2, 5, 10].map((mult) => mult * magnitude).find((step) => rawStep <= step) ?? 10 * magnitude;
+      const axisStep = niceStep;
+      const min = Math.floor((Math.min(...all) - rawSpan * .06) / axisStep) * axisStep;
+      const max = Math.ceil((Math.max(...all) + rawSpan * .06) / axisStep) * axisStep;
       const xActual = (index: number) => pad.left + (index / Math.max(candles.length - 1, 1)) * (splitX - pad.left);
       const xForecast = (index: number) => splitX + (index / Math.max(forecastPath.length - 1, 1)) * (rightX - splitX);
       const y = (value: number) => pad.top + ((max - value) / (max - min)) * plotH;
@@ -1426,8 +1443,8 @@ function ForecastChart({ scenario, marketData, liveSeries }: { scenario: Scenari
       ctx.clearRect(0, 0, width, height);
       ctx.font = '10px "Pretendard Variable", sans-serif';
       ctx.textAlign = "right";
-      ctx.fillStyle = "#a1a1aa";
-      ctx.strokeStyle = "#ececef";
+      ctx.fillStyle = "#9aa0ab";
+      ctx.strokeStyle = "#e8eaf0";
       ctx.lineWidth = 1;
       const tickCount = Math.round((max - min) / axisStep);
       for (let i = 0; i <= tickCount; i += 1) {
@@ -1452,7 +1469,7 @@ function ForecastChart({ scenario, marketData, liveSeries }: { scenario: Scenari
           ctx.lineTo(xForecast(index), y(lower[index]));
         }
         ctx.closePath();
-        ctx.fillStyle = scenario.tone === "up" ? `rgba(239,68,68,${opacity})` : `rgba(37,99,235,${opacity})`;
+        ctx.fillStyle = scenario.tone === "up" ? `rgba(214,76,83,${opacity})` : `rgba(7,105,255,${opacity})`;
         ctx.fill();
       };
 
@@ -1462,7 +1479,7 @@ function ForecastChart({ scenario, marketData, liveSeries }: { scenario: Scenari
       const candleWidth = Math.max(3, Math.min(7, (splitX - pad.left) / candles.length * 0.58));
       candles.slice(1).forEach((candle, index) => {
         const px = xActual(index + 1);
-        const color = candle.close >= candle.open ? "#ef4444" : "#2563eb";
+        const color = candle.close >= candle.open ? "#d64c53" : "#0769ff";
         ctx.strokeStyle = color;
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -1476,7 +1493,7 @@ function ForecastChart({ scenario, marketData, liveSeries }: { scenario: Scenari
       });
 
       const currentY = y(closes[closes.length - 1]);
-      ctx.strokeStyle = "#a1a1aa";
+      ctx.strokeStyle = "#9aa0ab";
       ctx.setLineDash([3, 3]);
       ctx.beginPath();
       ctx.moveTo(pad.left, currentY);
@@ -1491,7 +1508,7 @@ function ForecastChart({ scenario, marketData, liveSeries }: { scenario: Scenari
         if (index === 0) ctx.moveTo(px, py);
         else ctx.lineTo(px, py);
       });
-      const forecastColor = scenario.tone === "up" ? "#ef4444" : "#2563eb";
+      const forecastColor = scenario.tone === "up" ? "#d64c53" : "#0769ff";
       ctx.strokeStyle = forecastColor;
       ctx.lineWidth = 3;
       ctx.stroke();
@@ -1507,7 +1524,7 @@ function ForecastChart({ scenario, marketData, liveSeries }: { scenario: Scenari
         ctx.stroke();
       });
 
-      ctx.strokeStyle = "#18181b";
+      ctx.strokeStyle = "#0b0d14";
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.moveTo(splitX, pad.top);
@@ -1516,20 +1533,20 @@ function ForecastChart({ scenario, marketData, liveSeries }: { scenario: Scenari
 
       ctx.textAlign = "center";
       ctx.font = '10px "Pretendard Variable", sans-serif';
-      ctx.fillStyle = "#71717a";
+      ctx.fillStyle = "#6d7380";
       const actualLabelIndexes = [0, .25, .5, .75, 1].map((ratio) => Math.round((candles.length - 1) * ratio));
       actualLabelIndexes.forEach((pathIndex) => {
         ctx.fillText(candles[pathIndex].label, xActual(pathIndex), height - 12);
       });
       ctx.fillStyle = "#fff";
       ctx.fillRect(splitX - 20, height - 29, 40, 24);
-      ctx.fillStyle = "#18181b";
+      ctx.fillStyle = "#0b0d14";
       ctx.fillRect(splitX - 20, height - 29, 40, 24);
       ctx.fillStyle = "#fff";
       ctx.font = '700 10px "Pretendard Variable", sans-serif';
       ctx.fillText(candles[candles.length - 1].label, splitX, height - 13);
       ctx.font = '10px "Pretendard Variable", sans-serif';
-      ctx.fillStyle = "#a1a1aa";
+      ctx.fillStyle = "#9aa0ab";
       ["+7일", "+14일", "+21일", "+1개월"].forEach((label, index, labels) => {
         ctx.fillText(label, splitX + ((index + 1) / labels.length) * (rightX - splitX), height - 12);
       });
@@ -1544,47 +1561,629 @@ function ForecastChart({ scenario, marketData, liveSeries }: { scenario: Scenari
   return <canvas ref={canvasRef} className="forecast-canvas" aria-label={`${scenario.title} 조건부 KOSPI 예상 경로`} />;
 }
 
-function TwinPathChart({ scenario }: { scenario: Scenario }) {
-  const targets = [140.2, 121.6, 107.8];
-  const colors = ["#111113", "#ef4444", "#2563eb"];
-  const selectedIndex = scenario.id === "kospi-rebound" ? 0 : scenario.id === "chip-miss" ? 1 : 2;
-  const x = (index: number) => 24 + (index / 11) * 496;
-  const y = (value: number) => 142 - ((value - 94) / 54) * 110;
-  const makeLine = (target: number) => Array.from({ length: 12 }, (_, index) => 128.5 + ((target - 128.5) * index) / 11 + Math.sin(index * 1.25) * .65);
-  const lines = targets.map(makeLine);
-  const selectedLine = lines[selectedIndex];
-  const forecastColor = colors[selectedIndex];
-  const selectedPath = selectedLine.map((value, index) => `${index === 0 ? "M" : "L"} ${x(index).toFixed(1)} ${y(value).toFixed(1)}`).join(" ");
-  const upper = selectedLine.map((value, index) => `${x(index).toFixed(1)},${y(value + 4 + index * .45).toFixed(1)}`).join(" ");
-  const lower = [...selectedLine].reverse().map((value, reverseIndex) => { const index = 11 - reverseIndex; return `${x(index).toFixed(1)},${y(value - 4 - index * .45).toFixed(1)}`; }).join(" ");
+/* ============================================================
+ * 나의 투자 일지 — event-scenario paper trading, real data only.
+ * Backed by services/paper_trading/api.py + scenario_trading.py +
+ * scenario_investor_analyzer.py via the /api/paper-trading proxy.
+ * ============================================================ */
+
+type TwinGameSummary = {
+  game_id: string;
+  mode?: string;
+  ticker: string;
+  name: string;
+  status: string;
+  phase: string;
+  created_at?: string;
+  updated_at?: string;
+  scenario_premise?: string;
+  current_event_index: number;
+  total_events: number;
+  market_days: number;
+  current_price: number | null;
+  total_return_pct: number | null;
+};
+
+type TwinOntologySource = {
+  origin?: "macro" | "micro";
+  event_types?: string[];
+  headline?: string;
+  original_date?: string;
+};
+
+type TwinRevealedEvent = {
+  event_id: string;
+  sequence: number;
+  title: string;
+  description?: string;
+  pre_brief?: string;
+  event_date: string;
+  ontology_source?: TwinOntologySource | null;
+};
+
+type TwinPricePoint = {
+  step: number;
+  label: string;
+  phase: string;
+  price: number;
+  market_date?: string;
+  return_pct?: number;
+  open?: number;
+  high?: number;
+  low?: number;
+  close?: number;
+  volume?: number;
+};
+
+type TwinHistoryCandle = { market_date: string; open: number; high: number; low: number; close: number; volume: number };
+
+type TwinGameDetail = {
+  game_id: string;
+  ticker: string;
+  name: string;
+  status: string;
+  phase: string;
+  current_price: number;
+  initial_reference_price: number;
+  scenario_premise?: string;
+  history_candles?: TwinHistoryCandle[];
+  price_history?: TwinPricePoint[];
+  revealed_events?: TwinRevealedEvent[];
+  portfolio?: { total_return_pct: number };
+};
+
+type TwinAssessmentMetrics = {
+  completed_events?: number;
+  trade_count?: number;
+  pre_event_trades?: number;
+  post_event_trades?: number;
+  autonomous_market_days?: number;
+  max_abs_market_sentiment?: number;
+  turnover_ratio?: number;
+  total_return_pct?: number;
+  max_price_drawdown_pct?: number;
+  average_confidence?: number | null;
+};
+
+type TwinAssessment = {
+  style?: string;
+  metrics?: TwinAssessmentMetrics;
+  findings?: string[];
+  lessons?: { topic: string; message: string }[];
+};
+
+type TwinSession = { game: TwinGameSummary; assessment: TwinAssessment };
+type TwinBar = { key: string; date: string; open: number; high: number; low: number; close: number; real: boolean };
+
+// analyze_scenario_investor()의 4가지 스타일. 관찰형(기본)→사전 포지셔닝→추종→고회전
+// 순서로 매매 개입도가 커진다는 분석 로직 순서를 그대로 pill 음영 단계에 반영한다.
+const TWIN_STYLE_ORDER = ["이벤트 반응 관찰형", "사전 포지셔닝형", "이벤트 추종형", "이벤트 고회전형"];
+// 세션이 많아지면 판정 API를 세션 수만큼 부르게 된다. 최근 N건만 부르고 나머지는
+// 히스토리 노트로 알린다.
+const TWIN_ASSESSMENT_CAP = 8;
+
+async function fetchPaperTradingJson<T>(path: string): Promise<T> {
+  const response = await fetch(`/api/paper-trading${path}`, { cache: "no-store" });
+  const payload = await response.json().catch(() => null) as { success?: boolean; data?: T; error?: string } | null;
+  if (!response.ok || !payload || payload.success === false) throw new Error(payload?.error ?? "요청을 처리하지 못했습니다.");
+  return payload.data as T;
+}
+
+function twinStyleShade(style?: string) {
+  const idx = style ? TWIN_STYLE_ORDER.indexOf(style) : -1;
+  const pct = 14 + Math.max(0, idx) * 24;
+  return `color-mix(in srgb, var(--ink) ${pct}%, var(--soft))`;
+}
+function twinStyleTextColor(style?: string) {
+  const idx = style ? TWIN_STYLE_ORDER.indexOf(style) : -1;
+  return idx >= 2 ? "#fff" : "var(--ink)";
+}
+function twinCategoryLabel(source?: TwinOntologySource | null) {
+  if (!source) return "이벤트";
+  if (source.event_types?.length) return source.event_types[0];
+  if (source.origin === "macro") return "거시 지표";
+  if (source.origin === "micro") return "종목 뉴스";
+  return "이벤트";
+}
+const twinTone = (value: number) => (value > 0 ? "up" : value < 0 ? "down" : "");
+const twinSignedPct = (value: number) => `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
+const twinWon = (value: number) => `${Math.round(value).toLocaleString("ko-KR")}원`;
+function formatTwinDate(iso?: string) {
+  if (!iso || iso.length < 10) return iso ?? "";
+  return `${iso.slice(0, 4)}.${iso.slice(5, 7)}.${iso.slice(8, 10)}`;
+}
+function formatTwinShortDate(iso?: string) {
+  if (!iso || iso.length < 10) return "";
+  return `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}`;
+}
+function twinCssVar(name: string, fallback: string) {
+  if (typeof window === "undefined") return fallback;
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+function twinMetricChips(metrics?: TwinAssessmentMetrics): { label: string; value: string }[] {
+  if (!metrics) return [];
+  const chips = [
+    { label: "회전율", value: `${(metrics.turnover_ratio ?? 0).toFixed(2)}배` },
+    { label: "누적수익률", value: twinSignedPct(metrics.total_return_pct ?? 0) },
+    { label: "거래", value: `${metrics.trade_count ?? 0}회` },
+  ];
+  chips.push(metrics.average_confidence != null
+    ? { label: "평균확신도", value: `${metrics.average_confidence}점` }
+    : { label: "완료 이벤트", value: `${metrics.completed_events ?? 0}개` });
+  return chips;
+}
+function twinStyleNarrative(sessions: TwinSession[]): string {
+  if (sessions.length === 0) return "";
+  const first = sessions[0];
+  const last = sessions[sessions.length - 1];
+  const firstDate = formatTwinDate(first.game.created_at ?? first.game.updated_at);
+  const lastDate = formatTwinDate(last.game.created_at ?? last.game.updated_at);
+  const latestFinding = last.assessment.findings?.[0];
+  if (sessions.length === 1) {
+    return `${lastDate} ${last.game.name} 모의투자에서 '${last.assessment.style ?? "판정 전"}' 성향으로 판정됐습니다.${latestFinding ? ` ${latestFinding}` : ""} 세션이 더 쌓이면 성향 변화 흐름을 함께 보여드립니다.`;
+  }
+  const distinctStyles = Array.from(new Set(
+    sessions.map((session) => session.assessment.style).filter((style): style is string => Boolean(style)),
+  ));
+  const middle = distinctStyles.length <= 1
+    ? "그 사이 스타일 변화 없이 동일한 성향을 유지했습니다."
+    : `그 사이 ${distinctStyles.join(", ")} 등 총 ${distinctStyles.length}가지 스타일을 오갔습니다.`;
+  return `${firstDate} ${first.game.name} 세션에서는 '${first.assessment.style ?? "판정 전"}'으로 시작해, ${middle} 가장 최근인 ${lastDate} ${last.game.name} 세션에서는 '${last.assessment.style ?? "판정 전"}'으로 판정됐습니다.${latestFinding ? ` ${latestFinding}` : ""}`;
+}
+
+/** history_candles(실제 이력)과 price_history(시뮬레이션 라운드)를 하나의 캔들 배열로 합친다.
+ *  둘 다 이미 open/high/low/close를 들고 있으므로 목업의 합성 캔들 기법은 필요 없다. */
+function buildTwinBars(detail: TwinGameDetail): TwinBar[] {
+  const bars: TwinBar[] = [];
+  const seen = new Set<string>();
+  for (const row of detail.history_candles ?? []) {
+    if (!row.close || !row.market_date || seen.has(row.market_date)) continue;
+    seen.add(row.market_date);
+    bars.push({ key: `real-${row.market_date}`, date: row.market_date, open: row.open, high: row.high, low: row.low, close: row.close, real: true });
+  }
+  for (const point of detail.price_history ?? []) {
+    const close = point.close ?? point.price;
+    if (!close) continue;
+    if (point.step === 0 && point.market_date && seen.has(point.market_date)) continue;
+    bars.push({
+      key: `sim-${point.step}`, date: point.market_date ?? "",
+      open: point.open ?? close, high: point.high ?? close, low: point.low ?? close, close,
+      real: point.step === 0,
+    });
+  }
+  return bars;
+}
+
+function TwinEmptyState({ onOpen }: { onOpen: () => void }) {
   return (
-    <svg className="twin-path-chart" viewBox="0 0 540 170" role="img" aria-label="나의 자산 예상 경로">
-      {[28, 60, 92, 124].map((line) => <line key={line} x1="24" y1={line} x2="520" y2={line} stroke="#ededf0" strokeWidth="1" />)}
-      <polygon points={`${upper} ${lower}`} fill={forecastColor === "#111113" ? "rgba(17,17,19,.08)" : `${forecastColor}18`} />
-      {lines.map((line, index) => <path key={index} d={line.map((value, pointIndex) => `${pointIndex === 0 ? "M" : "L"} ${x(pointIndex).toFixed(1)} ${y(value).toFixed(1)}`).join(" ")} fill="none" stroke={colors[index]} strokeWidth={index === selectedIndex ? "2.8" : "1.6"} strokeDasharray={index === selectedIndex ? undefined : "5 4"} strokeLinecap="round" opacity={index === selectedIndex ? 1 : .72} />)}
-      <circle cx="24" cy={y(128.5)} r="4" fill="#111113" />
-      {targets.map((target, index) => <text key={target} x="468" y={y(target) - (index === 0 ? 7 : index === 1 ? 0 : -9)} fill={colors[index]} fontSize="11" fontWeight="700">{target.toFixed(1)} ({target > 128.5 ? "+9.1%" : target === 121.6 ? "-5.4%" : "-16.1%"})</text>)}
-      <text x="18" y="154" fill="#a1a1aa" fontSize="10">현재</text><text x="180" y="154" fill="#a1a1aa" fontSize="10">7일 후</text><text x="342" y="154" fill="#a1a1aa" fontSize="10">14일 후</text><text x="486" y="154" fill="#a1a1aa" fontSize="10">1개월 후</text>
-      <text x="32" y={y(128.5) - 9} fill="#27272a" fontSize="11" fontWeight="700">128.5</text>
-    </svg>
+    <div className="journal-empty">
+      <CandlestickChart size={26} />
+      <strong>아직 진행한 이벤트 시나리오 모의투자가 없습니다.</strong>
+      <p>모의 투자에서 이벤트 시나리오를 한 번 진행하면 이곳에 투자 성향 분석과 종목별 실험 결과가 쌓입니다.</p>
+      <button type="button" onClick={onOpen}>모의 투자 시작하기</button>
+    </div>
   );
 }
 
-function TwinPage({ selectedScenario, onSelectScenario, onOpenBuilder }: { selectedScenario: Scenario; onSelectScenario: (scenario: Scenario) => void; onOpenBuilder: () => void }) {
-  const [twinScenarioId, setTwinScenarioId] = useState(selectedScenario.id);
-  const twinScenario = scenarios.find((scenario) => scenario.id === twinScenarioId) ?? selectedScenario;
-  const holdings = [
-    { symbol: "S", name: "삼성전자", code: "005930", value: "220,000원", weight: "28.6%", change: "+1.03%", contribution: "+286,500원", tone: "up" },
-    { symbol: "H", name: "SK하이닉스", code: "000660", value: "1,555,000원", weight: "24.3%", change: "-0.74%", contribution: "-182,400원", tone: "down" },
-    { symbol: "E", name: "KODEX 200", code: "069500", value: "34,210원", weight: "18.7%", change: "+0.42%", contribution: "+90,800원", tone: "up" },
-    { symbol: "$", name: "USD 현금", code: "KRW 환산", value: "23,600,000원", weight: "18.4%", change: "0.00%", contribution: "0원", tone: "flat" },
-  ];
+type TwinPinDatum = { event: TwinRevealedEvent; index: number; barIndex: number; bar: TwinBar; cumulativePct: number; isUp: boolean; category: string };
+
+/** ForecastChart와 같은 캔버스 패턴(그리드, 심지+몸통 캔들, 실제/시뮬레이션 분할선)으로
+ *  선택한 실행의 캔들 경로를 그리고, 공개된 이벤트를 번호 핀으로 오버레이한다. */
+function TwinCandleChart({ detail }: { detail: TwinGameDetail }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [layout, setLayout] = useState<{ x: (index: number) => number; y: (value: number) => number; bars: TwinBar[] } | null>(null);
+  const bars = useMemo(() => buildTwinBars(detail), [detail]);
+  const events = useMemo(
+    () => (detail.revealed_events ?? []).slice().sort((a, b) => a.sequence - b.sequence),
+    [detail.revealed_events],
+  );
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || bars.length < 2) { setLayout(null); return; }
+
+    const draw = () => {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(rect.width * dpr);
+      canvas.height = Math.round(rect.height * dpr);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.scale(dpr, dpr);
+
+      const width = rect.width;
+      const height = rect.height;
+      const pad = { top: 20, right: 22, bottom: 40, left: 68 };
+      const plotW = width - pad.left - pad.right;
+      const plotH = height - pad.top - pad.bottom;
+
+      const rawMax = Math.max(...bars.map((bar) => bar.high), detail.initial_reference_price);
+      const rawMin = Math.min(...bars.map((bar) => bar.low), detail.initial_reference_price);
+      const vpad = (rawMax - rawMin) * 0.14 || rawMax * 0.02;
+      const max = rawMax + vpad;
+      const min = rawMin - vpad;
+
+      const x = (index: number) => pad.left + (index / Math.max(bars.length - 1, 1)) * plotW;
+      const y = (value: number) => pad.top + ((max - value) / (max - min)) * plotH;
+
+      const lineColor = twinCssVar("--line", "#e8eaf0");
+      const lightColor = twinCssVar("--light", "#9aa0ab");
+      const mutedColor = twinCssVar("--muted", "#6d7380");
+      const upColor = twinCssVar("--up", "#d64c53");
+      const downColor = twinCssVar("--down", "#0769ff");
+      const inkColor = twinCssVar("--ink", "#0b0d14");
+
+      ctx.clearRect(0, 0, width, height);
+      ctx.font = '10px "Pretendard Variable", sans-serif';
+      ctx.strokeStyle = lineColor;
+      ctx.lineWidth = 1;
+      ctx.fillStyle = lightColor;
+      ctx.textAlign = "right";
+      const ticks = 4;
+      for (let i = 0; i <= ticks; i += 1) {
+        const value = min + (i / ticks) * (max - min);
+        const py = y(value);
+        ctx.beginPath();
+        ctx.moveTo(pad.left, py);
+        ctx.lineTo(width - pad.right, py);
+        ctx.stroke();
+        ctx.fillText(Math.round(value).toLocaleString("ko-KR"), pad.left - 10, py + 3);
+      }
+
+      const candleWidth = Math.max(2.5, Math.min(14, (plotW / bars.length) * 0.6));
+      const simStart = bars.findIndex((bar) => !bar.real);
+      bars.forEach((bar, index) => {
+        const px = x(index);
+        const color = bar.close >= bar.open ? upColor : downColor;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(px, y(bar.high));
+        ctx.lineTo(px, y(bar.low));
+        ctx.stroke();
+        const bodyTop = Math.min(y(bar.open), y(bar.close));
+        const bodyHeight = Math.max(1.5, Math.abs(y(bar.open) - y(bar.close)));
+        ctx.fillStyle = color;
+        ctx.fillRect(px - candleWidth / 2, bodyTop, candleWidth, bodyHeight);
+      });
+
+      ctx.textAlign = "center";
+      ctx.fillStyle = lightColor;
+      ctx.font = '10px "Pretendard Variable", sans-serif';
+      [0, 0.25, 0.5, 0.75, 1].map((ratio) => Math.round((bars.length - 1) * ratio)).forEach((idx) => {
+        const label = formatTwinShortDate(bars[idx]?.date);
+        if (label) ctx.fillText(label, x(idx), height - 12);
+      });
+
+      if (simStart > 0) {
+        const splitX = (x(simStart - 1) + x(simStart)) / 2;
+        ctx.strokeStyle = inkColor;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(splitX, pad.top);
+        ctx.lineTo(splitX, height - pad.bottom);
+        ctx.stroke();
+
+        ctx.textAlign = "center";
+        ctx.fillStyle = mutedColor;
+        ctx.font = '9.5px "Pretendard Variable", sans-serif';
+        ctx.fillText("시뮬레이션 시작", splitX, height - pad.bottom + 14);
+
+        ctx.fillStyle = inkColor;
+        ctx.fillRect(splitX - 22, height - 24, 44, 20);
+        ctx.fillStyle = "#fff";
+        ctx.font = '700 10px "Pretendard Variable", sans-serif';
+        ctx.fillText(formatTwinShortDate(bars[simStart]?.date), splitX, height - 10);
+      }
+
+      setLayout({ x, y, bars });
+    };
+
+    draw();
+    const observer = new ResizeObserver(draw);
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, [bars, detail.initial_reference_price]);
+
+  const pins = useMemo<TwinPinDatum[]>(() => {
+    if (!layout) return [];
+    return events.flatMap((event, index) => {
+      const barIndex = layout.bars.findIndex((bar) => !bar.real && bar.date === event.event_date);
+      if (barIndex < 0) return [];
+      const bar = layout.bars[barIndex];
+      const cumulativePct = ((bar.close - detail.initial_reference_price) / detail.initial_reference_price) * 100;
+      return [{ event, index, barIndex, bar, cumulativePct, isUp: cumulativePct >= 0, category: twinCategoryLabel(event.ontology_source) }];
+    });
+  }, [layout, events, detail.initial_reference_price]);
+
+  if (bars.length < 2) {
+    return (
+      <div className="journal-empty">
+        <CandlestickChart size={24} />
+        <strong>표시할 캔들 데이터가 없습니다</strong>
+        <p>이 실행에는 아직 가격 이력이 충분하지 않습니다.</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="twin-page">
-      <header className="page-heading twin-heading"><div><span>MY FINANCIAL TWIN</span><h1>내 금융 상태를 이해하고, 다음 선택을 미리 확인하세요.</h1></div><div className="market-stamp"><CalendarDays size={15} />2026.07.28 KRX 장마감 기준</div></header>
-      <section className="panel twin-assets-panel"><div className="panel-title"><h2>나의 자산 현황</h2><span className="twin-profile-chip"><UserRound size={13} /> 김민서님</span></div><div className="twin-assets-grid"><div className="twin-metric"><span>총 자산(평가금액)</span><strong>128,450,000원</strong><small>전일 대비 <b className="up">+1,250,000원 (+0.98%)</b></small></div><div className="twin-metric"><span>현금 비중</span><strong>18.4<em>%</em></strong><small>23,600,000원</small></div><div className="twin-metric"><span>목표 달성률</span><strong>62<em>%</em></strong><div className="twin-progress"><i style={{ width: "62%" }} /></div><small>목표 금액 200,000,000원</small></div><div className="twin-net-chart"><div><span>순자산 추이 (최근 6개월)</span><strong>+18.4%</strong></div><svg viewBox="0 0 280 92" aria-label="최근 6개월 순자산 추이"><line x1="0" y1="22" x2="280" y2="22" /><line x1="0" y1="48" x2="280" y2="48" /><line x1="0" y1="74" x2="280" y2="74" /><path d="M4 71 C19 65 28 69 40 58 S62 62 74 50 S93 46 104 48 S124 38 137 41 S152 29 166 34 S183 22 196 28 S212 21 222 24 S237 11 248 17 S262 8 276 4" /></svg><div className="twin-chart-labels"><span>2월</span><span>3월</span><span>4월</span><span>5월</span><span>6월</span><span>7월</span></div></div></div></section>
-      <section className="twin-main-grid"><section className="panel twin-portfolio-panel"><div className="panel-title"><h2>포트폴리오 보유 현황</h2><button className="twin-text-button" type="button">전체 보기 <ChevronRight size={15} /></button></div><div className="twin-table-wrap"><table className="twin-table"><thead><tr><th>종목</th><th>현재가</th><th>비중</th><th>등락률(1D)</th><th>기여도(1D)</th></tr></thead><tbody>{holdings.map((holding) => <tr key={holding.name}><td><div className="twin-holding-name"><span className={`twin-holding-symbol ${holding.tone}`}>{holding.symbol}</span><div><strong>{holding.name}</strong><small>{holding.code} · KOSPI</small></div></div></td><td>{holding.value}</td><td>{holding.weight}</td><td className={holding.tone}>{holding.change}</td><td className={holding.tone}>{holding.contribution}</td></tr>)}</tbody></table></div><p className="twin-table-note">* 가격과 수익률은 2026.07.28 KRX 장마감 기준이며, 실제 계좌와 다를 수 있습니다.</p></section><section className="panel twin-path-panel"><div className="panel-title"><h2>시나리오별 내 자산 경로</h2><span className="twin-path-caption">조건에 따른 가상 경로</span></div><div className="twin-scenario-cards">{scenarios.map((scenario, index) => <button key={scenario.id} className={`twin-scenario-card ${twinScenario.id === scenario.id ? "active" : ""}`} type="button" onClick={() => { setTwinScenarioId(scenario.id); onSelectScenario(scenario); }}><span className="twin-radio" /><span><small>시나리오 {index + 1}</small><strong>{scenario.title}</strong><em>{scenario.forecast}</em></span><i>{scenario.tone === "up" ? "상승" : "하락"}</i></button>)}<button className="twin-scenario-card twin-add-scenario" type="button" onClick={onOpenBuilder}><Plus size={20} /><span><small>내 시나리오</small><strong>직접 만들기</strong></span></button></div><div className="twin-selected-path"><div className="twin-selected-path-head"><div><span>선택 시나리오</span><strong>{twinScenario.title}</strong></div><b className={twinScenario.tone}>{twinScenario.forecast}</b></div><TwinPathChart scenario={twinScenario} /><p>선택한 시나리오에 따라 보유 자산의 예상 경로가 다시 계산됩니다.</p></div></section></section>
-      <section className="panel twin-experts-panel"><div className="panel-title"><h2>금융 대가의 한마디</h2><span>시나리오에 대한 서로 다른 관점</span></div><div className="twin-expert-grid"><article><div className="twin-expert-avatar">WB</div><div><span>워런 버핏 관점</span><h3>좋은 기업도 가격보다 이익의 지속성을 먼저 확인하세요.</h3><p>반등을 따라가기보다 HBM 수요와 외국인 수급이 함께 돌아오는지 확인합니다.</p><button type="button">직접 이야기해보기 <ArrowRight size={14} /></button></div></article><article><div className="twin-expert-avatar">HM</div><div><span>하워드 막스 관점</span><h3>낙폭보다 먼저, 기대가 얼마나 낮아졌는지 계산하세요.</h3><p>실적 리스크와 AI CapEx 둔화가 일시적 충격인지 추세 변화인지 구분합니다.</p><button type="button">직접 이야기해보기 <ArrowRight size={14} /></button></div></article><article><div className="twin-expert-avatar">TR</div><div><span>트럼프식 시장 관점</span><h3>정책과 자금 흐름이 바뀌기 전에는 현금을 협상 카드로 두세요.</h3><p>환율·외국인 수급·정책 뉴스가 같은 방향인지 확인하고 행동합니다.</p><button type="button">직접 이야기해보기 <ArrowRight size={14} /></button></div></article></div><div className="twin-disclaimer">상기 정보는 AI 분석 기반 참고 자료이며, 투자 판단의 최종 책임은 본인에게 있습니다.</div></section>
+    <>
+      <div className="journal-candle-wrap">
+        <canvas ref={canvasRef} className="journal-candle-canvas" aria-label={`${detail.name} 시나리오 캔들 차트`} />
+        {layout && (
+          <div className="journal-event-pins">
+            {pins.map((pin) => {
+              const anchorPrice = pin.isUp ? pin.bar.high : pin.bar.low;
+              const px = layout.x(pin.barIndex);
+              const py = layout.y(anchorPrice) + (pin.isUp ? -16 : 16);
+              return (
+                <div key={pin.event.event_id} className="journal-event-pin" style={{ left: px, top: py }}>
+                  <button type="button" className={`journal-event-pin-badge ${pin.isUp ? "journal-badge-up" : "journal-badge-down"}`} aria-label={`이벤트 ${pin.index + 1} 상세 보기`}>
+                    {pin.index + 1}
+                  </button>
+                  <div className="journal-event-tooltip">
+                    <div className="journal-event-tooltip-top">
+                      <span>{formatTwinShortDate(pin.event.event_date)} · {pin.category}</span>
+                      <b className={pin.isUp ? "up" : "down"}>{twinSignedPct(pin.cumulativePct)}</b>
+                    </div>
+                    <h4>{pin.event.title}</h4>
+                    <p>{pin.event.description || pin.event.pre_brief || "세부 설명이 제공되지 않았습니다."}</p>
+                    <em>이 시점 누적 수익률 {twinSignedPct(pin.cumulativePct)}</em>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      <div className="journal-event-strip">
+        {pins.map((pin) => (
+          <div key={pin.event.event_id} className="journal-event-chip">
+            <button type="button" className="journal-event-chip-btn">
+              <span className={`journal-event-chip-idx ${pin.isUp ? "journal-badge-up" : "journal-badge-down"}`}>{pin.index + 1}</span>
+              {formatTwinShortDate(pin.event.event_date)} · {pin.category}
+            </button>
+            <div className="journal-event-tooltip">
+              <div className="journal-event-tooltip-top">
+                <span>{formatTwinShortDate(pin.event.event_date)} · {pin.category}</span>
+                <b className={pin.isUp ? "up" : "down"}>{twinSignedPct(pin.cumulativePct)}</b>
+              </div>
+              <h4>{pin.event.title}</h4>
+              <p>{pin.event.description || pin.event.pre_brief || "세부 설명이 제공되지 않았습니다."}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function TwinPage() {
+  const [games, setGames] = useState<TwinGameSummary[]>([]);
+  const [gamesState, setGamesState] = useState<"loading" | "ready" | "error">("loading");
+  const [twinSessions, setTwinSessions] = useState<TwinSession[]>([]);
+  const [assessmentsState, setAssessmentsState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
+  const [gameDetails, setGameDetails] = useState<Record<string, TwinGameDetail | "error">>({});
+  const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
+  const [journalPaperTradingOpen, setJournalPaperTradingOpen] = useState(false);
+  const detailRequest = useRef(0);
+
+  useEffect(() => {
+    let active = true;
+    setGamesState("loading");
+    fetchPaperTradingJson<TwinGameSummary[]>("/games?summary=1")
+      .then((data) => {
+        if (!active) return;
+        const scenarioGames = data
+          .filter((game) => game.mode === "scenario")
+          .sort((a, b) => (a.created_at ?? a.updated_at ?? "").localeCompare(b.created_at ?? b.updated_at ?? ""));
+        setGames(scenarioGames);
+        setGamesState("ready");
+      })
+      .catch(() => { if (active) setGamesState("error"); });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (gamesState !== "ready" || games.length === 0) return;
+    let active = true;
+    const targets = games.slice(-TWIN_ASSESSMENT_CAP);
+    setAssessmentsState("loading");
+    Promise.allSettled(
+      targets.map((game) => fetchPaperTradingJson<TwinAssessment>(`/scenarios/${game.game_id}/assessment`).then((assessment) => ({ game, assessment }))),
+    ).then((results) => {
+      if (!active) return;
+      const sessions = results.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
+      setTwinSessions(sessions);
+      setAssessmentsState(sessions.length > 0 ? "ready" : "error");
+    });
+    return () => { active = false; };
+  }, [gamesState, games]);
+
+  const loadDetail = useCallback((gameId: string) => {
+    const requestId = ++detailRequest.current;
+    setLoadingDetailId(gameId);
+    fetchPaperTradingJson<TwinGameDetail>(`/games/${gameId}`)
+      .then((detail) => { if (detailRequest.current === requestId) setGameDetails((current) => ({ ...current, [gameId]: detail })); })
+      .catch(() => { if (detailRequest.current === requestId) setGameDetails((current) => ({ ...current, [gameId]: "error" })); })
+      .finally(() => { if (detailRequest.current === requestId) setLoadingDetailId(null); });
+  }, []);
+
+  useEffect(() => {
+    if (games.length === 0 || selectedGameId) return;
+    setSelectedGameId(games[games.length - 1].game_id);
+  }, [games, selectedGameId]);
+
+  useEffect(() => {
+    if (!selectedGameId || selectedGameId in gameDetails || loadingDetailId === selectedGameId) return;
+    loadDetail(selectedGameId);
+  }, [selectedGameId, gameDetails, loadingDetailId, loadDetail]);
+
+  const stockGroups = useMemo(() => {
+    const groups = new Map<string, { ticker: string; name: string; games: TwinGameSummary[] }>();
+    games.forEach((game) => {
+      const group = groups.get(game.ticker) ?? { ticker: game.ticker, name: game.name, games: [] };
+      group.games.push(game);
+      groups.set(game.ticker, group);
+    });
+    return Array.from(groups.values())
+      .map((group) => ({ ...group, games: group.games.slice().sort((a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? "")) }))
+      .sort((a, b) => (b.games.at(-1)?.updated_at ?? "").localeCompare(a.games.at(-1)?.updated_at ?? ""));
+  }, [games]);
+
+  const currentSession = twinSessions.at(-1);
+  const cappedNotice = games.length > TWIN_ASSESSMENT_CAP;
+  const selectedSummary = games.find((game) => game.game_id === selectedGameId);
+  const selectedDetail = selectedGameId ? gameDetails[selectedGameId] : undefined;
+  const openPaperTrading = () => setJournalPaperTradingOpen(true);
+
+  return (
+    <div className="journal-page">
+      <header className="page-heading journal-heading">
+        <div><span>MY INVESTMENT JOURNAL</span><h1>모의투자로 알게 된 내 투자 성향과, 종목별 실험 결과를 한눈에 확인하세요.</h1></div>
+      </header>
+
+      <section className="panel">
+        <div className="panel-title">
+          <div><span>CURRENT STYLE SUMMARY</span><h2>현재 나의 투자 성향</h2></div>
+          <span className="panel-note">가장 최근 이벤트 시나리오 모의투자에서 판정된 스타일과, 히스토리 전체의 변화 흐름을 함께 보여줍니다.</span>
+        </div>
+        <div className="journal-summary-body">
+          {gamesState === "loading" || (gamesState === "ready" && games.length > 0 && (assessmentsState === "loading" || assessmentsState === "idle")) ? (
+            <div className="journal-loading"><LoaderCircle size={16} className="spin" /> 불러오는 중…</div>
+          ) : gamesState === "error" ? (
+            <div className="journal-error">투자 성향 데이터를 불러오지 못했습니다.</div>
+          ) : games.length === 0 ? (
+            <TwinEmptyState onOpen={openPaperTrading} />
+          ) : !currentSession ? (
+            <div className="journal-error">최근 세션의 투자 성향 판정 결과를 불러오지 못했습니다.</div>
+          ) : (
+            <>
+              <div className="journal-current-style-row">
+                <span className="journal-current-style-label">현재 스타일</span>
+                <span className="journal-style-pill journal-style-pill-lg" style={{ background: twinStyleShade(currentSession.assessment.style), color: twinStyleTextColor(currentSession.assessment.style) }}>
+                  {currentSession.assessment.style ?? "판정 전"}
+                </span>
+                <span className="journal-current-style-date">{formatTwinDate(currentSession.game.created_at ?? currentSession.game.updated_at)} 기준</span>
+              </div>
+              <p className="journal-current-style-desc">{twinStyleNarrative(twinSessions)}</p>
+            </>
+          )}
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-title">
+          <div><span>INVESTOR STYLE TIMELINE</span><h2>나의 투자 성향 히스토리</h2></div>
+          <span className="panel-note">모의투자를 마칠 때마다 매매 행동에서 스타일을 다시 판정합니다. 점수가 아니라 스타일 전환과 그 근거로 봅니다.</span>
+        </div>
+        <div className="journal-behavior-body">
+          {gamesState === "loading" || (gamesState === "ready" && games.length > 0 && (assessmentsState === "loading" || assessmentsState === "idle")) ? (
+            <div className="journal-loading"><LoaderCircle size={16} className="spin" /> 불러오는 중…</div>
+          ) : gamesState === "error" ? (
+            <div className="journal-error">히스토리를 불러오지 못했습니다.</div>
+          ) : games.length === 0 ? (
+            <TwinEmptyState onOpen={openPaperTrading} />
+          ) : twinSessions.length === 0 ? (
+            <div className="journal-error">세션별 투자 성향 판정 결과를 불러오지 못했습니다.</div>
+          ) : (
+            <>
+              <div className="journal-timeline">
+                <div className="journal-timeline-row labels">
+                  {twinSessions.map((session) => <span key={session.game.game_id}>{session.assessment.style ?? "판정 전"}</span>)}
+                </div>
+                <div className="journal-timeline-row dots" style={{ "--tl-count": twinSessions.length } as CSSProperties}>
+                  {twinSessions.map((session) => (
+                    <span key={session.game.game_id}><i className="journal-timeline-dot" style={{ background: twinStyleShade(session.assessment.style) }} /></span>
+                  ))}
+                </div>
+                <div className="journal-timeline-row dates">
+                  {twinSessions.map((session) => <span key={session.game.game_id}>{formatTwinShortDate(session.game.created_at ?? session.game.updated_at)}</span>)}
+                </div>
+              </div>
+              <div className="journal-session-list">
+                {twinSessions.slice().reverse().map((session) => (
+                  <article className="journal-session-card" key={session.game.game_id}>
+                    <div className="journal-session-card-top">
+                      <span className="journal-session-date">{formatTwinDate(session.game.created_at ?? session.game.updated_at)}</span>
+                      <span className="journal-session-ticker">{session.game.name}</span>
+                      <span className="journal-style-pill" style={{ background: twinStyleShade(session.assessment.style), color: twinStyleTextColor(session.assessment.style) }}>
+                        {session.assessment.style ?? "판정 전"}
+                      </span>
+                    </div>
+                    <div className="journal-session-card-bottom">
+                      <div className="journal-metric-chips">
+                        {twinMetricChips(session.assessment.metrics).map((chip) => <span className="journal-metric-chip" key={chip.label}>{chip.label} <b>{chip.value}</b></span>)}
+                      </div>
+                      <p className="journal-session-finding">{session.assessment.findings?.[0] ?? "기록된 세부 관찰이 없습니다."}</p>
+                    </div>
+                  </article>
+                ))}
+              </div>
+              {cappedNotice && <p className="journal-history-note">전체 {games.length}건 중 최근 {TWIN_ASSESSMENT_CAP}건의 세션만 표시합니다.</p>}
+            </>
+          )}
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-title">
+          <div><span>SCENARIO EXPERIMENT LAB</span><h2>종목별 이벤트 시나리오 실험</h2></div>
+          <span className="panel-note">종목과 실행을 고르면 그 실험의 캔들 경로가 아래에 나타납니다. 이벤트를 가리키면 그 시점의 내용만 보여줍니다.</span>
+        </div>
+        {gamesState === "loading" ? (
+          <div className="journal-loading"><LoaderCircle size={16} className="spin" /> 불러오는 중…</div>
+        ) : gamesState === "error" ? (
+          <div className="journal-error">실험 목록을 불러오지 못했습니다.</div>
+        ) : games.length === 0 ? (
+          <TwinEmptyState onOpen={openPaperTrading} />
+        ) : (
+          <div className="journal-lab-body">
+            <nav className="journal-lab-sidebar" aria-label="종목·실행 선택">
+              {stockGroups.map((group) => (
+                <div className="journal-lab-stock-group" key={group.ticker}>
+                  <div className="journal-lab-stock-group-head"><strong>{group.name}</strong><span>{group.ticker}</span></div>
+                  {group.games.map((game, index) => (
+                    <button key={game.game_id} type="button" className={`journal-lab-run-btn ${selectedGameId === game.game_id ? "active" : ""}`} onClick={() => setSelectedGameId(game.game_id)}>
+                      <span className="journal-lab-run-btn-top"><b>실행 {index + 1}</b></span>
+                      <span className="journal-lab-run-btn-meta">
+                        <span>{formatTwinDate(game.created_at ?? game.updated_at)} 시작</span>
+                        <span className={game.total_return_pct == null ? "" : twinTone(game.total_return_pct)}>
+                          {game.total_return_pct == null ? (game.phase === "completed" ? "-" : "진행 중") : twinSignedPct(game.total_return_pct)}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </nav>
+            <div className="journal-lab-main">
+              {!selectedSummary ? null : loadingDetailId === selectedGameId || selectedDetail === undefined ? (
+                <div className="journal-loading"><LoaderCircle size={16} className="spin" /> 불러오는 중…</div>
+              ) : selectedDetail === "error" ? (
+                <div className="journal-error">실행 데이터를 불러오지 못했습니다. <button type="button" onClick={() => loadDetail(selectedSummary.game_id)}>다시 시도</button></div>
+              ) : (
+                <>
+                  <div className="journal-lab-run-head">
+                    <div>
+                      <h3>{selectedDetail.name} ({selectedDetail.ticker})</h3>
+                      <p>{formatTwinDate(selectedSummary.created_at ?? selectedSummary.updated_at)} 시작 · 시작가 {twinWon(selectedDetail.initial_reference_price)} · 이벤트 {(selectedDetail.revealed_events ?? []).length}/{selectedSummary.total_events}개 공개</p>
+                    </div>
+                    <div className="journal-lab-run-return">
+                      <span>누적 수익률</span>
+                      <b className={twinTone(selectedDetail.portfolio?.total_return_pct ?? 0)}>{twinSignedPct(selectedDetail.portfolio?.total_return_pct ?? 0)}</b>
+                    </div>
+                  </div>
+                  <TwinCandleChart detail={selectedDetail} />
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </section>
+
+      {journalPaperTradingOpen && <PaperTradingModal onClose={() => setJournalPaperTradingOpen(false)} />}
     </div>
   );
 }
@@ -1598,6 +2197,14 @@ export default function Home() {
   const [marketBrief, setMarketBrief] = useState<string[]>(defaultMarketBrief);
   const [marketBriefExpanded, setMarketBriefExpanded] = useState(false);
   const [selectedMarketSignal, setSelectedMarketSignal] = useState<DashboardSignal | null>(null);
+  const [watchlist, setWatchlist] = useState<WatchSymbol[]>(followedSymbols);
+  const [selectedSymbol, setSelectedSymbol] = useState<WatchSymbol>(followedSymbols[0]);
+  const [symbolQuery, setSymbolQuery] = useState("");
+  const [symbolResults, setSymbolResults] = useState<Security[]>([]);
+  const [symbolSearching, setSymbolSearching] = useState(false);
+  const [tickerSources, setTickerSources] = useState<TickerSource[] | null>(null);
+  const [tickerSourcesError, setTickerSourcesError] = useState<string | null>(null);
+  const [symbolCandles, setSymbolCandles] = useState<{ ticker: string; data: KospiMarketData } | null>(null);
   const [selectedScenario, setSelectedScenario] = useState(scenarios[0]);
   const [scenarioDetailOpen, setScenarioDetailOpen] = useState(false);
   const [scenarioEditorial, setScenarioEditorial] = useState<ScenarioEditorial>(() => fallbackEditorial(scenarios[0]));
@@ -1694,6 +2301,75 @@ export default function Home() {
     return () => { active = false; window.clearInterval(timer); };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    setTickerSources(null);
+    setTickerSourcesError(null);
+    const loadTickerContext = async () => {
+      try {
+        const response = await fetch(`/api/paper-trading/securities/${encodeURIComponent(selectedSymbol.ticker)}/scenario-context`, { cache: "no-store" });
+        const payload = await response.json().catch(() => null) as { data?: { sources?: TickerSource[] }; success?: boolean; error?: string } | null;
+        if (!response.ok || !payload || payload.success === false) throw new Error(payload?.error ?? "종목 연결 데이터를 불러오지 못했습니다.");
+        if (active) setTickerSources(payload.data?.sources ?? []);
+      } catch (error) {
+        if (active) setTickerSourcesError(error instanceof Error ? error.message : "종목 연결 데이터를 불러오지 못했습니다.");
+      }
+    };
+    loadTickerContext();
+    return () => { active = false; };
+  }, [selectedSymbol.ticker]);
+
+  useEffect(() => {
+    let active = true;
+    const ticker = selectedSymbol.ticker;
+    const loadSymbolCandles = async () => {
+      try {
+        const response = await fetch(`/api/paper-trading/securities/${encodeURIComponent(ticker)}/candles?limit=40`, { cache: "no-store" });
+        const payload = await response.json().catch(() => null) as { data?: { candles?: Array<{ market_date: string; open: number; high: number; low: number; close: number }> } } | null;
+        const rows = payload?.data?.candles ?? [];
+        if (!response.ok || !rows.length || !active) return;
+        const candles: KospiCandle[] = rows.map((row) => {
+          const parsed = new Date(row.market_date);
+          return { date: row.market_date.replaceAll("-", ""), label: `${parsed.getMonth() + 1}/${parsed.getDate()}`, open: row.open, high: row.high, low: row.low, close: row.close };
+        });
+        const last = candles[candles.length - 1];
+        const prev = candles[candles.length - 2];
+        setSymbolCandles({
+          ticker,
+          data: {
+            latestDate: last.date, latestLabel: last.label, value: last.close,
+            change: prev ? last.close - prev.close : 0,
+            rate: prev ? ((last.close - prev.close) / prev.close) * 100 : 0,
+            candles,
+          },
+        });
+      } catch {
+        // keep the previous symbol's chart on screen (dimmed via the "불러오는 중" state below) rather than flashing the unrelated KOSPI placeholder
+      }
+    };
+    loadSymbolCandles();
+    return () => { active = false; };
+  }, [selectedSymbol.ticker]);
+
+  useEffect(() => {
+    const keyword = symbolQuery.trim();
+    if (!keyword) { setSymbolResults([]); setSymbolSearching(false); return; }
+    let cancelled = false;
+    setSymbolSearching(true);
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/paper-trading/securities?q=${encodeURIComponent(keyword)}&limit=8`, { cache: "no-store" });
+        const payload = await response.json().catch(() => null) as { data?: Security[] } | null;
+        if (!cancelled) setSymbolResults(response.ok && payload?.data ? payload.data : []);
+      } catch {
+        if (!cancelled) setSymbolResults([]);
+      } finally {
+        if (!cancelled) setSymbolSearching(false);
+      }
+    }, 250);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [symbolQuery]);
+
   useLayoutEffect(() => {
     if (scenarioScrollY.current === null) return;
     const scrollTop = scenarioScrollY.current;
@@ -1705,6 +2381,22 @@ export default function Home() {
   const activateTab = (tab: MainTab) => {
     setActiveTab(tab);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const selectSymbol = (item: WatchSymbol) => {
+    setSelectedSymbol(item);
+    setWatchlist((current) => current.some((row) => row.ticker === item.ticker) ? current : [...current, item]);
+    setSymbolQuery("");
+    setSymbolResults([]);
+  };
+
+  const removeSymbol = (ticker: string) => {
+    setWatchlist((current) => {
+      if (current.length <= 1) return current;
+      const next = current.filter((row) => row.ticker !== ticker);
+      if (selectedSymbol.ticker === ticker && next.length) setSelectedSymbol(next[0]);
+      return next;
+    });
   };
 
   const toggleSeed = (seed: string) => {
@@ -2057,175 +2749,174 @@ export default function Home() {
 
   return (
     <div className="finverse-app">
-      <header className="mobile-header">
-        <button className="sidebar-brand" onClick={() => activateTab("market")} aria-label="FINVERSE 시장 인사이트 홈">
-          <span className="brand-mark">F</span><span>FINVERSE</span>
+      <header className="top-header">
+        <button className="brand" onClick={() => activateTab("market")} aria-label="FINVERSE 시장 인사이트 홈">
+          FINVERSE<span>.</span>
         </button>
+        <nav className="top-nav" aria-label="FINVERSE 탐색">
+          <button className={activeTab === "market" ? "active" : ""} onClick={() => activateTab("market")} aria-current={activeTab === "market" ? "page" : undefined}>시장 인사이트</button>
+          <button className={activeTab === "twin" ? "active" : ""} onClick={() => activateTab("twin")} aria-current={activeTab === "twin" ? "page" : undefined}>나의 투자 일지</button>
+          <button onClick={() => setPaperTradingOpen(true)}>모의 투자</button>
+        </nav>
+        <div className="top-header-actions">
+          <button className="header-help" type="button" aria-label="도움말"><CircleHelp size={18} /></button>
+        </div>
       </header>
 
-      <div className="app-layout">
-        <aside className="sidebar" aria-label="FINVERSE 탐색">
-          <button className="sidebar-brand" onClick={() => activateTab("market")} aria-label="FINVERSE 시장 인사이트 홈">
-            <span className="brand-mark">F</span><span>FINVERSE</span>
-          </button>
-          <div className="sidebar-label"><BrainCircuit size={19} /><div><span>AI DECISION LAB</span><strong>금융 판단 실험실</strong></div></div>
-          <nav className="side-tabs">
-            <button className={activeTab === "market" ? "active" : ""} onClick={() => activateTab("market")}><BarChart3 size={18} />시장 인사이트</button>
-            <button className={activeTab === "twin" ? "active" : ""} onClick={() => activateTab("twin")}><UserRound size={18} />마이 금융 트윈</button>
-            <button onClick={() => setPaperTradingOpen(true)}><CircleDollarSign size={18} />모의 투자</button>
-          </nav>
-          <button className="sidebar-help" type="button"><CircleHelp size={20} /><span>도움말</span><ChevronRight size={17} /></button>
-        </aside>
-
-        <main className="main-content">
+      <main className="main-content">
           {activeTab === "market" ? (
             <div className="market-page">
-              <header className="page-heading">
-                <div><span>MARKET INSIGHT</span><h1>오늘의 시장을 이해하고, 다음 움직임을 미리 살펴보세요.</h1></div>
-                <div className="market-stamp"><CalendarDays size={15} />{kospiAsOfLabel} 최신 기준</div>
-              </header>
-
-              <section className="market-dashboard">
-                <section className="panel connection-panel market-signal-panel">
-                  <div className="panel-title">
-                    <div><span>MARKET PULSE</span><h2>시장 연결</h2></div>
-                  </div>
-                  <div className="signal-stack">
-                    {dashboardSignals.map((signal) => {
-                      const Icon = marketSignalIcons[signal.key];
-                      return (
-                        <article className={`signal-group ${signal.key}`} key={signal.key}>
-                          <button className="signal-group-button" type="button" onClick={() => setSelectedMarketSignal(signal)} aria-label={`${signal.label} 상세 보기`}>
-                            <span className="signal-group-head">
-                              <span className="signal-icon"><Icon size={15} /></span>
-                              <strong>{signal.label}</strong>
-                              <span className="signal-share"><ChevronRight className="signal-disclosure" size={12} /></span>
-                            </span>
-                            <span className="signal-events">
-                              {signal.topics.slice(0, 2).map((topic) => {
-                                const importance = importanceScore(topic.importance);
-                                return <span key={topic.title}><span><strong>{topic.title}</strong><small>근거 {topic.sources?.length ?? 0}개</small></span><b aria-label={`중요도 ${importance}점`}>{"★".repeat(importance)}{"☆".repeat(3 - importance)}</b></span>;
-                              })}
-                            </span>
-                            <span className="signal-track" aria-hidden="true">
-                              {signal.topics.slice(0, 2).map((topic) => <i key={topic.title} />)}
-                            </span>
+              <div className="market-layout">
+                <aside className="symbol-sidebar" aria-label="종목 선택">
+                  <div className="symbol-search">
+                    <div className="symbol-search-row">
+                      <input type="search" value={symbolQuery} onChange={(event) => setSymbolQuery(event.target.value)} placeholder="종목 검색" aria-label="종목 검색" />
+                    </div>
+                    {symbolQuery.trim() && (
+                      <div className="search-results" aria-live="polite">
+                        {symbolSearching ? (
+                          <p className="search-empty">검색 중…</p>
+                        ) : symbolResults.length ? symbolResults.map((item) => (
+                          <button key={item.ticker} className="search-result" type="button" onClick={() => selectSymbol({ ticker: item.ticker, name: item.name })}>
+                            <span><strong>{item.name}</strong><small>{item.ticker}</small></span>
                           </button>
-                        </article>
-                      );
-                    })}
-                  </div>
-                </section>
-
-                <section className="panel chart-panel">
-                  <div className="market-overview">
-                    <article className="market-overview-primary kospi-classic-primary">
-                      <div className="kospi-head">
-                        <div>
-                          <div className="kospi-title-line"><span>코스피</span></div>
-                          <div className="kospi-value-line"><b>{formatIndexValue(kospiValue)}</b><strong className={kospiTone}>{formatSignedIndex(kospiChange)} ({Math.abs(kospiRate).toFixed(2)}%)</strong></div>
-                        </div>
-                        <div className="scenario-preview-meta">
-                          <span>선택 시나리오</span>
-                          <button className="scenario-preview-card" type="button" onClick={() => openScenarioDetail(selectedScenario)} aria-label={`${selectedScenario.title} 상세 보기`}>
-                            <strong>{selectedScenario.title}</strong>
-                            <b className={selectedScenario.tone}>{selectedScenario.forecast}</b>
-                          </button>
-                        </div>
+                        )) : <p className="search-empty">검색 결과가 없습니다.</p>}
                       </div>
-                      <ForecastChart scenario={selectedScenario} marketData={kospiData} liveSeries={liveKospi} />
-                    </article>
-                    <div className="market-overview-side">
-                      {marketOverview.slice(1).map((item) => {
-                        const live = intradayIndices.find((index) => index.name === item.name);
-                        const latest = live?.points.at(-1);
-                        const values = live?.points.map((point) => point.close) ?? item.points;
-                        const rate = latest?.changePct;
-                        const previousClose = latest && typeof rate === "number" && rate !== -100 ? latest.close / (1 + rate / 100) : latest?.close;
-                        const change = latest && previousClose !== undefined ? latest.close - previousClose : undefined;
-                        const tone = rate === undefined ? item.tone : rate >= 0 ? "up" : "down";
+                    )}
+                  </div>
+                  <div className="symbol-list">
+                    {watchlist.map((item) => (
+                      <div className="symbol-row" key={item.ticker}>
+                        <button className="symbol" type="button" aria-pressed={selectedSymbol.ticker === item.ticker} onClick={() => setSelectedSymbol(item)}>
+                          <span className="symbol-mark"><em>{item.name.slice(0, 1)}</em><img src={`/stock-logos/${item.ticker}.png`} alt="" onError={(event) => { event.currentTarget.style.display = "none"; }} /></span>
+                          <span className="symbol-name"><strong>{item.name}</strong><small>{item.ticker}</small></span>
+                        </button>
+                        {watchlist.length > 1 && <button className="symbol-remove" type="button" aria-label={`${item.name} 제거`} onClick={() => removeSymbol(item.ticker)}>×</button>}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="symbol-connection">
+                    <div className="symbol-connection-heading"><span>DATA COVERAGE</span><strong>{selectedSymbol.name} 데이터 연결</strong></div>
+                    {tickerSourcesError ? (
+                      <p className="symbol-connection-empty">데이터 준비 중입니다.</p>
+                    ) : tickerSources ? (
+                      tickerSources.length ? tickerSources.map((source) => {
+                        const Icon = tickerSourceIcons[source.key];
                         return (
-                          <article className="market-overview-mini" key={item.key}>
-                            <MarketLineChart values={values} name={`${item.name} 당일`} />
-                            <div>
-                              <header><span>{item.name}</span></header>
-                              <div className="market-overview-mini-value">
-                                <b>{latest ? formatIndexValue(latest.close) : item.value}</b>
-                                <span className={tone}>
-                                  {change === undefined || rate === undefined
-                                    ? `${item.change} (${item.rate})`
-                                    : `${formatSignedIndex(change)} (${Math.abs(rate).toFixed(2)}%)`}
-                                </span>
-                              </div>
-                            </div>
+                          <article key={source.key} className={`symbol-source ${source.status}`}>
+                            <header><Icon size={12} /><strong>{source.label}</strong><em>{source.status === "ready" ? "READY" : "MISSING"}</em></header>
+                            <b>{source.count.toLocaleString("ko-KR")}<small>{source.unit}</small></b>
+                            <p>{source.detail}</p>
                           </article>
                         );
-                      })}
-                    </div>
-                  </div>
-                  <div className={`ai-summary ${marketBriefExpanded ? "expanded" : ""}`}>
-                    <Sparkles size={17} />
-                    <button className="ai-summary-copy" type="button" aria-expanded={marketBriefExpanded} aria-label={`AI 요약 전문 ${marketBriefExpanded ? "접기" : "보기"}`} onClick={() => setMarketBriefExpanded((expanded) => !expanded)}>
-                      <strong>AI 요약</strong>
-                      <p>{marketBrief.map((line) => <span key={line}>{line}</span>)}</p>
-                    </button>
-                  </div>
-                </section>
-
-                <aside className="panel event-panel">
-                  <div className="panel-title"><div><span>가상 시뮬레이션</span><h2>발생 가능 이벤트</h2></div><span className="scenario-period">{selectedScenario.duration}</span></div>
-                  <div className="event-timeline">
-                    {selectedScenario.events.map((event) => (
-                      <article key={event.title}>
-                        <div className="event-week">{event.week}</div>
-                        <div className="event-dot" />
-                        <div className="event-copy">
-                          <span>{event.category}</span>
-                          <h3>{event.title}</h3>
-                          <p>{event.body}</p>
-                          <div className="event-impact">
-                            <span>예상 영향</span>
-                            <strong className={event.impact.startsWith("+") ? "up" : "down"}>{event.impact}</strong>
-                          </div>
-                          <button type="button" aria-label={`${event.title} 시나리오에 포함됨`}>
-                            <span>시나리오에 포함됨</span>
-                            <Bookmark size={14} />
-                          </button>
-                        </div>
-                      </article>
+                      }) : <p className="symbol-connection-empty">데이터 준비 중입니다.</p>
+                    ) : Array.from({ length: 4 }).map((_, index) => (
+                      <article key={index} className="symbol-source waiting"><LoaderCircle size={12} className="spin" /></article>
                     ))}
                   </div>
                 </aside>
+                <div className="market-content">
+              <header className="page-heading">
+                <div><span>MARKET INSIGHT</span><h1>시장의 주요 지표는 다음과 같이 움직였습니다.</h1></div>
+                <div className="market-stamp"><CalendarDays size={15} />{kospiAsOfLabel} 최신 기준</div>
+              </header>
+
+              <section className="market-indicators" aria-label="시장 주요 지표">
+                <div className="indicator-grid">
+                  {marketOverview.map((item) => {
+                    const isKospi = item.key === "KOSPI";
+                    const live = intradayIndices.find((index) => index.name === item.name);
+                    const latest = live?.points.at(-1);
+                    const values = isKospi ? undefined : (live?.points.map((point) => point.close) ?? item.points);
+                    const rate = isKospi ? kospiRate : latest?.changePct;
+                    const previousClose = !isKospi && latest && typeof rate === "number" && rate !== -100 ? latest.close / (1 + rate / 100) : latest?.close;
+                    const change = isKospi ? kospiChange : (latest && previousClose !== undefined ? latest.close - previousClose : undefined);
+                    const tone = rate === undefined ? item.tone : rate >= 0 ? "up" : "down";
+                    return (
+                      <article className="indicator-tile" data-tone={tone} key={item.key}>
+                        <header>
+                          <h3>{item.name}</h3>
+                          <strong>{isKospi ? formatIndexValue(kospiValue) : latest ? formatIndexValue(latest.close) : item.value}</strong>
+                        </header>
+                        <div className="indicator-change">
+                          {change === undefined || rate === undefined ? (
+                            <><b className={tone}>{item.change}</b><span>{item.rate}</span></>
+                          ) : (
+                            <><b className={tone}>{formatSignedIndex(change)}</b><span>{Math.abs(rate).toFixed(2)}%</span></>
+                          )}
+                        </div>
+                        <div className="indicator-spark"><MarketLineChart values={isKospi ? actualPath.slice(-20) : values ?? []} name={`${item.name} 당일`} /></div>
+                      </article>
+                    );
+                  })}
+                </div>
               </section>
 
+              <div className="page-heading stock-condition-heading">
+                <div><h1><span className="stock-heading-symbol">{selectedSymbol.name}</span>, 당신이 선택한 조건에서 어떻게 움직일까요?</h1></div>
+              </div>
               <section className="scenario-section">
-                <div className="scenario-heading"><div><span>SCENARIO LIBRARY</span><h2>시나리오별 KOSPI 경로를 비교하세요</h2><p>준비된 시장 환경을 선택하면 발생 가능 이벤트와 조건부 예상 경로가 열립니다.</p></div><span><CircleDollarSign size={15} />가상 시뮬레이션</span></div>
                 <div className="scenario-grid">
-                  {scenarios.map((scenario) => (
-                    <article key={scenario.id} className={`scenario-card ${scenario.id} ${selectedScenario.id === scenario.id ? "active" : ""}`} onMouseDown={(event) => event.preventDefault()} onClick={() => selectScenario(scenario)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") selectScenario(scenario); }} role="button" tabIndex={0} aria-pressed={selectedScenario.id === scenario.id}>
-                      <div className="scenario-card-main">
-                        <span className={`scenario-icon ${scenario.tone}`}>
-                          {scenario.id === "kospi-rebound" ? <BarChart3 size={22} /> : scenario.id === "chip-miss" ? <BrainCircuit size={22} /> : scenario.id === "risk-off" ? <CircleDollarSign size={22} /> : <UserRound size={22} />}
-                        </span>
-                        <div>
-                          <h3>{scenario.title}</h3>
-                          <div className="scenario-tags"><span>{scenario.duration}</span>{scenario.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
-                        </div>
+                  {scenarios.map((scenario, index) => (
+                    <article key={scenario.id} className={`scenario-card ${scenario.tone} ${selectedScenario.id === scenario.id ? "active" : ""}`} onMouseDown={(event) => event.preventDefault()} onClick={() => selectScenario(scenario)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") selectScenario(scenario); }} role="button" tabIndex={0} aria-pressed={selectedScenario.id === scenario.id}>
+                      <div className="scenario-card-head">
+                        <span className="scenario-card-index">{String(index + 1).padStart(2, "0")}</span>
+                        <span className="scenario-card-meta"><i>{scenario.duration}</i><em className={scenario.tone}>{scenario.forecast.replace(/^KOSPI\s*/, "")}</em></span>
                       </div>
-                      <small>조건부 예상</small>
-                      <strong className={scenario.tone}>{scenario.forecast}</strong>
-                      <button className="scenario-card-detail-button" type="button" onClick={(event) => { event.stopPropagation(); openScenarioDetail(scenario); }}>상세 보기 <ChevronRight size={15} /></button>
+                      <div className="scenario-card-body">
+                        <strong>{scenario.title}</strong>
+                        <small>{scenario.tags.join(" · ")}</small>
+                      </div>
+                      <div className={`scenario-card-action ${scenario.tone}`}>
+                        <button type="button" onClick={(event) => { event.stopPropagation(); openScenarioDetail(scenario); }}>시나리오 상세</button>
+                      </div>
                     </article>
                   ))}
-                  <button className="custom-scenario-card" onClick={openBuilder}>
-                    <Plus size={24} /><div><strong>내 시나리오 예측하기</strong><p>원하는 시장 조건과 기간을 직접 선택하세요.</p></div><ArrowRight size={18} />
-                  </button>
-                  <button className="paper-trading-card" type="button" onClick={() => setPaperTradingOpen(true)}>
-                    <span><CircleDollarSign size={21} /></span>
-                    <div><strong>모의 투자로 연습하기</strong><p>실제 KOSPI 시세 위에서 아직 공개되지 않은 이벤트를 마주하며 매매 판단을 훈련합니다.</p></div>
-                    <ArrowRight size={18} />
-                  </button>
+                  <article className="custom-scenario-card">
+                    <button type="button" onClick={() => setPaperTradingOpen(true)}>
+                      <Plus size={26} />
+                      <span>내가 생각한<br />시나리오로 보기</span>
+                    </button>
+                  </article>
                 </div>
+
+                <section className="panel chart-panel conditional-chart">
+                  <header className="chart-title-row">
+                    <div><h2>시나리오 - <span>{selectedSymbol.name} {selectedScenario.title}</span></h2></div>
+                    <div className={`chart-meta ${selectedScenario.tone}`}><span>{selectedScenario.duration}</span><strong>{selectedScenario.forecast.replace(/^KOSPI\s*/, "")}</strong></div>
+                  </header>
+                  <div className="chart-content">
+                    <div className={`chart-wrap ${symbolCandles?.ticker === selectedSymbol.ticker ? "" : "loading"}`}>
+                      <ForecastChart scenario={selectedScenario} marketData={symbolCandles?.ticker === selectedSymbol.ticker ? symbolCandles.data : symbolCandles?.data ?? kospiData} />
+                      {symbolCandles?.ticker !== selectedSymbol.ticker && <div className="chart-loading-overlay"><LoaderCircle size={18} className="spin" /><span>{selectedSymbol.name} 데이터 불러오는 중…</span></div>}
+                    </div>
+                    <aside className="event-rail" aria-label="발생 가능 이벤트">
+                      <header><h2>발생 가능 이벤트</h2><span>{selectedScenario.duration}</span></header>
+                      <div className="event-timeline">
+                        {selectedScenario.events.map((event) => (
+                          <article key={event.title}>
+                            <div className="event-week">{event.week}</div>
+                            <div className="event-dot" />
+                            <div className="event-copy">
+                              <span>{event.category}</span>
+                              <h3>{event.title}</h3>
+                              <p>{event.body}</p>
+                              <div className="event-impact">
+                                <span>예상 영향</span>
+                                <strong className={event.impact.startsWith("+") ? "up" : "down"}>{event.impact}</strong>
+                              </div>
+                              <button type="button" aria-label={`${event.title} 시나리오에 포함됨`}>
+                                <span>시나리오에 포함됨</span>
+                                <Bookmark size={14} />
+                              </button>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    </aside>
+                  </div>
+                </section>
+
                 <span className="visually-hidden">SELECTED SCENARIO · 시나리오 전제 · 예상 전개</span>
 
                 {false && <section className="scenario-detail" id="scenario-detail" aria-live="polite" aria-label="선택한 시나리오 상세 내용">
@@ -2357,14 +3048,15 @@ export default function Home() {
                   </section>
                 </section>}
               </section>
+                </div>
+              </div>
             </div>
-          ) : <TwinPage selectedScenario={selectedScenario} onSelectScenario={setSelectedScenario} onOpenBuilder={openBuilder} />}
-        </main>
-      </div>
+          ) : <TwinPage />}
+      </main>
 
       <nav className="mobile-tabs" aria-label="모바일 주요 메뉴">
         <button className={activeTab === "market" ? "active" : ""} onClick={() => activateTab("market")}><BarChart3 size={18} /><span>시장 인사이트</span></button>
-        <button className={activeTab === "twin" ? "active" : ""} onClick={() => activateTab("twin")}><UserRound size={18} /><span>마이 금융 트윈</span></button>
+        <button className={activeTab === "twin" ? "active" : ""} onClick={() => activateTab("twin")}><UserRound size={18} /><span>나의 투자 일지</span></button>
       </nav>
 
       {builderOpen && (
