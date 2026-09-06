@@ -2072,8 +2072,8 @@ function SetupScreen({
                       {agent.strategies.slice(0, 4).map((strategy) => <span key={strategy}>{agentStrategyLabel(strategy)}</span>)}
                     </div>
                     <div className="paper-agent-actions" aria-label={`${agent.label} 가능한 행동`}>
-                      <strong>가능한 행동</strong>
-                      <div>{GROUP_ACTION_LABELS[agent.key].map((action) => <span key={action}>{action}</span>)}</div>
+                      <span className="paper-agent-actions-label">가능한 행동</span>
+                      <div>{GROUP_ACTION_LABELS[agent.key].map((action) => <span className="paper-agent-action-chip" key={action}>{action}</span>)}</div>
                     </div>
                     <dl className="paper-agent-metrics">
                       <div><dt>위험 허용</dt><dd>{agent.average_risk_tolerance.toFixed(2)}</dd></div>
