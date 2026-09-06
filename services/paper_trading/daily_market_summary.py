@@ -23,6 +23,21 @@ GROUP_LABELS = {
     "pension": "연기금",
 }
 
+# 화면의 범주별 요약은 전체 시장 주문 통계가 아니라 대표 에이전트 표본의
+# 방향성을 설명하는 영역이다. LLM이 입력 수치를 그대로 되풀이해도 사용자가
+# 실제 시장 건수로 오해하지 않도록 건수 단위 표현을 제거한다.
+_GROUP_COUNT_PATTERN = re.compile(r"(매수세|매도세|매수|매도|관망)\s*[0-9][0-9,]*\s*(?:건|명|개)")
+
+
+def _sanitize_group_action(value: Any) -> str:
+    text = str(value or "").strip()
+    return _GROUP_COUNT_PATTERN.sub(
+        lambda match: {
+            "매수세": "매수 우위 흐름", "매도세": "매도 우위 흐름",
+            "매수": "매수 흐름", "매도": "매도 흐름", "관망": "관망 흐름",
+        }[match.group(1)], text
+    )
+
 
 def _number(value: Any) -> float:
     try:
@@ -142,12 +157,15 @@ def _fallback_detail(payload: dict[str, Any], reason: str | None = None) -> dict
     group_actions: dict[str, str] = {}
     for group, label in GROUP_LABELS.items():
         row = groups.get(group) or {}
-        group_actions[group] = (
-            f"매수 {int(row.get('buy_count', 0))}명·매도 {int(row.get('sell_count', 0))}명·"
-            f"관망 {int(row.get('hold_count', 0))}명. "
-            f"매수 {_won(_number(row.get('buy_notional')))}, "
-            f"매도 {_won(_number(row.get('sell_notional')))}"
-        )
+        buy = _number(row.get("buy_notional"))
+        sell = _number(row.get("sell_notional"))
+        if buy > sell:
+            direction = "매수 우위 흐름"
+        elif sell > buy:
+            direction = "매도 우위 흐름"
+        else:
+            direction = "관망 또는 방향성 혼재 흐름"
+        group_actions[group] = f"{direction}. 대표 참여자들의 수급 방향과 판단 배경을 종합한 결과임."
     components = payload.get("price_components_pct") or {}
     drivers = [
         f"수급 { _pct(components.get('flow'))}",
@@ -182,13 +200,16 @@ def generate_daily_market_summary(
             "content": (
                 "한국 주식 교육용 모의투자의 장 마감 해설자다. 실제 시장 예측이나 투자 권유를 하지 말고, "
                 "제공된 시뮬레이션 집계만 근거로 오늘의 결과를 설명한다. 반드시 JSON 객체만 반환한다. "
-                "그룹 키는 retail, foreign, institution, pension을 그대로 사용한다."
+                "그룹 키는 retail, foreign, institution, pension을 그대로 사용한다. "
+                "각 그룹은 전체 시장의 대표 표본이므로 실제 시장의 주문 건수나 참여자 수가 아니다. "
+                "group_actions에는 매수세·매도세·관망의 건수, 명수, 개수를 절대 쓰지 말고, "
+                "매수 우위·매도 우위·관망·방향성 혼재 같은 전반적 흐름과 주요 판단 배경만 설명한다."
             ),
         },
         {
             "role": "user",
             "content": f"""다음은 {payload['stock']}의 {payload['market_date']} 거래일이 체결된 뒤의 집계다.
-개인·외국인·기관·연기금이 어떤 방향으로 행동했는지 각각 설명하고, 그 주문 흐름·가격 구성요소·공개 이벤트·환경을 바탕으로 주가가 왜 변했는지 추론하라. 확인되지 않은 원인을 사실처럼 단정하지 말고 '추론'으로 표현하라.
+개인·외국인·기관·연기금이 어떤 방향으로 행동했는지 각각 설명하고, 그 주문 흐름·가격 구성요소·공개 이벤트·환경을 바탕으로 주가가 왜 변했는지 추론하라. 각 그룹은 전체 시장의 대표 표본이므로 주문 건수나 에이전트 수를 시장 전체 수치처럼 쓰지 말라. group_actions에는 건수·명수·개수 표현을 넣지 말고 전반적인 방향성, 주요 행동, 판단 배경만 작성하라. 확인되지 않은 원인을 사실처럼 단정하지 말고 '추론'으로 표현하라.
 
 {json.dumps(payload, ensure_ascii=False)}
 
@@ -213,7 +234,7 @@ def generate_daily_market_summary(
         if not isinstance(group_actions, dict):
             group_actions = {}
         normalized_groups = {
-            group: str(group_actions.get(group) or _fallback_detail(payload)["group_actions"][group]).strip()
+            group: _sanitize_group_action(group_actions.get(group) or _fallback_detail(payload)["group_actions"][group])
             for group in GROUP_LABELS
         }
         uncertainties = parsed.get("uncertainties")
