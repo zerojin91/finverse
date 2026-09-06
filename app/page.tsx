@@ -33,6 +33,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { ChangeEvent, CSSProperties, FormEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation";
 import { PaperTradingModal, type Security } from "@/components/paper-trading";
+import { AuthModal, useAuthUser } from "@/components/auth";
 import { MockMarketSimulation } from "@/components/mock-market-simulation";
 
 const SimulationMessageResponse = dynamic(
@@ -1958,7 +1959,7 @@ function TwinCandleChart({ detail }: { detail: TwinGameDetail }) {
   );
 }
 
-function TwinPage() {
+function TwinPage({ onRequireAuth }: { onRequireAuth?: (action: () => void) => void }) {
   const [games, setGames] = useState<TwinGameSummary[]>([]);
   const [gamesState, setGamesState] = useState<"loading" | "ready" | "error">("loading");
   const [twinSessions, setTwinSessions] = useState<TwinSession[]>([]);
@@ -2036,7 +2037,11 @@ function TwinPage() {
   const cappedNotice = games.length > TWIN_ASSESSMENT_CAP;
   const selectedSummary = games.find((game) => game.game_id === selectedGameId);
   const selectedDetail = selectedGameId ? gameDetails[selectedGameId] : undefined;
-  const openPaperTrading = () => setJournalPaperTradingOpen(true);
+  const openPaperTrading = () => {
+    const open = () => setJournalPaperTradingOpen(true);
+    if (onRequireAuth) onRequireAuth(open);
+    else open();
+  };
 
   return (
     <div className="journal-page">
@@ -2188,7 +2193,7 @@ function TwinPage() {
   );
 }
 
-function MockNavigation({ activeTab, onActivate }: { activeTab: MainTab; onActivate: (tab: MainTab) => void }) {
+function MockNavigation({ activeTab, onActivate, onLogin }: { activeTab: MainTab; onActivate: (tab: MainTab) => void; onLogin: () => void }) {
   return (
     <header className="mock-journal-header">
       <button className="mock-journal-brand" type="button" onClick={() => onActivate("market")} aria-label="FINVERSE 홈">
@@ -2198,7 +2203,7 @@ function MockNavigation({ activeTab, onActivate }: { activeTab: MainTab; onActiv
         <button type="button" onClick={() => onActivate("market")} aria-current={activeTab === "market" ? "page" : undefined}>시장 시뮬레이션</button>
         <button type="button" onClick={() => onActivate("twin")} aria-current={activeTab === "twin" ? "page" : undefined}>나의 투자 일지</button>
       </nav>
-      <button className="mock-journal-login" type="button" aria-label="로그인">로그인</button>
+      <button className="mock-journal-login" type="button" onClick={onLogin} aria-label="로그인">로그인</button>
     </header>
   );
 }
@@ -2206,6 +2211,18 @@ function MockNavigation({ activeTab, onActivate }: { activeTab: MainTab; onActiv
 export default function Home() {
   const [activeTab, setActiveTab] = useState<MainTab>("market");
   const [paperTradingOpen, setPaperTradingOpen] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authIntent, setAuthIntent] = useState<(() => void) | null>(null);
+  const { user: authUser, refresh: refreshAuthUser } = useAuthUser();
+
+  const requireAuth = (action: () => void) => {
+    if (authUser) {
+      action();
+      return;
+    }
+    setAuthIntent(() => action);
+    setAuthOpen(true);
+  };
   const [kospiData, setKospiData] = useState<KospiMarketData | null>(null);
   const [intradayIndices, setIntradayIndices] = useState<IntradayIndex[]>([]);
   const [dashboardSignals, setDashboardSignals] = useState<DashboardSignal[]>(marketSignals);
@@ -2398,6 +2415,28 @@ export default function Home() {
     setActiveTab(tab);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  const activateProtectedTab = (tab: MainTab) => {
+    if (tab === "twin") {
+      requireAuth(() => activateTab(tab));
+      return;
+    }
+    activateTab(tab);
+  };
+
+  const authModal = authOpen ? (
+    <AuthModal
+      onClose={() => { setAuthOpen(false); setAuthIntent(null); }}
+      onAuthenticated={() => {
+        refreshAuthUser();
+        setAuthOpen(false);
+        if (authIntent) {
+          authIntent();
+          setAuthIntent(null);
+        }
+      }}
+    />
+  ) : null;
 
   const selectSymbol = (item: WatchSymbol) => {
     setSelectedSymbol(item);
@@ -2766,14 +2805,15 @@ export default function Home() {
   if (activeTab === "market") {
     return (
       <div className="mock-journal-app">
-        <MockNavigation activeTab={activeTab} onActivate={activateTab} />
+        <MockNavigation activeTab={activeTab} onActivate={activateProtectedTab} onLogin={() => setAuthOpen(true)} />
         <MockMarketSimulation
-          onOpenJournal={() => activateTab("twin")}
-          onOpenJudgement={() => setPaperTradingOpen(true)}
-          onOpenLogin={() => undefined}
+          onOpenJournal={() => requireAuth(() => activateTab("twin"))}
+          onOpenJudgement={() => requireAuth(() => setPaperTradingOpen(true))}
+          onOpenLogin={() => setAuthOpen(true)}
           hideHeader
         />
         {paperTradingOpen && <PaperTradingModal onClose={() => setPaperTradingOpen(false)} />}
+        {authModal}
       </div>
     );
   }
@@ -2781,10 +2821,11 @@ export default function Home() {
   if (activeTab === "twin") {
     return (
       <div className="mock-journal-app">
-        <MockNavigation activeTab={activeTab} onActivate={activateTab} />
+        <MockNavigation activeTab={activeTab} onActivate={activateProtectedTab} onLogin={() => setAuthOpen(true)} />
         <main className="mock-journal-main">
-          <TwinPage />
+          <TwinPage onRequireAuth={requireAuth} />
         </main>
+        {authModal}
       </div>
     );
   }
