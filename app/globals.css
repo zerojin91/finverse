@@ -1797,6 +1797,15 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .paper-report-tabs button { min-height: 42px; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); background: #fff; font-family: inherit; font-size: 11px; font-weight: 750; cursor: pointer; }
 .paper-report-tabs button.active { border-color: var(--ink); color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
 .paper-report-tabs button:disabled { cursor: not-allowed; opacity: .45; }
+.journal-stored-reports { display: grid; gap: 10px; margin-top: 18px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+.journal-stored-reports-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.journal-stored-reports-head h4 { margin: 0; color: var(--ink); font-size: 14px; }
+.journal-stored-reports-head span { color: var(--light); font-size: 10px; }
+.journal-stored-report-tabs { display: flex; gap: 6px; }
+.journal-stored-report-tabs button { min-height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 7px; color: var(--muted); background: #fff; font: inherit; font-size: 11px; font-weight: 750; cursor: pointer; }
+.journal-stored-report-tabs button.active { border-color: var(--ink); color: var(--ink); }
+.journal-stored-report-tabs button:disabled { cursor: not-allowed; opacity: .45; }
+.journal-stored-report-markdown { max-height: 620px; overflow: auto; margin: 0; padding: 14px; border-radius: 8px; color: var(--ink); background: #fafafa; white-space: pre-wrap; font-size: 12px; line-height: 1.8; }
 .paper-completed-reports-heading span,.paper-report-card header span { color: #ef4444; font-size: 8px; font-weight: 900; letter-spacing: .1em; }
 .paper-completed-reports-heading h2 { margin: 5px 0 3px; color: var(--ink); font-size: 19px; letter-spacing: -.03em; }
 .paper-completed-reports-heading p { margin: 0; color: var(--muted); font-size: 10px; }

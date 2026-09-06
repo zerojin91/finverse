@@ -43,12 +43,14 @@ REQUIRED_REPORT_KEYS = ("executive_summary", "investor_profile", "event_reviews"
 REPORT_ATTEMPTS = 3
 
 
-def _load_report_documents() -> tuple[str, str]:
+def _load_report_documents() -> tuple[str, str, str, str]:
     """Load the user-owned report contract and analysis instructions."""
     docs_dir = Path(__file__).resolve().parents[2] / "docs"
-    template = (docs_dir / "report-template.md").read_text(encoding="utf-8")
-    agent = (docs_dir / "report-agent.md").read_text(encoding="utf-8")
-    return template, agent
+    result_template = (docs_dir / "report-result-template.md").read_text(encoding="utf-8")
+    scenario_template = (docs_dir / "report-scenario-template.md").read_text(encoding="utf-8")
+    behavior_agent = (docs_dir / "report-agent.md").read_text(encoding="utf-8")
+    simulation_agent = (docs_dir / "simulation-report-agent.md").read_text(encoding="utf-8")
+    return result_template, scenario_template, behavior_agent, simulation_agent
 
 
 def _compact_agent_rounds(game: dict[str, Any]) -> list[dict[str, Any]]:
@@ -63,7 +65,8 @@ def _compact_agent_rounds(game: dict[str, Any]) -> list[dict[str, Any]]:
         actions = []
         for order in row.get("persona_orders") or []:
             actions.append({key: order.get(key) for key in
-                            ("persona_id", "group", "side", "quantity", "filled_quantity", "notional")})
+                            ("persona_id", "group", "side", "quantity", "filled_quantity", "notional",
+                             "confidence", "rationale")})
         rounds.append({
             "market_date": row.get("market_date"), "phase": row.get("phase"),
             "return_pct": row.get("return_pct"), "previous_price": row.get("previous_price"),
@@ -73,6 +76,44 @@ def _compact_agent_rounds(game: dict[str, Any]) -> list[dict[str, Any]]:
             "actions": actions,
         })
     return rounds
+
+
+def _world_event_catalog(game: dict[str, Any]) -> list[dict[str, Any]]:
+    """Expose the completed World Agent event record without leaking user data."""
+    world = game.get("world") or {}
+    memory = world.get("memory") or {}
+    events = memory.get("event_ledger") or game.get("revealed_events") or []
+    allowed = ("event_id", "sequence", "event_date", "title", "description", "category",
+               "scope", "direction", "surprise_level", "uncertainty", "expected_persistence",
+               "transmission_mechanism", "historical_source_events", "retrieval_sources",
+               "ontology_source", "market_reaction", "status")
+    return [{key: event.get(key) for key in allowed if key in event} for event in events]
+
+
+def _scenario_report_context(game: dict[str, Any], assessment: dict[str, Any]) -> dict[str, Any]:
+    """Build a pure market/world context for the scenario report.
+
+    The result deliberately has no user order, reflection, portfolio, or PnL
+    fields.  This keeps the market scenario reusable for the same game while
+    allowing the learner report to stay account-specific.
+    """
+    world = game.get("world") or {}
+    memory = world.get("memory") or {}
+    return {
+        "scenario_id": game.get("game_id"),
+        "security": {"ticker": game.get("ticker"), "name": game.get("name")},
+        "simulation_days": game.get("simulation_days"),
+        "initial_context": game.get("initial_context"),
+        "world_state_daily_memory": memory.get("daily_ledger") or [],
+        "world_event_catalog": _world_event_catalog(game),
+        "revealed_events": game.get("revealed_events") or [],
+        "market_path": [{key: point.get(key) for key in
+                         ("step", "label", "market_date", "phase", "price", "open", "high", "low", "close",
+                          "return_pct", "volume")}
+                        for point in game.get("price_history") or []],
+        "agent_rounds_and_all_actions": _compact_agent_rounds(game),
+        "market_assessment": assessment,
+    }
 
 
 def _report_context(game: dict[str, Any]) -> dict[str, Any]:
@@ -141,20 +182,22 @@ def generate_llm_reports(game: dict[str, Any],
         from .llm_client import LLMClient
         chat = LLMClient().chat
     context = _report_context(game)
-    report_template, report_agent = _load_report_documents()
+    result_template, scenario_template, behavior_agent, simulation_agent = _load_report_documents()
+    scenario_context = _scenario_report_context(game, context["verified_assessment"])
     common = ("한국 주식 교육용 가상 시뮬레이션이다. 실제 투자 권유나 미래 예측을 하지 않는다. "
               "입력의 금액과 퍼센트는 엔진이 계산한 검증값이므로 임의로 바꾸지 않는다. "
               "근거가 없는 심리 특성은 단정하지 말고 기록에서 확인되는 행동 패턴으로만 설명한다. "
               "반드시 JSON 객체만 반환한다. 아래 분석 에이전트 지침을 따른다.\n\n"
-              f"[report-agent.md]\n{report_agent}")
+              f"[report-agent.md]\n{behavior_agent}\n\n"
+              f"[simulation-report-agent.md]\n{simulation_agent}")
     # Keep the legacy JSON contract required so older/mock providers can still
     # complete a run; report_markdown is preferred and the UI has a fallback.
     investment_keys = ["summary", "daily_action_review", "behavior_pattern", "strengths", "risk_patterns", "next_practice", "report_markdown"]
     scenario_keys = ["summary", "environment_evolution", "event_reviews", "stock_flow", "group_behavior", "key_turning_points"]
     investment_message = {"role": "user", "content": (
         f"다음 기록으로 사용자의 투자보고서를 작성하라.\n{json.dumps(context, ensure_ascii=False)}\n"
-        f"다음 report-template.md의 목차·순서·표 구조를 지켜 report_markdown으로 완성된 한국어 Markdown 보고서를 반환하라. "
-        f"템플릿의 {{...}} 변수는 실제 입력 기록으로 모두 치환하고 남겨두지 마라.\n\n[report-template.md]\n{report_template}\n\n"
+        f"다음 report-result-template.md의 목차·순서·표 구조를 지켜 report_markdown으로 완성된 한국어 Markdown 보고서를 반환하라. "
+        f"템플릿의 {{...}} 변수는 실제 입력 기록으로 모두 치환하고 남겨두지 마라.\n\n[report-result-template.md]\n{result_template}\n\n"
         "사용자가 날짜별로 매수·매도·관찰을 어떻게 선택했는지, 최종 투자금액과 종료일 가격 기준 손익을 설명하라. "
         "investor_type은 행동 기록과 템플릿 기준을 종합해 anchor, adapter, defender, chaser 중 정확히 하나를 선택하라. "
         "daily_action_review는 날짜별 1~2문장 배열로 작성하라. 반환 형식: "
@@ -162,24 +205,28 @@ def generate_llm_reports(game: dict[str, Any],
         '"behavior_pattern":"종합 행동 패턴", "strengths":["잘한 점"], "risk_patterns":["주의할 점"], "next_practice":["다음 연습 원칙"], "report_markdown":"완성된 template.md 전체"}'
     )}
     scenario_message = {"role": "user", "content": (
-        f"다음 기록으로 시나리오 보고서를 작성하라.\n{json.dumps(context, ensure_ascii=False)}\n"
-        "World State의 거래일별 변화, 실제 유사 근거로 생성된 이벤트, 사건 전후 종목 흐름, "
-        "개인·외국인·기관·연기금의 집단 행동과 모든 개별 행동 기록을 종합하라. "
+        f"다음 순수 시장 기록으로 시나리오 보고서를 작성하라.\n{json.dumps(scenario_context, ensure_ascii=False)}\n"
+        "사용자·개인 투자·손익·성향·사전 테스트를 언급하지 마라. World State의 거래일별 변화, 실제 유사 근거로 생성된 이벤트, "
+        "사건 전후 종목 흐름, 개인·외국인·기관·연기금의 집단 행동과 모든 개별 행동 기록을 종합하라. "
+        "각 주요 전환점에는 선행 시장 상태 → 사건 또는 수급 변화 → 가격/시장 상태 결과의 연결을 넣어라. "
+        f"다음 report-scenario-template.md의 목차·순서·표 구조를 지켜 report_markdown으로 완성된 한국어 Markdown을 반환하라. "
+        f"템플릿의 {{...}} 변수는 실제 입력 기록으로 모두 치환하고 남겨두지 마라.\n\n[report-scenario-template.md]\n{scenario_template}\n\n"
         "반환 형식: {\"summary\":\"전체 흐름 3~5문장\", \"environment_evolution\":\"환경 변화\", "
         "\"event_reviews\":[{\"date\":\"날짜\",\"event\":\"사건\",\"impact\":\"영향\"}], "
         "\"stock_flow\":\"가격 흐름\", \"group_behavior\":{\"retail\":\"개인\",\"foreign\":\"외국인\",\"institution\":\"기관\",\"pension\":\"연기금\"}, "
-        "\"key_turning_points\":[\"전환점\"]}"
+        "\"key_turning_points\":[\"전환점\"], \"report_markdown\":\"완성된 시나리오 Markdown 전체\"}"
     )}
     investment = _call_structured_report(
         [{"role": "system", "content": common}, investment_message], investment_keys, chat)
     scenario = _call_structured_report(
-        [{"role": "system", "content": common}, scenario_message], scenario_keys, chat)
+        [{"role": "system", "content": common}, scenario_message], [*scenario_keys, "report_markdown"], chat)
     metrics = context["verified_assessment"]["metrics"]
     investment["verified_metrics"] = metrics
     investment["portfolio_at_end"] = context["portfolio_at_end"]
     investment["initial_equity"] = context["initial_equity"]
     investment = enforce_verified_report_metrics(investment, metrics)
     scenario["verified_metrics"] = metrics
+    scenario["scenario_id"] = game.get("game_id")
     return {"investment": investment, "scenario": scenario}
 
 

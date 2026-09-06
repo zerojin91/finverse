@@ -1631,6 +1631,10 @@ type TwinGameDetail = {
   price_history?: TwinPricePoint[];
   revealed_events?: TwinRevealedEvent[];
   portfolio?: { total_return_pct: number };
+  llm_reports?: {
+    investment?: { report_markdown?: string; summary?: string };
+    scenario?: { report_markdown?: string; summary?: string };
+  };
 };
 
 type TwinAssessmentMetrics = {
@@ -1655,6 +1659,24 @@ type TwinAssessment = {
 
 type TwinSession = { game: TwinGameSummary; assessment: TwinAssessment };
 type TwinBar = { key: string; date: string; open: number; high: number; low: number; close: number; real: boolean };
+
+function TwinStoredReports({ reports }: { reports?: TwinGameDetail["llm_reports"] }) {
+  const [tab, setTab] = useState<"investment" | "scenario">("investment");
+  const investment = reports?.investment;
+  const scenario = reports?.scenario;
+  const active = tab === "investment" ? investment : scenario;
+  if (!investment && !scenario) return <p className="journal-history-note">이 실행은 아직 완료된 보고서를 생성하지 않았습니다.</p>;
+  return (
+    <section className="journal-stored-reports" aria-label="저장된 완료 보고서">
+      <div className="journal-stored-reports-head"><h4>저장된 완료 보고서</h4><span>이 계정의 투자 성향 히스토리에 저장됨</span></div>
+      <div className="journal-stored-report-tabs">
+        <button type="button" className={tab === "investment" ? "active" : ""} disabled={!investment} onClick={() => setTab("investment")}>나의 투자 일지</button>
+        <button type="button" className={tab === "scenario" ? "active" : ""} disabled={!scenario} onClick={() => setTab("scenario")}>해당 시나리오</button>
+      </div>
+      {active?.report_markdown ? <article className="journal-stored-report-markdown">{active.report_markdown}</article> : <p className="journal-history-note">저장된 요약: {active?.summary ?? "보고서 내용을 불러오지 못했습니다."}</p>}
+    </section>
+  );
+}
 
 // analyze_scenario_investor()의 4가지 스타일. 관찰형(기본)→사전 포지셔닝→추종→고회전
 // 순서로 매매 개입도가 커진다는 분석 로직 순서를 그대로 pill 음영 단계에 반영한다.
@@ -1977,7 +1999,7 @@ function TwinPage({ onRequireAuth }: { onRequireAuth?: (action: () => void) => v
       .then((data) => {
         if (!active) return;
         const scenarioGames = data
-          .filter((game) => game.mode === "scenario")
+          .filter((game) => game.mode === "scenario" || game.mode === "world")
           .sort((a, b) => (a.created_at ?? a.updated_at ?? "").localeCompare(b.created_at ?? b.updated_at ?? ""));
         setGames(scenarioGames);
         setGamesState("ready");
@@ -2052,7 +2074,7 @@ function TwinPage({ onRequireAuth }: { onRequireAuth?: (action: () => void) => v
       <section className="panel">
         <div className="panel-title">
           <div><h2>현재 나의 투자 성향</h2></div>
-          <span className="panel-note">가장 최근 이벤트 시나리오 모의투자에서 판정된 스타일과, 히스토리 전체의 변화 흐름을 함께 보여줍니다.</span>
+          <span className="panel-note">완료된 모의투자의 나의 투자 일지와 해당 시나리오 보고서를 계정별로 함께 보관합니다.</span>
         </div>
         <div className="journal-summary-body">
           {gamesState === "loading" || (gamesState === "ready" && games.length > 0 && (assessmentsState === "loading" || assessmentsState === "idle")) ? (
@@ -2181,6 +2203,7 @@ function TwinPage({ onRequireAuth }: { onRequireAuth?: (action: () => void) => v
                     </div>
                   </div>
                   <TwinCandleChart detail={selectedDetail} />
+                  <TwinStoredReports reports={selectedDetail.llm_reports} />
                 </>
               )}
             </div>
