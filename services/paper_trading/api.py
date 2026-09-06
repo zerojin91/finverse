@@ -45,7 +45,7 @@ paper_trading_bp = Blueprint("paper_trading", __name__)
 
 # 기간은 총 거래일만 정한다. 사건 수는 World Agent의 상태 기반 hazard가 정한다.
 SIMULATION_DURATION_CONFIG = {
-    1: {"source_window_days": 20},
+    5: {"source_window_days": 30},
     10: {"source_window_days": 40},
     20: {"source_window_days": 60},
     60: {"source_window_days": 75},
@@ -308,7 +308,7 @@ def create_event_scenario():
     ticker = str(data.get("ticker", "")).zfill(6)
     simulation_days = int(data.get("simulation_days", 10))
     if simulation_days not in SIMULATION_DURATION_CONFIG:
-        raise TradingError("시뮬레이션 기간은 1일, 10일, 20일, 60일 중에서 선택해주세요.")
+        raise TradingError("시뮬레이션 기간은 5일, 10일, 20일, 60일 중에서 선택해주세요.")
     investment_mode = str(data.get("investment_mode") or "new").lower()
     if investment_mode not in INVESTMENT_MODES:
         raise TradingError("지원하지 않는 투자 상태입니다.")
