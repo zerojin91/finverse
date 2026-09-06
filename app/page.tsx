@@ -2454,6 +2454,21 @@ function ServiceIntro({ onEnter, onOpenJournal }: { onEnter: () => void; onOpenJ
         <h2>몰라서가 아닙니다. 알면서 못 한 겁니다.</h2>
       </section>
 
+      <section className="intro-smoke-errors">
+        <div className="intro-smoke-wrap">
+          <span className="intro-smoke-tag">금융 현안</span>
+          <h2>불확실한 순간에는,<br />판단 오류가 반복됩니다.</h2>
+          <p className="intro-smoke-errors-lede">시장 급등락과 금리·환율 변화처럼 불확실성이 큰 순간에는 장기 목표와 위험 감내 수준보다 감정과 주변 정보가 먼저 판단을 이끌기 쉽습니다. FINVERSE는 아래와 같은 순간을 안전한 가상 환경에서 먼저 마주하게 합니다.</p>
+          <div className="intro-smoke-error-grid">
+            <article><span>급등</span><h3>“더 오를 것 같아” 추격합니다</h3><p>삼성전자 실적 기대가 커지며 주가가 급등한 날, 놓칠까 봐 불안해 계획보다 큰 비중을 한 번에 매수하는 상황입니다.</p><b>확인할 것 · 이미 반영된 기대와 실적 근거는 다른가?</b></article>
+            <article><span>급락</span><h3>“더 떨어지기 전에” 포기합니다</h3><p>SK하이닉스가 수급 악화나 시장 공포로 하락한 날, 정해둔 기준을 점검하기 전에 공포 매도로 장기 계획을 끝내는 상황입니다.</p><b>확인할 것 · 가격 하락과 투자 근거 훼손을 구분했는가?</b></article>
+            <article><span>미루기</span><h3>기준 점검을 다음으로 미룹니다</h3><p>보유 비중, 현금 여력, 손실 감내 범위는 평소에 정리하지 않고 사건이 터진 뒤에야 대응하려는 상황입니다.</p><b>확인할 것 · 판단 전에 나의 가상 투자 상태를 확인했는가?</b></article>
+            <article><span>추종</span><h3>내 기준보다 타인의 확신을 따릅니다</h3><p>뉴스·커뮤니티·주변 의견이 강해질수록 삼성전자나 SK하이닉스의 흐름을 내 목표와 무관하게 따라가는 상황입니다.</p><b>확인할 것 · 정보의 출처와 내 판단 근거를 분리했는가?</b></article>
+          </div>
+          <p className="intro-smoke-errors-note">종목명은 판단 연습을 위한 예시이며, 특정 종목이나 금융상품의 매수·매도를 권유하지 않습니다.</p>
+        </div>
+      </section>
+
       <section className="intro-smoke-feature">
         <div className="intro-smoke-wrap intro-smoke-feature-grid">
           <div><span className="intro-smoke-tag">아는 것</span><h2>가격이 아니라<br />조건을 봅니다</h2><p>종목을 고르면 시장·경제·사건·커뮤니티에서 모은 근거로 지금 그 종목이 <b>어떤 조건 위에 서 있는지</b> 정리합니다.</p><p>숫자를 정답처럼 던지지 않고, 조건이 깨지는 신호까지 함께 보여줍니다.</p></div>
