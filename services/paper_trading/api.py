@@ -364,8 +364,9 @@ def create_world_daily_reflection(game_id: str):
 
 @paper_trading_bp.route("/scenarios/<game_id>/assessment", methods=["GET"])
 def get_event_scenario_assessment(game_id: str):
+    owner_id = _owner_id()
     game = _store().get(game_id)
-    if not game:
+    if not game or game.get("owner_id") != owner_id:
         return _not_found(game_id)
     if game.get("mode") not in ("scenario", "world"):
         raise TradingError("지원하지 않는 모의투자 게임입니다.")
@@ -377,11 +378,12 @@ def get_event_scenario_assessment(game_id: str):
 
 @paper_trading_bp.route("/scenarios/<game_id>/actions", methods=["POST"])
 def start_event_scenario_action(game_id: str):
+    owner_id = _owner_id()
     data = request.get_json(silent=True) or {}
     action = str(data.get("action") or "").strip().lower()
     root = current_app.config.get("PAPER_TRADING_DATA_DIR")
     existing = PaperGameStore(root).get(game_id)
-    if not existing:
+    if not existing or existing.get("owner_id") != owner_id:
         return _not_found(game_id)
 
     if existing.get("mode") == "world":

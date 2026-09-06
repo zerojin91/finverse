@@ -1806,6 +1806,8 @@ button:focus-visible { outline: 3px solid rgba(24,24,27,.16); outline-offset: 2p
 .journal-stored-report-tabs button.active { border-color: var(--ink); color: var(--ink); }
 .journal-stored-report-tabs button:disabled { cursor: not-allowed; opacity: .45; }
 .journal-stored-report-markdown { max-height: 620px; overflow: auto; margin: 0; padding: 14px; border-radius: 8px; color: var(--ink); background: #fafafa; white-space: pre-wrap; font-size: 12px; line-height: 1.8; }
+.journal-report-regenerate { justify-self: start; min-height: 32px; padding: 0 12px; border: 1px solid var(--ink); border-radius: 7px; color: var(--ink); background: #fff; font: inherit; font-size: 11px; font-weight: 750; cursor: pointer; }
+.journal-report-regenerate:disabled { cursor: wait; opacity: .55; }
 .paper-completed-reports-heading span,.paper-report-card header span { color: #ef4444; font-size: 8px; font-weight: 900; letter-spacing: .1em; }
 .paper-completed-reports-heading h2 { margin: 5px 0 3px; color: var(--ink); font-size: 19px; letter-spacing: -.03em; }
 .paper-completed-reports-heading p { margin: 0; color: var(--muted); font-size: 10px; }

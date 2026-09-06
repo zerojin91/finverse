@@ -1660,7 +1660,11 @@ type TwinAssessment = {
 type TwinSession = { game: TwinGameSummary; assessment: TwinAssessment };
 type TwinBar = { key: string; date: string; open: number; high: number; low: number; close: number; real: boolean };
 
-function TwinStoredReports({ reports }: { reports?: TwinGameDetail["llm_reports"] }) {
+function TwinStoredReports({ reports, regenerating, onRegenerate }: {
+  reports?: TwinGameDetail["llm_reports"];
+  regenerating?: boolean;
+  onRegenerate?: () => void;
+}) {
   const [tab, setTab] = useState<"investment" | "scenario">("investment");
   const investment = reports?.investment;
   const scenario = reports?.scenario;
@@ -1674,6 +1678,7 @@ function TwinStoredReports({ reports }: { reports?: TwinGameDetail["llm_reports"
         <button type="button" className={tab === "scenario" ? "active" : ""} disabled={!scenario} onClick={() => setTab("scenario")}>해당 시나리오</button>
       </div>
       {active?.report_markdown ? <article className="journal-stored-report-markdown">{active.report_markdown}</article> : <p className="journal-history-note">저장된 요약: {active?.summary ?? "보고서 내용을 불러오지 못했습니다."}</p>}
+      {onRegenerate && <button className="journal-report-regenerate" type="button" onClick={onRegenerate} disabled={regenerating}>{regenerating ? "새 형식 보고서를 생성 중…" : "새 형식으로 두 보고서 다시 생성"}</button>}
     </section>
   );
 }
@@ -1687,6 +1692,13 @@ const TWIN_ASSESSMENT_CAP = 8;
 
 async function fetchPaperTradingJson<T>(path: string): Promise<T> {
   const response = await fetch(`/api/paper-trading${path}`, { cache: "no-store" });
+  const payload = await response.json().catch(() => null) as { success?: boolean; data?: T; error?: string } | null;
+  if (!response.ok || !payload || payload.success === false) throw new Error(payload?.error ?? "요청을 처리하지 못했습니다.");
+  return payload.data as T;
+}
+
+async function postPaperTradingJson<T>(path: string, body: Record<string, unknown> = {}): Promise<T> {
+  const response = await fetch(`/api/paper-trading${path}`, { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const payload = await response.json().catch(() => null) as { success?: boolean; data?: T; error?: string } | null;
   if (!response.ok || !payload || payload.success === false) throw new Error(payload?.error ?? "요청을 처리하지 못했습니다.");
   return payload.data as T;
@@ -1989,6 +2001,7 @@ function TwinPage({ onRequireAuth }: { onRequireAuth?: (action: () => void) => v
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [gameDetails, setGameDetails] = useState<Record<string, TwinGameDetail | "error">>({});
   const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
+  const [regeneratingReportId, setRegeneratingReportId] = useState<string | null>(null);
   const [journalPaperTradingOpen, setJournalPaperTradingOpen] = useState(false);
   const detailRequest = useRef(0);
 
@@ -2032,6 +2045,29 @@ function TwinPage({ onRequireAuth }: { onRequireAuth?: (action: () => void) => v
       .catch(() => { if (detailRequest.current === requestId) setGameDetails((current) => ({ ...current, [gameId]: "error" })); })
       .finally(() => { if (detailRequest.current === requestId) setLoadingDetailId(null); });
   }, []);
+
+  const regenerateReports = useCallback(async (gameId: string) => {
+    setRegeneratingReportId(gameId);
+    try {
+      const job = await postPaperTradingJson<{ job_id: string }>(`/scenarios/${gameId}/actions`, { action: "report" });
+      const poll = async () => {
+        const current = await fetchPaperTradingJson<{ status?: string; error?: string }>(`/scenario-jobs/${job.job_id}`);
+        if (current.status === "completed") {
+          loadDetail(gameId);
+          setRegeneratingReportId(null);
+          return;
+        }
+        if (current.status === "failed") {
+          setRegeneratingReportId(null);
+          return;
+        }
+        window.setTimeout(() => { void poll(); }, 1400);
+      };
+      await poll();
+    } catch {
+      setRegeneratingReportId(null);
+    }
+  }, [loadDetail]);
 
   useEffect(() => {
     if (games.length === 0 || selectedGameId) return;
@@ -2203,7 +2239,7 @@ function TwinPage({ onRequireAuth }: { onRequireAuth?: (action: () => void) => v
                     </div>
                   </div>
                   <TwinCandleChart detail={selectedDetail} />
-                  <TwinStoredReports reports={selectedDetail.llm_reports} />
+                  <TwinStoredReports reports={selectedDetail.llm_reports} regenerating={regeneratingReportId === selectedDetail.game_id} onRegenerate={() => { void regenerateReports(selectedDetail.game_id); }} />
                 </>
               )}
             </div>
